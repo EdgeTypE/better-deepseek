@@ -1,5 +1,10 @@
 "use strict";
 
+/**
+ * Background service worker.
+ * Handles LaTeX compilation via latexonline.cc.
+ */
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || message.type !== "bds-compile-latex") {
     return false;
@@ -10,7 +15,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ ok: true, base64 });
     })
     .catch((error) => {
-      sendResponse({ ok: false, error: String(error && error.message ? error.message : error) });
+      sendResponse({
+        ok: false,
+        error: String(error && error.message ? error.message : error),
+      });
     });
 
   return true;
@@ -25,7 +33,9 @@ async function compileLatexToPdfBase64(source) {
   const response = await fetch(compileUrl, { method: "GET" });
 
   if (!response.ok) {
-    throw new Error(`LaTeX compile request failed with status ${response.status}.`);
+    throw new Error(
+      `LaTeX compile request failed with status ${response.status}.`
+    );
   }
 
   const arrayBuffer = await response.arrayBuffer();
@@ -38,7 +48,10 @@ function bytesToBase64(bytes) {
   const chunkSize = 0x8000;
 
   for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-    const chunk = bytes.subarray(offset, Math.min(offset + chunkSize, bytes.length));
+    const chunk = bytes.subarray(
+      offset,
+      Math.min(offset + chunkSize, bytes.length)
+    );
     binary += String.fromCharCode(...chunk);
   }
 

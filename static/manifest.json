@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "Better DeepSeek",
+  "version": "0.1.0",
+  "description": "Enhanced UX layer for chat.deepseek.com with hidden prompts, tools, memory, and long-work packaging.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://chat.deepseek.com/*",
+    "https://latexonline.cc/*",
+    "https://cdn.jsdelivr.net/*",
+    "https://pyscript.net/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://chat.deepseek.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["injected.js"],
+      "matches": ["https://chat.deepseek.com/*"]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Better DeepSeek"
+  }
+}
