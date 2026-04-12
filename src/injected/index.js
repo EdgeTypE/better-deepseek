@@ -58,7 +58,8 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
   }
 
   function isChatCompletionUrl(url) {
-    return String(url || "").includes(CHAT_COMPLETION_PATH);
+    const s = String(url || "");
+    return s.includes("/api/v0/chat/completion") || s.includes("/api/v0/chat/edit_message");
   }
 
   function emitNetworkState(status, url) {

@@ -32,7 +32,14 @@
       const currentText = extractMessageText(target);
       if (currentText) {
         const cleanText = stripInjectedBlocks(currentText);
-        const prefix = buildHiddenPrefix(cleanText, conversationId, state);
+        const historyHasPrompt = hasSystemPromptInHistory(messages, target);
+        const forceSystemPrompt = !historyHasPrompt;
+        const prefix = buildHiddenPrefix(
+          cleanText,
+          conversationId,
+          state,
+          forceSystemPrompt
+        );
         if (prefix) {
           setMessageText(target, `${prefix}
 
@@ -45,7 +52,9 @@ ${cleanText}`);
       }
     } else if (typeof payload.prompt === "string") {
       const cleanText = stripInjectedBlocks(payload.prompt);
-      const prefix = buildHiddenPrefix(cleanText, conversationId, state);
+      const isFirstMessageEdit = payload.message_id === 1 || payload.parent_message_id === null;
+      const forceSystemPrompt = isFirstMessageEdit || !state.initializedConversations.has(conversationId);
+      const prefix = buildHiddenPrefix(cleanText, conversationId, state, forceSystemPrompt);
       if (prefix) {
         payload.prompt = `${prefix}
 
@@ -129,9 +138,21 @@ ${cleanText}`;
     }
     message.content = text;
   }
-  function buildHiddenPrefix(userPrompt, conversationId, state) {
+  function hasSystemPromptInHistory(messages, excludeTarget = null) {
+    if (!Array.isArray(messages)) return false;
+    for (const msg of messages) {
+      if (msg === excludeTarget) continue;
+      const text = extractMessageText(msg);
+      if (text.includes("<BetterDeepSeek>")) {
+        return true;
+      }
+    }
+    return false;
+  }
+  function buildHiddenPrefix(userPrompt, conversationId, state, forceSystemPrompt = false) {
     const blocks = [];
-    if (!state.initializedConversations.has(conversationId) && state.config.systemPrompt.trim()) {
+    const shouldInjectSystemPrompt = (forceSystemPrompt || !state.initializedConversations.has(conversationId)) && state.config.systemPrompt.trim();
+    if (shouldInjectSystemPrompt) {
       blocks.push(
         `<BetterDeepSeek>
 ${state.config.systemPrompt.trim()}
@@ -378,7 +399,8 @@ ${skillsText}
       window.dispatchEvent(new CustomEvent(EVENTS.requestConfig));
     }
     function isChatCompletionUrl(url) {
-      return String(url || "").includes(CHAT_COMPLETION_PATH);
+      const s = String(url || "");
+      return s.includes("/api/v0/chat/completion") || s.includes("/api/v0/chat/edit_message");
     }
     function emitNetworkState(status, url) {
       window.dispatchEvent(

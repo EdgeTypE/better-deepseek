@@ -20,9 +20,22 @@ export function mutatePayload(payload, state) {
   if (messages && messages.length > 0) {
     target = findLastUserMessage(messages) || messages[messages.length - 1];
     const currentText = extractMessageText(target);
+
     if (currentText) {
       const cleanText = stripInjectedBlocks(currentText);
-      const prefix = buildHiddenPrefix(cleanText, conversationId, state);
+
+      // If we are about to check if we need to inject the system prompt,
+      // we check if it already exists in the history (excluding the target if we just cleaned it).
+      const historyHasPrompt = hasSystemPromptInHistory(messages, target);
+      const forceSystemPrompt = !historyHasPrompt;
+
+      const prefix = buildHiddenPrefix(
+        cleanText,
+        conversationId,
+        state,
+        forceSystemPrompt
+      );
+
       if (prefix) {
         setMessageText(target, `${prefix}\n\n${cleanText}`);
         changed = true;
@@ -33,7 +46,14 @@ export function mutatePayload(payload, state) {
     }
   } else if (typeof payload.prompt === "string") {
     const cleanText = stripInjectedBlocks(payload.prompt);
-    const prefix = buildHiddenPrefix(cleanText, conversationId, state);
+    
+    // For single prompt requests (like edits or standalone calls):
+    // If it's an edit of the first message (message_id === 1), we must force the system prompt
+    // because we just stripped the old one and it's essential for the conversation.
+    const isFirstMessageEdit = payload.message_id === 1 || payload.parent_message_id === null;
+    const forceSystemPrompt = isFirstMessageEdit || !state.initializedConversations.has(conversationId);
+    
+    const prefix = buildHiddenPrefix(cleanText, conversationId, state, forceSystemPrompt);
     if (prefix) {
       payload.prompt = `${prefix}\n\n${cleanText}`;
       changed = true;
@@ -158,16 +178,38 @@ export function setMessageText(message, text) {
 }
 
 /**
- * Build the hidden prefix that gets prepended to the user message.
- * Contains: system prompt (first message only), skills, and memory calls.
+ * Check if the BetterDeepSeek system prompt tag exists in any message in the history.
  */
-export function buildHiddenPrefix(userPrompt, conversationId, state) {
+export function hasSystemPromptInHistory(messages, excludeTarget = null) {
+  if (!Array.isArray(messages)) return false;
+
+  for (const msg of messages) {
+    if (msg === excludeTarget) continue;
+    const text = extractMessageText(msg);
+    if (text.includes("<BetterDeepSeek>")) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Build the hidden prefix that gets prepended to the user message.
+ * Contains: system prompt (if missing or session start), skills, and memory calls.
+ */
+export function buildHiddenPrefix(
+  userPrompt,
+  conversationId,
+  state,
+  forceSystemPrompt = false
+) {
   const blocks = [];
 
-  if (
-    !state.initializedConversations.has(conversationId) &&
-    state.config.systemPrompt.trim()
-  ) {
+  const shouldInjectSystemPrompt =
+    (forceSystemPrompt || !state.initializedConversations.has(conversationId)) &&
+    state.config.systemPrompt.trim();
+
+  if (shouldInjectSystemPrompt) {
     blocks.push(
       `<BetterDeepSeek>\n${state.config.systemPrompt.trim()}\n</BetterDeepSeek>`
     );
