@@ -27,7 +27,7 @@ export async function handleAutoWebFetch(url) {
     // Optionally create a text file with the error so DeepSeek knows it failed
     const errorBlob = new Blob([`Failed to fetch ${url}:\n\n${err.message}`], { type: "text/plain" });
     const errorFile = new File([errorBlob], `error_${url.replace(/[^a-zA-Z0-9]/g, "_")}.txt`, { type: "text/plain" });
-    injectFileAndSend(errorFile, `Web sayfası çekilemedi: ${url}`);
+    injectFileAndSend(errorFile, `<BetterDeepSeek> Web fetch failed for ${url} </BetterDeepSeek>`);
   }
 }
 

@@ -7,6 +7,7 @@ import { simpleHash } from "../lib/utils/hash.js";
 import {
   detectMessageRole,
   isLatestAssistantMessage,
+  isAbsoluteLastMessage,
 } from "./scanner.js";
 import { extractMessageRawText } from "./dom/message-text.js";
 import { parseBdsMessage } from "./parser/index.js";
@@ -151,7 +152,9 @@ export function processMessageNode(node) {
     }
 
     // --- AUTO INTERFACES ---
-    if (isSettled && parsed.autoRequests.webFetch.length > 0) {
+    // Only trigger auto-requests if this is the absolute latest message in the entire chat.
+    // This prevents redundant historical triggers on page refresh.
+    if (isSettled && parsed.autoRequests.webFetch.length > 0 && isAbsoluteLastMessage(node)) {
       if (!stateData.autoWebFetchesHandled) {
         stateData.autoWebFetchesHandled = new Set();
       }

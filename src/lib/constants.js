@@ -197,7 +197,7 @@ export const DEFAULT_SYSTEM_PROMPT = [
     "",
     "",
     "",
-    "When using <BDS:memory_write>key: value, importance: always|called</BDS:memory_write>:",
+    "When using <BDS:memory_write>key_name: value_content, importance: always|called</BDS:memory_write>:",
     "",
     "PURPOSE: Persist facts about the user across sessions so you can give",
     "more personalized, context-aware answers without the user repeating themselves.",

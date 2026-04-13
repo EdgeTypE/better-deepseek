@@ -10,6 +10,9 @@ let memoryPersistTimer = 0;
 
 /**
  * Parse a memory_write tag content.
+ * Supports both:
+ * 1. key_name: value, importance: always
+ * 2. key: key_name, value: value, importance: always
  */
 export function parseMemoryWrite(content) {
   const cleaned = String(content || "").trim();
@@ -17,22 +20,36 @@ export function parseMemoryWrite(content) {
     return null;
   }
 
-  const match = cleaned.match(
+  // Pattern 1: Explicit 'key: ..., value: ...'
+  const explicitKeyMatch = cleaned.match(/key\s*:\s*(?:"|')?([^,"']+)(?:"|')?/i);
+  const explicitValueMatch = cleaned.match(/value\s*:\s*(?:"|')?([\s\S]*?)(?:"|'|,\s*importance|$)/i);
+  const importanceMatch = cleaned.match(/importance\s*:\s*(always|called)/i);
+
+  if (explicitKeyMatch && explicitValueMatch) {
+    const key = sanitizeMemoryKey(explicitKeyMatch[1]);
+    const value = String(explicitValueMatch[1] || "").trim();
+    const importance = sanitizeMemoryImportance(
+      importanceMatch ? importanceMatch[1] : "called"
+    );
+    if (key && value) {
+      return { key, value, importance };
+    }
+  }
+
+  // Pattern 2: Standard 'key_name: value'
+  const simpleMatch = cleaned.match(
     /^([a-z0-9_]+)\s*:\s*([\s\S]*?)(?:,\s*importance\s*:\s*(always|called))?$/i
   );
-  if (!match) {
-    return null;
+  if (simpleMatch) {
+    const key = sanitizeMemoryKey(simpleMatch[1]);
+    const value = String(simpleMatch[2] || "").trim();
+    const importance = sanitizeMemoryImportance(simpleMatch[3] || "called");
+    if (key && value) {
+      return { key, value, importance };
+    }
   }
 
-  const key = sanitizeMemoryKey(match[1]);
-  const value = String(match[2] || "").trim();
-  const importance = sanitizeMemoryImportance(match[3] || "called");
-
-  if (!key || !value) {
-    return null;
-  }
-
-  return { key, value, importance };
+  return null;
 }
 
 /**

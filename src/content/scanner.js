@@ -76,6 +76,14 @@ export function detectMessageRole(node) {
 }
 
 /**
+ * Check if a node is the absolute last message in the entire chat.
+ */
+export function isAbsoluteLastMessage(node) {
+  const nodes = collectMessageNodes();
+  return nodes[nodes.length - 1] === node;
+}
+
+/**
  * Check if a node is the latest assistant message.
  */
 export function isLatestAssistantMessage(node) {
