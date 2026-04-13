@@ -7,6 +7,7 @@ import { getOrCreateHost } from "../dom/host.js";
 import { buildHtmlPreviewCard } from "./html-preview.js";
 import { buildLatexCard } from "./latex-card.js";
 import { buildPythonCard } from "./python-runner.js";
+import { buildVisualizerCard } from "./visualizer.js";
 
 /**
  * Map of tool name → renderer function.
@@ -16,6 +17,7 @@ const TOOL_RENDERERS = {
   html: (content) => buildHtmlPreviewCard(content),
   latex: (content) => buildLatexCard(content),
   run_python_embed: (content) => buildPythonCard(content),
+  visualizer: (content) => buildVisualizerCard(content),
 };
 
 /**

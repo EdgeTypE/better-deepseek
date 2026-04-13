@@ -1,0 +1,146 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 800" width="100%" height="100%">
+  <defs>
+    <style>
+      /* Main Animations */
+      .whale-container { animation: swim 14s linear infinite; }
+      .whale-body-group { animation: bob 2.5s ease-in-out infinite; }
+      .tail { animation: swish 1.2s ease-in-out infinite; transform-origin: 200px 400px; }
+      .flipper { animation: flap 1.2s ease-in-out infinite; transform-origin: 600px 485px; }
+      
+      /* Spout & Bubble Animations */
+      .drop { animation: spout 1.8s ease-out infinite; }
+      .drop:nth-child(1) { animation-delay: 0s; }
+      .drop:nth-child(2) { animation-delay: 0.6s; }
+      .drop:nth-child(3) { animation-delay: 1.2s; }
+      
+      .bubble { animation: bubble 2.5s ease-out infinite; opacity: 0; }
+      .bubble:nth-child(1) { animation-delay: 0s; }
+      .bubble:nth-child(2) { animation-delay: 0.8s; }
+      .bubble:nth-child(3) { animation-delay: 1.6s; }
+      
+      /* Background Waves */
+      .wave { animation: waveMove 4s ease-in-out infinite alternate; }
+      .wave2 { animation-duration: 5s; }
+      .wave3 { animation-duration: 6s; }
+
+      /* Keyframes */
+      @keyframes swim {
+        0% { transform: translate(100vw, 0); }
+        100% { transform: translate(-100vw, 0); }
+      }
+      @keyframes bob {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-30px); }
+      }
+      @keyframes swish {
+        0%, 100% { transform: rotate(-22deg); }
+        50% { transform: rotate(22deg); }
+      }
+      @keyframes flap {
+        0%, 100% { transform: rotate(-18deg); }
+        50% { transform: rotate(18deg); }
+      }
+      @keyframes spout {
+        0% { transform: translateY(0px) scale(0.5); opacity: 1; }
+        100% { transform: translateY(-100px) scale(1.5); opacity: 0; }
+      }
+      @keyframes bubble {
+        0% { transform: translateY(0px) scale(0.5); opacity: 0.8; }
+        100% { transform: translateY(-150px) scale(1.8); opacity: 0; }
+      }
+      @keyframes waveMove {
+        0% { transform: translateX(-40px); }
+        100% { transform: translateX(40px); }
+      }
+    </style>
+  </defs>
+
+  <!-- Subtle Background Ocean Waves -->
+  <g class="background-waves" opacity="0.08">
+    <path class="wave" d="M 0 650 Q 150 620, 300 650 T 600 650 T 900 650 T 1200 650" fill="none" stroke="white" stroke-width="4"/>
+    <path class="wave wave2" d="M 0 700 Q 200 670, 400 700 T 800 700 T 1200 700" fill="none" stroke="white" stroke-width="4"/>
+    <path class="wave wave3" d="M 0 750 Q 250 720, 500 750 T 1000 750 T 1500 750" fill="none" stroke="white" stroke-width="4"/>
+  </g>
+
+  <!-- Ambient Sparkles / Particles -->
+  <g class="sparkles" opacity="0.3">
+    <circle cx="200" cy="150" r="2.5" fill="white">
+      <animate attributeName="opacity" values="0;1;0" dur="3s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="600" cy="100" r="4" fill="white">
+      <animate attributeName="opacity" values="0;1;0" dur="4s" repeatCount="indefinite" begin="1.5s"/>
+    </circle>
+    <circle cx="850" cy="200" r="2" fill="white">
+      <animate attributeName="opacity" values="0;1;0" dur="3.5s" repeatCount="indefinite" begin="0.8s"/>
+    </circle>
+    <circle cx="100" cy="650" r="3" fill="white">
+      <animate attributeName="opacity" values="0;1;0" dur="4.5s" repeatCount="indefinite" begin="2.5s"/>
+    </circle>
+    <circle cx="900" cy="600" r="2" fill="white">
+      <animate attributeName="opacity" values="0;1;0" dur="3.2s" repeatCount="indefinite" begin="1s"/>
+    </circle>
+  </g>
+
+  <!-- Main Whale Group -->
+  <g class="whale-container">
+    <g class="whale-body-group">
+      
+      <!-- Main Whale Body -->
+      <path d="M 200 400
+               C 250 280, 550 300, 750 380
+               C 810 400, 810 460, 750 480
+               C 600 530, 300 510, 200 400 Z" 
+            fill="none" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      
+      <!-- Dorsal Fin -->
+      <path d="M 450 320 C 455 285, 475 280, 480 320" fill="none" stroke="white" stroke-width="5" stroke-linecap="round"/>
+
+      <!-- Belly Grooves (Ventral Pleats) -->
+      <path d="M 760 455 Q 650 520, 500 500" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+      <path d="M 750 465 Q 650 530, 480 505" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.4"/>
+      <path d="M 740 475 Q 650 535, 460 510" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.2"/>
+
+      <!-- Eye & Expression -->
+      <circle cx="720" cy="390" r="6" fill="white"/>
+      <path d="M 726 384 Q 732 378, 738 384" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"/>
+
+      <!-- Mouth -->
+      <path d="M 780 425 Q 750 445, 720 435" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/>
+
+      <!-- Tail Flukes -->
+      <g class="tail">
+        <path d="M 200 400
+                 C 140 330, 70 300, 40 310
+                 C 90 360, 130 380, 200 400" 
+              fill="none" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M 200 400
+                 C 140 470, 70 500, 40 490
+                 C 90 440, 130 420, 200 400" 
+              fill="none" stroke="white" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+
+      <!-- Pectoral Flipper -->
+      <g class="flipper">
+        <path d="M 600 485 C 610 560, 520 590, 500 570 C 510 530, 550 500, 600 485" 
+              fill="none" stroke="white" stroke-width="6" stroke-linecap="round"/>
+      </g>
+
+      <!-- Water Spout -->
+      <g class="spout">
+        <path d="M 750 380 Q 740 310, 710 280" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/>
+        <path d="M 755 375 Q 750 300, 740 270" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/>
+        <path d="M 760 370 Q 760 300, 760 260" fill="none" stroke="white" stroke-width="4" stroke-linecap="round"/>
+        
+        <circle class="drop" cx="710" cy="280" r="6" fill="white"/>
+        <circle class="drop" cx="740" cy="270" r="5" fill="white"/>
+        <circle class="drop" cx="760" cy="260" r="7" fill="white"/>
+      </g>
+
+      <!-- Exhaled Bubbles -->
+      <circle class="bubble" cx="710" cy="435" r="6" fill="white"/>
+      <circle class="bubble" cx="690" cy="445" r="8" fill="white"/>
+      <circle class="bubble" cx="670" cy="440" r="5" fill="white"/>
+
+    </g>
+  </g>
+</svg>

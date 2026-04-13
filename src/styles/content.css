@@ -220,10 +220,10 @@
 
 .bds-sanitized-host {
   margin-top: 8px;
-  border: 1px solid #d7e6f3;
-  border-radius: 10px;
-  background: #f8fcff;
-  color: #27425b;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
   font-size: 12px;
   line-height: 1.4;
   padding: 8px 10px;
@@ -232,12 +232,12 @@
 
 .bds-tool-card,
 .bds-download-card {
-  border: 1px solid #cad8e6;
-  border-radius: 12px;
-  background: linear-gradient(180deg, #ffffff, #f6fbff);
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: transparent;
   padding: 10px;
-  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  color: #1a3348;
+  font-family: inherit;
+  color: inherit;
 }
 
 .bds-tool-card-header {
@@ -470,4 +470,26 @@
   .bds-python-frame {
     min-height: 360px;
   }
+}
+
+.bds-visualizer-card {
+  border: 1px solid #000;
+  background: transparent;
+  box-shadow: none;
+}
+
+.bds-visualizer-card .bds-tool-card-header h4 {
+  color: #818cf8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bds-visualizer-card .bds-tool-card-header p {
+  color: #94a3b8;
+}
+
+.bds-visualizer-frame {
+  min-height: 450px;
+  background: transparent;
+  border: none;
 }

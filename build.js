@@ -11,6 +11,7 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { copyFileSync, mkdirSync, existsSync } from "fs";
+import { execSync } from "child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -19,6 +20,9 @@ const builds = [
   // ── Content Script ──
   {
     plugins: [svelte()],
+    esbuild: {
+      charset: 'ascii'
+    },
     build: {
       emptyOutDir: true,
       outDir: resolve(__dirname, "dist"),
@@ -34,7 +38,7 @@ const builds = [
         treeshake: false,
       },
       cssCodeSplit: false,
-      minify: false,
+      minify: true,
       sourcemap: false,
     },
     define: {
@@ -45,6 +49,9 @@ const builds = [
   // ── Background Service Worker ──
   {
     plugins: [],
+    esbuild: {
+      charset: 'ascii'
+    },
     build: {
       emptyOutDir: false,
       outDir: resolve(__dirname, "dist"),
@@ -57,7 +64,7 @@ const builds = [
         },
         treeshake: false,
       },
-      minify: false,
+      minify: true,
       sourcemap: false,
     },
   },
@@ -65,6 +72,9 @@ const builds = [
   // ── Injected Script (MAIN world) ──
   {
     plugins: [],
+    esbuild: {
+      charset: 'ascii'
+    },
     build: {
       emptyOutDir: false,
       outDir: resolve(__dirname, "dist"),
@@ -77,7 +87,7 @@ const builds = [
         },
         treeshake: false,
       },
-      minify: false,
+      minify: true,
       sourcemap: false,
     },
   },
@@ -97,6 +107,13 @@ async function run() {
     resolve(__dirname, "static/manifest.json"),
     resolve(distDir, "manifest.json")
   );
+  
+  console.log("\n🧹 Cleaning non-ASCII characters from bundle...");
+  try {
+    execSync("node scripts/sanitize-dist.js", { stdio: "inherit" });
+  } catch (e) {
+    console.error("Sanitization failed:", e.message);
+  }
 
   console.log("\n✅ All builds complete. Extension ready in dist/\n");
 }

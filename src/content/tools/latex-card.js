@@ -1,7 +1,3 @@
-/**
- * LaTeX tool card — compile and preview PDFs.
- */
-
 import state from "../state.js";
 import { createToolCardShell } from "./common.js";
 import {
@@ -10,14 +6,15 @@ import {
 } from "../../lib/utils/download.js";
 import { base64ToBlob } from "../../lib/utils/helpers.js";
 import { simpleHash } from "../../lib/utils/hash.js";
+import { preprocessLatex } from "../../lib/utils/latex-renderer.js";
 
 export function buildLatexCard(latexSource) {
-  const source = String(latexSource || "");
-  const card = createToolCardShell("LaTeX to PDF", "Compile and download");
+  const source = preprocessLatex(String(latexSource || ""));
+  const card = createToolCardShell("LaTeX to PDF", "Remote Compilation");
 
   const status = document.createElement("p");
   status.className = "bds-latex-status";
-  status.textContent = "Compiling PDF preview...";
+  status.textContent = "Connecting to TeX server...";
 
   const pdfFrame = document.createElement("iframe");
   pdfFrame.className = "bds-latex-pdf-frame";
@@ -31,7 +28,7 @@ export function buildLatexCard(latexSource) {
 
   const preview = document.createElement("pre");
   preview.className = "bds-latex-preview";
-  preview.textContent = source.slice(0, 4000);
+  preview.textContent = source;
 
   sourceDetails.appendChild(sourceSummary);
   sourceDetails.appendChild(preview);
@@ -46,7 +43,7 @@ export function buildLatexCard(latexSource) {
   pdfButton.addEventListener("click", async () => {
     const previousText = pdfButton.textContent;
     pdfButton.disabled = true;
-    pdfButton.textContent = "Preparing PDF...";
+    pdfButton.textContent = "Compiling PDF...";
     await downloadLatexPdf(source, `latex-${Date.now()}.pdf`);
     pdfButton.disabled = false;
     pdfButton.textContent = previousText;
@@ -57,7 +54,7 @@ export function buildLatexCard(latexSource) {
   texButton.className = "bds-btn bds-btn-secondary";
   texButton.textContent = "Download .tex";
   texButton.addEventListener("click", () => {
-    triggerTextDownload(source, `latex-${Date.now()}.tex`);
+    triggerTextDownload(latexSource, `latex-${Date.now()}.tex`);
   });
 
   actions.appendChild(pdfButton);
@@ -83,6 +80,8 @@ export function buildLatexCard(latexSource) {
 
 async function renderLatexPdfPreview(source, pdfFrame, statusNode) {
   try {
+    statusNode.textContent = "Compiling on Remote Server (TeXLive)...";
+    
     const blob = await compileLatexPdfBlob(source);
     const nextUrl = URL.createObjectURL(blob);
 
@@ -93,11 +92,12 @@ async function renderLatexPdfPreview(source, pdfFrame, statusNode) {
 
     pdfFrame.dataset.pdfUrl = nextUrl;
     pdfFrame.src = nextUrl;
-    statusNode.textContent = "PDF preview ready.";
+    statusNode.textContent = "PDF Preview Ready.";
   } catch (error) {
+    console.error("LaTeX preview failed:", error);
     statusNode.textContent =
-      "PDF preview could not be rendered. You can use Download PDF or Download .tex.";
-    pdfFrame.removeAttribute("src");
+      "Compilation failed. Standard TeX errors or server timeout. Use Download .tex to check local.";
+    pdfFrame.style.display = 'none';
   }
 }
 
@@ -120,18 +120,16 @@ export async function downloadLatexPdf(source, fileName) {
   try {
     const blob = await compileLatexPdfBlob(source);
     triggerBlobDownload(blob, fileName);
+    
     if (state.ui) {
-      state.ui.showToast("LaTeX PDF downloaded.");
+      state.ui.showToast("LaTeX PDF compiled successfully.");
     }
     return true;
   } catch (error) {
+    console.error("Download failed:", error);
     if (state.ui) {
-      state.ui.showToast("LaTeX PDF failed. Downloaded .tex fallback.");
+      state.ui.showToast("Compilation error. Check source syntax.");
     }
-    triggerTextDownload(
-      source,
-      String(fileName || "latex.pdf").replace(/\.pdf$/i, ".tex")
-    );
     return false;
   }
 }
