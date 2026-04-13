@@ -30,11 +30,20 @@ function parseNodeWithBestTextSource(node) {
 }
 
 function getNodeTextCandidates(node) {
-  const innerText = String(node.innerText || "");
-  const textContent = String(node.textContent || "");
-  const htmlDecoded = decodeNodeHtmlText(node.innerHTML || "");
+  // Instead of innerText (which fails on detached clones), 
+  // we'll filter out thinking blocks and then use textContent.
+  
+  const clone = node.cloneNode(true);
+  
+  // Remove Thinking blocks from the clone to exclude them from text extraction
+  const thinkingElements = clone.querySelectorAll('.ds-think-content, [class*="think"]');
+  thinkingElements.forEach(el => el.remove());
 
-  return [innerText, textContent, htmlDecoded].filter(
+  // decodeNodeHtmlText already uses textContent internally but handles line breaks
+  const htmlDecoded = decodeNodeHtmlText(clone.innerHTML || "");
+  const textContent = String(clone.textContent || "");
+
+  return [htmlDecoded, textContent].filter(
     (value) => value && value.trim()
   );
 }

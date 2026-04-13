@@ -1,6 +1,5 @@
 <script>
   import Drawer from "./Drawer.svelte";
-  import LongWorkOverlay from "./LongWorkOverlay.svelte";
   import ToastStack from "./ToastStack.svelte";
 
   let drawerOpen = $state(false);
@@ -12,9 +11,6 @@
 
   // ── Public API (called from non-Svelte code via mount.js) ──
 
-  export function showLongWorkOverlay(show) {
-    overlayVisible = show;
-  }
 
   export function showToast(message) {
     const id = ++toastId;
@@ -51,6 +47,5 @@
 
 <Drawer bind:this={drawerRef} open={drawerOpen} onclose={closeDrawer} />
 
-<LongWorkOverlay visible={overlayVisible} />
 
 <ToastStack {toasts} />

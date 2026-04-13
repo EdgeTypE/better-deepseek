@@ -8,7 +8,6 @@ import state from "../state.js";
 
 /**
  * @typedef {object} UiApi
- * @property {(show: boolean) => void} showLongWorkOverlay
  * @property {(message: string) => void} showToast
  * @property {() => void} refreshSettings
  * @property {() => void} refreshSkills
@@ -32,7 +31,6 @@ export function mountUi() {
 
   /** @type {UiApi} */
   const api = {
-    showLongWorkOverlay: (show) => app.showLongWorkOverlay(show),
     showToast: (message) => app.showToast(message),
     refreshSettings: () => app.refreshSettings(),
     refreshSkills: () => app.refreshSkills(),

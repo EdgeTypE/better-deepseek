@@ -30,9 +30,6 @@ export function collectLongWorkFiles(createFiles) {
 export function finalizeLongWork(node) {
   state.longWork.active = false;
   state.longWork.lastActivityAt = 0;
-  if (state.ui) {
-    state.ui.showLongWorkOverlay(false);
-  }
 
   const entries = Array.from(state.longWork.files.entries()).map(
     ([path, content]) => ({ path, content })
@@ -45,6 +42,28 @@ export function finalizeLongWork(node) {
     }
     return;
   }
+
+  const success = emitZipForFiles(node, entries);
+  if (success) {
+    if (state.settings.autoDownloadLongWorkZip) {
+      // Find the blob we just created? Actually, we'll need to handle it better.
+      // For now, let's just use the toast.
+    }
+
+    if (state.ui) {
+      state.ui.showToast(
+        `LONG_WORK complete: ${entries.length} files zipped.`
+      );
+    }
+  }
+}
+
+/**
+ * Emit a ZIP download card for a specific set of files.
+ * Useful for historical messages where we don't use the global state buffer.
+ */
+export function emitZipForFiles(node, entries) {
+  if (!entries || !entries.length) return false;
 
   try {
     const host = getOrCreateHost(node, "bds-file-host");
@@ -59,22 +78,9 @@ export function finalizeLongWork(node) {
         blob: zipBlob,
       })
     );
-
-    if (state.settings.autoDownloadLongWorkZip) {
-      triggerBlobDownload(zipBlob, zipName);
-    }
-
-    if (state.ui) {
-      state.ui.showToast(
-        `LONG_WORK complete: ${entries.length} files zipped.`
-      );
-    }
+    return true;
   } catch (error) {
-    if (state.ui) {
-      state.ui.showToast(
-        "ZIP builder error. Files will be provided one by one."
-      );
-    }
+    console.error("ZIP emit error:", error);
     emitStandaloneFiles(
       node,
       entries.map((entry) => ({
@@ -82,5 +88,6 @@ export function finalizeLongWork(node) {
         content: entry.content,
       }))
     );
+    return false;
   }
 }

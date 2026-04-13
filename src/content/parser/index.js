@@ -109,5 +109,43 @@ export function parseBdsMessage(rawText) {
   }
 
   result.visibleText = sanitizeVisibleText(text);
+
+  // UNIVERSAL INTERFACE LOCK: Detect if ANY BDS tag is currently open (not closed)
+  // This handles streaming for all tools (Visualizer, LongWork, etc.)
+  const allBdsTags = Array.from(text.matchAll(/<BDS:([A-Za-z0-9_]+)[^>]*>/gi));
+  const allBdsCloseTags = Array.from(text.matchAll(/<\/BDS:([A-Za-z0-9_]+)>/gi));
+
+  // Determine if there's an open tag that hasn't been closed yet
+  // We check if the last open tag has a corresponding close tag after it
+  let streamingTagName = null;
+  let streamingTagStartIdx = -1;
+
+  // Simple heuristic: if number of open tags > number of close tags, we are streaming
+  // Or more accurately: find the last open tag and see if there's a close tag for it later
+  for (let i = allBdsTags.length - 1; i >= 0; i--) {
+    const openTag = allBdsTags[i];
+    const tagName = openTag[1].toLowerCase();
+    
+    // Check if this specific tag name has a close tag appearing after this open tag
+    const hasClose = allBdsCloseTags.some(ct => 
+      ct[1].toLowerCase() === tagName && ct.index > openTag.index
+    );
+
+    if (!hasClose) {
+      streamingTagName = tagName;
+      streamingTagStartIdx = openTag.index;
+      break; 
+    }
+  }
+
+  result.isStreamingTool = streamingTagStartIdx !== -1;
+  result.streamingTagName = streamingTagName;
+
+  if (result.isStreamingTool) {
+    // Cut off visibility at the start of the FIRST open tool tag
+    // (In case there are multiple, though unlikely)
+    result.visibleText = sanitizeVisibleText(text.substring(0, streamingTagStartIdx));
+  }
+
   return result;
 }

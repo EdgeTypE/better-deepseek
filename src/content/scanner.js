@@ -4,7 +4,7 @@
 
 import state from "./state.js";
 import { LONG_WORK_STALE_MS } from "../lib/constants.js";
-import { processMessageNode } from "./message-processor.js";
+import { processMessageNode } from "./message-processor.svelte.js";
 import { enhanceCodeBlockDownloads } from "./files/code-blocks.js";
 
 /**

@@ -20,7 +20,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["injected.js"],
+      "resources": ["injected.js", "static/loading/*.svg"],
       "matches": ["https://chat.deepseek.com/*"]
     }
   ],

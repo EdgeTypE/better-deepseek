@@ -10,7 +10,7 @@ import { build } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import { copyFileSync, mkdirSync, existsSync } from "fs";
+import { copyFileSync, mkdirSync, existsSync, readdirSync, statSync } from "fs";
 import { execSync } from "child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -98,11 +98,32 @@ async function run() {
     await build({ ...config, configFile: false });
   }
 
-  // Copy static manifest.json to dist
+  // Copy static folder to dist
+  console.log("📂 Copying static assets...");
   const distDir = resolve(__dirname, "dist");
-  if (!existsSync(distDir)) {
-    mkdirSync(distDir, { recursive: true });
+  const staticSrc = resolve(__dirname, "static");
+  const staticDest = resolve(distDir, "static");
+  
+  function copyRecursiveSync(src, dest) {
+    if (statSync(src).isDirectory()) {
+      if (!existsSync(dest)) mkdirSync(dest, { recursive: true });
+      readdirSync(src).forEach(childItem => {
+        copyRecursiveSync(resolve(src, childItem), resolve(dest, childItem));
+      });
+    } else {
+      copyFileSync(src, dest);
+    }
   }
+
+  if (existsSync(staticSrc)) {
+    try {
+      copyRecursiveSync(staticSrc, staticDest);
+    } catch (e) {
+      console.warn("Static copy warning:", e.message);
+    }
+  }
+
+  // Copy manifest to root dist
   copyFileSync(
     resolve(__dirname, "static/manifest.json"),
     resolve(distDir, "manifest.json")
