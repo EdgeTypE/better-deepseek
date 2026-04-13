@@ -445,8 +445,8 @@
   white-space: nowrap;
 }
 
-/* Delete button — outlined red, like DeepSeek "Delete all" */
-.bds-skill-item button {
+/* Delete / Danger button — outlined red, like DeepSeek "Delete all" */
+.bds-btn-danger {
   border: 1px solid var(--bds-danger-border);
   border-radius: 7px;
   background: transparent;
@@ -459,10 +459,17 @@
   white-space: nowrap;
 }
 
-.bds-skill-item button:hover {
+.bds-btn-danger:hover {
   background: var(--bds-danger);
   color: #ffffff;
   border-color: var(--bds-danger);
+}
+
+.bds-skill-item button {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
 }
 
 /* ── Memory Items ── */
