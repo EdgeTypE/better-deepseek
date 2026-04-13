@@ -86,15 +86,21 @@ export function processMessageNode(node) {
         state.longWork.lastActivityAt = Date.now();
         collectLongWorkFiles(parsed.createFiles);
       } else if (!isGenerating && parsed.longWorkOpen) {
-        // Historical LONG_WORK: Emit zip immediately for files found in THIS single message
-        const entries = parsed.createFiles.map(f => ({
-          path: f.fileName,
-          content: f.content
-        }));
-        emitZipForFiles(node, entries);
+        // Historical LONG_WORK: Emit zip immediately if not already done
+        if (node.dataset.bdsFilesEmitted !== signature) {
+          const entries = parsed.createFiles.map(f => ({
+            path: f.fileName,
+            content: f.content
+          }));
+          emitZipForFiles(node, entries);
+          node.dataset.bdsFilesEmitted = signature;
+        }
       } else if (!state.longWork.active && !parsed.longWorkOpen) {
-        // Historical or standalone files
-        emitStandaloneFiles(node, parsed.createFiles);
+        // Historical or standalone files: Emit once per unique content hash
+        if (node.dataset.bdsFilesEmitted !== signature) {
+          emitStandaloneFiles(node, parsed.createFiles);
+          node.dataset.bdsFilesEmitted = signature;
+        }
       }
     }
 
@@ -102,9 +108,10 @@ export function processMessageNode(node) {
     const isSettled = isMessageFinished(node);
     const shouldFinalize = (parsed.longWorkClose || (isSettled && node.dataset.bdsIsLongWorkActive === "1")) && isLatestAssistant;
 
-    if (shouldFinalize && node.dataset.bdsLongWorkClosed !== "1") {
-      node.dataset.bdsLongWorkClosed = "1";
+    if (shouldFinalize && node.dataset.bdsLongWorkClosed !== signature) {
+      node.dataset.bdsLongWorkClosed = signature;
       finalizeLongWork(node);
+      node.dataset.bdsFilesEmitted = signature;
     }
 
     // TAG-DRIVEN INTERFACE LOCK:
