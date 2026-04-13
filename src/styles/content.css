@@ -1,40 +1,43 @@
-/* ── BDS Design Tokens ── */
+/* ══════════════════════════════════════════════
+   BDS Design System — DeepSeek Native Style
+   ══════════════════════════════════════════════ */
+
+/* ── Light Theme Tokens ── */
 #bds-root {
-  --bds-bg-primary: #ffffff;
-  --bds-bg-secondary: #f4f4f5;
-  --bds-bg-tertiary: #e4e4e7;
+  --bds-bg-panel: #ffffff;
+  --bds-bg-elevated: #f7f7f8;
+  --bds-bg-hover: #ececee;
   --bds-bg-input: #ffffff;
-  --bds-border: #e4e4e7;
-  --bds-border-subtle: #f4f4f5;
-  --bds-text-primary: #18181b;
-  --bds-text-secondary: #71717a;
-  --bds-text-tertiary: #a1a1aa;
-  --bds-accent: #4f8ff7;
-  --bds-accent-hover: #3b7ce3;
+  --bds-border: #e5e5e5;
+  --bds-border-hover: #d4d4d4;
+  --bds-text-primary: #0d0d0d;
+  --bds-text-secondary: #6b6b6b;
+  --bds-text-tertiary: #999999;
+  --bds-accent: #4d6bfe;
+  --bds-accent-glow: rgba(77, 107, 254, 0.12);
   --bds-danger: #ef4444;
-  --bds-danger-hover: #dc2626;
-  --bds-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
-  --bds-radius-sm: 8px;
-  --bds-radius-md: 12px;
-  --bds-radius-lg: 16px;
-  --bds-transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --bds-danger-border: rgba(239, 68, 68, 0.35);
+  --bds-shadow: 0 12px 40px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.05);
+  --bds-radius: 14px;
+  --bds-transition: 0.18s ease;
 }
 
+/* ── Dark Theme Tokens ── */
 .dark #bds-root {
-  --bds-bg-primary: #18181b;
-  --bds-bg-secondary: #27272a;
-  --bds-bg-tertiary: #3f3f46;
-  --bds-bg-input: #27272a;
-  --bds-border: #3f3f46;
-  --bds-border-subtle: #27272a;
-  --bds-text-primary: #fafafa;
-  --bds-text-secondary: #a1a1aa;
-  --bds-text-tertiary: #71717a;
-  --bds-accent: #4f8ff7;
-  --bds-accent-hover: #6ba3ff;
+  --bds-bg-panel: #1e1f23;
+  --bds-bg-elevated: #2a2b30;
+  --bds-bg-hover: #35363b;
+  --bds-bg-input: #2a2b30;
+  --bds-border: #3a3b3f;
+  --bds-border-hover: #4a4b50;
+  --bds-text-primary: #ececec;
+  --bds-text-secondary: #8e8ea0;
+  --bds-text-tertiary: #6b6b7b;
+  --bds-accent: #5b7bff;
+  --bds-accent-glow: rgba(91, 123, 255, 0.15);
   --bds-danger: #f87171;
-  --bds-danger-hover: #ef4444;
-  --bds-shadow: 0 8px 32px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.2);
+  --bds-danger-border: rgba(248, 113, 113, 0.35);
+  --bds-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
 /* ── Hidden Messages ── */
@@ -54,7 +57,7 @@
   right: 16px;
   top: 16px;
   z-index: 2147483646;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color: var(--bds-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -65,7 +68,7 @@
   font-family: inherit;
 }
 
-/* ── Toggle Button ── */
+/* ── Toggle Pill ── */
 #bds-toggle {
   border: 0;
   border-radius: 999px;
@@ -77,88 +80,85 @@
   letter-spacing: 0.3px;
   box-shadow: var(--bds-shadow);
   cursor: pointer;
-  transition: transform var(--bds-transition), background var(--bds-transition), box-shadow var(--bds-transition);
+  transition: transform var(--bds-transition), opacity var(--bds-transition);
 }
 
 #bds-toggle:hover {
-  background: var(--bds-accent-hover);
-  transform: scale(1.04);
+  opacity: 0.9;
+  transform: scale(1.03);
 }
 
 #bds-toggle:active {
   transform: scale(0.97);
 }
 
-/* ── Drawer Panel ── */
+/* ══════════════════════════════════
+   Drawer Panel
+   ══════════════════════════════════ */
 #bds-drawer {
-  width: min(92vw, 380px);
+  width: min(92vw, 400px);
   margin-top: 10px;
   border: 1px solid var(--bds-border);
-  border-radius: var(--bds-radius-lg);
-  background: var(--bds-bg-primary);
+  border-radius: var(--bds-radius);
+  background: var(--bds-bg-panel);
   box-shadow: var(--bds-shadow);
   color: var(--bds-text-primary);
-  max-height: 80vh;
-  overflow: auto;
-  padding: 20px;
+  max-height: 82vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px;
   transition: background var(--bds-transition), border-color var(--bds-transition);
 }
 
-/* Scrollbar styling */
-#bds-drawer::-webkit-scrollbar {
-  width: 6px;
-}
-
-#bds-drawer::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+#bds-drawer::-webkit-scrollbar { width: 5px; }
+#bds-drawer::-webkit-scrollbar-track { background: transparent; }
 #bds-drawer::-webkit-scrollbar-thumb {
-  background: var(--bds-bg-tertiary);
-  border-radius: 3px;
+  background: var(--bds-bg-hover);
+  border-radius: 4px;
 }
 
-#bds-drawer.bds-closed {
-  display: none;
-}
-
-#bds-drawer.bds-open {
-  display: block;
-}
+#bds-drawer.bds-closed { display: none; }
+#bds-drawer.bds-open { display: block; }
 
 /* ── Drawer Header ── */
 .bds-drawer-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--bds-border);
+  margin-bottom: 24px;
 }
 
 .bds-drawer-header h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.3px;
 }
 
+/* X close button */
 #bds-close {
-  border: 1px solid var(--bds-border);
-  border-radius: var(--bds-radius-sm);
-  background: var(--bds-bg-secondary);
-  color: var(--bds-text-secondary);
-  font-weight: 600;
-  font-size: 12px;
-  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--bds-text-tertiary);
   cursor: pointer;
+  padding: 0;
   transition: all var(--bds-transition);
 }
 
 #bds-close:hover {
-  background: var(--bds-bg-tertiary);
+  background: var(--bds-bg-elevated);
   color: var(--bds-text-primary);
+}
+
+#bds-close svg {
+  width: 18px;
+  height: 18px;
 }
 
 /* ── Section Dividers ── */
@@ -169,7 +169,19 @@
   margin: 20px 0;
 }
 
-/* ── Labels ── */
+/* ══════════════════════════════════
+   Settings Section
+   ══════════════════════════════════ */
+
+/* Section titles */
+.bds-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bds-text-primary);
+  margin: 0 0 14px;
+}
+
+/* Labels */
 .bds-label {
   display: block;
   font-size: 13px;
@@ -181,15 +193,15 @@
 /* ── System Prompt Textarea ── */
 #bds-system-prompt {
   width: 100%;
-  min-height: 140px;
+  min-height: 120px;
   resize: vertical;
-  border-radius: var(--bds-radius-md);
+  border-radius: 10px;
   border: 1px solid var(--bds-border);
   background: var(--bds-bg-input);
   color: var(--bds-text-primary);
-  padding: 12px;
+  padding: 12px 14px;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.55;
   transition: border-color var(--bds-transition), box-shadow var(--bds-transition);
   outline: none;
 }
@@ -200,66 +212,88 @@
 
 #bds-system-prompt:focus {
   border-color: var(--bds-accent);
-  box-shadow: 0 0 0 3px rgba(79, 143, 247, 0.15);
+  box-shadow: 0 0 0 3px var(--bds-accent-glow);
 }
 
-/* ── Checkboxes ── */
-.bds-check {
+/* ══════════════════════════════════
+   Toggle Switch (DeepSeek style)
+   ══════════════════════════════════ */
+.bds-toggle-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--bds-border);
+  gap: 12px;
+}
+
+.bds-toggle-row:last-of-type {
+  border-bottom: none;
+}
+
+.bds-toggle-label {
   font-size: 13px;
-  color: var(--bds-text-secondary);
-  margin-top: 10px;
-  padding: 8px 12px;
-  border-radius: var(--bds-radius-sm);
-  cursor: pointer;
-  transition: background var(--bds-transition);
+  color: var(--bds-text-primary);
   user-select: none;
+  line-height: 1.4;
+  flex: 1;
 }
 
-.bds-check:hover {
-  background: var(--bds-bg-secondary);
-}
-
-.bds-check input[type="checkbox"] {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  min-width: 18px;
-  border: 2px solid var(--bds-border);
-  border-radius: 5px;
-  background: var(--bds-bg-input);
-  cursor: pointer;
+/* The toggle switch track */
+.bds-switch {
   position: relative;
-  transition: all var(--bds-transition);
-  margin: 0;
+  width: 40px;
+  height: 22px;
+  min-width: 40px;
+  cursor: pointer;
 }
 
-.bds-check input[type="checkbox"]:checked {
+.bds-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.bds-switch .bds-switch-track {
+  position: absolute;
+  inset: 0;
+  background: var(--bds-bg-hover);
+  border-radius: 999px;
+  transition: background var(--bds-transition);
+}
+
+.bds-switch input:checked + .bds-switch-track {
   background: var(--bds-accent);
-  border-color: var(--bds-accent);
 }
 
-.bds-check input[type="checkbox"]:checked::after {
+.bds-switch .bds-switch-track::after {
   content: "";
   position: absolute;
-  left: 5px;
-  top: 2px;
-  width: 5px;
-  height: 9px;
-  border: solid #ffffff;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform var(--bds-transition);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
-/* ── Buttons ── */
+.bds-switch input:checked + .bds-switch-track::after {
+  transform: translateX(18px);
+}
+
+/* ══════════════════════════════════
+   Buttons
+   ══════════════════════════════════ */
+
+/* Primary — filled */
 #bds-save-settings {
   margin-top: 16px;
   width: 100%;
-  border: 0;
-  border-radius: var(--bds-radius-md);
+  border: none;
+  border-radius: 10px;
   background: var(--bds-accent);
   color: #ffffff;
   cursor: pointer;
@@ -270,49 +304,84 @@
 }
 
 #bds-save-settings:hover {
-  background: var(--bds-accent-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(79, 143, 247, 0.3);
+  opacity: 0.88;
 }
 
 #bds-save-settings:active {
-  transform: translateY(0);
+  transform: scale(0.98);
 }
 
+/* Outlined button (like DeepSeek "Manage" / "Export") */
+.bds-btn-outlined {
+  border: 1px solid var(--bds-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--bds-text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  transition: all var(--bds-transition);
+}
+
+.bds-btn-outlined:hover {
+  background: var(--bds-bg-elevated);
+  border-color: var(--bds-border-hover);
+}
+
+/* Generic btn */
 .bds-btn {
   border: 0;
-  border-radius: var(--bds-radius-sm);
+  border-radius: 8px;
   background: var(--bds-accent);
   color: #ffffff;
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  padding: 8px 14px;
+  padding: 7px 14px;
   transition: all var(--bds-transition);
 }
 
 .bds-btn:hover {
-  background: var(--bds-accent-hover);
+  opacity: 0.88;
 }
 
-/* ── File Upload ── */
+/* ══════════════════════════════════
+   File Upload
+   ══════════════════════════════════ */
+.bds-upload-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
 #bds-skill-upload {
-  width: 100%;
   font-size: 12px;
   color: var(--bds-text-secondary);
-  padding: 8px;
-  border: 1px dashed var(--bds-border);
-  border-radius: var(--bds-radius-sm);
-  background: var(--bds-bg-secondary);
+}
+
+#bds-skill-upload::file-selector-button {
+  border: 1px solid var(--bds-border);
+  border-radius: 8px;
+  background: var(--bds-bg-elevated);
+  color: var(--bds-text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  margin-right: 10px;
   transition: all var(--bds-transition);
 }
 
-#bds-skill-upload:hover {
-  border-color: var(--bds-accent);
-  background: var(--bds-bg-primary);
+#bds-skill-upload::file-selector-button:hover {
+  background: var(--bds-bg-hover);
+  border-color: var(--bds-border-hover);
 }
 
-/* ── Lists ── */
+/* ══════════════════════════════════
+   Lists
+   ══════════════════════════════════ */
 .bds-list {
   display: grid;
   gap: 8px;
@@ -323,25 +392,24 @@
   margin: 0;
   color: var(--bds-text-tertiary);
   font-size: 13px;
-  font-style: italic;
 }
 
 /* ── Skill Items ── */
 .bds-skill-item {
-  background: var(--bds-bg-secondary);
+  background: var(--bds-bg-elevated);
   border: 1px solid var(--bds-border);
-  border-radius: var(--bds-radius-sm);
+  border-radius: 10px;
   padding: 10px 12px;
   font-size: 13px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  transition: all var(--bds-transition);
+  gap: 10px;
+  transition: border-color var(--bds-transition);
 }
 
 .bds-skill-item:hover {
-  border-color: var(--bds-accent);
+  border-color: var(--bds-border-hover);
 }
 
 .bds-skill-item label {
@@ -350,68 +418,116 @@
   gap: 8px;
   color: var(--bds-text-primary);
   cursor: pointer;
+  flex: 1;
+  min-width: 0;
 }
 
+.bds-skill-item label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Delete button — outlined red, like DeepSeek "Delete all" */
 .bds-skill-item button {
-  border: 0;
-  border-radius: 6px;
-  background: var(--bds-danger);
-  color: #ffffff;
+  border: 1px solid var(--bds-danger-border);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--bds-danger);
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
-  padding: 5px 10px;
+  padding: 4px 10px;
   transition: all var(--bds-transition);
+  white-space: nowrap;
 }
 
 .bds-skill-item button:hover {
-  background: var(--bds-danger-hover);
+  background: var(--bds-danger);
+  color: #ffffff;
+  border-color: var(--bds-danger);
 }
 
 /* ── Memory Items ── */
 .bds-memory-item {
-  background: var(--bds-bg-secondary);
+  background: var(--bds-bg-elevated);
   border: 1px solid var(--bds-border);
-  border-radius: var(--bds-radius-sm);
-  padding: 12px;
+  border-radius: 10px;
+  padding: 12px 14px;
   font-size: 13px;
   display: grid;
   gap: 4px;
-  transition: all var(--bds-transition);
+  transition: border-color var(--bds-transition);
 }
 
 .bds-memory-item:hover {
-  border-color: var(--bds-accent);
+  border-color: var(--bds-border-hover);
 }
 
 .bds-memory-item strong {
   color: var(--bds-accent);
   font-size: 13px;
+  font-weight: 600;
 }
 
 .bds-memory-item span {
   color: var(--bds-text-primary);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .bds-memory-item em {
   color: var(--bds-text-tertiary);
   font-style: normal;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   font-size: 10px;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.6px;
 }
 
 /* ── Section Subtitles ── */
 .bds-subtitle {
-  margin: 0;
-  font-size: 13px;
+  margin: 0 0 4px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--bds-text-primary);
 }
 
-/* ── Host Wrappers (for inline content) ── */
+/* ── Skill toggle checkbox (small) ── */
+.bds-skill-item input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  border: 1.5px solid var(--bds-border);
+  border-radius: 4px;
+  background: var(--bds-bg-input);
+  cursor: pointer;
+  position: relative;
+  transition: all var(--bds-transition);
+  margin: 0;
+}
+
+.bds-skill-item input[type="checkbox"]:checked {
+  background: var(--bds-accent);
+  border-color: var(--bds-accent);
+}
+
+.bds-skill-item input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid #ffffff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* ══════════════════════════════════
+   Host Wrappers (inline content)
+   ══════════════════════════════════ */
 .bds-host-wrapper {
   margin: 10px 0 2px;
 }

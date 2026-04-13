@@ -45,18 +45,29 @@
   bind:value={systemPrompt}
 ></textarea>
 
-<label class="bds-check">
-  <input id="bds-auto-files" type="checkbox" bind:checked={autoFiles} />
-  Auto download create_file outputs
-</label>
-<label class="bds-check">
-  <input id="bds-auto-zip" type="checkbox" bind:checked={autoZip} />
-  Auto download LONG_WORK zip
-</label>
-<label class="bds-check">
-  <input id="bds-auto-latex" type="checkbox" bind:checked={autoLatex} />
-  Auto download LATEX PDF outputs
-</label>
+<div class="bds-toggle-row">
+  <span class="bds-toggle-label">Auto download create_file outputs</span>
+  <label class="bds-switch">
+    <input id="bds-auto-files" type="checkbox" bind:checked={autoFiles} />
+    <span class="bds-switch-track"></span>
+  </label>
+</div>
+
+<div class="bds-toggle-row">
+  <span class="bds-toggle-label">Auto download LONG_WORK zip</span>
+  <label class="bds-switch">
+    <input id="bds-auto-zip" type="checkbox" bind:checked={autoZip} />
+    <span class="bds-switch-track"></span>
+  </label>
+</div>
+
+<div class="bds-toggle-row">
+  <span class="bds-toggle-label">Auto download LATEX PDF outputs</span>
+  <label class="bds-switch">
+    <input id="bds-auto-latex" type="checkbox" bind:checked={autoLatex} />
+    <span class="bds-switch-track"></span>
+  </label>
+</div>
 
 <button id="bds-save-settings" type="button" onclick={save}>
   Save Settings
