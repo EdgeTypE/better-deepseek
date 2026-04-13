@@ -61,6 +61,11 @@
   color: var(--bds-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Keep children pinned to the right */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 #bds-root * {
