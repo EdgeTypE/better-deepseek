@@ -8,7 +8,8 @@ import { buildTimestamp } from "../../lib/utils/helpers.js";
 import { triggerBlobDownload } from "../../lib/utils/download.js";
 import { buildZip } from "../../lib/zip.js";
 import { getOrCreateHost } from "../dom/host.js";
-import { buildDownloadCard } from "../tools/common.js";
+import { mount } from "svelte";
+import DownloadCard from "../ui/DownloadCard.svelte";
 import { emitStandaloneFiles } from "./standalone.js";
 
 /**
@@ -74,14 +75,15 @@ export function emitZipForFiles(node, entries) {
     const zipBlob = buildZip(entries);
     const zipName = `better-deepseek-${buildTimestamp()}.zip`;
 
-    host.appendChild(
-      buildDownloadCard({
+    mount(DownloadCard, {
+      target: host,
+      props: {
         title: "LONG_WORK project",
         description: `${entries.length} files packaged`,
         fileName: zipName,
         blob: zipBlob,
-      })
-    );
+      }
+    });
     return true;
   } catch (error) {
     console.error("ZIP emit error:", error);

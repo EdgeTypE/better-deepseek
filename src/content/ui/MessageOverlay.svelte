@@ -70,14 +70,5 @@ import VisualizerCard from "./VisualizerCard.svelte";
     color: #ececec;
   }
 
-  .bds-fallback-card {
-    border: 1px solid #ccc;
-    padding: 10px;
-    border-radius: 4px;
-  }
 
-  .bds-fallback-card pre {
-    font-size: 12px;
-    overflow-x: auto;
-  }
 </style>

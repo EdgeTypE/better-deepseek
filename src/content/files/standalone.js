@@ -12,7 +12,8 @@ import {
 import { triggerBlobDownload } from "../../lib/utils/download.js";
 import { buildZip } from "../../lib/zip.js";
 import { getOrCreateHost } from "../dom/host.js";
-import { buildDownloadCard } from "../tools/common.js";
+import { mount } from "svelte";
+import DownloadCard from "../ui/DownloadCard.svelte";
 
 /**
  * Emit standalone file download cards for create_file entries.
@@ -52,14 +53,15 @@ export function emitStandaloneFiles(node, createFiles) {
       downloadName = normalizedPath;
     }
 
-    const card = buildDownloadCard({
-      title: cardTitle,
-      description,
-      fileName: downloadName,
-      blob,
+    mount(DownloadCard, {
+      target: host,
+      props: {
+        title: cardTitle,
+        description,
+        fileName: downloadName,
+        blob,
+      }
     });
-
-    host.appendChild(card);
 
     if (state.settings.autoDownloadFiles) {
       triggerBlobDownload(blob, downloadName);
