@@ -14,6 +14,7 @@ import { upsertMemories } from "./parser/memory-parser.js";
 import { collectLongWorkFiles, finalizeLongWork, emitZipForFiles } from "./files/long-work.js";
 import { emitStandaloneFiles } from "./files/standalone.js";
 import { getOrCreateHost } from "./dom/host.js";
+import { handleAutoWebFetch } from "./auto.js";
 
 import { mount, unmount } from "svelte";
 import MessageOverlay from "./ui/MessageOverlay.svelte";
@@ -47,7 +48,9 @@ export function processMessageNode(node) {
   const isLatestAssistant =
     role === "assistant" && isLatestAssistantMessage(node);
 
-  const signature = simpleHash(rawText);
+  const isSettled = isMessageFinished(node);
+  // Include settlement state in hash so transition to 'finished' triggers a final re-parse
+  const signature = simpleHash(rawText + (isSettled ? ":settled" : ":streaming"));
   const stateData = getNodeState(node);
 
   // OPTIMIZATION: If hash matches, we still need to ENSURE visibility is correct
@@ -111,9 +114,7 @@ export function processMessageNode(node) {
       }
     }
 
-    // --- FINALIZATION ---
     // ZIP emission happens ONLY here, via a single controlled path.
-    const isSettled = isMessageFinished(node);
     const shouldFinalize =
       // LIVE: explicit close tag on latest assistant
       (parsed.longWorkClose && isLatestAssistant) ||
@@ -139,6 +140,19 @@ export function processMessageNode(node) {
         }
       }
       stateData.filesEmitted = true;
+    }
+
+    // --- AUTO INTERFACES ---
+    if (isSettled && parsed.autoRequests.webFetch.length > 0) {
+      if (!stateData.autoWebFetchesHandled) {
+        stateData.autoWebFetchesHandled = new Set();
+      }
+      for (const url of parsed.autoRequests.webFetch) {
+        if (!stateData.autoWebFetchesHandled.has(url)) {
+          stateData.autoWebFetchesHandled.add(url);
+          handleAutoWebFetch(url);
+        }
+      }
     }
 
     // TAG-DRIVEN INTERFACE LOCK
@@ -218,12 +232,18 @@ function isSystemGenerating() {
  * Settled messages have action buttons (Copy, Regenerate, etc.).
  */
 function isMessageFinished(node) {
-  const hasActionButtons = !!node.querySelector('.ds-icon-copy, .ds-icon-regenerate, .ds-icon-share');
   const hasCursor = !!node.querySelector('.ds-cursor');
   const isCurrentlyStreamingClass = node.classList.contains('_streaming');
   
-  // If it has action buttons and NO cursor, it's definitely finished.
-  return hasActionButtons && !hasCursor && !isCurrentlyStreamingClass;
+  // If the system is no longer generating and no cursor is present, it's done.
+  // We also check for common footer buttons as a backup.
+  const hasFooterButtons = !!node.querySelector('div[role="button"] svg, .ds-icon-copy, .ds-icon-regenerate, .ds-icon-share');
+  
+  if (!isSystemGenerating() && !hasCursor && !isCurrentlyStreamingClass) {
+    return true;
+  }
+
+  return hasFooterButtons && !hasCursor && !isCurrentlyStreamingClass;
 }
 
 /**

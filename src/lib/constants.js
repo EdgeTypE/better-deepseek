@@ -13,7 +13,7 @@ export const BRIDGE_EVENTS = {
 };
 
 // ── Versioning ──
-export const SYSTEM_PROMPT_TEMPLATE_VERSION = 4;
+export const SYSTEM_PROMPT_TEMPLATE_VERSION = 5;
 export const DOWNLOAD_BEHAVIOR_VERSION = 2;
 export const LONG_WORK_STALE_MS = 30000;
 
@@ -51,6 +51,14 @@ export const DEFAULT_SYSTEM_PROMPT = [
     "3. Python Runner: <BDS:run_python_embed>your python code</BDS:run_python_embed>",
     "4. File Creator: <BDS:create_file fileName=\"path/to/file.ext\">content</BDS:create_file>",
     "5. Visualizer: <BDS:VISUALIZER>your html/svg simulation code</BDS:VISUALIZER>",
+    "6. Web Fetch: <BDS:AUTO:REQUEST_WEB_FETCH>url</BDS:AUTO:REQUEST_WEB_FETCH>",
+    "",
+    "When using <BDS:AUTO:REQUEST_WEB_FETCH>url</BDS:AUTO:REQUEST_WEB_FETCH>:",
+    "- Instructs the Better DeepSeek extension to automatically fetch a web page.",
+    "- The url is the full website address you want to read.",
+    "- Output this tag when you need external context to answer the user.",
+    "- The extension will immediately load the site, clean its HTML into markdown, upload it to the chat, and prompt you to continue.",
+    "- Only provide this tag as your full response. Do not explain you are doing it, the system will read the tag seamlessly.",
     "",
     "If you're explaining a detailed workflow to a user, create a Mermaid diagram. You have a built-in Mermaid viewer.",
     "When using <BDS:HTML>...</BDS:HTML>:",

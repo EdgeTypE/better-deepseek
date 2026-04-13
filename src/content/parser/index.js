@@ -31,6 +31,9 @@ export function parseBdsMessage(rawText) {
     renderableBlocks: [],
     createFiles: [],
     memoryWrites: [],
+    autoRequests: {
+      webFetch: []
+    },
     visibleText: text,
   };
 
@@ -38,7 +41,10 @@ export function parseBdsMessage(rawText) {
     return result;
   }
 
-  result.containsControlTags = true;
+  // We have BDS tags, but do we have tags that should HIDE the original message?
+  // AUTO tags should NOT hide the message.
+  const hasHidingTags = /(<BDS:(?!AUTO)[a-zA-Z0-9_]+|<BetterDeepSeek>|Bds create file>)/i.test(text);
+  result.containsControlTags = hasHidingTags;
   result.longWorkOpen = /<BDS:LONG_WORK>/i.test(text);
   result.longWorkClose = /<\/BDS:LONG_WORK>/i.test(text);
 
@@ -80,6 +86,14 @@ export function parseBdsMessage(rawText) {
         result.memoryWrites.push(parsedMemory);
       }
     }
+  }
+
+  const autoWebFetchRegex = /<BDS:AUTO:REQUEST_WEB_FETCH>([\s\S]*?)<\/BDS:AUTO:REQUEST_WEB_FETCH>/gi;
+  while ((match = autoWebFetchRegex.exec(text)) !== null) {
+     const cleanUrl = String(match[1] || "").trim();
+     if (cleanUrl) {
+       result.autoRequests.webFetch.push(cleanUrl);
+     }
   }
 
   const selfClosingCreateRegex = /<BDS:create_file([^>]*)\/>/gi;
@@ -126,6 +140,10 @@ export function parseBdsMessage(rawText) {
     const openTag = allBdsTags[i];
     const tagName = openTag[1].toLowerCase();
     
+    // EXCEPTION: AUTO tags are background instructions/requests, 
+    // they should never trigger the UI's "Working..." overlay.
+    if (tagName.startsWith("auto")) continue;
+
     // Check if this specific tag name has a close tag appearing after this open tag
     const hasClose = allBdsCloseTags.some(ct => 
       ct[1].toLowerCase() === tagName && ct.index > openTag.index
