@@ -67,6 +67,10 @@ export function emitZipForFiles(node, entries) {
 
   try {
     const host = getOrCreateHost(node, "bds-file-host");
+    
+    // Clear any previously emitted ZIP cards for this node to make this idempotent
+    host.innerHTML = '';
+    
     const zipBlob = buildZip(entries);
     const zipName = `better-deepseek-${buildTimestamp()}.zip`;
 

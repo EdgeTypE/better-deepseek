@@ -19,6 +19,16 @@ import { mount, unmount } from "svelte";
 import MessageOverlay from "./ui/MessageOverlay.svelte";
 
 const messageOverlays = new Map();
+const nodeStates = new WeakMap();
+
+function getNodeState(node) {
+  let s = nodeStates.get(node);
+  if (!s) {
+    s = {};
+    nodeStates.set(node, s);
+  }
+  return s;
+}
 
 /**
  * Process a single message node — the main per-node logic.
@@ -38,15 +48,17 @@ export function processMessageNode(node) {
     role === "assistant" && isLatestAssistantMessage(node);
 
   const signature = simpleHash(rawText);
+  const stateData = getNodeState(node);
+
   // OPTIMIZATION: If hash matches, we still need to ENSURE visibility is correct
   // but we can skip the expensive parsing and collections.
-  if (node.dataset.bdsHash === signature) {
+  if (stateData.hash === signature) {
     if (role === "assistant") {
-      syncVisibilityState(node, isLatestAssistant);
+      syncVisibilityState(node, isLatestAssistant, stateData);
     }
     return;
   }
-  node.dataset.bdsHash = signature;
+  stateData.hash = signature;
 
   const parsed = parseBdsMessage(rawText);
   const hasActionableFiles = parsed.createFiles.length > 0;
@@ -59,77 +71,88 @@ export function processMessageNode(node) {
     }
   }
 
-  const shouldStartLongWork =
-    parsed.longWorkOpen && parsed.createFiles.length > 0 && isLatestAssistant;
-
   // Check if we already have an overlay for this node
   const existing = messageOverlays.get(node);
-  // We'll handle cleanup/update later in the role-specific block
-
 
   if (parsed.memoryWrites.length) {
     upsertMemories(parsed.memoryWrites);
   }
 
   if (role === "assistant") {
-    // Store parsing result for syncVisibilityState
-    node.dataset.bdsIsStreamingTool = parsed.isStreamingTool ? "1" : "0";
-    node.dataset.bdsIsLongWorkActive = (state.longWork.active && !parsed.longWorkClose) ? "1" : "0";
-    node.dataset.bdsHasControlTags = parsed.containsControlTags ? "1" : "0";
+    // Store parsing result for syncVisibilityState in WeakMap
+    stateData.isStreamingTool = parsed.isStreamingTool;
+    stateData.isLongWorkActive = state.longWork.active && !parsed.longWorkClose;
+    stateData.hasControlTags = parsed.containsControlTags;
 
-    syncVisibilityState(node, isLatestAssistant);
+    syncVisibilityState(node, isLatestAssistant, stateData);
 
     const isGenerating = !!node.querySelector('.ds-cursor, ._streaming') || (isLatestAssistant && isSystemGenerating());
 
+    // --- FILE COLLECTION ---
+    // During LONG_WORK: ALWAYS buffer files. NEVER emit ZIP here.
+    // ZIP emission happens ONLY at finalization below.
     if (parsed.createFiles.length > 0) {
-      if ((state.longWork.active || parsed.longWorkOpen) && isGenerating) {
-        state.longWork.lastActivityAt = Date.now();
-        collectLongWorkFiles(parsed.createFiles);
-      } else if (!isGenerating && parsed.longWorkOpen) {
-        // Historical LONG_WORK: Emit zip immediately if not already done
-        if (node.dataset.bdsFilesEmitted !== signature) {
-          const entries = parsed.createFiles.map(f => ({
-            path: f.fileName,
-            content: f.content
-          }));
-          emitZipForFiles(node, entries);
-          node.dataset.bdsFilesEmitted = signature;
+      const inLongWorkContext = state.longWork.active || parsed.longWorkOpen;
+
+      if (inLongWorkContext) {
+        if (isLatestAssistant) {
+          // LIVE session: buffer files into global state for finalizeLongWork
+          collectLongWorkFiles(parsed.createFiles);
+          if (isGenerating) {
+            state.longWork.lastActivityAt = Date.now();
+          }
         }
-      } else if (!state.longWork.active && !parsed.longWorkOpen) {
-        // Historical or standalone files: Emit once per unique content hash
-        if (node.dataset.bdsFilesEmitted !== signature) {
-          emitStandaloneFiles(node, parsed.createFiles);
-          node.dataset.bdsFilesEmitted = signature;
-        }
+        // Historical (non-latest) messages: files stay in parsed.createFiles
+        // and will be emitted directly at finalization below.
+      } else if (!stateData.filesEmitted) {
+        // Standalone files (no LONG_WORK context)
+        emitStandaloneFiles(node, parsed.createFiles);
+        stateData.filesEmitted = true;
       }
     }
 
-    // Only finalize if we see the close tag OR the message is truly settled (has buttons, no cursor)
+    // --- FINALIZATION ---
+    // ZIP emission happens ONLY here, via a single controlled path.
     const isSettled = isMessageFinished(node);
-    const shouldFinalize = (parsed.longWorkClose || (isSettled && node.dataset.bdsIsLongWorkActive === "1")) && isLatestAssistant;
+    const shouldFinalize =
+      // LIVE: explicit close tag on latest assistant
+      (parsed.longWorkClose && isLatestAssistant) ||
+      // LIVE: message settled while longWork was active (fallback if close tag missed)
+      (isSettled && stateData.isLongWorkActive && isLatestAssistant) ||
+      // HISTORICAL: complete LONG_WORK block in a finished, non-latest message
+      (parsed.longWorkOpen && parsed.longWorkClose && !isGenerating && !isLatestAssistant);
 
-    if (shouldFinalize && node.dataset.bdsLongWorkClosed !== signature) {
-      node.dataset.bdsLongWorkClosed = signature;
-      finalizeLongWork(node);
-      node.dataset.bdsFilesEmitted = signature;
+    if (shouldFinalize && !stateData.longWorkClosed) {
+      stateData.longWorkClosed = true;
+
+      if (isLatestAssistant) {
+        // Live finalization: use the global buffer
+        finalizeLongWork(node);
+      } else {
+        // Historical finalization: emit directly from this message's parsed files
+        const entries = parsed.createFiles.map(f => ({
+          path: f.fileName,
+          content: f.content
+        }));
+        if (entries.length > 0) {
+          emitZipForFiles(node, entries);
+        }
+      }
+      stateData.filesEmitted = true;
     }
 
-    // TAG-DRIVEN INTERFACE LOCK:
-    // We are "Loading" if:
-    // 1. The parser detected an unclosed BDS tag (parsed.isStreamingTool).
-    // 2. We are in an active LONG_WORK session and haven't seen the close tag yet.
-    // 3. FALLBACK: It's the latest message and it's still generating (handles Thinking phase).
+    // TAG-DRIVEN INTERFACE LOCK
     const isCurrentlyLoading = parsed.isStreamingTool || 
-                               (node.dataset.bdsIsLongWorkActive === "1") || 
+                               stateData.isLongWorkActive || 
                                (isLatestAssistant && isGenerating && !isSettled);
     const hasTags = parsed.containsControlTags || isCurrentlyLoading;
 
     if (hasTags) {
       // Ensure a stable loading index for this message
-      if (!node.dataset.bdsLoadingIndex) {
-        node.dataset.bdsLoadingIndex = Math.floor(Math.random() * 3) + 1;
+      if (!stateData.loadingIndex) {
+        stateData.loadingIndex = Math.floor(Math.random() * 3) + 1;
       }
-      const loadingIndex = parseInt(node.dataset.bdsLoadingIndex, 10);
+      const loadingIndex = stateData.loadingIndex;
       
       const newText = isCurrentlyLoading ? (parsed.visibleText || "") : parsed.visibleText;
       const newBlocks = isCurrentlyLoading ? [] : parsed.renderableBlocks;
@@ -160,16 +183,16 @@ export function processMessageNode(node) {
         messageOverlays.set(node, { component, props });
       }
 
-      node.dataset.bdsHiddenByTags = "1";
+      stateData.hiddenByTags = true;
       node.classList.add("bds-hidden-message");
-    } else if (node.dataset.bdsHiddenByTags === "1") {
+    } else if (stateData.hiddenByTags) {
       // Cleanup if tags were removed
       if (existing) {
         unmount(existing.component);
         messageOverlays.delete(node);
       }
       
-      delete node.dataset.bdsHiddenByTags;
+      stateData.hiddenByTags = false;
       node.classList.remove("bds-hidden-message");
       
       const wrapper = node.nextElementSibling;
@@ -207,20 +230,17 @@ function isMessageFinished(node) {
  * Sync the visibility of the message node based on stored state.
  * Called on every scan to ensure DeepSeek doesn't strip the hidden class.
  */
-function syncVisibilityState(node, isLatestAssistant) {
-  const isStreamingTool = node.dataset.bdsIsStreamingTool === "1";
-  const isLongWork = node.dataset.bdsIsLongWorkActive === "1";
-  const hasControlTags = node.dataset.bdsHasControlTags === "1";
-  
+function syncVisibilityState(node, isLatestAssistant, stateData) {
   // IF IT HAS ANY BDS CONTENT, HIDE THE ORIGINAL MARKDOWN PERMANENTLY.
   // The overlay will display the sanitized content. 
   // We hide regardless of whether it is currently generating to prevent leakage in history.
-  if (isStreamingTool || isLongWork || hasControlTags) {
+  if (stateData.isStreamingTool || stateData.isLongWorkActive || stateData.hasControlTags) {
     hideMessageNode(node, true);
   } else {
     hideMessageNode(node, false);
   }
 }
+
 
 /**
  * Show or hide a message node's content area using CSS classes.
