@@ -27,7 +27,16 @@ export function mutatePayload(payload, state) {
       // If we are about to check if we need to inject the system prompt,
       // we check if it already exists in the history (excluding the target if we just cleaned it).
       const historyHasPrompt = hasSystemPromptInHistory(messages, target);
-      const forceSystemPrompt = !historyHasPrompt;
+      let forceSystemPrompt = !historyHasPrompt;
+
+      // DO NOT inject system prompt or skills mid-conversation in existing chats!
+      // If messages.length > 1, the server already has the primary context.
+      if (messages.length > 1) {
+        forceSystemPrompt = false;
+      } else if (state.hasInjected && state.hasInjected(conversationId)) {
+        // Fallback for length == 1 (e.g., F5 then sending first message)
+        forceSystemPrompt = false;
+      }
 
       const prefix = buildHiddenPrefix(
         cleanText,
@@ -50,10 +59,10 @@ export function mutatePayload(payload, state) {
     const cleanText = stripInjectedBlocks(payload.prompt);
     
     // For single prompt requests (like edits or standalone calls):
-    // If it's an edit of the first message (message_id === 1), we must force the system prompt
-    // because we just stripped the old one and it's essential for the conversation.
-    const isFirstMessageEdit = payload.message_id === 1 || payload.parent_message_id === null;
-    const forceSystemPrompt = isFirstMessageEdit || !state.initializedConversations.has(conversationId);
+    // If it's an edit of the first message, we force injection.
+    // If it's a subsequent message, the server already has the context.
+    const isFirstMessageEdit = payload.message_id === 1 || payload.parent_message_id == null;
+    const forceSystemPrompt = isFirstMessageEdit;
     
     const prefix = buildHiddenPrefix(cleanText, conversationId, state, forceSystemPrompt, null, null);
     if (prefix) {
@@ -210,19 +219,23 @@ export function buildHiddenPrefix(
   const blocks = [];
 
   const shouldInjectSystemPrompt =
-    (forceSystemPrompt || !state.initializedConversations.has(conversationId)) &&
-    state.config.systemPrompt.trim();
+    forceSystemPrompt && state.config.systemPrompt.trim();
 
   if (shouldInjectSystemPrompt) {
     blocks.push(
       `<BetterDeepSeek>\n${state.config.systemPrompt.trim()}\n</BetterDeepSeek>`
     );
-    state.initializedConversations.add(conversationId);
+    if (state.markInjected) {
+      state.markInjected(conversationId);
+    }
   }
 
-  const skillsBlock = buildSkillsBlock(state);
-  if (skillsBlock) {
-    blocks.push(skillsBlock);
+  // Only inject static skills on the first turn to prevent context bloat on every message
+  if (forceSystemPrompt) {
+    const skillsBlock = buildSkillsBlock(state);
+    if (skillsBlock) {
+      blocks.push(skillsBlock);
+    }
   }
 
   const memoryBlock = buildMemoryCallsBlock(userPrompt, state);
@@ -232,13 +245,27 @@ export function buildHiddenPrefix(
 
   const activeChar = state.config.activeCharacter;
   if (activeChar) {
-    const lastCharName = messages ? getLastCharacterInHistory(messages, excludeTarget) : null;
+    let lastCharName = messages ? getLastCharacterInHistory(messages, excludeTarget) : null;
+    
+    // Fail-safe lookup from persistent state if not found in history
+    if (!lastCharName && state.getLastChar) {
+      lastCharName = state.getLastChar(conversationId);
+    }
+
+    // In-memory cache fallback for the transition from "default" to the real unique ID
+    if (!lastCharName && state.currentSessionChar && messages?.length > 1) {
+      lastCharName = state.currentSessionChar;
+    }
     
     // Only inject if it's the first persona in this context OR the character has changed
     if (!lastCharName || lastCharName !== activeChar.name) {
       const characterBlock = buildCharacterBlock(state);
       if (characterBlock) {
         blocks.push(characterBlock);
+        if (state.setLastChar) {
+          state.setLastChar(conversationId, activeChar.name);
+        }
+        state.currentSessionChar = activeChar.name;
       }
     }
   }

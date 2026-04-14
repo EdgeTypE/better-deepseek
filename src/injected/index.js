@@ -22,6 +22,28 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
 
   const CHAT_COMPLETION_PATH = "/api/v0/chat/completion";
 
+  function getInjectedChats() {
+    try { return JSON.parse(localStorage.getItem('bds_injected_chats') || '[]'); } catch { return []; }
+  }
+  function addInjectedChat(id) {
+    const chats = getInjectedChats();
+    if (!chats.includes(id)) {
+      chats.push(id);
+      if (chats.length > 50) chats.shift();
+      localStorage.setItem('bds_injected_chats', JSON.stringify(chats));
+    }
+  }
+  function getInjectedCharacters() {
+    try { return JSON.parse(localStorage.getItem('bds_injected_chars') || '{}'); } catch { return {}; }
+  }
+  function setInjectedCharacter(id, name) {
+    const chars = getInjectedCharacters();
+    chars[id] = name;
+    const keys = Object.keys(chars);
+    if (keys.length > 50) delete chars[keys[0]];
+    localStorage.setItem('bds_injected_chars', JSON.stringify(chars));
+  }
+
   const state = {
     config: {
       systemPrompt: "",
@@ -29,7 +51,11 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
       memories: [],
       activeCharacter: null,
     },
-    initializedConversations: new Set(),
+    hasInjected: (id) => getInjectedChats().includes(id),
+    markInjected: (id) => addInjectedChat(id),
+    getLastChar: (id) => getInjectedCharacters()[id] || null,
+    setLastChar: (id, name) => setInjectedCharacter(id, name),
+    currentSessionChar: null, // memory cache for default ID transition
     activeCompletionRequests: 0,
   };
 
