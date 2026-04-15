@@ -20,6 +20,7 @@
     "jspdf": "^4.2.1",
     "latex.js": "^0.12.6",
     "pptxgenjs": "^4.0.1",
-    "turndown": "^7.2.4"
+    "turndown": "^7.2.4",
+    "xlsx": "^0.18.5"
   }
 }

@@ -4,6 +4,12 @@
  */
 
 import PptxGenJS from "pptxgenjs";
+import * as XLSX from "xlsx";
+
+// Attach to window so AI can access them globally or via window.Library
+window.PptxGenJS = PptxGenJS;
+window.pptxgen = PptxGenJS; // Alias often used
+window.XLSX = XLSX;
 
 console.log("BDS Sandbox: Initialized");
 
@@ -11,7 +17,7 @@ window.addEventListener("message", async (event) => {
   const { type, code, id } = event.data;
 
   if (type === "GEN_PPTX") {
-    console.log("BDS Sandbox: Received generation request", id);
+    console.log("BDS Sandbox: Received PPTX generation request", id);
     try {
       // Intercept writeFile to capture the promise
       const originalWriteFile = PptxGenJS.prototype.writeFile;
@@ -23,27 +29,60 @@ window.addEventListener("message", async (event) => {
         return generationPromise;
       };
 
-      // Execute the AI code
-      const func = new Function("PptxGenJS", "pptxgen", code);
-      await func(PptxGenJS, PptxGenJS);
+      // Execute the AI code. 
+      // We don't pass 'PptxGenJS' as a parameter name to avoid "Identifier already declared" 
+      // if the AI does 'const PptxGenJS = ...'. It will find it on the window.
+      const func = new Function(code);
+      await func();
       
-      // Important: The AI code might not await the writeFile call.
-      // We must check if it was called and await the resulting promise.
       if (generationPromise) {
-        console.log("BDS Sandbox: Awaiting file generation...");
         const capturedBase64 = await generationPromise;
         window.parent.postMessage({ type: "PPTX_RESULT", base64: capturedBase64, id }, "*");
-        console.log("BDS Sandbox: Success, sent result to parent");
       } else {
         throw new Error("No PPTX data was generated. Did the script call pptx.writeFile()?");
       }
 
-      // Restore prototype just in case of reuse
       PptxGenJS.prototype.writeFile = originalWriteFile;
-
     } catch (err) {
-      console.error("BDS Sandbox Error:", err);
+      console.error("BDS Sandbox Error (PPTX):", err);
       window.parent.postMessage({ type: "PPTX_ERROR", error: err.message, id }, "*");
+    }
+  }
+
+  if (type === "GEN_EXCEL") {
+    console.log("BDS Sandbox: Received Excel generation request", id);
+    try {
+      let capturedBase64 = null;
+
+      // Create a wrapper for XLSX to intercept writeFile
+      const XLSX_WRAPPER = {
+        ...XLSX,
+        writeFile: (wb, filename, opts) => {
+          console.log("BDS Sandbox: XLSX.writeFile() intercepted");
+          capturedBase64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx', ...opts });
+        }
+      };
+
+      // Temporarily override global XLSX for this execution
+      const originalGlobalXLSX = window.XLSX;
+      window.XLSX = XLSX_WRAPPER;
+
+      // Execute the AI code. 
+      // No parameter name collision possible here.
+      const func = new Function(code);
+      await func();
+
+      if (capturedBase64) {
+        window.parent.postMessage({ type: "EXCEL_RESULT", base64: capturedBase64, id }, "*");
+      } else {
+        throw new Error("No Excel data was generated. Did the script call XLSX.writeFile()?");
+      }
+
+      // Restore
+      window.XLSX = originalGlobalXLSX;
+    } catch (err) {
+      console.error("BDS Sandbox Error (Excel):", err);
+      window.parent.postMessage({ type: "EXCEL_ERROR", error: err.message, id }, "*");
     }
   }
 });

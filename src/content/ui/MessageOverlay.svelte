@@ -2,6 +2,7 @@
 import VisualizerCard from "./VisualizerCard.svelte";
   import ToolCard from "./ToolCard.svelte";
   import PptxCard from "./PptxCard.svelte";
+  import ExcelCard from "./ExcelCard.svelte";
   import LoadingIndicator from "./LoadingIndicator.svelte";
 
   /** 
@@ -34,6 +35,8 @@ import VisualizerCard from "./VisualizerCard.svelte";
         <VisualizerCard content={block.content} />
       {:else if block.name === 'pptx'}
         <PptxCard content={block.content} />
+      {:else if block.name === 'excel'}
+        <ExcelCard content={block.content} />
       {:else}
         <ToolCard name={block.name} content={block.content} />
       {/if}
