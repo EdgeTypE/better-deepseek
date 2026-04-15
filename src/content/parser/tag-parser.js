@@ -34,7 +34,8 @@ export function normalizeTaggedCodeContent(content, tagName) {
     name === "run_python_embed" ||
     name === "html" ||
     name === "latex" ||
-    name === "visualizer"
+    name === "visualizer" ||
+    name === "docx"
   ) {
     output = unwrapMarkdownCodeFence(output);
   }

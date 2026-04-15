@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
+    "docx": "^9.6.1",
     "fflate": "^0.8.2",
     "html2canvas": "^1.4.1",
     "ignore": "^7.0.5",

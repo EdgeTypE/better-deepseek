@@ -5,13 +5,26 @@
 
 import PptxGenJS from "pptxgenjs";
 import * as XLSX from "xlsx";
+import * as docx from "docx";
 
 // Attach to window so AI can access them globally or via window.Library
 window.PptxGenJS = PptxGenJS;
 window.pptxgen = PptxGenJS; // Alias often used
 window.XLSX = XLSX;
+window.docx = docx;
+window.DOCX = docx; // Common naming convention
+
+// Expose all docx exports as globals for easier AI access
+Object.keys(docx).forEach(key => {
+  if (!(key in window)) {
+    window[key] = docx[key];
+  }
+});
 
 console.log("BDS Sandbox: Initialized");
+
+// Helper for executing AI code which might contain 'await'
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 window.addEventListener("message", async (event) => {
   const { type, code, id } = event.data;
@@ -30,9 +43,7 @@ window.addEventListener("message", async (event) => {
       };
 
       // Execute the AI code. 
-      // We don't pass 'PptxGenJS' as a parameter name to avoid "Identifier already declared" 
-      // if the AI does 'const PptxGenJS = ...'. It will find it on the window.
-      const func = new Function(code);
+      const func = new AsyncFunction(code);
       await func();
       
       if (generationPromise) {
@@ -67,9 +78,7 @@ window.addEventListener("message", async (event) => {
       const originalGlobalXLSX = window.XLSX;
       window.XLSX = XLSX_WRAPPER;
 
-      // Execute the AI code. 
-      // No parameter name collision possible here.
-      const func = new Function(code);
+      const func = new AsyncFunction(code);
       await func();
 
       if (capturedBase64) {
@@ -85,4 +94,61 @@ window.addEventListener("message", async (event) => {
       window.parent.postMessage({ type: "EXCEL_ERROR", error: err.message, id }, "*");
     }
   }
+
+  if (type === "GEN_DOCX") {
+    console.log("BDS Sandbox: Received DOCX generation request", id);
+    try {
+      let generationPromise = null;
+
+      // Create a wrapper for docx to provide a simple save() method and intercept Packer
+      const DOCX_WRAPPER = {
+        ...docx,
+        save: (doc) => {
+          console.log("BDS Sandbox: docx.save() called");
+          generationPromise = docx.Packer.toBase64String(doc);
+          return generationPromise;
+        },
+        Packer: {
+          ...docx.Packer,
+          toBase64String: (doc, ...args) => {
+            console.log("BDS Sandbox: Packer.toBase64String() intercepted");
+            generationPromise = docx.Packer.toBase64String(doc, ...args);
+            return generationPromise;
+          },
+          toBlob: (doc, ...args) => {
+            console.log("BDS Sandbox: Packer.toBlob() intercepted");
+            generationPromise = docx.Packer.toBase64String(doc, ...args);
+            return docx.Packer.toBlob(doc, ...args);
+          }
+        }
+      };
+
+      // Temporarily override globals
+      const originalDocx = window.docx;
+      const originalDOCX = window.DOCX;
+      const originalPacker = window.Packer;
+
+      window.docx = DOCX_WRAPPER;
+      window.DOCX = DOCX_WRAPPER;
+      window.Packer = DOCX_WRAPPER.Packer;
+
+      const func = new AsyncFunction(code);
+      await func();
+
+      if (generationPromise) {
+        const capturedBase64 = await generationPromise;
+        window.parent.postMessage({ type: "DOCX_RESULT", base64: capturedBase64, id }, "*");
+      } else {
+        throw new Error("No Word document data was generated. Did the script call DOCX.save(doc) or Packer.toBlob(doc)?");
+      }
+
+      window.docx = originalDocx;
+      window.DOCX = originalDOCX;
+      window.Packer = originalPacker;
+    } catch (err) {
+      console.error("BDS Sandbox Error (DOCX):", err);
+      window.parent.postMessage({ type: "DOCX_ERROR", error: err.message, id }, "*");
+    }
+  }
 });
+
