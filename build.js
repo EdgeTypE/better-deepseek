@@ -91,6 +91,29 @@ const builds = [
       sourcemap: false,
     },
   },
+
+  // ── Sandbox Script (Safe Eval World) ──
+  {
+    plugins: [],
+    esbuild: {
+      charset: 'ascii'
+    },
+    build: {
+      emptyOutDir: false,
+      outDir: resolve(__dirname, "dist"),
+      rollupOptions: {
+        input: resolve(__dirname, "src/sandbox/index.js"),
+        output: {
+          format: "iife",
+          entryFileNames: "sandbox.js",
+          inlineDynamicImports: true,
+        },
+        treeshake: false,
+      },
+      minify: true,
+      sourcemap: false,
+    },
+  },
 ];
 
 async function run() {
@@ -127,6 +150,12 @@ async function run() {
   copyFileSync(
     resolve(__dirname, "static/manifest.json"),
     resolve(distDir, "manifest.json")
+  );
+
+  // Copy sandbox.html to root dist
+  copyFileSync(
+    resolve(__dirname, "static/sandbox.html"),
+    resolve(distDir, "sandbox.html")
   );
   
   console.log("\n🧹 Cleaning non-ASCII characters from bundle...");

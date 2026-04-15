@@ -8,6 +8,7 @@ import { buildHtmlPreviewCard } from "./html-preview.js";
 import { buildLatexCard } from "./latex-card.js";
 import { buildPythonCard } from "./python-runner.js";
 import { buildVisualizerCard } from "./visualizer.js";
+import { buildPptxCard } from "./pptx-generator.js";
 
 /**
  * Map of tool name → renderer function.
@@ -18,6 +19,7 @@ const TOOL_RENDERERS = {
   latex: (content) => buildLatexCard(content),
   run_python_embed: (content) => buildPythonCard(content),
   visualizer: (content) => buildVisualizerCard(content),
+  pptx: (content) => buildPptxCard(content),
 };
 
 /**

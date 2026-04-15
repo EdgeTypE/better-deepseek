@@ -648,3 +648,102 @@
   gap: 8px;
 }
 
+
+/* ── PPTX Tool Card ── */
+.bds-pptx-card {
+  --pptx-icon-bg: #fff1f2;
+  --pptx-icon-color: #e11d48;
+}
+
+.dark .bds-pptx-card {
+  --pptx-icon-bg: #4c0519;
+  --pptx-icon-color: #fb7185;
+}
+
+.bds-pptx-card .bds-tool-card-body {
+  padding: 0;
+}
+
+.bds-pptx-download-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bds-bg-panel);
+  border-radius: var(--bds-radius);
+}
+
+.bds-pptx-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.bds-pptx-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 48px;
+  background-color: var(--pptx-icon-bg);
+  border: 1px solid var(--bds-border);
+  border-radius: 8px;
+  color: var(--pptx-icon-color);
+}
+
+.bds-pptx-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bds-pptx-details h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bds-text-primary);
+}
+
+.bds-pptx-details p {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  color: var(--bds-text-tertiary);
+  letter-spacing: 0.5px;
+}
+
+.bds-pptx-script-toggle {
+  margin-top: 8px;
+  padding: 0 16px 12px;
+}
+
+.bds-pptx-script-btn {
+  background: transparent;
+  border: none;
+  color: var(--bds-text-tertiary);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+
+.bds-pptx-script-btn:hover {
+  color: var(--bds-text-secondary);
+}
+
+.bds-pptx-script-content {
+  margin-top: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bds-bg-elevated);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 11px;
+  border: 1px solid var(--bds-border);
+}
+
+.bds-pptx-script-content.hidden {
+  display: none;
+}

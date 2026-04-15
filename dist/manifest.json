@@ -22,14 +22,21 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["injected.js", "static/loading/*.svg"],
+      "resources": ["injected.js", "sandbox.html", "sandbox.js", "static/loading/*.svg"],
       "matches": ["https://chat.deepseek.com/*"]
     }
   ],
   "background": {
     "service_worker": "background.js"
   },
+  "sandbox": {
+    "pages": ["sandbox.html"]
+  },
   "action": {
     "default_title": "Better DeepSeek"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'",
+    "sandbox": "sandbox allow-scripts allow-forms allow-popups; script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:; object-src 'self'"
   }
 }
