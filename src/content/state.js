@@ -17,7 +17,6 @@ const state = {
   urlWatchTimer: 0,
   lastUrl: location.href,
   processedStandaloneFiles: new Set(),
-  processedLatexAutoDownloads: new Set(),
   downloadCounter: 0,
   network: {
     activeCompletionRequests: 0,

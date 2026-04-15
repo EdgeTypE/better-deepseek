@@ -47,7 +47,7 @@ export async function loadStateFromStorage() {
     state.settings.downloadBehaviorVersion = DOWNLOAD_BEHAVIOR_VERSION;
     state.settings.autoDownloadFiles = false;
     state.settings.autoDownloadLongWorkZip = false;
-    state.settings.autoDownloadLatexPdf = false;
+
     await chrome.storage.local.set({
       [STORAGE_KEYS.settings]: state.settings,
     });

@@ -2,12 +2,11 @@
   "manifest_version": 3,
   "name": "Better DeepSeek",
   "version": "0.1.0",
-  "description": "Enhanced UX layer for chat.deepseek.com with hidden prompts, tools, memory, and long-work packaging.",
+  "description": "Enhanced UX layer for DeepSeek with hidden prompts, tools, memory, document generation, and long-work packaging.",
   "permissions": ["storage"],
   "host_permissions": [
     "https://chat.deepseek.com/*",
     "https://codeload.github.com/*",
-    "https://latexonline.cc/*",
     "https://cdn.jsdelivr.net/*",
     "https://pyscript.net/*",
     "<all_urls>"

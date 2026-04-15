@@ -10,11 +10,7 @@
     <h4>{headerTitle}</h4>
   </header>
   <div class="bds-tool-body">
-    {#if name === 'latex'}
-      <div class="bds-latex-preview">{content}</div>
-    {:else}
-      <code><pre>{content}</pre></code>
-    {/if}
+    <code><pre>{content}</pre></code>
   </div>
 </div>
 
@@ -44,13 +40,5 @@
     background: rgba(0,0,0,0.05);
     padding: 8px;
     border-radius: 4px;
-  }
-
-  .bds-latex-preview {
-    font-family: serif;
-    background: #fff;
-    padding: 15px;
-    border: 1px solid #eee;
-    color: #000;
   }
 </style>

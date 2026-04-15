@@ -747,3 +747,33 @@
 .bds-pptx-script-content.hidden {
   display: none;
 }
+
+/* ── Drawer Footer ── */
+.bds-drawer-footer {
+  margin-top: 32px;
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--bds-border);
+}
+
+.bds-github-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--bds-text-tertiary);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: color var(--bds-transition);
+  padding: 12px;
+}
+
+.bds-github-link:hover {
+  color: var(--bds-text-primary);
+}
+
+.bds-github-link svg {
+  width: 14px;
+  height: 14px;
+}
