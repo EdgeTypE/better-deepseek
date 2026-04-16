@@ -35,34 +35,65 @@ export function normalizeTaggedCodeContent(content, tagName) {
     name === "html" ||
     name === "latex" ||
     name === "visualizer" ||
-    name === "docx"
+    name === "docx" ||
+    name === "pptx" ||
+    name === "excel"
   ) {
     output = unwrapMarkdownCodeFence(output);
+  }
+
+  if (
+    name === "run_python_embed" ||
+    name === "html" ||
+    name === "docx" ||
+    name === "pptx" ||
+    name === "excel"
+  ) {
+    output = stripLeadingChatter(output);
   }
 
   return stripMarkdownViewerControls(output);
 }
 
 /**
+ * Strips leading/trailing conversational text from a code block.
+ * Specifically targets cases where AI ignores markdown fences and writes:
+ * "Here is the code: const doc = ..."
+ */
+function stripLeadingChatter(content) {
+  let output = String(content || "").trim();
+
+  // If it already looks like it starts with code, leave it
+  if (/^(?:const|let|var|function|async|import|export|class|await|\/\/|\/\*)/.test(output)) {
+    return output;
+  }
+
+  // Look for the first occurrence of a JS keyword at the start of a line
+  const jsStartMatch = output.match(/(?:\r?\n|^)\s*(const|let|var|function|async|import|class|await|document)\s+/);
+  if (jsStartMatch && jsStartMatch.index > 0) {
+    console.log(`[BDS:Parser] Stripping leading chatter for JS block: "${output.substring(0, 30)}..."`);
+    return output.substring(jsStartMatch.index).trim();
+  }
+
+  return output;
+}
+
+/**
  * Unwrap markdown code fences (```lang ... ```) from content.
+ * Robust: Extracts the first code block found, even if there is surrounding text.
  */
 export function unwrapMarkdownCodeFence(content) {
   const original = String(content || "");
-  const trimmed = original.trim();
 
-  const fencedMultiline = trimmed.match(
-    /^```[a-zA-Z0-9_+.-]*\s*\r?\n([\s\S]*?)\r?\n```$/
-  );
-  if (fencedMultiline) {
-    return String(fencedMultiline[1] || "");
+  // Match the first fence: ```[optional lang][optional newline]CODE[optional newline]```
+  const regex = /```(?:[a-zA-Z0-9_+.-]*\s*(?:\r?\n|\s))?([\s\S]*?)\r?\n?```/;
+  const match = original.match(regex);
+
+  if (match) {
+    return String(match[1] || "").trim();
   }
 
-  const fencedInline = trimmed.match(/^```([\s\S]*?)```$/);
-  if (fencedInline) {
-    return String(fencedInline[1] || "");
-  }
-
-  return original;
+  return original.trim();
 }
 
 /**

@@ -140,7 +140,11 @@ async function run() {
 
   if (existsSync(staticSrc)) {
     try {
-      copyRecursiveSync(staticSrc, staticDest);
+      if (!existsSync(staticDest)) mkdirSync(staticDest, { recursive: true });
+      readdirSync(staticSrc).forEach(item => {
+        if (item === 'manifest.json' || item === 'sandbox.html') return;
+        copyRecursiveSync(resolve(staticSrc, item), resolve(staticDest, item));
+      });
     } catch (e) {
       console.warn("Static copy warning:", e.message);
     }

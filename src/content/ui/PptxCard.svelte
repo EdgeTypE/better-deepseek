@@ -1,5 +1,6 @@
 <script>
   import { triggerBlobDownload } from "../../lib/utils/download.js";
+  import { handleAutoErrorReport } from "../auto.js";
 
   /** @type {{content: string}} */
   let { content } = $props();
@@ -14,8 +15,14 @@
 
   // Extract filename from code
   let fileName = $derived.by(() => {
-    const match = content.match(/fileName:\s*["'](.*?)["']/);
-    return match ? match[1] : "Presentation.pptx";
+    // Handle fileName: "test.pptx" or writeFile({ fileName: "test.pptx" })
+    const match = content.match(/fileName:\s*[`"'](.*?)["'`]/);
+    let name = match ? match[1].trim() : "Presentation";
+    
+    if (!name.toLowerCase().endsWith(".pptx")) {
+      name += ".pptx";
+    }
+    return name;
   });
 
   async function handleDownload() {
@@ -46,6 +53,7 @@
         } else if (event.data.type === "PPTX_ERROR") {
           status = "Error: " + event.data.error;
           statusColor = "#ef4444";
+          handleAutoErrorReport("PPTX", event.data.error, content);
           finish();
         }
       };

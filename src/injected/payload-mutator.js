@@ -317,7 +317,7 @@ export function buildMemoryCallsBlock(userPrompt, state) {
   const text = selected
     .map((item) => `${item.key}: ${item.value}`)
     .join(". ");
-  return `<BDS:memory_calls>${text}</BDS:memory_calls>`;
+  return `<BetterDeepSeek> <BDS:memory_calls>${text}</BDS:memory_calls> </BetterDeepSeek>`;
 }
 
 /**
@@ -364,10 +364,18 @@ export function getLastCharacterInHistory(messages, excludeTarget = null) {
  */
 export function stripInjectedBlocks(text) {
   let output = String(text || "");
+  
+  // Strip <BetterDeepSeek> blocks UNLESS they contain [BDS:AUTO] markers or memory calls
   output = output.replace(
-    /<BetterDeepSeek>[\s\S]*?<\/BetterDeepSeek>/gi,
-    ""
+    /<BetterDeepSeek>([\s\S]*?)<\/BetterDeepSeek>/gi,
+    (match, content) => {
+      if (content.includes("[BDS:AUTO]") || content.includes("<BDS:memory_calls>")) {
+        return match;
+      }
+      return "";
+    }
   );
+
   output = output.replace(/<BDS:SKILLS>[\s\S]*?<\/BDS:SKILLS>/gi, "");
   output = output.replace(
     /<BDS:memory_calls>[\s\S]*?<\/BDS:memory_calls>/gi,

@@ -213,11 +213,11 @@
     <div class="bds-attach-dropdown" style={dropdownStyle} use:portal on:click|stopPropagation>
       <button class="bds-attach-item" on:click={handleUploadFile}>
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="bds-item-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
-        Dosya Yükle
+        Upload File
       </button>
       <button class="bds-attach-item" on:click={handleUploadFolder}>
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="bds-item-icon"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
-        Klasör Yükle
+        Upload Folder
       </button>
       <div class="bds-attach-divider"></div>
       <button class="bds-attach-item" on:click={handleGithubImport}>
@@ -226,7 +226,7 @@
       </button>
       <button class="bds-attach-item" on:click={handleWebImport}>
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="bds-item-icon"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-        Web Sayfası Aktar
+        Fetch Web Page
       </button>
     </div>
   {/if}
@@ -249,7 +249,7 @@
         <input
           class="bds-github-input"
           type="text"
-          placeholder="https://github.com/owner/repo veya owner/repo"
+          placeholder="https://github.com/owner/repo or owner/repo"
           bind:value={githubUrl}
           on:keydown={(e) => handleDialogKeydown(e, 'github')}
           disabled={githubLoading}
@@ -274,7 +274,7 @@
           on:click={() => { if (!githubLoading) showGithubDialog = false; }}
           disabled={githubLoading}
         >
-          Kapat
+          Close
         </button>
         <button
           class="bds-github-btn bds-github-btn-import"
@@ -295,7 +295,7 @@
     <div class="bds-github-dialog" bind:this={dialogRef} on:click|stopPropagation on:keydown|stopPropagation>
       <div class="bds-github-header">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
-        <span>Web Sayfası Aktar</span>
+        <span>Fetch Web Page</span>
         {#if !webLoading}
           <button class="bds-github-close" on:click={() => showWebDialog = false}>&times;</button>
         {/if}
@@ -330,7 +330,7 @@
           on:click={() => { if (!webLoading) showWebDialog = false; }}
           disabled={webLoading}
         >
-          Kapat
+          Close
         </button>
         <button
           class="bds-github-btn bds-github-btn-import"

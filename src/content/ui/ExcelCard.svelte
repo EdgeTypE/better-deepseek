@@ -1,5 +1,6 @@
 <script>
   import { triggerBlobDownload } from "../../lib/utils/download.js";
+  import { handleAutoErrorReport } from "../auto.js";
 
   /** @type {{content: string}} */
   let { content } = $props();
@@ -15,8 +16,13 @@
   // Extract filename from code
   let fileName = $derived.by(() => {
     // Look for XLSX.writeFile(wb, "filename.xlsx")
-    const match = content.match(/XLSX\.writeFile\(.*,\s*["'](.*?)["']/);
-    return match ? match[1] : "Data.xlsx";
+    const match = content.match(/XLSX\.writeFile\(.*,\s*[`"'](.*?)["'`]/);
+    let name = match ? match[1].trim() : "Data";
+
+    if (!name.toLowerCase().endsWith(".xlsx")) {
+      name += ".xlsx";
+    }
+    return name;
   });
 
   async function handleDownload() {
@@ -47,6 +53,7 @@
         } else if (event.data.type === "EXCEL_ERROR") {
           status = "Error: " + event.data.error;
           statusColor = "#ef4444";
+          handleAutoErrorReport("Excel", event.data.error, content);
           finish();
         }
       };

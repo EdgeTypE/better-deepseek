@@ -1,5 +1,6 @@
 <script>
   import { triggerBlobDownload } from "../../lib/utils/download.js";
+  import { handleAutoErrorReport } from "../auto.js";
 
   /** @type {{content: string}} */
   let { content } = $props();
@@ -14,9 +15,15 @@
 
   // Extract filename from code
   let fileName = $derived.by(() => {
-    // Look for DOCX.save(doc, "filename.docx")
-    const match = content.match(/DOCX\.save\(.*,\s*["'](.*?)["']/);
-    return match ? match[1] : "Document.docx";
+    // Look for DOCX.save(doc, "filename.docx") - handle quotes and backticks
+    const match = content.match(/DOCX\.save\(.*,\s*[`"'](.*?)["'`]/);
+    let name = match ? match[1].trim() : "Document";
+    
+    // Ensure .docx extension
+    if (!name.toLowerCase().endsWith(".docx")) {
+      name += ".docx";
+    }
+    return name;
   });
 
   async function handleDownload() {
@@ -47,6 +54,7 @@
         } else if (event.data.type === "DOCX_ERROR") {
           status = "Error: " + event.data.error;
           statusColor = "#ef4444";
+          handleAutoErrorReport("Word", event.data.error, content);
           finish();
         }
       };
