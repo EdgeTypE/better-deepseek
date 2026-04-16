@@ -22,8 +22,37 @@ const RENDERABLE_TOOLS = new Set(["html", "latex", "run_python_embed", "visualiz
 /**
  * Parse a raw message text for all BDS tags.
  */
-export function parseBdsMessage(rawText) {
-  const text = String(rawText || "");
+export function parseBdsMessage(rawText, isSettled = false) {
+  let text = String(rawText || "");
+
+  // Intercept unclosed tags if the message is fully settled (AI stopped generating).
+  // This prevents infinite "Working..." animations and lost tool output.
+  if (isSettled) {
+    const unclosedTags = [];
+    const allTags = Array.from(text.matchAll(/<\/?BDS:([A-Za-z0-9_]+)[^>]*>/gi));
+    for (const match of allTags) {
+      const isClose = match[0].startsWith('</');
+      const tName = match[1].toLowerCase();
+      
+      // AUTO tags are background requests lacking standard rendering lifecycle
+      if (tName.startsWith("auto")) continue;
+
+      if (!isClose) {
+        unclosedTags.push(match[1]);
+      } else {
+        const idx = unclosedTags.map(t => t.toLowerCase()).lastIndexOf(tName);
+        if (idx !== -1) {
+          unclosedTags.splice(idx, 1);
+        }
+      }
+    }
+    
+    // Auto-close anything left gracefully
+    for (let i = unclosedTags.length - 1; i >= 0; i--) {
+      text += `\n</BDS:${unclosedTags[i]}>\n`;
+    }
+  }
+
   const result = {
     containsControlTags: false,
     longWorkOpen: false,

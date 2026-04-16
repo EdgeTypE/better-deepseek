@@ -8,6 +8,7 @@ import {
   detectMessageRole,
   isLatestAssistantMessage,
   isAbsoluteLastMessage,
+  scheduleScan
 } from "./scanner.js";
 import { extractMessageRawText } from "./dom/message-text.js";
 import { parseBdsMessage } from "./parser/index.js";
@@ -55,25 +56,48 @@ export function processMessageNode(node) {
     return;
   }
 
-  const isLatestAssistant =
-    role === "assistant" && isLatestAssistantMessage(node);
-
-  const isSettled = isMessageFinished(node);
-  // Include settlement state in hash so transition to 'finished' triggers a final re-parse
-  const signature = simpleHash(rawText + (isSettled ? ":settled" : ":streaming"));
+  const isLatestAssistant = role === "assistant" && isLatestAssistantMessage(node);
   const stateData = getNodeState(node);
 
-  // OPTIMIZATION: If hash matches, we still need to ENSURE visibility is correct
-  // but we can skip the expensive parsing and collections.
-  if (stateData.hash === signature) {
+  const now = Date.now();
+  if (stateData.lastRawText !== rawText) {
+    stateData.lastRawText = rawText;
+    stateData.lastUpdateAt = now;
+  }
+
+  const timeSinceUpdate = now - (stateData.lastUpdateAt || now);
+  const isStalled = timeSinceUpdate > 2500;
+
+  // Fix false positives: a message cannot be completely settled if it's currently mutating
+  let isSettled = isMessageFinished(node);
+  if (!isStalled) {
+    isSettled = false;
+  }
+
+  // Include settlement state in hash so transition to 'finished' triggers a final re-parse
+  const signature = simpleHash(rawText + (isSettled ? ":settled" : ":streaming"));
+  const shouldForceCloseTags = isSettled && isStalled;
+
+  if (stateData.hash === signature && stateData.forceClosedTags === shouldForceCloseTags) {
     if (role === "assistant") {
       syncVisibilityState(node, isLatestAssistant, stateData);
     }
     return;
   }
+  
   stateData.hash = signature;
+  stateData.forceClosedTags = shouldForceCloseTags;
 
-  const parsed = parseBdsMessage(rawText);
+  const parsed = parseBdsMessage(rawText, shouldForceCloseTags);
+  
+  // If we are still streaming a tool but aren't stalled yet, schedule a check in case it gets cut off
+  if (!isStalled && parsed.isStreamingTool) {
+    if (stateData.stallTimer) clearTimeout(stateData.stallTimer);
+    stateData.stallTimer = setTimeout(() => {
+      scheduleScan();
+    }, 2600);
+  }
+
   const hasActionableFiles = parsed.createFiles.length > 0;
   
   // IMMEDIATELY activate longWork state if tag is seen in latest assistant message
