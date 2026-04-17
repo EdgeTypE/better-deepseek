@@ -10,12 +10,18 @@
   let systemPrompt = $state(appState.settings.systemPrompt || "");
   let autoFiles = $state(Boolean(appState.settings.autoDownloadFiles));
   let autoZip = $state(Boolean(appState.settings.autoDownloadLongWorkZip));
+  let voiceMode = $state(Boolean(appState.settings.voiceMode));
+  let voiceLanguage = $state(appState.settings.voiceLanguage || (typeof navigator !== 'undefined' ? navigator.language : 'en-US'));
+  let autoSubmitVoice = $state(Boolean(appState.settings.autoSubmitVoice));
 
 
   export function refresh() {
     systemPrompt = appState.settings.systemPrompt || "";
     autoFiles = Boolean(appState.settings.autoDownloadFiles);
     autoZip = Boolean(appState.settings.autoDownloadLongWorkZip);
+    voiceMode = Boolean(appState.settings.voiceMode);
+    voiceLanguage = appState.settings.voiceLanguage || (typeof navigator !== 'undefined' ? navigator.language : 'en-US');
+    autoSubmitVoice = Boolean(appState.settings.autoSubmitVoice);
 
   }
 
@@ -25,6 +31,9 @@
     appState.settings.downloadBehaviorVersion = DOWNLOAD_BEHAVIOR_VERSION;
     appState.settings.autoDownloadFiles = autoFiles;
     appState.settings.autoDownloadLongWorkZip = autoZip;
+    appState.settings.voiceMode = voiceMode;
+    appState.settings.voiceLanguage = voiceLanguage;
+    appState.settings.autoSubmitVoice = autoSubmitVoice;
 
 
     await chrome.storage.local.set({
@@ -63,6 +72,41 @@
     <input id="bds-auto-files" type="checkbox" bind:checked={autoFiles} />
     <span class="bds-switch-track"></span>
   </label>
+</div>
+
+<div class="bds-section-title" style="margin-top: 20px;">
+  Voice Support
+</div>
+
+<div class="bds-toggle-row">
+  <span class="bds-toggle-label">Voice Mode (Auto-read responses)</span>
+  <label class="bds-switch">
+    <input id="bds-voice-mode" type="checkbox" bind:checked={voiceMode} />
+    <span class="bds-switch-track"></span>
+  </label>
+</div>
+
+<div class="bds-toggle-row">
+  <span class="bds-toggle-label">Auto-submit after speech</span>
+  <label class="bds-switch">
+    <input id="bds-voice-autosubmit" type="checkbox" bind:checked={autoSubmitVoice} />
+    <span class="bds-switch-track"></span>
+  </label>
+</div>
+
+<div class="bds-toggle-row">
+  <span class="bds-toggle-label">Speech Language</span>
+  <select class="bds-select" bind:value={voiceLanguage}>
+    <option value="en-US">English (US)</option>
+    <option value="en-GB">English (UK)</option>
+    <option value="tr-TR">Türkçe (TR)</option>
+    <option value="de-DE">Deutsch (DE)</option>
+    <option value="fr-FR">Français (FR)</option>
+    <option value="es-ES">Español (ES)</option>
+    <option value="it-IT">Italiano (IT)</option>
+    <option value="zh-CN">中文 (简体)</option>
+    <option value="ja-JP">日本語 (JP)</option>
+  </select>
 </div>
 
 <div class="bds-toggle-row">

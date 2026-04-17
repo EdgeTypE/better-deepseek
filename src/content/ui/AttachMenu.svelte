@@ -3,6 +3,7 @@
   import { pickFolderAndConcatenate } from "../files/folder-reader.js";
   import { fetchGitHubRepo, parseGitHubUrl } from "../files/github-reader.js";
   import { fetchAndConvertWebPage } from "../files/web-reader.js";
+  import appState from "../state.js";
 
   // The native input[type="file"] reference passed from scanner
   export let nativeInput;
@@ -26,6 +27,125 @@
   let webError = "";
 
   let dialogRef;
+
+  // Speech Recognition state
+  let isRecording = false;
+  let recognition = null;
+
+  function stopTTS() {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
+  function toggleSpeechRecognition() {
+    if (isRecording) {
+      if (recognition) recognition.stop();
+      isRecording = false;
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      if (appState.ui) appState.ui.showToast("Browser does not support Speech Recognition.");
+      return;
+    }
+
+    stopTTS();
+
+    recognition = new SpeechRecognition();
+    recognition.lang = appState.settings.voiceLanguage || navigator.language || 'en-US';
+    recognition.interimResults = true;
+    recognition.continuous = false;
+
+    recognition.onstart = () => {
+      isRecording = true;
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results)
+        .map(result => result[0])
+        .map(result => result.transcript)
+        .join('');
+      
+      injectTextIntoDeepSeek(transcript, event.results[0].isFinal);
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech Recognition Error:", event.error);
+      isRecording = false;
+      if (appState.ui) appState.ui.showToast(`Voice Error: ${event.error}`);
+    };
+
+    recognition.onend = () => {
+      isRecording = false;
+    };
+
+    recognition.start();
+  }
+
+  function injectTextIntoDeepSeek(text, isFinal) {
+    // DeepSeek uses a <textarea> or a contenteditable div. 
+    // Usually it's #chat-input in modern DeepSeek.
+    const textarea = document.querySelector('textarea#chat-input') || 
+                     document.querySelector('.ds-textarea textarea') ||
+                     document.querySelector('textarea');
+
+    if (!textarea) {
+      if (isFinal && appState.ui) appState.ui.showToast("Could not find input field.");
+      return;
+    }
+
+    // textarea.value = text;
+    textarea.value = text;
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+    if (isFinal && appState.settings.autoSubmitVoice) {
+      setTimeout(robustSend, 400);
+    }
+  }
+
+  function robustSend() {
+    let attempts = 0;
+    const maxAttempts = 50;
+
+    const attempt = () => {
+      attempts++;
+      const buttons = Array.from(document.querySelectorAll('div[role="button"], button'));
+      const sendBtn = buttons.find(b => {
+        // Match logic from auto.js
+        const isSend = b.querySelector('svg path[d*="M8.3125"], .ds-icon-send') || 
+                       b.querySelector('svg path[d*="M13.12 19.98"]') ||
+                       b.title === "Send message" || 
+                       b.ariaLabel === "Send Message";
+        const isAttach = b.classList.contains('bds-plus-btn') || b.querySelector('svg line');
+        return isSend && !isAttach;
+      });
+
+      if (sendBtn) {
+        const isDisabled = sendBtn.getAttribute('aria-disabled') === 'true' || 
+                           sendBtn.classList.contains('ds-icon-button--disabled');
+        
+        if (!isDisabled) {
+          sendBtn.click();
+          return;
+        }
+      }
+
+      if (attempts < maxAttempts) {
+        setTimeout(attempt, 200);
+      } else {
+        // Fallback: Try Enter key on input
+        const textarea = document.querySelector('textarea#chat-input') || 
+                         document.querySelector('.ds-textarea textarea');
+        if (textarea) {
+          textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, keyCode: 13 }));
+        }
+      }
+    };
+
+    attempt();
+  }
 
   function toggleMenu(e) {
     e.stopPropagation();
@@ -206,6 +326,22 @@
       <line x1="5" y1="12" x2="19" y2="12"></line>
     </svg>
   </button>
+
+  <button 
+    class="bds-mic-btn {isRecording ? 'bds-recording' : ''}" 
+    on:click={toggleSpeechRecognition} 
+    title={isRecording ? "Stop Recording" : "Voice Prompt"}
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill={isRecording ? "currentColor" : "none"} stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+      <line x1="12" y1="19" x2="12" y2="23"></line>
+      <line x1="8" y1="23" x2="16" y2="23"></line>
+    </svg>
+    {#if isRecording}
+      <div class="bds-recording-pulse"></div>
+    {/if}
+  </button>
   
   {#if isOpen}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -373,6 +509,45 @@
 
   .bds-plus-btn:active {
     transform: scale(0.95);
+  }
+
+  .bds-mic-btn {
+    position: relative;
+    background: transparent;
+    border: none;
+    color: var(--dsw-alias-brand-text, #4d6bfe);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-right: 2px;
+  }
+
+  .bds-mic-btn:hover {
+    background-color: var(--dsw-alias-brand-hover-bg, rgba(77, 107, 254, 0.1));
+  }
+
+  .bds-mic-btn.bds-recording {
+    color: #ef4444;
+    background-color: rgba(239, 68, 68, 0.1);
+  }
+
+  .bds-recording-pulse {
+    position: absolute;
+    inset: -2px;
+    border: 2px solid #ef4444;
+    border-radius: 50%;
+    animation: bds-pulse 1.5s infinite;
+    opacity: 0;
+  }
+
+  @keyframes bds-pulse {
+    0% { transform: scale(1); opacity: 0.6; }
+    100% { transform: scale(1.5); opacity: 0; }
   }
 
   .bds-attach-dropdown {

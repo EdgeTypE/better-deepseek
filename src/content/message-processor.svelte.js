@@ -25,6 +25,7 @@ import MessageOverlay from "./ui/MessageOverlay.svelte";
 const messageOverlays = new Map();
 const nodeStates = new WeakMap();
 const userMsgCleaned = new WeakSet();
+const readMessages = new WeakSet();
 
 function getNodeState(node) {
   let s = nodeStates.get(node);
@@ -80,7 +81,7 @@ export function processMessageNode(node) {
 
   if (stateData.hash === signature && stateData.forceClosedTags === shouldForceCloseTags) {
     if (role === "assistant") {
-      syncVisibilityState(node, isLatestAssistant, stateData);
+      syncVisibilityState(node, isLatestAssistant, stateData, isSettled);
     }
     return;
   }
@@ -126,7 +127,7 @@ export function processMessageNode(node) {
     stateData.isLongWorkActive = state.longWork.active && !parsed.longWorkClose;
     stateData.hasControlTags = parsed.containsControlTags;
 
-    syncVisibilityState(node, isLatestAssistant, stateData);
+    syncVisibilityState(node, isLatestAssistant, stateData, isSettled);
 
     const isGenerating = !!node.querySelector('.ds-cursor, ._streaming') || (isLatestAssistant && isSystemGenerating());
 
@@ -320,7 +321,7 @@ function isMessageFinished(node) {
  * Sync the visibility of the message node based on stored state.
  * Called on every scan to ensure DeepSeek doesn't strip the hidden class.
  */
-function syncVisibilityState(node, isLatestAssistant, stateData) {
+function syncVisibilityState(node, isLatestAssistant, stateData, isSettled) {
   // IF IT HAS ANY BDS CONTENT, HIDE THE ORIGINAL MARKDOWN PERMANENTLY.
   // The overlay will display the sanitized content. 
   // We hide regardless of whether it is currently generating to prevent leakage in history.
@@ -329,6 +330,38 @@ function syncVisibilityState(node, isLatestAssistant, stateData) {
   } else {
     hideMessageNode(node, false);
   }
+
+  // --- VOICE OUTPUT (TTS) ---
+  if (isLatestAssistant && isSettled && state.settings.voiceMode) {
+    if (!readMessages.has(node)) {
+      readMessages.add(node);
+      playVoiceResponse(stateData.lastRawText);
+    }
+  }
+}
+
+/**
+ * Play voice response using Web Speech Synthesis.
+ */
+function playVoiceResponse(text) {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+  // Clean the text: remove BDS tags
+  const cleanText = text.replace(/<(BDS|BetterDeepSeek):[\s\S]*?<\/(BDS|BetterDeepSeek):[\s\S]*?>/gi, '')
+                        .replace(/<[^>]*>?/gm, '') // Remove any other HTML-like tags
+                        .trim();
+
+  if (!cleanText) return;
+
+  const utterance = new SpeechSynthesisUtterance(cleanText);
+  utterance.lang = state.settings.voiceLanguage || navigator.language || 'en-US';
+  
+  // Try to find a good voice for the language
+  const voices = window.speechSynthesis.getVoices();
+  const langMatch = voices.find(v => v.lang.startsWith(utterance.lang.split('-')[0]));
+  if (langMatch) utterance.voice = langMatch;
+
+  window.speechSynthesis.speak(utterance);
 }
 
 
