@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Better DeepSeek",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Enhanced UX layer for DeepSeek with hidden prompts, tools, memory, document generation, and long-work packaging.",
   "permissions": ["storage"],
   "host_permissions": [

@@ -793,3 +793,16 @@
   width: 14px;
   height: 14px;
 }
+
+/* ── Logo Linkified ── */
+.bds-logo-link {
+  text-decoration: none !important;
+  color: inherit !important;
+  display: contents; /* Ensures it doesn't break flex/grid layouts */
+}
+
+.bds-logo-link:hover {
+  text-decoration: none !important;
+}
+
+
