@@ -1,5 +1,9 @@
 # Better DeepSeek
 
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/aabiopennjmopfippagcalmkdjlepdhh?style=for-the-badge&color=blue&logo=google-chrome&logoColor=white)](https://chromewebstore.google.com/detail/better-deepseek/aabiopennjmopfippagcalmkdjlepdhh)
+[![License](https://img.shields.io/github/license/EdgeTypE/better-deepseek?style=for-the-badge&color=green)](LICENSE)
+[![GitHub Stars](https://img.shields.io/github/stars/EdgeTypE/better-deepseek?style=for-the-badge&color=gold)](https://github.com/EdgeTypE/better-deepseek/stargazers)
+
 Better DeepSeek is a browser extension that enhances the DeepSeek chat interface with a powerful set of tools, persistent memory, and a customizable system prompt. It enables DeepSeek to generate files, run code, create presentations, and manage complex projects directly within the conversation, all while keeping your data local and private.
 
 > "Better DeepSeek" is an unofficial, independent, and community-driven open-source extension. It is NOT affiliated with, endorsed by, sponsored by, or officially connected to DeepSeek or DeepSeek AI in any way. All product names, logos, and brands are property of their respective owners.
@@ -33,6 +37,15 @@ When building multi-file projects, DeepSeek can use the `<BDS:LONG_WORK>` tag. A
 - **Skills**: Upload markdown files that define custom instructions or behaviors. Skills can be toggled on and off from the drawer.
 - **Characters**: Create and manage roleplay personas. Only one character can be active at a time.
 
+### Voice Support (STT & TTS)
+Better DeepSeek now supports full voice interaction:
+- **Voice-to-Text**: Dictate your prompts using the microphone button next to the chat input. Supports optional auto-submission for a hands-free experience.
+- **Text-to-Speech**: Assistant responses can be automatically read aloud once generation is complete.
+- **Language Selection**: Configure your preferred voice and recognition language directly from the extension settings.
+
+### Native Navigation
+The DeepSeek logo and "New Chat" button have been transformed into native links, allowing for standard browser interactions such as "Open in New Tab" via right-click or Ctrl/Cmd+Click.
+
 ### User Interface
 A sleek drawer slides out from a floating button on the DeepSeek page. Inside you can:
 - Edit the system prompt.
@@ -55,13 +68,17 @@ The extension adds a "+" button next to the chat input, offering:
 
 ## Installation
 
-Better DeepSeek is not yet available on the Chrome Web Store. You can install it manually in developer mode.
+### Recommended: Chrome Web Store
+The easiest way to install Better DeepSeek is through the **[Chrome Web Store](https://chromewebstore.google.com/detail/better-deepseek/aabiopennjmopfippagcalmkdjlepdhh)**. This ensures you receive automatic updates.
 
-### Prerequisites
+### Manual Installation (Developer Mode)
+If you prefer to build from source or contribute to development:
+
+#### Prerequisites
 - Node.js (version 18 or later)
 - npm
 
-### Build from Source
+#### Build from Source
 1. Clone the repository:
    ```bash
    git clone https://github.com/EdgeTypE/better-deepseek.git
@@ -144,10 +161,17 @@ After making changes, rebuild the extension and reload it from `chrome://extensi
 
 Better DeepSeek does not collect, transmit, or sell any personal data. All settings, memories, skills, and characters are stored locally on your device. The extension only communicates with DeepSeek's official API and the external services you explicitly request (e.g., GitHub for repository fetching). See the full [Privacy Policy](extension/PRIVACY.md) for details.
 
+## Changelog
+
+### v0.1.1 (2026-04-18)
+- **New Feature**: Added full Voice Support (Speech-to-Text and Text-to-Speech).
+- **New Feature**: Configurable voice and recognition languages in Settings.
+- **UX Improvement**: Logo and "New Chat" button are now real `<a>` tags, supporting "Open in new tab".
+- **Improved Reliability**: Better handling of stalled streams and automatic closing of tags.
+
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request on GitHub. Before submitting a PR, ensure that your code builds without errors and follows the existing style.
-
 
 ## Acknowledgements and Disclaimer
 
