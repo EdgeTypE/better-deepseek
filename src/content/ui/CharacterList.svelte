@@ -246,7 +246,9 @@
             <div style="display: flex; flex-direction: column; overflow: hidden;">
               <span style="font-weight: 500; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">{char.name}</span>
               {#if char.usage}
-                <span style="font-size: 10px; opacity: 0.6; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">{char.usage}</span>
+                <span style="font-size: 10px; opacity: 0.6; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                  {char.usage.length > 50 ? char.usage.slice(0, 50) + "..." : char.usage}
+                </span>
               {/if}
             </div>
           </label>
