@@ -31,7 +31,11 @@ jobs:
       - name: Zip extension
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          zip -r "better-deepseek-v${VERSION}.zip" dist/
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            zip -r "better-deepseek-latest.zip" dist/
+          else
+            zip -r "better-deepseek-v${VERSION}.zip" dist/
+          fi
 
       - name: Update Latest Release
         if: github.ref == 'refs/heads/main'
@@ -40,7 +44,7 @@ jobs:
           tag_name: latest
           name: Latest Build
           body: "This release contains the latest automated build from the main branch. It is updated on every commit."
-          files: better-deepseek-*.zip
+          files: better-deepseek-latest.zip
           prerelease: true
           make_latest: true
         env:
@@ -50,7 +54,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: better-deepseek-*.zip
+          files: better-deepseek-v*.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
