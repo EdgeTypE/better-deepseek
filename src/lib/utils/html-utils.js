@@ -42,26 +42,32 @@ export function buildPythonRunnerDocument(sourceCode) {
       }
       body {
         margin: 0;
-        font-family: "Consolas", "Courier New", monospace;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         background: #0f172a;
-        color: #e2e8f0;
+        color: #f8fafc;
       }
       .toolbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 8px;
-        padding: 8px;
-        background: #111827;
+        padding: 10px 12px;
+        background: #1e293b;
+        border-bottom: 1px solid #334155;
       }
       button {
         border: 0;
-        padding: 6px 12px;
-        border-radius: 999px;
+        padding: 6px 16px;
+        border-radius: 6px;
         cursor: pointer;
-        background: #14b8a6;
-        color: #06201d;
-        font-weight: 700;
+        background: #10b981;
+        color: #ffffff;
+        font-weight: 600;
+        font-size: 12px;
+        transition: opacity 0.2s;
+      }
+      button:hover {
+        opacity: 0.9;
       }
       textarea {
         width: 100%;
@@ -70,21 +76,31 @@ export function buildPythonRunnerDocument(sourceCode) {
         outline: 0;
         resize: vertical;
         box-sizing: border-box;
-        padding: 10px;
+        padding: 12px;
         background: #1e293b;
-        color: #f8fafc;
+        color: #f1f5f9;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 13px;
+        line-height: 1.5;
       }
       pre {
         margin: 0;
-        padding: 10px;
-        min-height: 100px;
+        padding: 12px;
+        min-height: 120px;
         white-space: pre-wrap;
         background: #020617;
-        color: #dcfce7;
+        color: #34d399;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        border-top: 1px solid #1e293b;
       }
       .status {
-        font-size: 12px;
-        color: #93c5fd;
+        font-size: 11px;
+        font-weight: 600;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
       }
     </style>
     <script src="https://cdn.jsdelivr.net/pyodide/v0.27.3/full/pyodide.js"><\/script>
@@ -179,26 +195,39 @@ export function buildJsRunnerDocument(sourceCode, language = "javascript") {
       }
       body {
         margin: 0;
-        font-family: "Consolas", "Courier New", monospace;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         background: #0f172a;
-        color: #e2e8f0;
+        color: #f8fafc;
       }
       .toolbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 8px;
-        padding: 8px;
-        background: #111827;
+        padding: 10px 12px;
+        background: #1e293b;
+        border-bottom: 1px solid #334155;
       }
       button {
         border: 0;
-        padding: 6px 12px;
-        border-radius: 999px;
+        padding: 6px 16px;
+        border-radius: 6px;
         cursor: pointer;
         background: #f59e0b;
-        color: #451a03;
-        font-weight: 700;
+        color: #ffffff;
+        font-weight: 600;
+        font-size: 12px;
+        transition: opacity 0.2s;
+      }
+      button:hover {
+        opacity: 0.9;
+      }
+      .status {
+        font-size: 11px;
+        font-weight: 600;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
       }
       textarea {
         width: 100%;
@@ -207,17 +236,25 @@ export function buildJsRunnerDocument(sourceCode, language = "javascript") {
         outline: 0;
         resize: vertical;
         box-sizing: border-box;
-        padding: 10px;
+        padding: 12px;
         background: #1e293b;
-        color: #f8fafc;
+        color: #f1f5f9;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 13px;
+        line-height: 1.5;
       }
       pre {
         margin: 0;
-        padding: 10px;
-        min-height: 100px;
+        padding: 12px;
+        min-height: 120px;
         white-space: pre-wrap;
         background: #020617;
-        color: #dcfce7;
+        color: #34d399;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        border-top: 1px solid #1e293b;
+      }
       }
       .status {
         font-size: 12px;
@@ -437,5 +474,104 @@ canvas {
     <style>${vKitCss}</style>
   </head>
   <body>${trimmed}</body>
+</html>`;
+}
+/**
+ * Build a headless runner document for off-thread execution.
+ * Communicates with the parent via postMessage.
+ */
+export function buildHeadlessRunnerDocument(language = "javascript") {
+  const isPython = language === "python" || language === "py";
+  const isTypeScript = language === "typescript" || language === "ts";
+
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    ${isPython ? '<script src="https://cdn.jsdelivr.net/pyodide/v0.27.3/full/pyodide.js"><\/script>' : ''}
+    ${isTypeScript ? '<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.0/babel.min.js"></script>' : ''}
+  </head>
+  <body>
+    <script>
+      function sendToParent(type, data) {
+        window.parent.postMessage({ type, data }, "*");
+      }
+
+      // Console override
+      const originalConsole = { ...console };
+      ['log', 'error', 'warn', 'info'].forEach(method => {
+        console[method] = (...args) => {
+          originalConsole[method](...args);
+          sendToParent('CONSOLE_LOG', { method, args: args.map(arg => {
+            try { return typeof arg === 'object' ? JSON.stringify(arg) : String(arg); }
+            catch(e) { return String(arg); }
+          })});
+        };
+      });
+
+      window.addEventListener('message', async (event) => {
+        const { type, code, id } = event.data;
+        if (type !== 'RUN_CODE') return;
+
+        sendToParent('STATUS', 'RUNNING');
+
+        try {
+          if ("${isPython}" === "true") {
+            if (!window.pyodide) {
+              sendToParent('STATUS', 'LOADING_PYODIDE');
+              window.pyodide = await loadPyodide({
+                indexURL: "https://cdn.jsdelivr.net/pyodide/v0.27.3/full/"
+              });
+            }
+            
+            window.pyodide.globals.set("bds_user_code", code);
+            const result = await window.pyodide.runPythonAsync(
+              "import io, sys, traceback\\n" +
+              "_buffer = io.StringIO()\\n" +
+              "_old_stdout = sys.stdout\\n" +
+              "_old_stderr = sys.stderr\\n" +
+              "sys.stdout = _buffer\\n" +
+              "sys.stderr = _buffer\\n" +
+              "try:\\n" +
+              "    exec(bds_user_code, {})\\n" +
+              "except Exception:\\n" +
+              "    traceback.print_exc()\\n" +
+              "finally:\\n" +
+              "    sys.stdout = _old_stdout\\n" +
+              "    sys.stderr = _old_stderr\\n" +
+              "_buffer.getvalue()"
+            );
+            if (result) console.log(result);
+          } else {
+            let finalCode = code;
+            if ("${isTypeScript}" === "true") {
+              if (!window.Babel) {
+                // Wait for Babel
+                let checks = 0;
+                while(!window.Babel && checks < 50) {
+                  await new Promise(r => setTimeout(r, 100));
+                  checks++;
+                }
+              }
+              if (!window.Babel) throw new Error("Babel failed to load");
+              finalCode = window.Babel.transform(code, {
+                presets: ['typescript'],
+                filename: 'script.ts'
+              }).code;
+            }
+            const runner = new Function(finalCode);
+            const result = runner();
+            if (result !== undefined) console.log("Return:", result);
+          }
+          sendToParent('STATUS', 'FINISHED');
+        } catch (err) {
+          console.error(err.message || String(err));
+          sendToParent('STATUS', 'ERROR');
+        }
+      });
+
+      sendToParent('STATUS', 'READY');
+    <\/script>
+  </body>
 </html>`;
 }

@@ -1,23 +1,10 @@
-/**
- * Python Code Block Run-Button Injector
- *
- * Scans the page for DeepSeek-rendered Python code blocks (`.md-code-block`)
- * and injects a "▶ Run" button into each one's banner.  Clicking the button
- * extracts `textContent` from the <pre> element (which has perfect indentation)
- * and opens an inline Pyodide runner.
- *
- * This completely bypasses BDS tag parsing — the AI just writes normal Python
- * code and DeepSeek renders it naturally with syntax highlighting.
- */
-
-import { buildPythonRunnerDocument } from "../../lib/utils/html-utils.js";
-import { triggerTextDownload } from "../../lib/utils/download.js";
+import { mount } from "svelte";
+import CodeRunner from "../ui/CodeRunner.svelte";
 
 const processedBlocks = new WeakSet();
 
 /**
  * Scan a DOM subtree for Python code blocks and inject Run buttons.
- * Safe to call repeatedly — blocks are tracked via a WeakSet.
  */
 export function injectPythonRunButtons(rootNode) {
   if (!rootNode) return;
@@ -40,7 +27,6 @@ export function injectPythonRunButtons(rootNode) {
 // ── Detection ────────────────────────────────────────────────────────────────
 
 function isPythonCodeBlock(block) {
-  // Strategy 1: look for "python" / "py" in any span inside the banner
   const banner =
     block.querySelector(".md-code-block-banner") ||
     block.querySelector('[class*="code-block-banner"]');
@@ -52,15 +38,12 @@ function isPythonCodeBlock(block) {
     }
   }
 
-  // Strategy 2: look for a <code class="language-python"> inside <pre>
   const codeEl = block.querySelector(
     'pre code[class*="language-python"], pre code[class*="language-py"]'
   );
   if (codeEl) return true;
 
-  // Strategy 3: check token classes for Python-specific syntax
   if (block.querySelector('.token.keyword + .token.function')) {
-    // Could be any language — but if we also see "def" or "import", it's Python
     const text = block.querySelector("pre")?.textContent || "";
     if (/^(import |from |def |class )/m.test(text)) return true;
   }
@@ -81,12 +64,13 @@ function injectButton(block, preEl) {
     '<span style="margin-right:4px">▶</span><span>Run</span>';
   applyButtonStyle(runBtn);
 
-  let panelEl = null;
+  let mounted = null;
 
   runBtn.addEventListener("click", () => {
-    if (panelEl) {
-      panelEl.remove();
-      panelEl = null;
+    if (mounted) {
+      mounted.instance.$destroy ? mounted.instance.$destroy() : mounted.unmount();
+      mounted.container.remove();
+      mounted = null;
       runBtn.innerHTML =
         '<span style="margin-right:4px">▶</span><span>Run</span>';
       applyButtonStyle(runBtn);
@@ -94,9 +78,26 @@ function injectButton(block, preEl) {
     }
 
     const code = preEl.textContent || "";
-    panelEl = createRunnerPanel(code);
-    // Insert after the code block
-    block.parentNode.insertBefore(panelEl, block.nextSibling);
+    
+    // Create container for Svelte component
+    const container = document.createElement("div");
+    block.parentNode.insertBefore(container, block.nextSibling);
+
+    const instance = mount(CodeRunner, {
+      target: container,
+      props: {
+        content: code,
+        language: "python"
+      }
+    });
+
+    mounted = { instance, container, unmount: () => {} }; // Note: Svelte 5 mount returns instance, unmount is a separate call if needed but usually just remove target or use unmount()
+    // In Svelte 5, mount returns the component instance. To unmount, we need to keep track of it.
+    // Actually Svelte 5 mount returns an object with unmount if called differently or just the instance.
+    // Let's use the standard Svelte 5 unmount.
+    import("svelte").then(({ unmount: svelteUnmount }) => {
+      mounted.unmount = () => svelteUnmount(instance);
+    });
 
     runBtn.innerHTML =
       '<span style="margin-right:4px">✕</span><span>Close</span>';
@@ -106,7 +107,6 @@ function injectButton(block, preEl) {
   if (btnContainer) {
     btnContainer.insertBefore(runBtn, btnContainer.firstChild);
   } else {
-    // Fallback: append to the banner
     const banner =
       block.querySelector(".md-code-block-banner") ||
       block.querySelector('[class*="code-block-banner"]');
@@ -117,14 +117,12 @@ function injectButton(block, preEl) {
 }
 
 function findButtonContainer(block) {
-  // Find via .code-info-button-text (DeepSeek's Copy/Download label class)
   const btnText = block.querySelector(".code-info-button-text");
   if (btnText) {
     const btn = btnText.closest("button");
     if (btn && btn.parentElement) return btn.parentElement;
   }
 
-  // Fallback: find via .ds-atom-button
   const dsBtn = block.querySelector(".ds-atom-button");
   if (dsBtn && dsBtn.parentElement) return dsBtn.parentElement;
 
@@ -148,74 +146,4 @@ function applyButtonStyle(el) {
     lineHeight: "1.4",
     verticalAlign: "middle",
   });
-}
-
-// ── Runner Panel ─────────────────────────────────────────────────────────────
-
-function createRunnerPanel(code) {
-  const panel = document.createElement("div");
-  panel.className = "bds-python-runner-panel";
-  Object.assign(panel.style, {
-    margin: "6px 0 14px 0",
-    borderRadius: "0 0 12px 12px",
-    overflow: "hidden",
-    border: "1px solid #334155",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-  });
-
-  // Header bar
-  const header = document.createElement("div");
-  Object.assign(header.style, {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "8px 14px",
-    background: "#111827",
-    borderBottom: "1px solid #334155",
-    fontFamily: "sans-serif",
-  });
-
-  const title = document.createElement("span");
-  title.textContent = "Python Runner — Pyodide WASM";
-  Object.assign(title.style, {
-    fontSize: "12px",
-    fontWeight: "600",
-    color: "#9ca3af",
-  });
-
-  const downloadBtn = document.createElement("button");
-  downloadBtn.type = "button";
-  downloadBtn.textContent = "↓ Download .py";
-  Object.assign(downloadBtn.style, {
-    fontSize: "11px",
-    fontWeight: "600",
-    padding: "3px 10px",
-    border: "1px solid #374151",
-    borderRadius: "4px",
-    background: "#1f2937",
-    color: "#d1d5db",
-    cursor: "pointer",
-  });
-  downloadBtn.addEventListener("click", () => {
-    triggerTextDownload(code, `script-${Date.now()}.py`);
-  });
-
-  header.appendChild(title);
-  header.appendChild(downloadBtn);
-
-  // Iframe
-  const iframe = document.createElement("iframe");
-  iframe.title = "Python Runner";
-  iframe.sandbox = "allow-scripts";
-  iframe.srcdoc = buildPythonRunnerDocument(code);
-  Object.assign(iframe.style, {
-    width: "100%",
-    height: "420px",
-    border: "none",
-    display: "block",
-  });
-
-  panel.appendChild(header);
-  panel.appendChild(iframe);
-  return panel;
 }

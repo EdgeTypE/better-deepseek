@@ -1,12 +1,5 @@
-/**
- * JavaScript Code Block Run-Button Injector
- *
- * Scans the page for DeepSeek-rendered JavaScript code blocks (`.md-code-block`)
- * and injects a "▶ Run JS" button into each one's banner.
- */
-
-import { buildJsRunnerDocument } from "../../lib/utils/html-utils.js";
-import { triggerTextDownload } from "../../lib/utils/download.js";
+import { mount } from "svelte";
+import CodeRunner from "../ui/CodeRunner.svelte";
 
 const processedBlocks = new WeakSet();
 
@@ -34,7 +27,6 @@ export function injectJavaScriptRunButtons(rootNode) {
 // ── Detection ────────────────────────────────────────────────────────────────
 
 function getCodeBlockLanguage(block) {
-  // Strategy 1: look for "javascript", "js", "typescript", "ts" in any span inside the banner
   const banner =
     block.querySelector(".md-code-block-banner") ||
     block.querySelector('[class*="code-block-banner"]');
@@ -47,7 +39,6 @@ function getCodeBlockLanguage(block) {
     }
   }
 
-  // Strategy 2: look for a <code class="language-js"> inside <pre>
   const codeEl = block.querySelector('pre code[class*="language-"]');
   if (codeEl) {
     const cls = Array.from(codeEl.classList).find(c => c.startsWith('language-'));
@@ -79,12 +70,13 @@ function injectButton(block, preEl) {
     '<span style="margin-right:4px">▶</span><span>Run JS</span>';
   applyButtonStyle(runBtn);
 
-  let panelEl = null;
+  let mounted = null;
 
   runBtn.addEventListener("click", () => {
-    if (panelEl) {
-      panelEl.remove();
-      panelEl = null;
+    if (mounted) {
+      mounted.instance.$destroy ? mounted.instance.$destroy() : mounted.unmount();
+      mounted.container.remove();
+      mounted = null;
       runBtn.innerHTML =
         '<span style="margin-right:4px">▶</span><span>Run JS</span>';
       applyButtonStyle(runBtn);
@@ -93,9 +85,22 @@ function injectButton(block, preEl) {
 
     const code = preEl.textContent || "";
     const lang = getCodeBlockLanguage(block);
-    panelEl = createRunnerPanel(code, lang);
-    // Insert after the code block
-    block.parentNode.insertBefore(panelEl, block.nextSibling);
+    
+    const container = document.createElement("div");
+    block.parentNode.insertBefore(container, block.nextSibling);
+
+    const instance = mount(CodeRunner, {
+      target: container,
+      props: {
+        content: code,
+        language: lang
+      }
+    });
+
+    mounted = { instance, container, unmount: () => {} };
+    import("svelte").then(({ unmount: svelteUnmount }) => {
+      mounted.unmount = () => svelteUnmount(instance);
+    });
 
     runBtn.innerHTML =
       '<span style="margin-right:4px">✕</span><span>Close</span>';
@@ -144,75 +149,4 @@ function applyButtonStyle(el) {
     lineHeight: "1.4",
     verticalAlign: "middle",
   });
-}
-
-// ── Runner Panel ─────────────────────────────────────────────────────────────
-
-function createRunnerPanel(code, lang = "javascript") {
-  const panel = document.createElement("div");
-  panel.className = "bds-js-runner-panel";
-  Object.assign(panel.style, {
-    margin: "6px 0 14px 0",
-    borderRadius: "0 0 12px 12px",
-    overflow: "hidden",
-    border: "1px solid #334155",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
-  });
-
-  // Header bar
-  const header = document.createElement("div");
-  Object.assign(header.style, {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "8px 14px",
-    background: "#111827",
-    borderBottom: "1px solid #334155",
-    fontFamily: "sans-serif",
-  });
-
-  const title = document.createElement("span");
-  title.textContent = lang === "typescript" ? "TypeScript Runner — Sandbox" : "JavaScript Runner — Sandbox";
-  Object.assign(title.style, {
-    fontSize: "12px",
-    fontWeight: "600",
-    color: "#9ca3af",
-  });
-
-  const downloadBtn = document.createElement("button");
-  const ext = lang === "typescript" ? "ts" : "js";
-  downloadBtn.type = "button";
-  downloadBtn.textContent = `↓ Download .${ext}`;
-  Object.assign(downloadBtn.style, {
-    fontSize: "11px",
-    fontWeight: "600",
-    padding: "3px 10px",
-    border: "1px solid #374151",
-    borderRadius: "4px",
-    background: "#1f2937",
-    color: "#d1d5db",
-    cursor: "pointer",
-  });
-  downloadBtn.addEventListener("click", () => {
-    triggerTextDownload(code, `script-${Date.now()}.${ext}`);
-  });
-
-  header.appendChild(title);
-  header.appendChild(downloadBtn);
-
-  // Iframe
-  const iframe = document.createElement("iframe");
-  iframe.title = "JavaScript Runner";
-  iframe.sandbox = "allow-scripts";
-  iframe.srcdoc = buildJsRunnerDocument(code, lang);
-  Object.assign(iframe.style, {
-    width: "100%",
-    height: "420px",
-    border: "none",
-    display: "block",
-  });
-
-  panel.appendChild(header);
-  panel.appendChild(iframe);
-  return panel;
 }

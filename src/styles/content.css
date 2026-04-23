@@ -3,7 +3,8 @@
    ══════════════════════════════════════════════ */
 
 /* ── Light Theme Tokens ── */
-#bds-root {
+/* ── Theme Tokens ── */
+:root {
   --bds-bg-panel: #ffffff;
   --bds-bg-elevated: #f7f7f8;
   --bds-bg-hover: #ececee;
@@ -23,10 +24,10 @@
 }
 
 /* ── Dark Theme Tokens ── */
-.dark #bds-root {
+html.dark, body.dark, .dark :root {
   --bds-bg-panel: #1e1f23;
   --bds-bg-elevated: #2a2b30;
-  --bds-bg-hover: rgba(255, 255, 255, 0.08); /* --ds-rgb-hover equivalent */
+  --bds-bg-hover: rgba(255, 255, 255, 0.08);
   --bds-bg-input: #2a2b30;
   --bds-border: #3a3b3f;
   --bds-border-hover: #4a4b50;
