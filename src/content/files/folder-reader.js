@@ -80,6 +80,8 @@ async function selectFolderSelectionWithInput() {
     input.type = "file";
     input.multiple = true;
     input.setAttribute("webkitdirectory", "");
+    input.setAttribute("directory", "");
+    input.setAttribute("mozdirectory", "");
     input.setAttribute("aria-hidden", "true");
     input.tabIndex = -1;
     input.style.position = "fixed";
@@ -88,56 +90,119 @@ async function selectFolderSelectionWithInput() {
     input.style.width = "1px";
     input.style.height = "1px";
     input.style.opacity = "0";
+    let settled = false;
 
     const cleanup = () => {
-      window.removeEventListener("focus", handleWindowFocus);
       input.removeEventListener("change", handleChange);
+      input.removeEventListener("cancel", handleCancel);
       if (input.parentNode) {
         input.parentNode.removeChild(input);
       }
     };
 
     const finish = (value) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
       cleanup();
       resolve(value);
     };
 
-    const handleChange = () => {
-      const files = Array.from(input.files || []);
-      if (!files.length) {
-        finish(null);
-        return;
-      }
+    const handleChange = async () => {
+      try {
+        const files = await collectFilesFromInput(input);
+        const selectedFiles = files.filter((file) => shouldKeepPath(file.path));
 
-      const selectedFiles = files
-        .map((file) => {
-          const relativePath = file.webkitRelativePath || file.name;
-          file.path = relativePath;
-          return file;
-        })
-        .filter((file) => shouldKeepPath(file.path));
-
-      finish({
-        rootName: inferRootName(selectedFiles),
-        files: selectedFiles,
-      });
-    };
-
-    const handleWindowFocus = () => {
-      window.setTimeout(() => {
-        if (input.files && input.files.length) {
+        if (!selectedFiles.length) {
+          finish(null);
           return;
         }
 
+        finish({
+          rootName: inferRootName(selectedFiles),
+          files: selectedFiles,
+        });
+      } catch (err) {
+        console.warn("[AttachMenu] Could not read folder selection:", err);
         finish(null);
-      }, 0);
+      }
+    };
+
+    const handleCancel = () => {
+      finish(null);
     };
 
     input.addEventListener("change", handleChange, { once: true });
-    window.addEventListener("focus", handleWindowFocus, { once: true });
+    input.addEventListener("cancel", handleCancel, { once: true });
     document.body.appendChild(input);
     input.click();
   });
+}
+
+async function collectFilesFromInput(input) {
+  const entries = Array.from(input.webkitEntries || []);
+  if (entries.length) {
+    const files = [];
+    for (const entry of entries) {
+      await readDirectoryEntry(entry, "", files);
+    }
+    return files;
+  }
+
+  return Array.from(input.files || []).map((file) => {
+    file.path = file.webkitRelativePath || file.name;
+    return file;
+  });
+}
+
+async function readDirectoryEntry(entry, parentPath, allFiles) {
+  const entryPath = joinPath(parentPath, entry.name);
+  if (!shouldKeepPath(entryPath)) {
+    return;
+  }
+
+  if (entry.isFile) {
+    const file = await entryToFile(entry);
+    file.path = normalizePath(entry.fullPath || entryPath);
+    allFiles.push(file);
+    return;
+  }
+
+  if (entry.isDirectory) {
+    const reader = entry.createReader();
+    while (true) {
+      const batch = await readEntries(reader);
+      if (!batch.length) {
+        break;
+      }
+
+      for (const child of batch) {
+        await readDirectoryEntry(child, entryPath, allFiles);
+      }
+    }
+  }
+}
+
+function entryToFile(entry) {
+  return new Promise((resolve, reject) => {
+    entry.file(resolve, reject);
+  });
+}
+
+function readEntries(reader) {
+  return new Promise((resolve, reject) => {
+    reader.readEntries(resolve, reject);
+  });
+}
+
+function joinPath(parentPath, name) {
+  return parentPath ? `${parentPath}/${name}` : name;
+}
+
+function normalizePath(path) {
+  return String(path || "").replace(/^\/+/, "");
 }
 
 async function readDirectory(dirHandle, path, allFiles) {
