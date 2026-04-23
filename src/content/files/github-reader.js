@@ -89,8 +89,11 @@ export function parseGitHubUrl(input) {
     let branch = "main";
 
     // /tree/branch-name or /tree/branch/subpath
-    if (parts[2] === "tree" && parts[3]) {
-      branch = parts[3];
+    // Only consider it a branch if "tree" is the 3rd segment
+    // All segments after "tree" are considered part of the branch name
+    // to support slashes in branch names
+    if (parts[2] === "tree") {
+      branch = parts.slice(3).join("/");
     }
 
     return { owner, repo, branch };
@@ -105,7 +108,7 @@ export function parseGitHubUrl(input) {
  * @param {(status: string) => void} onStatus - status callback
  * @returns {Promise<File|null>}
  */
-export async function fetchGitHubRepo(repoUrl, onStatus = () => {}) {
+export async function fetchGitHubRepo(repoUrl, onStatus = () => { }) {
   const parsed = parseGitHubUrl(repoUrl);
   if (!parsed) {
     throw new Error("Invalid GitHub URL. Use: https://github.com/owner/repo");
@@ -142,7 +145,7 @@ export async function fetchGitHubRepo(repoUrl, onStatus = () => {}) {
   }
 
   if (!zipData) {
-    throw new Error(`Could not download ${owner}/${repo}. Check the URL and make sure the repo is public.`);
+    throw new Error(`Could not download ${owner}/${repo}/${branch}. Check the URL and make sure the repo is public.`);
   }
 
   onStatus("Extracting ZIP...");
@@ -211,7 +214,7 @@ export async function fetchGitHubRepo(repoUrl, onStatus = () => {}) {
   validEntries.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
 
   // Build file tree
-  let output = `Repository: ${owner}/${repo}\n`;
+  let output = `Repository: ${owner}/${repo}/${branch}\n`;
   output += `${"=".repeat(48)}\n\n`;
   output += "Directory Tree:\n";
   output += buildTree(validEntries.map((e) => e.relativePath));
