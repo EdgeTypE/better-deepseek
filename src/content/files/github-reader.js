@@ -120,7 +120,7 @@ export async function fetchGitHubRepo(repoUrl, onStatus = () => { }) {
   // Fetch via background service worker to bypass CORS
   let zipData = null;
   for (const b of [branch, branch === "main" ? "master" : null].filter(Boolean)) {
-    const codeloadUrl = `https://codeload.github.com/${owner}/${repo}/zip/refs/heads/${encodeURIComponent(b)}`;
+    const codeloadUrl = `https://codeload.github.com/${owner}/${repo}/zip/refs/heads/${b}`;
     onStatus(`Downloading ${owner}/${repo} (${b})...`);
 
     try {
