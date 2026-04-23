@@ -35,6 +35,8 @@ function isPythonCodeBlock(block) {
     for (const span of spans) {
       const t = span.textContent.trim().toLowerCase();
       if (t === "python" || t === "py" || t === "python3") return true;
+      // If it explicitly says JS/TS, it's not Python
+      if (t === "javascript" || t === "js" || t === "typescript" || t === "ts") return false;
     }
   }
 
@@ -45,7 +47,12 @@ function isPythonCodeBlock(block) {
 
   if (block.querySelector('.token.keyword + .token.function')) {
     const text = block.querySelector("pre")?.textContent || "";
-    if (/^(import |from |def |class )/m.test(text)) return true;
+    if (/^(import |from |def |class )/m.test(text)) {
+       // Avoid false positive with JS
+       if (!/^(const |let |var |function |async |await )/m.test(text)) {
+         return true;
+       }
+    }
   }
 
   return false;
@@ -59,10 +66,19 @@ function injectButton(block, preEl) {
   const runBtn = document.createElement("button");
   runBtn.type = "button";
   runBtn.setAttribute("role", "button");
-  runBtn.className = "bds-run-python-btn";
-  runBtn.innerHTML =
-    '<span style="margin-right:4px">▶</span><span>Run</span>';
-  applyButtonStyle(runBtn);
+  runBtn.className = "ds-atom-button ds-text-button ds-text-button--with-icon bds-run-btn";
+  runBtn.style.marginRight = "8px";
+
+  const iconHtml = `
+    <div class="ds-icon ds-atom-button__icon" style="font-size: 16px; width: 16px; height: 16px; margin-right: 3px; color: #10b981;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+      </svg>
+    </div>
+  `;
+
+  runBtn.innerHTML = `${iconHtml}<span><span class="code-info-button-text">Run Python</span></span><div class="ds-focus-ring"></div>`;
 
   let mounted = null;
 
@@ -71,15 +87,13 @@ function injectButton(block, preEl) {
       mounted.instance.$destroy ? mounted.instance.$destroy() : mounted.unmount();
       mounted.container.remove();
       mounted = null;
-      runBtn.innerHTML =
-        '<span style="margin-right:4px">▶</span><span>Run</span>';
-      applyButtonStyle(runBtn);
+      runBtn.querySelector(".code-info-button-text").textContent = "Run Python";
+      runBtn.querySelector(".ds-icon").style.color = "#10b981";
+      runBtn.querySelector("svg").innerHTML = '<path d="M12 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline>';
       return;
     }
 
     const code = preEl.textContent || "";
-    
-    // Create container for Svelte component
     const container = document.createElement("div");
     block.parentNode.insertBefore(container, block.nextSibling);
 
@@ -91,17 +105,14 @@ function injectButton(block, preEl) {
       }
     });
 
-    mounted = { instance, container, unmount: () => {} }; // Note: Svelte 5 mount returns instance, unmount is a separate call if needed but usually just remove target or use unmount()
-    // In Svelte 5, mount returns the component instance. To unmount, we need to keep track of it.
-    // Actually Svelte 5 mount returns an object with unmount if called differently or just the instance.
-    // Let's use the standard Svelte 5 unmount.
+    mounted = { instance, container, unmount: () => {} };
     import("svelte").then(({ unmount: svelteUnmount }) => {
       mounted.unmount = () => svelteUnmount(instance);
     });
 
-    runBtn.innerHTML =
-      '<span style="margin-right:4px">✕</span><span>Close</span>';
-    runBtn.style.background = "#ef4444";
+    runBtn.querySelector(".code-info-button-text").textContent = "Close";
+    runBtn.querySelector(".ds-icon").style.color = "#ef4444";
+    runBtn.querySelector("svg").innerHTML = '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>';
   });
 
   if (btnContainer) {
@@ -127,23 +138,4 @@ function findButtonContainer(block) {
   if (dsBtn && dsBtn.parentElement) return dsBtn.parentElement;
 
   return null;
-}
-
-function applyButtonStyle(el) {
-  Object.assign(el.style, {
-    display: "inline-flex",
-    alignItems: "center",
-    background: "#10b981",
-    color: "#fff",
-    border: "none",
-    borderRadius: "6px",
-    padding: "4px 12px",
-    fontSize: "13px",
-    fontWeight: "600",
-    cursor: "pointer",
-    marginRight: "6px",
-    transition: "background 0.15s ease",
-    lineHeight: "1.4",
-    verticalAlign: "middle",
-  });
 }

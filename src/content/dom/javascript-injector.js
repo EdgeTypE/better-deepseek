@@ -14,13 +14,14 @@ export function injectJavaScriptRunButtons(rootNode) {
   for (const block of codeBlocks) {
     if (processedBlocks.has(block)) continue;
 
-    if (!isJavaScriptCodeBlock(block)) continue;
+    const lang = getCodeBlockLanguage(block);
+    if (!lang) continue;
 
     const preEl = block.querySelector("pre");
     if (!preEl) continue;
 
     processedBlocks.add(block);
-    injectButton(block, preEl);
+    injectButton(block, preEl, lang);
   }
 }
 
@@ -30,12 +31,15 @@ function getCodeBlockLanguage(block) {
   const banner =
     block.querySelector(".md-code-block-banner") ||
     block.querySelector('[class*="code-block-banner"]');
+  
   if (banner) {
     const spans = banner.querySelectorAll("span");
     for (const span of spans) {
       const t = span.textContent.trim().toLowerCase();
       if (t === "javascript" || t === "js") return "javascript";
       if (t === "typescript" || t === "ts") return "typescript";
+      // If it says something else (like python), it's definitely not JS
+      if (t === "python" || t === "py" || t === "cpp" || t === "java") return null;
     }
   }
 
@@ -49,26 +53,38 @@ function getCodeBlockLanguage(block) {
     }
   }
 
-  return "javascript";
-}
+  // Final check: look for JS keywords if language is unknown
+  const text = block.querySelector("pre")?.textContent || "";
+  if (/^(import |export |const |let |var |function |async |await |window\.|document\.)/m.test(text)) {
+    // Only if it doesn't look like Python
+    if (!/^(def |class |import sys|print\()/m.test(text)) {
+       return "javascript";
+    }
+  }
 
-function isJavaScriptCodeBlock(block) {
-  const lang = getCodeBlockLanguage(block);
-  return lang === "javascript" || lang === "typescript";
+  return null;
 }
 
 // ── Injection ────────────────────────────────────────────────────────────────
 
-function injectButton(block, preEl) {
+function injectButton(block, preEl, lang) {
   const btnContainer = findButtonContainer(block);
 
   const runBtn = document.createElement("button");
   runBtn.type = "button";
   runBtn.setAttribute("role", "button");
-  runBtn.className = "bds-run-js-btn";
-  runBtn.innerHTML =
-    '<span style="margin-right:4px">▶</span><span>Run JS</span>';
-  applyButtonStyle(runBtn);
+  runBtn.className = "ds-atom-button ds-text-button ds-text-button--with-icon bds-run-btn";
+  runBtn.style.marginRight = "8px";
+  
+  const iconHtml = `
+    <div class="ds-icon ds-atom-button__icon" style="font-size: 16px; width: 16px; height: 16px; margin-right: 3px; color: #f59e0b;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 18l6-6-6-6M8 6l-6 6 6 6"></path>
+      </svg>
+    </div>
+  `;
+
+  runBtn.innerHTML = `${iconHtml}<span><span class="code-info-button-text">Run JS</span></span><div class="ds-focus-ring"></div>`;
 
   let mounted = null;
 
@@ -77,15 +93,13 @@ function injectButton(block, preEl) {
       mounted.instance.$destroy ? mounted.instance.$destroy() : mounted.unmount();
       mounted.container.remove();
       mounted = null;
-      runBtn.innerHTML =
-        '<span style="margin-right:4px">▶</span><span>Run JS</span>';
-      applyButtonStyle(runBtn);
+      runBtn.querySelector(".code-info-button-text").textContent = "Run JS";
+      runBtn.querySelector(".ds-icon").style.color = "#f59e0b";
+      runBtn.querySelector("svg").innerHTML = '<path d="M16 18l6-6-6-6M8 6l-6 6 6 6"></path>';
       return;
     }
 
     const code = preEl.textContent || "";
-    const lang = getCodeBlockLanguage(block);
-    
     const container = document.createElement("div");
     block.parentNode.insertBefore(container, block.nextSibling);
 
@@ -102,9 +116,9 @@ function injectButton(block, preEl) {
       mounted.unmount = () => svelteUnmount(instance);
     });
 
-    runBtn.innerHTML =
-      '<span style="margin-right:4px">✕</span><span>Close</span>';
-    runBtn.style.background = "#ef4444";
+    runBtn.querySelector(".code-info-button-text").textContent = "Close";
+    runBtn.querySelector(".ds-icon").style.color = "#ef4444";
+    runBtn.querySelector("svg").innerHTML = '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>';
   });
 
   if (btnContainer) {
@@ -130,23 +144,4 @@ function findButtonContainer(block) {
   if (dsBtn && dsBtn.parentElement) return dsBtn.parentElement;
 
   return null;
-}
-
-function applyButtonStyle(el) {
-  Object.assign(el.style, {
-    display: "inline-flex",
-    alignItems: "center",
-    background: "#f59e0b",
-    color: "#fff",
-    border: "none",
-    borderRadius: "6px",
-    padding: "4px 12px",
-    fontSize: "13px",
-    fontWeight: "600",
-    cursor: "pointer",
-    marginRight: "6px",
-    transition: "background 0.15s ease",
-    lineHeight: "1.4",
-    verticalAlign: "middle",
-  });
 }

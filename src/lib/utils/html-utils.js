@@ -493,8 +493,10 @@ export function buildHeadlessRunnerDocument(language = "javascript") {
   </head>
   <body>
     <script>
+      let currentId = null;
+
       function sendToParent(type, data) {
-        window.parent.postMessage({ type, data }, "*");
+        window.parent.postMessage({ type, data, id: currentId }, "*");
       }
 
       // Console override
@@ -503,7 +505,9 @@ export function buildHeadlessRunnerDocument(language = "javascript") {
         console[method] = (...args) => {
           originalConsole[method](...args);
           sendToParent('CONSOLE_LOG', { method, args: args.map(arg => {
-            try { return typeof arg === 'object' ? JSON.stringify(arg) : String(arg); }
+            if (arg === undefined) return "undefined";
+            if (arg === null) return "null";
+            try { return typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg); }
             catch(e) { return String(arg); }
           })});
         };
@@ -513,6 +517,7 @@ export function buildHeadlessRunnerDocument(language = "javascript") {
         const { type, code, id } = event.data;
         if (type !== 'RUN_CODE') return;
 
+        currentId = id;
         sendToParent('STATUS', 'RUNNING');
 
         try {
@@ -541,12 +546,15 @@ export function buildHeadlessRunnerDocument(language = "javascript") {
               "    sys.stderr = _old_stderr\\n" +
               "_buffer.getvalue()"
             );
-            if (result) console.log(result);
+            
+            // Log the result (stdout/stderr)
+            if (result !== undefined && result !== null) {
+              console.log(String(result).trim());
+            }
           } else {
             let finalCode = code;
             if ("${isTypeScript}" === "true") {
               if (!window.Babel) {
-                // Wait for Babel
                 let checks = 0;
                 while(!window.Babel && checks < 50) {
                   await new Promise(r => setTimeout(r, 100));

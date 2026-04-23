@@ -5,6 +5,7 @@
 
   /** @type {{content: string, language: string}} */
   let { content, language } = $props();
+  const instanceId = Math.random().toString(36).substring(2, 9);
 
   let code = $state(content);
   let output = $state([]);
@@ -17,7 +18,9 @@
   let headlessSrcDoc = $derived(buildHeadlessRunnerDocument(language));
 
   function handleMessage(event) {
-    const { type, data } = event.data;
+    const { type, data, id } = event.data;
+    if (id && id !== instanceId) return; // Ignore messages from other runners
+
     if (type === "CONSOLE_LOG") {
       output = [...output, { method: data.method, text: data.args.join(" ") }];
     } else if (type === "STATUS") {
@@ -34,7 +37,8 @@
     output = [];
     iframe.contentWindow.postMessage({
       type: "RUN_CODE",
-      code: code
+      code: code,
+      id: instanceId
     }, "*");
   }
 
@@ -106,9 +110,12 @@
       </button>
     </div>
 
-    {#if output.length > 0 || status === 'ERROR'}
+    {#if output.length > 0 || status === 'ERROR' || status === 'FINISHED'}
       <div class="bds-output-area">
-        <div class="bds-output-header">Console Output</div>
+        <div class="bds-output-header">
+          <span>Console Output</span>
+          <button class="bds-clear-btn" onclick={() => output = []}>Clear</button>
+        </div>
         <div class="bds-output-logs">
           {#each output as log}
             <div class="bds-log-line" class:error={log.method === 'error'} class:warn={log.method === 'warn'}>
@@ -116,7 +123,7 @@
             </div>
           {/each}
           {#if output.length === 0 && status === 'FINISHED'}
-            <div class="bds-log-line dim"><i>(No output)</i></div>
+            <div class="bds-log-line dim"><i>(Execution finished with no output)</i></div>
           {/if}
         </div>
       </div>
@@ -287,7 +294,10 @@
   }
 
   .bds-output-header {
-    padding: 8px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 14px;
     font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
@@ -297,6 +307,21 @@
     letter-spacing: 0.5px;
   }
 
+  .bds-clear-btn {
+    background: transparent;
+    border: none;
+    color: var(--bds-accent);
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .bds-clear-btn:hover {
+    background: var(--bds-bg-hover);
+  }
+
   .bds-output-logs {
     padding: 12px;
     max-height: 300px;
@@ -304,6 +329,8 @@
     font-family: 'Consolas', 'Monaco', monospace;
     font-size: 13px;
     line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
   }
 
   .bds-log-line {

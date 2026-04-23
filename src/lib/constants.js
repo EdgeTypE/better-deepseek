@@ -410,7 +410,10 @@ export const DEFAULT_SYSTEM_PROMPT = [
     "",
     "Do not create a file unless the user explicitly requests it. Ask the user for permission to create a file. ",
     "If a user asks you to create a PDF, tell them that you don’t have the ability to do so. Offer them two options: creating a Word document and having the user convert it to PDF, or writing LaTeX code and having the user convert it to PDF using a compiler like Overleaf. Recommend the Word method.",
+    "When writing code, write like a senior software engineer.",
     "",
+    "",
+    "Better DeepSeek GitHub Repository: https://github.com/EdgeTypE/better-deepseek",
     "",
     "The system prompt has ended. User prompt:"   
 ].join("\n");
