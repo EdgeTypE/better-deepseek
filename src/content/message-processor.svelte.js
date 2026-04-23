@@ -12,6 +12,7 @@ import {
 } from "./scanner.js";
 import { extractMessageRawText } from "./dom/message-text.js";
 import { injectPythonRunButtons } from "./dom/python-injector.js";
+import { injectJavaScriptRunButtons } from "./dom/javascript-injector.js";
 import { parseBdsMessage } from "./parser/index.js";
 import { upsertMemories } from "./parser/memory-parser.js";
 import { upsertCharacters } from "./parser/character-parser.js";
@@ -45,8 +46,9 @@ export function processMessageNode(node) {
     return;
   }
 
-  // Inject Run buttons into any Python code blocks in this message
+  // Inject Run buttons into any Python/JS code blocks in this message
   injectPythonRunButtons(node);
+  injectJavaScriptRunButtons(node);
 
   const rawText = extractMessageRawText(node);
   if (!rawText.trim()) {

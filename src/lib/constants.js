@@ -15,7 +15,7 @@ export const BRIDGE_EVENTS = {
 };
 
 // ── Versioning ──
-export const SYSTEM_PROMPT_TEMPLATE_VERSION = 6;
+export const SYSTEM_PROMPT_TEMPLATE_VERSION = 7;
 export const DOWNLOAD_BEHAVIOR_VERSION = 2;
 export const LONG_WORK_STALE_MS = 30000;
 
@@ -249,6 +249,32 @@ export const DEFAULT_SYSTEM_PROMPT = [
     "- Use matplotlib for charts (call plt.show() to render inline).",
     "- Use print() for meaningful status updates and results.",
     "- Include numerical simulations, data analysis, or algorithm demos when 'run' or 'calculate' is requested.",
+    "",
+    "JAVASCRIPT CODE BLOCKS:",
+    "JavaScript and TypeScript code blocks (```javascript ... ```, ```typescript ... ```) are automatically runnable in the browser's sandbox.",
+    "The user sees a \"Run JS\" button on every JS/TS code block. Just write normal JavaScript or TypeScript code.",
+    "",
+    "When writing JS code the user might run:",
+    "",
+    "FEATURES:",
+    "- Capture console.log(), console.error(), console.warn() — they appear in the embedded console.",
+    "- Supports modern ES6+ syntax.",
+    "- Sandboxed execution for safety.",
+    "",
+    "NOT AVAILABLE:",
+    "- Direct DOM access (document, window.parent, etc.) is limited/sandboxed.",
+    "- Network requests (fetch, XMLHttpRequest) — browser sandbox blocks these.",
+    "- Node.js specific APIs (fs, path, etc.).",
+    "",
+    "OUTPUT RULES:",
+    "- Use console.log() for text output — it appears in the embedded console.",
+    "- If the script returns a value, it will also be displayed as 'Return value'.",
+    "- Include a brief comment header explaining what the script does.",
+    "",
+    "PRO-TIPS FOR JS BLOCKS:",
+    "- Use for quick algorithm tests, data transformations, or logic demonstrations.",
+    "- Prefer console.log() for meaningful status updates and results.",
+    "",
     "",
     "",
     "",

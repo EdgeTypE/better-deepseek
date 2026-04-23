@@ -228,7 +228,9 @@ function shouldKeepPath(path) {
       segment === "bin" ||
       segment === "obj" ||
       segment === "out" ||
-      segment === "target"
+      segment === "target" ||
+      segment === "dist-chrome" ||
+      segment === "dist-firefox"
     ) {
       return false;
     }

@@ -161,6 +161,174 @@ export function buildPythonRunnerDocument(sourceCode) {
 }
 
 /**
+ * Build the full HTML document for the in-browser JavaScript runner.
+ * Provides a sandboxed environment with console.log capturing.
+ */
+export function buildJsRunnerDocument(sourceCode, language = "javascript") {
+  const encodedCode = encodeURIComponent(sourceCode);
+  const isTypeScript = language === "typescript" || language === "ts";
+
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        margin: 0;
+        font-family: "Consolas", "Courier New", monospace;
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 8px;
+        background: #111827;
+      }
+      button {
+        border: 0;
+        padding: 6px 12px;
+        border-radius: 999px;
+        cursor: pointer;
+        background: #f59e0b;
+        color: #451a03;
+        font-weight: 700;
+      }
+      textarea {
+        width: 100%;
+        min-height: 180px;
+        border: 0;
+        outline: 0;
+        resize: vertical;
+        box-sizing: border-box;
+        padding: 10px;
+        background: #1e293b;
+        color: #f8fafc;
+      }
+      pre {
+        margin: 0;
+        padding: 10px;
+        min-height: 100px;
+        white-space: pre-wrap;
+        background: #020617;
+        color: #dcfce7;
+      }
+      .status {
+        font-size: 12px;
+        color: #fcd34d;
+      }
+    </style>
+    ${isTypeScript ? '<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.0/babel.min.js"></script>' : ''}
+  </head>
+  <body>
+    <div class="toolbar">
+      <button id="run-btn" type="button">Run ${isTypeScript ? 'TypeScript' : 'JavaScript'}</button>
+      <span class="status" id="status">${isTypeScript ? 'TypeScript' : 'JavaScript'} Sandbox</span>
+    </div>
+    <textarea id="editor"></textarea>
+    <pre id="output"></pre>
+
+    <script>
+      const editor = document.getElementById("editor");
+      const output = document.getElementById("output");
+      const status = document.getElementById("status");
+      const runButton = document.getElementById("run-btn");
+      editor.value = decodeURIComponent("${encodedCode}");
+
+      function logToOutput(...args) {
+        const text = args.map(arg => {
+          if (typeof arg === 'object') {
+            try {
+              return JSON.stringify(arg, null, 2);
+            } catch (e) {
+              return String(arg);
+            }
+          }
+          return String(arg);
+        }).join(' ');
+        output.textContent += text + "\\n";
+      }
+
+      async function runJsCode() {
+        output.textContent = "";
+        status.textContent = "Running...";
+
+        let userCode = editor.value;
+
+        ${isTypeScript ? `
+        try {
+          status.textContent = "Preparing transpiler...";
+          
+          // Wait for Babel to load if it hasn't yet
+          let checks = 0;
+          while (!window.Babel && checks < 50) {
+            await new Promise(r => setTimeout(r, 100));
+            checks++;
+          }
+
+          const transformer = window.Babel;
+          if (!transformer) {
+            throw new Error("TypeScript transpiler (Babel) failed to load. Please check your internet connection or try again in a few seconds.");
+          }
+          
+          status.textContent = "Transpiling TypeScript...";
+          const result = transformer.transform(userCode, {
+            presets: ['typescript'],
+            filename: 'script.ts'
+          });
+          userCode = result.code;
+        } catch (err) {
+          logToOutput("TRANSPILE ERROR:", err.message);
+          status.textContent = "Transpile Error.";
+          return;
+        }
+        ` : ''}
+
+        // Override console
+        const originalConsole = { ...console };
+        console.log = (...args) => {
+          originalConsole.log(...args);
+          logToOutput(...args);
+        };
+        console.error = (...args) => {
+          originalConsole.error(...args);
+          logToOutput("ERROR:", ...args);
+        };
+        console.warn = (...args) => {
+          originalConsole.warn(...args);
+          logToOutput("WARN:", ...args);
+        };
+
+        try {
+          const runner = new Function(userCode);
+          const result = runner();
+          
+          if (result !== undefined) {
+            logToOutput("Return value:", result);
+          }
+          
+          status.textContent = "Finished.";
+        } catch (error) {
+          logToOutput("RUNTIME ERROR:", error.message);
+          status.textContent = "Error.";
+        } finally {
+          Object.assign(console, originalConsole);
+        }
+      }
+
+      runButton.addEventListener("click", runJsCode);
+    <\/script>
+  </body>
+</html>`;
+}
+
+/**
  * Build a premium visualizer document with the V-Kit CSS (Monochrome Minimalist).
  */
 export function buildVisualizerDocument(content) {
