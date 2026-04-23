@@ -277,17 +277,17 @@ export function processMessageNode(node) {
         messageOverlays.set(node, { component, props });
       }
 
-      stateData.hiddenByTags = true;
-      node.classList.add("bds-hidden-message");
-    } else if (stateData.hiddenByTags) {
+      // Visibility is managed by syncVisibilityState so native thinking UI can
+      // stay mounted while the sanitized overlay handles tagged content.
+      stateData.overlayActive = true;
+    } else if (stateData.overlayActive) {
       // Cleanup if tags were removed
       if (existing) {
         unmount(existing.component);
         messageOverlays.delete(node);
       }
       
-      stateData.hiddenByTags = false;
-      node.classList.remove("bds-hidden-message");
+      stateData.overlayActive = false;
       
       // NEVER remove the bds-host-wrapper, as it may contain bds-file-host (the ZIP card).
       // Only clear the overlay sub-container.
