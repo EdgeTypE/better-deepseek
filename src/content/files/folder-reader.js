@@ -4,86 +4,53 @@
  * and concatenates them into a single File object.
  */
 
+import { pickFolderSelection } from "../../lib/utils/folder-picker.js";
+
 export async function pickFolderAndConcatenate() {
-  try {
-    const dirHandle = await window.showDirectoryPicker();
-    const allFiles = [];
-    await readDirectory(dirHandle, dirHandle.name, allFiles);
-
-    // Add file tree at the top
-    let concatText = generateTree(allFiles);
-    concatText += "\n\n========================================\n\n";
-
-    for (const file of allFiles) {
-      if (isTextFile(file.name)) {
-        if (file.size > 2 * 1024 * 1024) continue; // skip files > 2MB to avoid freezing
-        
-        try {
-          const text = await file.text();
-          
-          if (text.indexOf("\0") !== -1) {
-            continue;
-          }
-
-          concatText += `\n\n--- [FILE: ${file.path}] ---\n\n`;
-          concatText += text;
-        } catch (e) {
-          console.warn(`Could not read ${file.path}`, e);
-        }
-      }
-    }
-
-    if (!concatText || concatText.trim() === "Directory Tree:") {
-      return null;
-    }
-
-    const blob = new Blob([concatText], { type: "text/plain" });
-    const fakeFile = new File([blob], `${dirHandle.name}_workspace.txt`, { type: "text/plain" });
-    return fakeFile;
-  } catch (err) {
-    if (err.name !== "AbortError") {
-      console.error("[AttachMenu] Folder read error:", err);
-    }
+  const selection = await pickFolderSelection();
+  if (!selection) {
     return null;
   }
-}
 
-async function readDirectory(dirHandle, path, allFiles) {
-  try {
-    for await (const entry of dirHandle.values()) {
-      const entryPath = `${path}/${entry.name}`;
-      if (entry.kind === "file") {
-        try {
-          const file = await entry.getFile();
-          file.path = entryPath;
-          allFiles.push(file);
-        } catch (fileErr) {
-          console.warn(`Skipping file ${entryPath} due to error:`, fileErr);
-        }
-      } else if (entry.kind === "directory") {
-        const name = entry.name;
-        if (
-          name === "node_modules" || 
-          name === ".git" || 
-          name === ".github" || 
-          name === "dist" || 
-          name === "build" || 
-          name === ".idea" || 
-          name === ".vscode" ||
-          name === ".vs" ||
-          name === "bin" ||
-          name === "obj" ||
-          name === "out" ||
-          name === "target"
-        ) {
-          continue;
-        }
-        await readDirectory(entry, entryPath, allFiles);
-      }
+  const allFiles = selection.files.slice();
+  allFiles.sort((a, b) => a.path.localeCompare(b.path));
+
+  // Add file tree at the top
+  let concatText = generateTree(allFiles);
+  concatText += "\n\n========================================\n\n";
+  let textFileCount = 0;
+
+  for (const file of allFiles) {
+    if (!isTextFile(file.name)) {
+      continue;
     }
-  } catch (dirErr) {
-    console.warn(`Could not read directory ${path}:`, dirErr);
+
+    if (file.size > 2 * 1024 * 1024) {
+      continue;  // skip files > 2MB to avoid freezing
+    }
+
+    try {
+      const text = await file.text();
+
+      if (text.indexOf("\0") !== -1) {
+        continue;
+      }
+
+      concatText += `\n\n--- [FILE: ${file.path}] ---\n\n`;
+      concatText += text;
+      textFileCount += 1;
+    } catch (e) {
+      console.warn(`Could not read ${file.path}`, e);
+    }
   }
+
+  if (!textFileCount) {
+    return null;
+  }
+
+  const blob = new Blob([concatText], { type: "text/plain" });
+  const workspaceName = `${selection.rootName || "folder"}_workspace.txt`;
+  return new File([blob], workspaceName, { type: "text/plain" });
 }
 
 function generateTree(allFiles) {

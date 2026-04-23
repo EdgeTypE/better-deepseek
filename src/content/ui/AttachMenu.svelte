@@ -221,9 +221,20 @@
     closeMenu();
     if (!nativeInput) return;
 
-    const fakeFile = await pickFolderAndConcatenate();
-    if (fakeFile) {
-      injectFile(fakeFile);
+    try {
+      const fakeFile = await pickFolderAndConcatenate();
+      if (fakeFile) {
+        injectFile(fakeFile);
+      }
+    } catch (err) {
+      if (err?.name === "AbortError") {
+        return;
+      }
+
+      console.error("[AttachMenu] Folder upload failed:", err);
+      if (appState.ui) {
+        appState.ui.showToast(err?.message || "Folder upload failed.");
+      }
     }
   }
 

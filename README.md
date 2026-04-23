@@ -131,7 +131,7 @@ DeepSeek will use the appropriate tags automatically (guided by the injected sys
 When DeepSeek writes to memory using `<BDS:memory_write>`, the entries appear in the "Stored Memory" section of the drawer. You can also manually import/export memory as JSON.
 
 ### Uploading Folders and GitHub Repos
-Click the "+" button next to the chat input to reveal the advanced upload menu. Choose "Upload Folder" to select a local directory; the extension will concatenate all text files into a single upload. "GitHub Repo" fetches the repository as a ZIP and converts it to a gitingest-style text file for context.
+Click the "+" button next to the chat input to reveal the advanced upload menu. Choose "Upload Folder" to select a local directory; the extension will concatenate all text files into a single upload. On browsers without the File System Access API (Firefox), the folder picker falls back to the browser's native directory input so the flow still works. "GitHub Repo" fetches the repository as a ZIP and converts it to a gitingest-style text file for context.
 
 ## Development
 
