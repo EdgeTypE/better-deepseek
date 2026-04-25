@@ -72,9 +72,22 @@ function getNodeTextCandidates(node) {
   
   const clone = node.cloneNode(true);
   
-  // Remove Thinking blocks from the clone to exclude them from text extraction
-  const thinkingElements = clone.querySelectorAll('.ds-think-content, [class*="think"]');
-  thinkingElements.forEach(el => el.remove());
+  // Remove Thinking blocks and other non-content UI elements
+  const selectorsToRemove = [
+    ".ds-think-content",
+    "[class*=\"think\"]",
+    "._5255ff8", // "Thought for X seconds"
+    "._60aa7fb", // "Found X web pages"
+    ".e4c3fd02", // "Read X pages" list
+    "._74c0879", // Collapsible area title
+    ".ds-icon",
+    ".ds-icon-button",
+    "div[role=\"button\"]"
+  ];
+
+  for (const selector of selectorsToRemove) {
+    clone.querySelectorAll(selector).forEach(el => el.remove());
+  }
 
   // decodeNodeHtmlText already uses textContent internally but handles line breaks
   const htmlDecoded = decodeNodeHtmlText(clone.innerHTML || "");
@@ -100,4 +113,81 @@ function scoreRawTextCandidate(value) {
   const lineBreakCount = (text.match(/\n/g) || []).length;
   const tagCount = (text.match(/<BDS:|<BetterDeepSeek>/gi) || []).length;
   return tagCount * 10000 + lineBreakCount * 100 + text.length;
+}
+
+/**
+ * Reconstruct markdown from a rendered message node.
+ * This is used for exporting when the original markdown source is not available.
+ */
+export function extractMessageMarkdown(node) {
+  if (!node) return "";
+  
+  const clone = node.cloneNode(true);
+  
+  // Remove noise first
+  const noiseSelectors = [
+    ".ds-think-content",
+    "[class*=\"think\"]",
+    "._5255ff8",
+    "._60aa7fb",
+    ".e4c3fd02",
+    "._74c0879",
+    ".ds-icon",
+    ".ds-icon-button",
+    "div[role=\"button\"]"
+  ];
+  for (const s of noiseSelectors) {
+    clone.querySelectorAll(s).forEach(el => el.remove());
+  }
+
+  // Find the markdown container
+  const container = clone.querySelector(".ds-markdown") || clone;
+  return htmlToMarkdown(container).trim();
+}
+
+function htmlToMarkdown(element) {
+  let markdown = "";
+  
+  for (const child of element.childNodes) {
+    if (child.nodeType === 3) { // TEXT_NODE
+      markdown += child.textContent;
+    } else if (child.nodeType === 1) { // ELEMENT_NODE
+      const tag = child.tagName.toLowerCase();
+      const content = htmlToMarkdown(child);
+      
+      switch (tag) {
+        case "h1": markdown += `\n# ${content}\n`; break;
+        case "h2": markdown += `\n## ${content}\n`; break;
+        case "h3": markdown += `\n### ${content}\n`; break;
+        case "h4": markdown += `\n#### ${content}\n`; break;
+        case "h5": markdown += `\n##### ${content}\n`; break;
+        case "h6": markdown += `\n###### ${content}\n`; break;
+        case "strong": case "b": markdown += `**${content}**`; break;
+        case "em": case "i": markdown += `*${content}*`; break;
+        case "code": 
+          // If it's inside a pre, we handle it in the pre case
+          if (child.parentElement?.tagName.toLowerCase() === "pre") {
+            markdown += content;
+          } else {
+            markdown += `\`${content}\``;
+          }
+          break;
+        case "pre": 
+          const lang = child.querySelector("code")?.className?.match(/language-(\w+)/)?.[1] || "";
+          markdown += `\n\`\`\`${lang}\n${child.textContent.trim()}\n\`\`\`\n`; 
+          break;
+        case "p": markdown += `\n${content}\n`; break;
+        case "ul": markdown += `\n${content}\n`; break;
+        case "ol": markdown += `\n${content}\n`; break;
+        case "li": markdown += `\n- ${content}`; break;
+        case "blockquote": markdown += `\n> ${content.trim()}\n`; break;
+        case "a": markdown += `[${content}](${child.getAttribute("href") || "#"})`; break;
+        case "br": markdown += `\n`; break;
+        default: markdown += content;
+      }
+    }
+  }
+  
+  // Clean up excessive newlines
+  return markdown.replace(/\n{3,}/g, "\n\n");
 }
