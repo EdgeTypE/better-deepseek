@@ -113,11 +113,17 @@ export async function exportSession(format) {
  * Export to PDF by creating a temporary window and printing.
  */
 function exportToPdf(messages, title, dark = false) {
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    alert("Please allow popups to export to PDF.");
-    return;
-  }
+  // Use a hidden iframe to trigger the print dialog without a new tab
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "none";
+  iframe.id = "bds-print-iframe";
+  
+  document.body.appendChild(iframe);
 
   const html = `
 <!DOCTYPE html>
@@ -152,14 +158,19 @@ function exportToPdf(messages, title, dark = false) {
 
     * { box-sizing: border-box; }
 
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
     body {
       font-family: 'Inter', -apple-system, system-ui, sans-serif;
       line-height: 1.6;
-      color: var(--text);
-      background: var(--bg);
-      margin: 0;
       padding: 50px;
-      -webkit-print-color-adjust: exact;
     }
 
     .container {
@@ -220,13 +231,16 @@ function exportToPdf(messages, title, dark = false) {
 
     .user {
       text-align: right;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
     }
 
     .assistant {
       text-align: left;
-      border-left: 2px solid var(--primary);
+      border-left: 3px solid var(--primary);
       padding-left: 24px;
-      margin-left: -2px;
+      margin-left: -3px;
     }
 
     .role-header {
@@ -234,10 +248,6 @@ function exportToPdf(messages, title, dark = false) {
       align-items: center;
       gap: 8px;
       margin-bottom: 16px;
-    }
-
-    .user .role-header {
-      justify-content: flex-end;
     }
 
     .role-badge {
@@ -273,16 +283,16 @@ function exportToPdf(messages, title, dark = false) {
       text-align: left;
       max-width: 85%;
       background: var(--user-bg);
-      padding: 16px 24px;
-      border-radius: 16px 4px 16px 16px;
+      padding: 20px 24px;
+      border-radius: 20px 4px 20px 20px;
       border: 1px solid var(--border);
     }
     
-    .user .content p { text-align: left; }
+    .user .content p { text-align: left; margin: 0; }
 
     pre {
-      background: var(--code-bg);
-      color: #e5e7eb;
+      background: var(--code-bg) !important;
+      color: #e5e7eb !important;
       padding: 40px 24px 24px 24px;
       border-radius: 12px;
       font-family: 'JetBrains Mono', monospace;
@@ -345,9 +355,36 @@ function exportToPdf(messages, title, dark = false) {
     }
 
     @media print {
-      body { padding: 0; }
-      .message { page-break-inside: avoid; }
-      pre { page-break-inside: avoid; }
+      html, body {
+        background: var(--bg) !important;
+        color: var(--text) !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      
+      body { padding: 40px; }
+      
+      .message { 
+        page-break-inside: auto; 
+        margin-bottom: 40px;
+      }
+      
+      .role-header {
+        page-break-after: avoid;
+      }
+      
+      pre { 
+        page-break-inside: avoid; 
+      }
+      
+      footer {
+        page-break-before: auto;
+      }
+
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
     }
   </style>
 </head>
@@ -378,21 +415,24 @@ function exportToPdf(messages, title, dark = false) {
       Document generated via Better DeepSeek Browser Extension
     </footer>
   </div>
-
-  <script>
-    window.onload = () => {
-      // Small delay to ensure Google Fonts are rendered
-      setTimeout(() => {
-        window.print();
-      }, 1000);
-    };
-  </script>
 </body>
 </html>
   `;
 
-  printWindow.document.write(html);
-  printWindow.document.close();
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  // Wait for resources (fonts) and then print
+  iframe.contentWindow.focus();
+  setTimeout(() => {
+    iframe.contentWindow.print();
+    // Cleanup after print
+    setTimeout(() => {
+      document.body.removeChild(iframe);
+    }, 1000);
+  }, 1500);
 }
 
 /**
