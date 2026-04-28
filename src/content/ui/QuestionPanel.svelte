@@ -124,9 +124,11 @@
     const key = q.id || `q_${currentQuestionIndex}`;
     answers[key] = option;
     
-    setTimeout(() => {
-      nextOrSubmit();
-    }, 250);
+    if (option !== "Other") {
+      setTimeout(() => {
+        nextOrSubmit();
+      }, 250);
+    }
   }
 
   function toggleMultipleOption(option) {
@@ -307,7 +309,24 @@
           {/each}
           
           {#if q.allowCustom}
-            <div class="bds-option-item custom-item {answers[key] === 'Other' ? 'selected' : ''} {focusedOptionIndex === (q.options?.length || 0) ? 'focused' : ''}">
+            <div 
+              class="bds-option-item custom-item {answers[key] === 'Other' ? 'selected' : ''} {focusedOptionIndex === (q.options?.length || 0) ? 'focused' : ''}"
+              role="button"
+              tabindex="0"
+              onclick={(e) => {
+                const input = e.currentTarget.querySelector('input');
+                if (input) input.focus();
+                selectSingleOption("Other");
+              }}
+              onkeydown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  const input = e.currentTarget.querySelector('input');
+                  if (input) input.focus();
+                  selectSingleOption("Other");
+                }
+              }}
+            >
               <span class="bds-option-index">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M12 20h9"></path>
@@ -319,12 +338,21 @@
                 class="bds-custom-text-input" 
                 placeholder="Something else..." 
                 bind:value={customAnswers[key]}
-                onclick={() => selectSingleOption("Other")}
                 oninput={() => answers[key] = "Other"}
-                onkeydown={(e) => e.key === 'Enter' && customAnswers[key].trim() && selectSingleOption("Other")}
+                onkeydown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (customAnswers[key].trim()) {
+                      answers[key] = "Other";
+                      nextOrSubmit();
+                    }
+                  }
+                }}
+                onkeyup={(e) => e.stopPropagation()}
               />
               {#if answers[key] === "Other" && customAnswers[key].trim()}
-                <button class="bds-custom-confirm" onclick={() => selectSingleOption("Other")}>→</button>
+                <button class="bds-custom-confirm" onclick={() => { answers[key] = "Other"; nextOrSubmit(); }}>→</button>
               {/if}
             </div>
           {/if}
@@ -344,7 +372,22 @@
           {/each}
           
           {#if q.allowCustom}
-            <div class="bds-option-item custom-item {focusedOptionIndex === (q.options?.length || 0) ? 'focused' : ''}">
+            <div 
+              class="bds-option-item custom-item {focusedOptionIndex === (q.options?.length || 0) ? 'focused' : ''}"
+              role="button"
+              tabindex="0"
+              onclick={(e) => {
+                const input = e.currentTarget.querySelector('input');
+                if (input) input.focus();
+              }}
+              onkeydown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  const input = e.currentTarget.querySelector('input');
+                  if (input) input.focus();
+                }
+              }}
+            >
               <span class="bds-option-index">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M12 20h9"></path>
@@ -356,6 +399,8 @@
                 class="bds-custom-text-input" 
                 placeholder="Something else..." 
                 bind:value={customAnswers[key]}
+                onkeydown={(e) => e.stopPropagation()}
+                onkeyup={(e) => e.stopPropagation()}
               />
             </div>
           {/if}
@@ -368,7 +413,14 @@
             class="bds-text-input" 
             placeholder="Type your answer here..." 
             bind:value={customAnswers[key]} 
-            onkeydown={(e) => e.key === 'Enter' && nextOrSubmit()}
+            onkeydown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                nextOrSubmit();
+              }
+            }}
+            onkeyup={(e) => e.stopPropagation()}
             autofocus
           />
         </div>
