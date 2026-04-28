@@ -43,8 +43,10 @@
   // File upload
   let fileInput = $state(null);
   let fileError = $state("");
+  let uploading = $state(false);
 
   export function refresh() {
+    if (uploading) return;
     projects = [...appState.projects];
     if (selectedProject) {
       const updated = appState.projects.find(
@@ -124,136 +126,157 @@
   }
 
   async function handleFileUpload(event) {
+    uploading = true;
     fileError = "";
     const files = Array.from(event.target.files || []);
-    if (files.length === 0) return;
-
-    const MAX_SIZE = 500 * 1024;
-    let hasErrors = false;
-
-    for (const file of files) {
-      if (file.size > MAX_SIZE) {
-        fileError = `"${file.name}" is too large (${(file.size / 1024).toFixed(1)} KB). Max 500 KB per file.`;
-        hasErrors = true;
-        continue;
-      }
-
-      let content;
-      try {
-        content = await file.text();
-      } catch {
-        fileError = `Could not read "${file.name}".`;
-        hasErrors = true;
-        continue;
-      }
-
-      if (!content.trim()) {
-        fileError = `"${file.name}" is empty.`;
-        hasErrors = true;
-        continue;
-      }
-
-      try {
-        await addProjectFile(selectedProject.id, file.name, content);
-      } catch (err) {
-        fileError = `Storage error for "${file.name}": ${err?.message || String(err)}`;
-        hasErrors = true;
-      }
+    if (files.length === 0) {
+      uploading = false;
+      return;
     }
 
-    if (!hasErrors) {
+    const MAX_SIZE = 500 * 1024;
+    const errors = [];
+    let uploadedCount = 0;
+
+    try {
+      for (const file of files) {
+        if (file.size > MAX_SIZE) {
+          errors.push(
+            `"${file.name}" is too large (${(file.size / 1024).toFixed(1)} KB)`,
+          );
+          continue;
+        }
+
+        let content;
+        try {
+          content = await file.text();
+        } catch {
+          errors.push(`Could not read "${file.name}"`);
+          continue;
+        }
+
+        if (!content.trim()) {
+          errors.push(`"${file.name}" is empty`);
+          continue;
+        }
+
+        try {
+          await addProjectFile(selectedProject.id, file.name, content);
+          uploadedCount++;
+        } catch (err) {
+          errors.push(
+            `Storage error for "${file.name}": ${err?.message || String(err)}`,
+          );
+        }
+      }
+
+      if (errors.length > 0) {
+        fileError = errors.join("; ");
+      }
+    } finally {
+      uploading = false;
       projectFiles = getFilesForProject(selectedProject.id);
-    } else {
-      projectFiles = getFilesForProject(selectedProject.id); // Refresh anyway
     }
 
     event.target.value = "";
   }
 
   async function handleFolderUpload() {
+    uploading = true;
     fileError = "";
     let selection;
     try {
       selection = await pickFolderSelection();
     } catch (err) {
-      if (err?.name === "AbortError") return;
+      if (err?.name === "AbortError") {
+        uploading = false;
+        return;
+      }
       fileError = `Folder upload failed: ${err?.message || String(err)}`;
+      uploading = false;
       return;
     }
 
-    if (!selection || !selection.files.length) return;
+    if (!selection || !selection.files.length) {
+      uploading = false;
+      return;
+    }
 
     const MAX_SIZE = 500 * 1024;
     let uploadedCount = 0;
     let errorCount = 0;
 
-    for (const file of selection.files) {
-      const ext = file.name.split(".").pop()?.toLowerCase();
-      const textExts = [
-        "txt",
-        "md",
-        "json",
-        "csv",
-        "js",
-        "ts",
-        "jsx",
-        "tsx",
-        "py",
-        "go",
-        "rs",
-        "java",
-        "kt",
-        "swift",
-        "c",
-        "cpp",
-        "cs",
-        "rb",
-        "php",
-        "html",
-        "css",
-        "sh",
-        "yaml",
-        "yml",
-        "toml",
-        "env",
-      ];
-      if (!ext || !textExts.includes(ext)) continue;
+    try {
+      for (const file of selection.files) {
+        const ext = file.name.split(".").pop()?.toLowerCase();
+        const textExts = [
+          "txt",
+          "md",
+          "json",
+          "csv",
+          "js",
+          "ts",
+          "jsx",
+          "tsx",
+          "py",
+          "go",
+          "rs",
+          "java",
+          "kt",
+          "swift",
+          "c",
+          "cpp",
+          "cs",
+          "rb",
+          "php",
+          "html",
+          "css",
+          "sh",
+          "yaml",
+          "yml",
+          "toml",
+          "env",
+        ];
+        if (!ext || !textExts.includes(ext)) continue;
 
-      if (file.size > MAX_SIZE) {
-        errorCount++;
-        continue;
+        if (file.size > MAX_SIZE) {
+          errorCount++;
+          continue;
+        }
+
+        let content;
+        try {
+          content = await file.text();
+        } catch {
+          errorCount++;
+          continue;
+        }
+
+        if (!content.trim()) {
+          errorCount++;
+          continue;
+        }
+
+        try {
+          await addProjectFile(
+            selectedProject.id,
+            file.path || file.name,
+            content,
+          );
+          uploadedCount++;
+        } catch {
+          errorCount++;
+        }
       }
 
-      let content;
-      try {
-        content = await file.text();
-      } catch {
-        errorCount++;
-        continue;
+      if (uploadedCount > 0) {
+        projectFiles = getFilesForProject(selectedProject.id);
       }
-
-      if (!content.trim()) {
-        errorCount++;
-        continue;
+      if (errorCount > 0) {
+        fileError = `${uploadedCount} files uploaded, ${errorCount} skipped (too large, unreadable, or not text).`;
       }
-
-      try {
-        await addProjectFile(
-          selectedProject.id,
-          file.path || file.name,
-          content,
-        );
-        uploadedCount++;
-      } catch {
-        errorCount++;
-      }
-    }
-
-    if (uploadedCount > 0) {
-      projectFiles = getFilesForProject(selectedProject.id);
-    }
-    if (errorCount > 0) {
-      fileError = `${uploadedCount} files uploaded, ${errorCount} skipped (too large, unreadable, or not text).`;
+    } finally {
+      uploading = false;
     }
   }
 
