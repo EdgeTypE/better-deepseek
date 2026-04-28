@@ -101,11 +101,11 @@
   </div>
   <textarea
     id="bds-project-instructions"
+    class="bds-input"
     spellcheck="false"
     bind:value={projectInstructions}
     oninput={scheduleProjectSave}
     placeholder="Custom instructions appended to the global system prompt for this project…"
-    style="min-height: 80px;"
   ></textarea>
   <p style="font-size: 10px; opacity: 0.5; margin: 2px 0 12px;">Auto-saved</p>
 {/if}

@@ -290,6 +290,7 @@
     <label class="bds-label" for="pm-instructions">Custom Instructions</label>
     <textarea
       id="pm-instructions"
+      class="bds-input"
       bind:value={editInstructions}
       placeholder="Instructions appended to the global system prompt when this project is active…"
       oninput={scheduleSave}
@@ -312,7 +313,7 @@
     {:else}
       {#each projectFiles as file (file.id)}
         {#if showDeleteFileConfirm && deleteFileId === file.id}
-          <div class="bds-confirm-box">
+          <div class="bds-confirm-box bds-confirm-danger">
             <p class="bds-confirm-text">
               Remove "{file.name}" from this project? The file will no longer be available as context.
             </p>

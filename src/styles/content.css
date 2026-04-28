@@ -232,45 +232,43 @@ html.dark, body.dark, .dark :root {
   text-decoration: underline;
 }
 
-/* ── System Prompt Textarea ── */
-#bds-system-prompt {
+/* ── Unified Form Inputs ── */
+.bds-input,
+#bds-system-prompt,
+.bds-inline-editor .bds-input,
+.bds-select {
   width: 100%;
-  min-height: 120px;
-  resize: vertical;
-  border-radius: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
   border: 1px solid var(--bds-border);
   background: var(--bds-bg-input);
   color: var(--bds-text-primary);
-  padding: 12px 14px;
   font-size: 13px;
-  line-height: 1.55;
-  transition: border-color var(--bds-transition), box-shadow var(--bds-transition);
   outline: none;
+  font-family: inherit;
+  line-height: 1.5;
+  transition: border-color var(--bds-transition), box-shadow var(--bds-transition);
 }
 
-#bds-system-prompt::placeholder {
-  color: var(--bds-text-tertiary);
-}
-
-#bds-system-prompt:focus {
+.bds-input:focus,
+#bds-system-prompt:focus,
+.bds-inline-editor .bds-input:focus,
+.bds-select:focus {
   border-color: var(--bds-accent);
   box-shadow: 0 0 0 3px var(--bds-accent-glow);
 }
 
-.bds-select {
-  background: var(--bds-bg-input);
-  border: 1px solid var(--bds-border);
-  border-radius: 8px;
-  color: var(--bds-text-primary);
-  padding: 6px 10px;
-  font-size: 13px;
-  outline: none;
-  cursor: pointer;
-  transition: border-color var(--bds-transition);
+textarea.bds-input,
+#bds-system-prompt,
+.bds-inline-editor textarea.bds-input {
+  min-height: 80px;
+  resize: vertical;
 }
 
-.bds-select:focus {
-  border-color: var(--bds-accent);
+.bds-input::placeholder,
+#bds-system-prompt::placeholder,
+.bds-inline-editor .bds-input::placeholder {
+  color: var(--bds-text-tertiary);
 }
 
 /* ══════════════════════════════════
@@ -662,26 +660,6 @@ html.dark, body.dark, .dark :root {
   box-shadow: 0 4px 20px var(--bds-accent-glow);
 }
 
-.bds-inline-editor .bds-input {
-  width: 100%;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--bds-border);
-  background: var(--bds-bg-input);
-  color: var(--bds-text-primary);
-  font-size: 13px;
-  outline: none;
-}
-
-.bds-inline-editor .bds-input:focus {
-  border-color: var(--bds-accent);
-}
-
-.bds-inline-editor textarea {
-  min-height: 120px;
-  resize: vertical;
-  line-height: 1.5;
-}
 
 .bds-inline-editor .bds-editor-actions {
   display: flex;
