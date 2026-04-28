@@ -203,6 +203,12 @@ Better DeepSeek does not collect, transmit, or sell any personal data. All setti
 
 ## Changelog
 
+### v0.1.3 (2026-04-28)
+- **New Feature**: Added "Ask Questions" tool. DeepSeek can now ask for clarification when unsure about context or instructions.
+- **New Feature**: Export full sessions to Markdown and PDF.
+- **UX Improvement**: Added a button to reset the system prompt to default.
+- **Bug Fix**: Resolved full page reloading issues when clicking the DeepSeek logo or the "New Chat" button.
+
 ### v0.1.2 (2026-04-23)
 - **Cross-Browser Support**: Added experimental support for Firefox.
 - **Enhanced Code Runners**: Updated Python runner and added new JavaScript and TypeScript execution environments.
