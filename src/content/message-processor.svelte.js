@@ -237,6 +237,16 @@ export function processMessageNode(node) {
       }
     }
 
+    if (isSettled && parsed.askQuestions.length > 0 && isLatestAssistantMessage(node)) {
+      state.activeQuestions = parsed.askQuestions;
+      window.dispatchEvent(new CustomEvent('bds-ask-questions', { 
+        detail: { 
+          questions: parsed.askQuestions,
+          messageNode: node
+        } 
+      }));
+    }
+
     // TAG-DRIVEN INTERFACE LOCK
     const isCurrentlyLoading = parsed.isStreamingTool || 
                                stateData.isLongWorkActive || 

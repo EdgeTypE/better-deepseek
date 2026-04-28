@@ -61,6 +61,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
     createFiles: [],
     memoryWrites: [],
     characterCreates: [],
+    askQuestions: [],
     autoRequests: {
       webFetch: [],
       githubFetch: [],
@@ -126,6 +127,17 @@ export function parseBdsMessage(rawText, isSettled = false) {
         usage: attrs.usage || attrs.kullanim_alani || "",
         content: content
       });
+    }
+
+    if (name === "ask_question") {
+      try {
+        const questions = JSON.parse(content);
+        if (Array.isArray(questions)) {
+          result.askQuestions = questions;
+        }
+      } catch (e) {
+        console.error("Failed to parse ask_question JSON:", e);
+      }
     }
   }
 

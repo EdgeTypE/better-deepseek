@@ -1,6 +1,7 @@
 <script>
   import Drawer from "./Drawer.svelte";
   import ToastStack from "./ToastStack.svelte";
+  import QuestionPanel from "./QuestionPanel.svelte";
 
   let drawerOpen = $state(false);
   let overlayVisible = $state(false);
@@ -52,6 +53,7 @@
 
 
 <ToastStack {toasts} />
+<QuestionPanel />
 
 
  
