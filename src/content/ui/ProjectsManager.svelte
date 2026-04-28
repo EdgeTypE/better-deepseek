@@ -11,6 +11,7 @@
     getConversationsForProject,
   } from "../project-manager.js";
   import { pushConfigToPage } from "../bridge.js";
+  import { pickFolderSelection } from "../../lib/utils/folder-picker.js";
 
   let { onback } = $props();
 
@@ -46,7 +47,9 @@
   export function refresh() {
     projects = [...appState.projects];
     if (selectedProject) {
-      const updated = appState.projects.find((p) => p.id === selectedProject.id);
+      const updated = appState.projects.find(
+        (p) => p.id === selectedProject.id,
+      );
       if (updated) {
         selectedProject = updated;
         projectFiles = getFilesForProject(updated.id);
@@ -122,38 +125,136 @@
 
   async function handleFileUpload(event) {
     fileError = "";
-    const file = event.target.files && event.target.files[0];
-    if (!file) return;
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
 
     const MAX_SIZE = 500 * 1024;
-    if (file.size > MAX_SIZE) {
-      fileError = `File too large (max 500 KB). "${file.name}" is ${(file.size / 1024).toFixed(1)} KB.`;
-      event.target.value = "";
-      return;
+    let hasErrors = false;
+
+    for (const file of files) {
+      if (file.size > MAX_SIZE) {
+        fileError = `"${file.name}" is too large (${(file.size / 1024).toFixed(1)} KB). Max 500 KB per file.`;
+        hasErrors = true;
+        continue;
+      }
+
+      let content;
+      try {
+        content = await file.text();
+      } catch {
+        fileError = `Could not read "${file.name}".`;
+        hasErrors = true;
+        continue;
+      }
+
+      if (!content.trim()) {
+        fileError = `"${file.name}" is empty.`;
+        hasErrors = true;
+        continue;
+      }
+
+      try {
+        await addProjectFile(selectedProject.id, file.name, content);
+      } catch (err) {
+        fileError = `Storage error for "${file.name}": ${err?.message || String(err)}`;
+        hasErrors = true;
+      }
     }
 
-    let content;
-    try {
-      content = await file.text();
-    } catch {
-      fileError = "Could not read file.";
-      event.target.value = "";
-      return;
-    }
-
-    if (!content.trim()) {
-      fileError = "File is empty.";
-      event.target.value = "";
-      return;
-    }
-
-    try {
-      await addProjectFile(selectedProject.id, file.name, content);
+    if (!hasErrors) {
       projectFiles = getFilesForProject(selectedProject.id);
-    } catch (err) {
-      fileError = `Storage error: ${err && err.message ? err.message : String(err)}`;
+    } else {
+      projectFiles = getFilesForProject(selectedProject.id); // Refresh anyway
     }
+
     event.target.value = "";
+  }
+
+  async function handleFolderUpload() {
+    fileError = "";
+    let selection;
+    try {
+      selection = await pickFolderSelection();
+    } catch (err) {
+      if (err?.name === "AbortError") return;
+      fileError = `Folder upload failed: ${err?.message || String(err)}`;
+      return;
+    }
+
+    if (!selection || !selection.files.length) return;
+
+    const MAX_SIZE = 500 * 1024;
+    let uploadedCount = 0;
+    let errorCount = 0;
+
+    for (const file of selection.files) {
+      const ext = file.name.split(".").pop()?.toLowerCase();
+      const textExts = [
+        "txt",
+        "md",
+        "json",
+        "csv",
+        "js",
+        "ts",
+        "jsx",
+        "tsx",
+        "py",
+        "go",
+        "rs",
+        "java",
+        "kt",
+        "swift",
+        "c",
+        "cpp",
+        "cs",
+        "rb",
+        "php",
+        "html",
+        "css",
+        "sh",
+        "yaml",
+        "yml",
+        "toml",
+        "env",
+      ];
+      if (!ext || !textExts.includes(ext)) continue;
+
+      if (file.size > MAX_SIZE) {
+        errorCount++;
+        continue;
+      }
+
+      let content;
+      try {
+        content = await file.text();
+      } catch {
+        errorCount++;
+        continue;
+      }
+
+      if (!content.trim()) {
+        errorCount++;
+        continue;
+      }
+
+      try {
+        await addProjectFile(
+          selectedProject.id,
+          file.path || file.name,
+          content,
+        );
+        uploadedCount++;
+      } catch {
+        errorCount++;
+      }
+    }
+
+    if (uploadedCount > 0) {
+      projectFiles = getFilesForProject(selectedProject.id);
+    }
+    if (errorCount > 0) {
+      fileError = `${uploadedCount} files uploaded, ${errorCount} skipped (too large, unreadable, or not text).`;
+    }
   }
 
   function promptDeleteFile(file) {
@@ -199,18 +300,27 @@
 </script>
 
 <div class="bds-manager-header">
-  <button type="button" class="bds-back-btn" onclick={view === "detail" ? goBack : onback}>
+  <button
+    type="button"
+    class="bds-back-btn"
+    onclick={view === "detail" ? goBack : onback}
+  >
     ← {view === "detail" ? "Projects" : "Back"}
   </button>
   <div class="bds-section-title" style="margin: 0; padding: 0; border: none;">
-    {view === "detail" ? (selectedProject?.name || "Project") : "Manage Projects"}
+    {view === "detail" ? selectedProject?.name || "Project" : "Manage Projects"}
   </div>
 </div>
 
 {#if view === "list"}
   <div style="margin-bottom: 8px;">
     {#if !showCreateForm}
-      <button type="button" class="bds-btn" style="width: 100%;" onclick={() => showCreateForm = true}>
+      <button
+        type="button"
+        class="bds-btn"
+        style="width: 100%;"
+        onclick={() => (showCreateForm = true)}
+      >
         + New Project
       </button>
     {:else}
@@ -230,10 +340,19 @@
           <p class="bds-field-error">{createError}</p>
         {/if}
         <div class="bds-editor-actions">
-          <button type="button" class="bds-btn-outlined" onclick={() => { showCreateForm = false; createError = ""; }}>
+          <button
+            type="button"
+            class="bds-btn-outlined"
+            onclick={() => {
+              showCreateForm = false;
+              createError = "";
+            }}
+          >
             Cancel
           </button>
-          <button type="button" class="bds-btn" onclick={handleCreate}>Create</button>
+          <button type="button" class="bds-btn" onclick={handleCreate}
+            >Create</button
+          >
         </div>
       </div>
     {/if}
@@ -244,25 +363,47 @@
       <p class="bds-empty">No projects yet.</p>
     {:else}
       {#each projects as project (project.id)}
-        <div class="bds-skill-item" style="cursor: pointer;" onclick={() => openProject(project)} role="button" tabindex="0" onkeydown={(e) => e.key === "Enter" && openProject(project)}>
+        <div
+          class="bds-skill-item"
+          style="cursor: pointer;"
+          onclick={() => openProject(project)}
+          role="button"
+          tabindex="0"
+          onkeydown={(e) => e.key === "Enter" && openProject(project)}
+        >
           <div style="flex: 1; min-width: 0;">
-            <div style="font-weight: 500; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; font-size: 13px;">
+            <div
+              style="font-weight: 500; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; font-size: 13px;"
+            >
               {project.name}
             </div>
             {#if project.description}
-              <div style="font-size: 11px; opacity: 0.55; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+              <div
+                style="font-size: 11px; opacity: 0.55; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;"
+              >
                 {project.description}
               </div>
             {/if}
           </div>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="opacity: 0.4; flex-shrink: 0;">
-            <path d="M4.5 2L8.5 6L4.5 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+            style="opacity: 0.4; flex-shrink: 0;"
+          >
+            <path
+              d="M4.5 2L8.5 6L4.5 10"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
           </svg>
         </div>
       {/each}
     {/if}
   </div>
-
 {:else if view === "detail" && selectedProject}
   <!-- Name + Description -->
   <div class="bds-field-group">
@@ -315,18 +456,33 @@
         {#if showDeleteFileConfirm && deleteFileId === file.id}
           <div class="bds-confirm-box bds-confirm-danger">
             <p class="bds-confirm-text">
-              Remove "{file.name}" from this project? The file will no longer be available as context.
+              Remove "{file.name}" from this project? The file will no longer be
+              available as context.
             </p>
             <div class="bds-editor-actions">
-              <button type="button" class="bds-btn-outlined" onclick={cancelDeleteFile}>Cancel</button>
-              <button type="button" class="bds-btn-danger" onclick={confirmDeleteFile}>Remove</button>
+              <button
+                type="button"
+                class="bds-btn-outlined"
+                onclick={cancelDeleteFile}>Cancel</button
+              >
+              <button
+                type="button"
+                class="bds-btn-danger"
+                onclick={confirmDeleteFile}>Remove</button
+              >
             </div>
           </div>
         {:else}
           <div class="bds-skill-item">
             <div style="flex: 1; min-width: 0;">
-              <div style="font-size: 12px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">{file.name}</div>
-              <div style="font-size: 10px; opacity: 0.5;">{formatSize(file.size)}</div>
+              <div
+                style="font-size: 12px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;"
+              >
+                {file.name}
+              </div>
+              <div style="font-size: 10px; opacity: 0.5;">
+                {formatSize(file.size)}
+              </div>
             </div>
             <button
               type="button"
@@ -342,11 +498,26 @@
     {/if}
   </div>
 
-  <button type="button" class="bds-btn-outlined" style="width: 100%;" onclick={triggerFileUpload}>
+  <button
+    type="button"
+    class="bds-btn-outlined"
+    style="width: 100%;"
+    onclick={triggerFileUpload}
+  >
     + Upload File
   </button>
+  <button
+    type="button"
+    class="bds-btn-outlined"
+    style="width: 100%; margin-top: 6px;"
+    onclick={handleFolderUpload}
+  >
+    + Upload Folder
+  </button>
+
   <input
     type="file"
+    multiple
     accept=".txt,.md,.json,.csv,.js,.ts,.jsx,.tsx,.py,.go,.rs,.java,.kt,.swift,.c,.cpp,.cs,.rb,.php,.html,.css,.sh,.yaml,.yml,.toml,.env"
     style="display: none;"
     bind:this={fileInput}
@@ -368,8 +539,14 @@
       {#each projectConversations as conv (conv.conversationId)}
         <div class="bds-skill-item">
           <div style="flex: 1; min-width: 0;">
-            <div style="font-size: 12px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">{conv.title}</div>
-            <div style="font-size: 10px; opacity: 0.5;">{formatDate(conv.createdAt)}</div>
+            <div
+              style="font-size: 12px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;"
+            >
+              {conv.title}
+            </div>
+            <div style="font-size: 10px; opacity: 0.5;">
+              {formatDate(conv.createdAt)}
+            </div>
           </div>
           <button
             type="button"
@@ -391,17 +568,33 @@
     <div class="bds-confirm-box bds-confirm-danger">
       <p class="bds-confirm-text">
         Delete "{selectedProject.name}"? This will also remove its
-        {projectFiles.length} {projectFiles.length === 1 ? "file" : "files"} and
-        {projectConversations.length} conversation {projectConversations.length === 1 ? "association" : "associations"}.
-        Conversations in DeepSeek are unaffected.
+        {projectFiles.length}
+        {projectFiles.length === 1 ? "file" : "files"} and
+        {projectConversations.length} conversation {projectConversations.length ===
+        1
+          ? "association"
+          : "associations"}. Conversations in DeepSeek are unaffected.
       </p>
       <div class="bds-editor-actions">
-        <button type="button" class="bds-btn-outlined" onclick={() => showDeleteConfirm = false}>Cancel</button>
-        <button type="button" class="bds-btn-danger" onclick={confirmDeleteProject}>Delete Project</button>
+        <button
+          type="button"
+          class="bds-btn-outlined"
+          onclick={() => (showDeleteConfirm = false)}>Cancel</button
+        >
+        <button
+          type="button"
+          class="bds-btn-danger"
+          onclick={confirmDeleteProject}>Delete Project</button
+        >
       </div>
     </div>
   {:else}
-    <button type="button" class="bds-btn-danger" style="width: 100%;" onclick={promptDeleteProject}>
+    <button
+      type="button"
+      class="bds-btn-danger"
+      style="width: 100%;"
+      onclick={promptDeleteProject}
+    >
       Delete Project
     </button>
   {/if}
@@ -414,7 +607,7 @@
     gap: 10px;
     margin-bottom: 14px;
     padding-bottom: 10px;
-    border-bottom: 1px solid var(--bds-border, rgba(0,0,0,0.08));
+    border-bottom: 1px solid var(--bds-border, rgba(0, 0, 0, 0.08));
   }
   .bds-back-btn {
     background: none;
