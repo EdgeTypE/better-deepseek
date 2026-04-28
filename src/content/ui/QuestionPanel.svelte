@@ -37,6 +37,10 @@
 
     const handleKeyDown = (e) => {
       if (!visible || questions.length === 0) return;
+      
+      if (document.activeElement && document.activeElement.tagName === "INPUT") {
+        return;
+      }
 
       const q = questions[currentQuestionIndex];
       const optionsCount = q.options?.length || 0;
@@ -73,6 +77,14 @@
     };
   });
 
+  function focusOnMount(node) {
+    setTimeout(() => {
+      if (node) {
+        node.focus();
+      }
+    }, 150);
+  }
+
   function attachToPromptBox() {
     if (!panelElement) return;
     
@@ -86,7 +98,14 @@
 
     if (target) {
       if (panelElement.parentElement !== target) {
+        const activeEl = document.activeElement;
+        const wasFocused = activeEl && panelElement.contains(activeEl);
+
         target.prepend(panelElement);
+
+        if (wasFocused && activeEl) {
+          setTimeout(() => activeEl.focus(), 10);
+        }
       }
     }
   }
@@ -335,10 +354,13 @@
               </span>
               <input 
                 type="text" 
+                use:focusOnMount
                 class="bds-custom-text-input" 
                 placeholder="Something else..." 
                 bind:value={customAnswers[key]}
                 oninput={() => answers[key] = "Other"}
+                onmousedown={(e) => e.stopPropagation()}
+                onclick={(e) => e.stopPropagation()}
                 onkeydown={(e) => {
                   e.stopPropagation();
                   if (e.key === 'Enter') {
@@ -396,9 +418,12 @@
               </span>
               <input 
                 type="text" 
+                use:focusOnMount
                 class="bds-custom-text-input" 
                 placeholder="Something else..." 
                 bind:value={customAnswers[key]}
+                onmousedown={(e) => e.stopPropagation()}
+                onclick={(e) => e.stopPropagation()}
                 onkeydown={(e) => e.stopPropagation()}
                 onkeyup={(e) => e.stopPropagation()}
               />
@@ -407,12 +432,21 @@
         </div>
 
       {:else}
-        <div class="bds-free-input-wrapper">
+        <div 
+          class="bds-free-input-wrapper"
+          onclick={(e) => {
+            const input = e.currentTarget.querySelector('input');
+            if (input) input.focus();
+          }}
+        >
           <input 
             type="text" 
+            use:focusOnMount
             class="bds-text-input" 
             placeholder="Type your answer here..." 
             bind:value={customAnswers[key]} 
+            onmousedown={(e) => e.stopPropagation()}
+            onclick={(e) => e.stopPropagation()}
             onkeydown={(e) => {
               e.stopPropagation();
               if (e.key === 'Enter') {
@@ -450,6 +484,9 @@
 
 <style>
   .bds-question-panel {
+    position: relative;
+    z-index: 99999;
+    pointer-events: auto !important;
     background: var(--bds-bg-panel, #1e1f23);
     border: 1px solid var(--bds-border, #3a3b3f);
     border-radius: 14px;
