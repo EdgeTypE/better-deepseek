@@ -22,7 +22,7 @@
 
   let showProjectsManager = $state(false);
 
-  let hasActiveProject = $derived(Boolean(appState.activeProjectId));
+  let hasActiveProject = $state(Boolean(appState.activeProjectId));
 
   export function refreshSettings() {
     if (settingsRef) settingsRef.refresh();
