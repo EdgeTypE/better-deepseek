@@ -9,6 +9,7 @@ import { enhanceCodeBlockDownloads } from "./files/code-blocks.js";
 import { mount } from "svelte";
 import AttachMenu from "./ui/AttachMenu.svelte";
 import { checkPendingExport } from "./tools/pending-export.js";
+import { getCurrentConversationId, snapshotTitleAndAssociate } from "./project-manager.js";
 
 /**
  * Collect all message nodes from the chat DOM.
@@ -274,6 +275,17 @@ export function startUrlWatcher() {
     }
 
     state.lastUrl = location.href;
+
+    if (state.activeProjectId) {
+      const convId = getCurrentConversationId();
+      if (convId) {
+        const exists = state.projectConversations.some((c) => c.conversationId === convId);
+        if (!exists) {
+          snapshotTitleAndAssociate(convId, state.activeProjectId);
+        }
+      }
+    }
+
     state.longWork.active = false;
     state.longWork.files.clear();
     state.longWork.lastActivityAt = 0;

@@ -12,6 +12,7 @@ import state from "../state.js";
  * @property {() => void} refreshSettings
  * @property {() => void} refreshSkills
  * @property {() => void} refreshMemories
+ * @property {() => void} refreshProjects
  */
 
 /**
@@ -36,6 +37,7 @@ export function mountUi() {
     refreshSkills: () => app.refreshSkills(),
     refreshCharacters: () => app.refreshCharacters(),
     refreshMemories: () => app.refreshMemories(),
+    refreshProjects: () => app.refreshProjects(),
   };
 
   state.ui = api;

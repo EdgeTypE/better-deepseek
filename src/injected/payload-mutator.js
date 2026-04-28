@@ -274,7 +274,14 @@ export function buildHiddenPrefix(
     blocks.push(`<BetterDeepSeek>User send this message using voice recorder tool.</BetterDeepSeek>`);
     state.isNextVoiceMessage = false;
   }
-  
+
+  if (forceSystemPrompt) {
+    const projectBlock = buildProjectBlock(state);
+    if (projectBlock) {
+      blocks.push(projectBlock);
+    }
+  }
+
   return blocks.join("\n\n");
 }
 
@@ -323,6 +330,28 @@ export function buildMemoryCallsBlock(userPrompt, state) {
     .map((item) => `${item.key}: ${item.value}`)
     .join(". ");
   return `<BetterDeepSeek> <BDS:memory_calls>${text}</BDS:memory_calls> </BetterDeepSeek>`;
+}
+
+/**
+ * Build the project context block from the active project config.
+ */
+export function buildProjectBlock(state) {
+  const project = state.config && state.config.activeProject;
+  if (!project) return "";
+
+  let inner = "";
+  if (project.instructions && project.instructions.trim()) {
+    inner += project.instructions.trim() + "\n";
+  }
+
+  if (project.files && project.files.length > 0) {
+    const filesInner = project.files
+      .map((f) => `<BDS:FILE name="${f.name}">\n${f.content}\n</BDS:FILE>`)
+      .join("\n");
+    inner += `<BDS:FILES>\n${filesInner}\n</BDS:FILES>\n`;
+  }
+
+  return `<BetterDeepSeek>\n<BDS:PROJECT name="${project.name}">\n${inner}</BDS:PROJECT>\n</BetterDeepSeek>`;
 }
 
 /**
@@ -387,5 +416,6 @@ export function stripInjectedBlocks(text) {
     ""
   );
   output = output.replace(/<BDS:RP>[\s\S]*?<\/BDS:RP>/gi, "");
+  output = output.replace(/<BDS:PROJECT[^>]*>[\s\S]*?<\/BDS:PROJECT>/gi, "");
   return output.trim();
 }

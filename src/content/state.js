@@ -12,6 +12,16 @@ const state = {
   skills: [],
   memories: {},
   characters: [],
+  /** @type {Array<{id:string,name:string,description:string,customInstructions:string,createdAt:number,updatedAt:number}>} */
+  projects: [],
+  /** @type {Array<{id:string,projectId:string,name:string,content:string,size:number,createdAt:number}>} */
+  projectFiles: [],
+  /** @type {Array<{conversationId:string,projectId:string,title:string,createdAt:number}>} */
+  projectConversations: [],
+  /** @type {string|null} session-only, never persisted */
+  activeProjectId: null,
+  /** @type {string[]} session-only, never persisted */
+  activeFileIds: [],
   observer: null,
   scanTimer: 0,
   urlWatchTimer: 0,

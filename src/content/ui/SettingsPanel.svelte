@@ -7,6 +7,7 @@
     DOWNLOAD_BEHAVIOR_VERSION,
     DEFAULT_SYSTEM_PROMPT,
   } from "../../lib/constants.js";
+  import { getActiveProject, updateProject } from "../project-manager.js";
 
   let systemPrompt = $state(appState.settings.systemPrompt || "");
   let autoFiles = $state(Boolean(appState.settings.autoDownloadFiles));
@@ -15,6 +16,9 @@
   let voiceLanguage = $state(appState.settings.voiceLanguage || (typeof navigator !== 'undefined' ? navigator.language : 'en-US'));
   let autoSubmitVoice = $state(Boolean(appState.settings.autoSubmitVoice));
 
+  let activeProject = $state(getActiveProject());
+  let projectInstructions = $state(activeProject?.customInstructions || "");
+  let projectSaveTimer = null;
 
   export function refresh() {
     systemPrompt = appState.settings.systemPrompt || "";
@@ -23,7 +27,22 @@
     voiceMode = Boolean(appState.settings.voiceMode);
     voiceLanguage = appState.settings.voiceLanguage || (typeof navigator !== 'undefined' ? navigator.language : 'en-US');
     autoSubmitVoice = Boolean(appState.settings.autoSubmitVoice);
+  }
 
+  export function refreshProject() {
+    activeProject = getActiveProject();
+    projectInstructions = activeProject?.customInstructions || "";
+  }
+
+  function scheduleProjectSave() {
+    if (projectSaveTimer) clearTimeout(projectSaveTimer);
+    projectSaveTimer = setTimeout(async () => {
+      projectSaveTimer = null;
+      const project = getActiveProject();
+      if (!project) return;
+      await updateProject(project.id, { customInstructions: projectInstructions });
+      pushConfigToPage();
+    }, 600);
   }
 
   async function save() {
@@ -73,6 +92,23 @@
   spellcheck="false"
   bind:value={systemPrompt}
 ></textarea>
+
+{#if activeProject}
+  <div class="bds-label-row" style="margin-top: 12px;">
+    <label class="bds-label" for="bds-project-instructions">
+      Project Instructions — <em style="font-weight: 400; opacity: 0.7;">{activeProject.name}</em>
+    </label>
+  </div>
+  <textarea
+    id="bds-project-instructions"
+    spellcheck="false"
+    bind:value={projectInstructions}
+    oninput={scheduleProjectSave}
+    placeholder="Custom instructions appended to the global system prompt for this project…"
+    style="min-height: 80px;"
+  ></textarea>
+  <p style="font-size: 10px; opacity: 0.5; margin: 2px 0 12px;">Auto-saved</p>
+{/if}
 
 <div class="bds-toggle-row">
   <span class="bds-toggle-label">Auto download create_file outputs</span>

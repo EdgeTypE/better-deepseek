@@ -36,6 +36,9 @@
   export function refreshMemories() {
     if (drawerRef) drawerRef.refreshMemories();
   }
+  export function refreshProjects() {
+    if (drawerRef) drawerRef.refreshProjects();
+  }
 
   function toggleDrawer() {
     drawerOpen = !drawerOpen;
