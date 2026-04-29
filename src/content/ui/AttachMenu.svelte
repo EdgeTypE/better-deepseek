@@ -37,7 +37,7 @@
   let projectPanelStyle = "";
   let projectBtnRef;
   let projectPanelRef;
-  let panelProjects = [];
+  let panelProjects = [...appState.projects];
   let panelActiveProjectId = "";
   let panelFiles = [];
   let panelTickedIds = [];
@@ -196,6 +196,7 @@
   }
 
   onMount(() => {
+    panelProjects = [...appState.projects];
     document.addEventListener("click", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
     appState.heroBarRef = { refresh: refreshProjectPanel };
@@ -432,22 +433,20 @@
     </svg>
   </button>
 
-  {#if appState.projects && appState.projects.length > 0}
-    <button
-      class="bds-project-btn"
-      bind:this={projectBtnRef}
-      on:click={openProjectPanel}
-      title="Attach Project"
+  <button
+    class="bds-project-btn"
+    bind:this={projectBtnRef}
+    on:click={openProjectPanel}
+    title="Attach Project"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+      style="opacity:0.65"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-        style="opacity:0.65"
-      >
-        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-      </svg>
-    </button>
-  {/if}
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+    </svg>
+  </button>
 
   <button
     class="bds-mic-btn {isRecording ? 'bds-recording' : ''}"
@@ -1022,6 +1021,7 @@
     max-width: 300px;
     z-index: 999999;
     overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   }
 
   .bds-pp-header {
@@ -1043,7 +1043,7 @@
   }
 
   .bds-pp-select {
-    background: transparent;
+    background: var(--dsw-color-bg-primary, #141414);
     border: 1px solid var(--dsw-color-border-primary, #3d3d3d);
     border-radius: 5px;
     color: var(--dsw-alias-text, #e0e0e0);
@@ -1053,10 +1053,54 @@
     flex: 1;
     outline: none;
     min-width: 0;
+    font-family: inherit;
   }
 
   .bds-pp-select:focus {
     border-color: var(--dsw-alias-brand-text, #4d6bfe);
+  }
+
+  .bds-pp-hint {
+    font-size: 11px;
+    color: var(--dsw-alias-text, #e0e0e0);
+    opacity: 0.55;
+    padding: 6px 12px 8px;
+    margin: 0;
+    line-height: 1.45;
+    border-bottom: 1px solid var(--dsw-color-border-primary, #3d3d3d);
+  }
+
+  .bds-pp-files-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px 2px;
+  }
+
+  .bds-pp-files-count {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--dsw-alias-text, #e0e0e0);
+    opacity: 0.45;
+  }
+
+  .bds-pp-select-all {
+    background: none;
+    border: none;
+    color: var(--dsw-alias-brand-text, #4d6bfe);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background 0.15s ease;
+    font-family: inherit;
+  }
+
+  .bds-pp-select-all:hover {
+    background: rgba(77, 107, 254, 0.12);
   }
 
   .bds-pp-files {
