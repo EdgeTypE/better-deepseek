@@ -344,13 +344,6 @@ export function buildProjectBlock(state) {
     inner += project.instructions.trim() + "\n";
   }
 
-  if (project.files && project.files.length > 0) {
-    const filesInner = project.files
-      .map((f) => `<BDS:FILE name="${f.name}">\n${f.content}\n</BDS:FILE>`)
-      .join("\n");
-    inner += `<BDS:FILES>\n${filesInner}\n</BDS:FILES>\n`;
-  }
-
   return `<BetterDeepSeek>\n<BDS:PROJECT name="${project.name}">\n${inner}</BDS:PROJECT>\n</BetterDeepSeek>`;
 }
 

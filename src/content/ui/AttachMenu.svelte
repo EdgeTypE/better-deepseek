@@ -3,6 +3,8 @@
   import { pickFolderAndConcatenate } from "../files/folder-reader.js";
   import { fetchGitHubRepo, parseGitHubUrl } from "../files/github-reader.js";
   import { fetchAndConvertWebPage } from "../files/web-reader.js";
+  import { projectFilesToFile } from "../files/project-file-builder.js";
+  import { getFilesForProject } from "../project-manager.js";
   import appState from "../state.js";
   import { BRIDGE_EVENTS } from "../../lib/constants.js";
 
@@ -28,6 +30,12 @@
   let webError = "";
 
   let dialogRef;
+
+  // Project file picker dialog state
+  let showProjectFilesDialog = false;
+  let projectPickerFiles = [];
+  let projectPickerSelected = [];
+  let projectPickerName = "";
 
   // Speech Recognition state
   let isRecording = false;
@@ -313,7 +321,7 @@
     }
   }
 
-  function injectFile(file) {
+  function injectFile(file, source = "upload") {
     if (!nativeInput) return;
     const dt = new DataTransfer();
     if (nativeInput.files) {
@@ -324,6 +332,56 @@
     dt.items.add(file);
     nativeInput.files = dt.files;
     nativeInput.dispatchEvent(new Event("change", { bubbles: true }));
+    window.dispatchEvent(
+      new CustomEvent("bds:fileAttached", {
+        detail: { name: file.name, size: file.size, source },
+      })
+    );
+  }
+
+  function handleAttachProjectFiles() {
+    closeMenu();
+    const pid = appState.activeProjectId;
+    if (!pid) return;
+    const project = appState.projects.find((p) => p.id === pid);
+    const files = getFilesForProject(pid);
+    if (!files.length) {
+      if (appState.ui) appState.ui.showToast("No files in active project.");
+      return;
+    }
+    projectPickerName = project?.name || "Project";
+    projectPickerFiles = files;
+    projectPickerSelected = files.map((f) => f.id);
+    showProjectFilesDialog = true;
+  }
+
+  function toggleProjectPickerFile(id) {
+    if (projectPickerSelected.includes(id)) {
+      projectPickerSelected = projectPickerSelected.filter((x) => x !== id);
+    } else {
+      projectPickerSelected = [...projectPickerSelected, id];
+    }
+  }
+
+  function confirmProjectFileAttach() {
+    const selected = projectPickerFiles.filter((f) =>
+      projectPickerSelected.includes(f.id)
+    );
+    if (!selected.length) {
+      showProjectFilesDialog = false;
+      return;
+    }
+    const file = projectFilesToFile(selected, projectPickerName);
+    if (file) {
+      injectFile(file, "project");
+    }
+    showProjectFilesDialog = false;
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1048576).toFixed(1)} MB`;
   }
 
   function handleDialogKeydown(e, type) {
@@ -370,6 +428,12 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="bds-item-icon"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
         Upload Folder
       </button>
+      {#if appState.activeProjectId && appState.projectFiles.some(f => f.projectId === appState.activeProjectId)}
+        <button class="bds-attach-item bds-attach-item--project" on:click={handleAttachProjectFiles}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="bds-item-icon"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          Attach Project Files
+        </button>
+      {/if}
       <div class="bds-attach-divider"></div>
       <button class="bds-attach-item" on:click={handleGithubImport}>
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="bds-item-icon"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"></path></svg>
@@ -433,6 +497,51 @@
           disabled={githubLoading || !githubUrl.trim()}
         >
           {githubLoading ? "Fetching..." : "Fetch"}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if showProjectFilesDialog}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <div class="bds-github-overlay" use:portal on:click|self={() => (showProjectFilesDialog = false)}>
+    <div class="bds-github-dialog" bind:this={dialogRef} on:click|stopPropagation on:keydown|stopPropagation>
+      <div class="bds-github-header">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        <span>Attach from {projectPickerName}</span>
+        <button class="bds-github-close" on:click={() => (showProjectFilesDialog = false)}>&times;</button>
+      </div>
+
+      <div class="bds-github-body" style="max-height: 320px; overflow-y: auto; padding: 8px 12px;">
+        {#each projectPickerFiles as file (file.id)}
+          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <label class="bds-picker-row">
+            <input
+              type="checkbox"
+              checked={projectPickerSelected.includes(file.id)}
+              on:change={() => toggleProjectPickerFile(file.id)}
+            />
+            <div class="bds-picker-info">
+              <span class="bds-picker-name">{file.name}</span>
+              <span class="bds-picker-size">{formatSize(file.size)}</span>
+            </div>
+          </label>
+        {/each}
+      </div>
+
+      <div class="bds-github-footer">
+        <button class="bds-github-btn bds-github-btn-cancel" on:click={() => (showProjectFilesDialog = false)}>
+          Cancel
+        </button>
+        <button
+          class="bds-github-btn bds-github-btn-import"
+          on:click={confirmProjectFileAttach}
+          disabled={projectPickerSelected.length === 0}
+        >
+          Attach ({projectPickerSelected.length})
         </button>
       </div>
     </div>
@@ -758,6 +867,53 @@
 
   .bds-github-btn-import:hover:not(:disabled) {
     background: #3d5bde;
+  }
+
+  .bds-attach-item--project {
+    color: var(--dsw-alias-brand-text, #4d6bfe);
+  }
+
+  .bds-attach-item--project:hover {
+    background: rgba(77, 107, 254, 0.1);
+    color: var(--dsw-alias-brand-text, #4d6bfe);
+  }
+
+  .bds-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 4px;
+    border-radius: 5px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--dsw-color-border-primary, rgba(255,255,255,0.06));
+  }
+
+  .bds-picker-row:last-child {
+    border-bottom: none;
+  }
+
+  .bds-picker-row:hover {
+    background: var(--dsw-color-bg-hover, rgba(255,255,255,0.04));
+  }
+
+  .bds-picker-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .bds-picker-name {
+    font-size: 13px;
+    color: var(--dsw-alias-text, #e0e0e0);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bds-picker-size {
+    font-size: 10px;
+    opacity: 0.45;
+    margin-top: 1px;
   }
 
   @media (prefers-color-scheme: light) {

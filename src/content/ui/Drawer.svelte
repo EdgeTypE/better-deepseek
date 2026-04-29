@@ -3,8 +3,6 @@
   import CharacterList from "./CharacterList.svelte";
   import SkillList from "./SkillList.svelte";
   import MemoryList from "./MemoryList.svelte";
-  import ProjectSwitcher from "./ProjectSwitcher.svelte";
-  import ProjectFileSelector from "./ProjectFileSelector.svelte";
   import ProjectConversationList from "./ProjectConversationList.svelte";
   import ProjectsManager from "./ProjectsManager.svelte";
   import appState from "../state.js";
@@ -15,8 +13,6 @@
   let charactersRef = $state(null);
   let skillsRef = $state(null);
   let memoryRef = $state(null);
-  let projectSwitcherRef = $state(null);
-  let projectFileSelectorRef = $state(null);
   let projectConversationListRef = $state(null);
   let projectsManagerRef = $state(null);
 
@@ -37,12 +33,9 @@
     if (memoryRef) memoryRef.refresh();
   }
   export function refreshProjects() {
-    if (projectSwitcherRef) projectSwitcherRef.refresh();
-    if (projectFileSelectorRef) projectFileSelectorRef.refresh();
     if (projectConversationListRef) projectConversationListRef.refresh();
     if (projectsManagerRef) projectsManagerRef.refresh();
     if (settingsRef) settingsRef.refreshProject();
-    // Re-evaluate derived so conditional sections update
     hasActiveProject = Boolean(appState.activeProjectId);
   }
 
@@ -69,10 +62,34 @@
   {#if showProjectsManager}
     <ProjectsManager bind:this={projectsManagerRef} onback={closeProjectsManager} />
   {:else}
-    <ProjectSwitcher bind:this={projectSwitcherRef} onManage={openProjectsManager} />
+    <!-- Projects section: selection is now in the hero bar below the chat input -->
+    <div class="bds-section-title">
+      <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+        <div style="display: flex; align-items: center;">
+          <span class="bds-icon-inline">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2 3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3Z" fill="currentColor" opacity="0.4"/>
+              <path d="M2 8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V8Z" fill="currentColor" opacity="0.6"/>
+              <path d="M3 12a1 1 0 0 0 0 2h10a1 1 0 0 0 0-2H3Z" fill="currentColor"/>
+            </svg>
+          </span>
+          Projects
+        </div>
+        <button
+          type="button"
+          class="bds-btn-outlined"
+          style="font-size: 11px; padding: 3px 8px;"
+          onclick={openProjectsManager}
+        >
+          Manage
+        </button>
+      </div>
+    </div>
+    <p style="font-size: 11px; opacity: 0.45; margin: 0 0 4px; padding: 0 2px;">
+      Project &amp; file selection available below the chat input.
+    </p>
 
     {#if hasActiveProject}
-      <ProjectFileSelector bind:this={projectFileSelectorRef} />
       <ProjectConversationList bind:this={projectConversationListRef} />
     {/if}
 

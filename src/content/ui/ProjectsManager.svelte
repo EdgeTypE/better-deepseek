@@ -320,6 +320,35 @@
       year: "numeric",
     });
   }
+
+  function exportFile(file) {
+    const blob = new Blob([file.content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = file.name.split("/").pop();
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportAll() {
+    if (!projectFiles.length) return;
+    let text = `Project: ${selectedProject.name}\n\nFiles:\n`;
+    projectFiles.forEach((f) => { text += `  ${f.name}\n`; });
+    text += "\n========================================\n";
+    for (const file of projectFiles) {
+      text += `\n\n--- [FILE: ${file.name}] ---\n\n`;
+      text += file.content;
+    }
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const safeName = selectedProject.name.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
+    a.download = `${safeName}_all_files.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 </script>
 
 <div class="bds-manager-header">
@@ -465,7 +494,20 @@
   <hr style="margin: 12px 0;" />
 
   <!-- Files section -->
-  <div class="bds-subsection-title">Files</div>
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+    <div class="bds-subsection-title" style="margin: 0;">Files</div>
+    {#if projectFiles.length > 0}
+      <button
+        type="button"
+        class="bds-btn-outlined"
+        style="font-size: 10px; padding: 2px 7px;"
+        onclick={exportAll}
+        title="Download all files as a single concatenated text file"
+      >
+        Export All
+      </button>
+    {/if}
+  </div>
 
   {#if fileError}
     <p class="bds-field-error">{fileError}</p>
@@ -507,14 +549,25 @@
                 {formatSize(file.size)}
               </div>
             </div>
-            <button
-              type="button"
-              class="bds-btn-danger"
-              style="font-size: 11px; padding: 3px 8px;"
-              onclick={() => promptDeleteFile(file)}
-            >
-              Delete
-            </button>
+            <div style="display: flex; gap: 4px;">
+              <button
+                type="button"
+                class="bds-btn-outlined"
+                style="font-size: 11px; padding: 3px 8px;"
+                onclick={() => exportFile(file)}
+                title="Download {file.name}"
+              >
+                Export
+              </button>
+              <button
+                type="button"
+                class="bds-btn-danger"
+                style="font-size: 11px; padding: 3px 8px;"
+                onclick={() => promptDeleteFile(file)}
+              >
+                Delete
+              </button>
+            </div>
           </div>
         {/if}
       {/each}

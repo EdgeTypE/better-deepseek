@@ -39,6 +39,8 @@ const state = {
   },
   /** @type {import('./ui/mount.js').UiApi | null} */
   ui: null,
+  /** @type {{ refresh: () => void } | null} session-only ref to ProjectHeroBar */
+  heroBarRef: null,
 };
 
 export default state;
