@@ -21,12 +21,34 @@ export function normalizeConfig(config) {
         .filter((item) => item.key && item.value.trim().length > 0)
     : [];
 
+  const activeProject = normalizeActiveProject(config.activeProject);
+
   return {
     systemPrompt: String(config.systemPrompt || ""),
     skills,
     memories,
     activeCharacter: config.activeCharacter || null,
+    activeProject,
   };
+}
+
+function normalizeActiveProject(raw) {
+  if (!raw || typeof raw !== "object") return null;
+
+  const name = String(raw.name || "").trim();
+  const instructions = String(raw.instructions || "");
+  const files = Array.isArray(raw.files)
+    ? raw.files
+        .map((f) => ({
+          name: String(f && f.name ? f.name : "file"),
+          content: String(f && f.content ? f.content : ""),
+        }))
+        .filter((f) => f.content.length > 0)
+    : [];
+
+  if (!name) return null;
+
+  return { name, instructions, files };
 }
 
 export function sanitizeKey(value) {

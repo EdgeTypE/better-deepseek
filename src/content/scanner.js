@@ -287,6 +287,8 @@ export function startUrlWatcher() {
     }
 
     state.lastUrl = location.href;
+    window.dispatchEvent(new CustomEvent("bds:urlChanged"));
+
     state.longWork.active = false;
     state.longWork.files.clear();
     state.longWork.lastActivityAt = 0;

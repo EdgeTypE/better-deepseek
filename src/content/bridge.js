@@ -6,6 +6,7 @@ import state from "./state.js";
 import { BRIDGE_EVENTS } from "../lib/constants.js";
 import { findLatestAssistantMessageNode, collectMessageNodes } from "./scanner.js";
 import { finalizeLongWork } from "./files/long-work.js";
+import { getActiveProject, getActiveFiles } from "./project-manager.js";
 
 /**
  * Set up listeners for bridge events from the injected script.
@@ -33,6 +34,7 @@ export function setupBridgeEvents() {
  * Push current config (system prompt, skills, memories) to the MAIN world.
  */
 export function pushConfigToPage() {
+  const activeProject = getActiveProject();
   const detail = {
     systemPrompt: String(state.settings.systemPrompt || ""),
     skills: state.skills
@@ -44,6 +46,13 @@ export function pushConfigToPage() {
       importance: item.importance,
     })),
     activeCharacter: state.characters.find(c => c.active) || null,
+    activeProject: activeProject
+      ? {
+          name: activeProject.name,
+          instructions: activeProject.customInstructions,
+          files: getActiveFiles().map((f) => ({ name: f.name, content: f.content })),
+        }
+      : null,
   };
 
   window.dispatchEvent(

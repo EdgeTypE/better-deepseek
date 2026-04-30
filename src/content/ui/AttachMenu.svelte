@@ -3,6 +3,9 @@
   import { pickFolderAndConcatenate } from "../files/folder-reader.js";
   import { fetchGitHubRepo, parseGitHubUrl } from "../files/github-reader.js";
   import { fetchAndConvertWebPage } from "../files/web-reader.js";
+  import { projectFilesToFile } from "../files/project-file-builder.js";
+  import { getFilesForProject, setActiveProject, clearActiveProject, tickFile, untickFile, clearActiveFiles } from "../project-manager.js";
+  import { pushConfigToPage } from "../bridge.js";
   import appState from "../state.js";
   import { BRIDGE_EVENTS } from "../../lib/constants.js";
 
@@ -28,6 +31,16 @@
   let webError = "";
 
   let dialogRef;
+
+  // Project panel (folder button) state
+  let showProjectPanel = false;
+  let projectPanelStyle = "";
+  let projectBtnRef;
+  let projectPanelRef;
+  let panelProjects = [...appState.projects];
+  let panelActiveProjectId = "";
+  let panelFiles = [];
+  let panelTickedIds = [];
 
   // Speech Recognition state
   let isRecording = false;
@@ -183,29 +196,34 @@
   }
 
   onMount(() => {
+    panelProjects = [...appState.projects];
     document.addEventListener("click", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
+    appState.heroBarRef = { refresh: refreshProjectPanel };
     return () => {
       document.removeEventListener("click", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
+      if (appState.heroBarRef?.refresh === refreshProjectPanel) {
+        appState.heroBarRef = null;
+      }
     };
   });
 
   function handleClickOutside(e) {
-    if (menuRef && !menuRef.contains(e.target)) {
-      if (dialogRef && dialogRef.contains(e.target)) return;
+    const inMenu = menuRef && menuRef.contains(e.target);
+    const inDialog = dialogRef && dialogRef.contains(e.target);
+    const inPanel = projectPanelRef && projectPanelRef.contains(e.target);
+    if (!inMenu && !inDialog && !inPanel) {
       closeMenu();
+      showProjectPanel = false;
     }
   }
 
   function handleEscape(e) {
     if (e.key === "Escape") {
-      if (showGithubDialog && !githubLoading) {
-        showGithubDialog = false;
-      }
-      if (showWebDialog && !webLoading) {
-        showWebDialog = false;
-      }
+      if (showGithubDialog && !githubLoading) showGithubDialog = false;
+      if (showWebDialog && !webLoading) showWebDialog = false;
+      showProjectPanel = false;
       closeMenu();
     }
   }
@@ -326,6 +344,79 @@
     nativeInput.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
+  function formatSize(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / 1048576).toFixed(1)} MB`;
+  }
+
+  function hasMessages() {
+    return document.querySelectorAll("div.ds-message").length > 0;
+  }
+
+  function openProjectPanel(e) {
+    e.stopPropagation();
+    if (showProjectPanel) { showProjectPanel = false; return; }
+    refreshProjectPanel();
+    if (projectBtnRef) {
+      const rect = projectBtnRef.getBoundingClientRect();
+      projectPanelStyle = `bottom: calc(100vh - ${rect.top}px + 8px); left: ${rect.left}px;`;
+    }
+    showProjectPanel = true;
+  }
+
+  function refreshProjectPanel() {
+    panelProjects = [...appState.projects];
+    panelActiveProjectId = appState.activeProjectId || "";
+    panelFiles = panelActiveProjectId ? getFilesForProject(panelActiveProjectId) : [];
+    panelTickedIds = [...appState.activeFileIds];
+  }
+
+  function handlePanelProjectChange(e) {
+    applyPanelSwitch(e.target.value || "");
+  }
+
+  function applyPanelSwitch(id) {
+    if (id) setActiveProject(id);
+    else clearActiveProject();
+    panelActiveProjectId = appState.activeProjectId || "";
+    panelFiles = panelActiveProjectId ? getFilesForProject(panelActiveProjectId) : [];
+    panelTickedIds = [...appState.activeFileIds];
+    pushConfigToPage();
+    if (appState.ui) appState.ui.refreshProjects();
+  }
+
+  function handlePanelFileToggle(fileId, checked) {
+    if (checked) tickFile(fileId);
+    else untickFile(fileId);
+    panelTickedIds = [...appState.activeFileIds];
+    pushConfigToPage();
+  }
+
+  function attachPanelFiles() {
+    if (!nativeInput || !panelTickedIds.length) return;
+    const activeFiles = panelFiles.filter((f) => panelTickedIds.includes(f.id));
+    if (!activeFiles.length) return;
+    const activeProject = panelProjects.find((p) => p.id === panelActiveProjectId);
+    const file = projectFilesToFile(activeFiles, activeProject?.name || "Project");
+    if (!file) return;
+    injectFile(file);
+    showProjectPanel = false;
+  }
+
+  function toggleSelectAll() {
+    if (panelTickedIds.length === panelFiles.length) {
+      for (const id of [...panelTickedIds]) untickFile(id);
+      panelTickedIds = [];
+    } else {
+      for (const file of panelFiles) {
+        if (!panelTickedIds.includes(file.id)) tickFile(file.id);
+      }
+      panelTickedIds = [...appState.activeFileIds];
+    }
+    pushConfigToPage();
+  }
+
   function handleDialogKeydown(e, type) {
     if (e.key === "Enter") {
       if (type === "github" && !githubLoading) submitGithubUrl();
@@ -342,8 +433,23 @@
     </svg>
   </button>
 
-  <button 
-    class="bds-mic-btn {isRecording ? 'bds-recording' : ''}" 
+  <button
+    class="bds-project-btn"
+    bind:this={projectBtnRef}
+    on:click={openProjectPanel}
+    title="Attach Project"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+      style="opacity:0.65"
+    >
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+    </svg>
+  </button>
+
+  <button
+    class="bds-mic-btn {isRecording ? 'bds-recording' : ''}"
     on:click={toggleSpeechRecognition} 
     title={isRecording ? "Stop Recording" : "Voice Prompt"}
   >
@@ -439,6 +545,72 @@
   </div>
 {/if}
 
+{#if showProjectPanel}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <div class="bds-project-panel" style={projectPanelStyle} use:portal bind:this={projectPanelRef} on:click|stopPropagation>
+    <div class="bds-pp-header">
+      <span class="bds-pp-label">Project</span>
+      <select class="bds-pp-select" value={panelActiveProjectId} on:change={handlePanelProjectChange}>
+        <option value="">None</option>
+        {#each panelProjects as p (p.id)}
+          <option value={p.id}>{p.name}</option>
+        {/each}
+      </select>
+    </div>
+
+    <p class="bds-pp-hint">Instructions from selected project apply at first message only.</p>
+
+    {#if panelActiveProjectId && panelFiles.length > 0}
+      <div class="bds-pp-files-header">
+        <span class="bds-pp-files-count">{panelFiles.length} file{panelFiles.length === 1 ? '' : 's'}</span>
+        <button class="bds-pp-select-all" on:click={toggleSelectAll}>
+          {panelTickedIds.length === panelFiles.length ? 'Deselect all' : 'Select all'}
+        </button>
+      </div>
+      <div class="bds-pp-files">
+        {#each panelFiles as file (file.id)}
+          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <label
+            class="bds-pp-pill{panelTickedIds.includes(file.id) ? ' bds-pp-pill--active' : ''}"
+            title={file.name}
+          >
+            <input
+              type="checkbox"
+              class="bds-sr-only"
+              checked={panelTickedIds.includes(file.id)}
+              on:change={(e) => handlePanelFileToggle(file.id, e.target.checked)}
+            />
+            <span class="bds-pp-pill-check" aria-hidden="true">
+              {#if panelTickedIds.includes(file.id)}
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M8.5 2L4 7 1.5 4.5l-.7.7L4 8.5 9.2 2.7z"/></svg>
+              {:else}
+                <span class="bds-pp-pill-box"></span>
+              {/if}
+            </span>
+            <span class="bds-pp-pill-name">{file.name.split("/").pop()}</span>
+          </label>
+        {/each}
+      </div>
+      {#if panelTickedIds.length > 0}
+        <div class="bds-pp-footer">
+          <button class="bds-pp-attach" on:click={attachPanelFiles}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            </svg>
+            Attach ({panelTickedIds.length})
+          </button>
+        </div>
+      {/if}
+    {:else if panelActiveProjectId}
+      <p class="bds-pp-empty">No files — add via Manage Projects</p>
+    {:else}
+      <p class="bds-pp-empty">No project selected</p>
+    {/if}
+  </div>
+{/if}
+
 {#if showWebDialog}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -507,7 +679,7 @@
   .bds-plus-btn {
     background: transparent;
     border: none;
-    color: var(--dsw-alias-brand-text, #4d6bfe);
+    color: var(--bds-accent);
     width: 32px;
     height: 32px;
     border-radius: 50%;
@@ -515,11 +687,11 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.1s ease;
+    transition: background-color var(--bds-transition, 0.18s ease), transform 0.1s ease;
   }
 
   .bds-plus-btn:hover {
-    background-color: var(--dsw-alias-brand-hover-bg, rgba(77, 107, 254, 0.1));
+    background-color: var(--bds-accent-glow);
   }
 
   .bds-plus-btn:active {
@@ -530,7 +702,7 @@
     position: relative;
     background: transparent;
     border: none;
-    color: var(--dsw-alias-brand-text, #4d6bfe);
+    color: var(--bds-accent);
     width: 32px;
     height: 32px;
     border-radius: 50%;
@@ -538,12 +710,12 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all var(--bds-transition, 0.18s ease);
     margin-right: 2px;
   }
 
   .bds-mic-btn:hover {
-    background-color: var(--dsw-alias-brand-hover-bg, rgba(77, 107, 254, 0.1));
+    background-color: var(--bds-accent-glow);
   }
 
   .bds-mic-btn.bds-recording {
@@ -567,10 +739,10 @@
 
   .bds-attach-dropdown {
     position: fixed;
-    background: var(--dsw-color-bg-elevated, #2a2a2a);
-    border: 1px solid var(--dsw-color-border-primary, #3d3d3d);
-    border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    background: var(--bds-bg-panel);
+    border: 1px solid var(--bds-border);
+    border-radius: var(--bds-radius, 14px);
+    box-shadow: var(--bds-shadow);
     padding: 6px;
     display: flex;
     flex-direction: column;
@@ -581,22 +753,21 @@
   .bds-attach-item {
     background: none;
     border: none;
-    color: var(--dsw-alias-text, #e0e0e0);
+    color: var(--bds-text-primary);
     padding: 10px 12px;
     text-align: left;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 13px;
     display: flex;
     align-items: center;
     gap: 10px;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition: background-color var(--bds-transition, 0.18s ease);
     white-space: nowrap;
   }
 
   .bds-attach-item:hover {
-    background: var(--dsw-color-bg-hover, #3d3d3d);
-    color: var(--dsw-alias-brand-text, #ffffff);
+    background: var(--bds-bg-hover);
   }
 
   .bds-item-icon {
@@ -606,7 +777,7 @@
 
   .bds-attach-divider {
     height: 1px;
-    background: var(--dsw-color-border-primary, #3d3d3d);
+    background: var(--bds-border);
     margin: 4px 6px;
   }
 
@@ -624,12 +795,12 @@
   }
 
   .bds-github-dialog {
-    background: var(--dsw-color-bg-elevated, #1e1e1e);
-    border: 1px solid var(--dsw-color-border-primary, #3d3d3d);
-    border-radius: 12px;
+    background: var(--bds-bg-panel);
+    border: 1px solid var(--bds-border);
+    border-radius: var(--bds-radius, 14px);
     width: 440px;
     max-width: 90vw;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--bds-shadow);
     overflow: hidden;
   }
 
@@ -638,10 +809,10 @@
     align-items: center;
     gap: 8px;
     padding: 14px 16px;
-    border-bottom: 1px solid var(--dsw-color-border-primary, #333);
+    border-bottom: 1px solid var(--bds-border);
     font-size: 15px;
     font-weight: 600;
-    color: var(--dsw-alias-text, #e0e0e0);
+    color: var(--bds-text-primary);
   }
 
   .bds-github-logo {
@@ -652,7 +823,7 @@
     margin-left: auto;
     background: none;
     border: none;
-    color: var(--dsw-alias-text, #999);
+    color: var(--bds-text-tertiary);
     font-size: 20px;
     cursor: pointer;
     padding: 0 4px;
@@ -660,7 +831,7 @@
   }
 
   .bds-github-close:hover {
-    color: #fff;
+    color: var(--bds-text-primary);
   }
 
   .bds-github-body {
@@ -671,19 +842,21 @@
   }
 
   .bds-github-input {
-    background: var(--dsw-color-bg-primary, #141414);
-    border: 1px solid var(--dsw-color-border-primary, #3d3d3d);
+    background: var(--bds-bg-input);
+    border: 1px solid var(--bds-border);
     border-radius: 8px;
     padding: 10px 12px;
-    font-size: 14px;
-    color: var(--dsw-alias-text, #e0e0e0);
+    font-size: 13px;
+    color: var(--bds-text-primary);
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color var(--bds-transition, 0.18s ease), box-shadow var(--bds-transition, 0.18s ease);
     font-family: inherit;
+    width: 100%;
   }
 
   .bds-github-input:focus {
-    border-color: var(--dsw-alias-brand-text, #4d6bfe);
+    border-color: var(--bds-accent);
+    box-shadow: 0 0 0 3px var(--bds-accent-glow);
   }
 
   .bds-github-input:disabled {
@@ -691,7 +864,7 @@
   }
 
   .bds-github-error {
-    color: #f87171;
+    color: var(--bds-danger, #f87171);
     font-size: 13px;
     padding: 0 2px;
   }
@@ -701,7 +874,7 @@
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    color: var(--dsw-alias-brand-text, #4d6bfe);
+    color: var(--bds-accent);
     padding: 0 2px;
   }
 
@@ -709,7 +882,7 @@
     width: 14px;
     height: 14px;
     border: 2px solid transparent;
-    border-top-color: var(--dsw-alias-brand-text, #4d6bfe);
+    border-top-color: var(--bds-accent);
     border-radius: 50%;
     animation: bds-spin 0.6s linear infinite;
     flex-shrink: 0;
@@ -724,17 +897,16 @@
     justify-content: flex-end;
     gap: 8px;
     padding: 12px 16px;
-    border-top: 1px solid var(--dsw-color-border-primary, #333);
+    border-top: 1px solid var(--bds-border);
   }
 
   .bds-github-btn {
-    padding: 8px 16px;
-    border-radius: 6px;
-    border: none;
+    padding: 7px 16px;
+    border-radius: 8px;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s, opacity 0.2s;
+    transition: all var(--bds-transition, 0.18s ease);
   }
 
   .bds-github-btn:disabled {
@@ -743,26 +915,314 @@
   }
 
   .bds-github-btn-cancel {
-    background: var(--dsw-color-bg-hover, #333);
-    color: var(--dsw-alias-text, #ccc);
+    border: 1px solid var(--bds-border);
+    background: transparent;
+    color: var(--bds-text-primary);
   }
 
   .bds-github-btn-cancel:hover:not(:disabled) {
-    background: #444;
+    background: var(--bds-bg-elevated);
+    border-color: var(--bds-border-hover);
   }
 
   .bds-github-btn-import {
-    background: var(--dsw-alias-brand-text, #4d6bfe);
+    border: none;
+    background: var(--bds-accent);
     color: #fff;
   }
 
   .bds-github-btn-import:hover:not(:disabled) {
-    background: #3d5bde;
+    opacity: 0.88;
   }
 
-  @media (prefers-color-scheme: light) {
-    .bds-attach-dropdown {
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-    }
+  .bds-attach-item--project {
+    color: var(--bds-accent);
+  }
+
+  .bds-attach-item--project:hover {
+    background: var(--bds-accent-glow);
+    color: var(--bds-accent);
+  }
+
+  .bds-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 4px;
+    border-radius: 5px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--bds-border);
+  }
+
+  .bds-picker-row:last-child {
+    border-bottom: none;
+  }
+
+  .bds-picker-row:hover {
+    background: var(--bds-bg-hover);
+  }
+
+  .bds-picker-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .bds-picker-name {
+    font-size: 13px;
+    color: var(--bds-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bds-picker-size {
+    font-size: 10px;
+    color: var(--bds-text-tertiary);
+    margin-top: 1px;
+  }
+
+  /* ─── Project Panel ─── */
+
+  .bds-project-btn {
+    background: transparent;
+    border: none;
+    color: var(--bds-accent);
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color var(--bds-transition, 0.18s ease);
+    flex-shrink: 0;
+    padding: 0;
+  }
+
+  .bds-project-btn:hover {
+    background-color: var(--bds-accent-glow);
+  }
+
+  .bds-project-btn--active {
+    color: var(--bds-accent);
+  }
+
+  .bds-project-panel {
+    position: fixed;
+    background: var(--bds-bg-panel);
+    border: 1px solid var(--bds-border);
+    border-radius: var(--bds-radius, 14px);
+    box-shadow: var(--bds-shadow);
+    min-width: 240px;
+    max-width: 300px;
+    z-index: 999999;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  .bds-pp-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--bds-border);
+  }
+
+  .bds-pp-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--bds-text-tertiary);
+    flex-shrink: 0;
+  }
+
+  .bds-pp-select {
+    background: var(--bds-bg-input);
+    border: 1px solid var(--bds-border);
+    border-radius: 6px;
+    color: var(--bds-text-primary);
+    font-size: 13px;
+    padding: 5px 8px;
+    cursor: pointer;
+    flex: 1;
+    outline: none;
+    min-width: 0;
+    font-family: inherit;
+    transition: border-color var(--bds-transition, 0.18s ease), box-shadow var(--bds-transition, 0.18s ease);
+  }
+
+  .bds-pp-select:focus {
+    border-color: var(--bds-accent);
+    box-shadow: 0 0 0 3px var(--bds-accent-glow);
+  }
+
+  .bds-pp-hint {
+    font-size: 11px;
+    color: var(--bds-text-secondary);
+    padding: 6px 12px 8px;
+    margin: 0;
+    line-height: 1.45;
+    border-bottom: 1px solid var(--bds-border);
+  }
+
+  .bds-pp-files-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px 2px;
+  }
+
+  .bds-pp-files-count {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--bds-text-tertiary);
+  }
+
+  .bds-pp-select-all {
+    background: none;
+    border: none;
+    color: var(--bds-accent);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background var(--bds-transition, 0.18s ease);
+    font-family: inherit;
+  }
+
+  .bds-pp-select-all:hover {
+    background: var(--bds-accent-glow);
+  }
+
+  .bds-pp-files {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 8px;
+    gap: 1px;
+    max-height: 210px;
+    overflow-y: auto;
+  }
+
+  .bds-pp-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--bds-text-primary);
+    transition: background var(--bds-transition, 0.18s ease);
+    user-select: none;
+  }
+
+  .bds-pp-pill:hover {
+    background: var(--bds-bg-hover);
+  }
+
+  .bds-pp-pill--active {
+    color: var(--bds-accent);
+    background: var(--bds-accent-glow);
+  }
+
+  .bds-pp-pill--active:hover {
+    background: var(--bds-accent-glow);
+    filter: brightness(1.15);
+  }
+
+  .bds-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+  }
+
+  .bds-pp-pill-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+  }
+
+  .bds-pp-pill-box {
+    display: block;
+    width: 10px;
+    height: 10px;
+    border: 1.5px solid currentColor;
+    border-radius: 2px;
+    opacity: 0.3;
+  }
+
+  .bds-pp-pill-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .bds-pp-footer {
+    padding: 8px 10px;
+    border-top: 1px solid var(--bds-border);
+  }
+
+  .bds-pp-attach {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 7px 12px;
+    background: var(--bds-accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    transition: opacity var(--bds-transition, 0.18s ease);
+    font-family: inherit;
+  }
+
+  .bds-pp-attach:hover {
+    opacity: 0.88;
+  }
+
+  .bds-pp-empty {
+    font-size: 12px;
+    color: var(--bds-text-tertiary);
+    font-style: italic;
+    padding: 14px 12px;
+    margin: 0;
+    text-align: center;
+  }
+
+  .bds-pp-confirm {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .bds-pp-confirm-text {
+    font-size: 12px;
+    color: var(--bds-text-secondary);
+  }
+
+  .bds-pp-confirm-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
   }
 </style>

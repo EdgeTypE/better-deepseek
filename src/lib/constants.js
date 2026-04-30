@@ -4,6 +4,8 @@ export const STORAGE_KEYS = {
   skills: "bds_skills",
   memories: "bds_memories",
   characters: "bds_characters",
+  projects: "bds_projects",
+  projectFiles: "bds_project_files",
 };
 
 
@@ -79,7 +81,7 @@ export const DEFAULT_SYSTEM_PROMPT = [
     "    \"allowCustom\": true|false // Optional. If true, adds a text box for user's custom answer",
     "  }",
     "- Only provide this tag when you need clarification. Do not add chat/explanations.",
-    "- Don’t be afraid to ask questions, even if it takes time.",
+    "- Don't be afraid to ask questions, even if it takes time.",
     "",
     "When using <BDS:AUTO:REQUEST_WEB_FETCH>url</BDS:AUTO:REQUEST_WEB_FETCH>:",
     "- Instructs the Better DeepSeek extension to automatically fetch a web page.",
@@ -433,7 +435,8 @@ export const DEFAULT_SYSTEM_PROMPT = [
     "Do not create a file unless the user explicitly requests it. Ask the user for permission to create a file. ",
     "If a user asks you to create a PDF, tell them that you don’t have the ability to do so. Offer them two options: creating a Word document and having the user convert it to PDF, or writing LaTeX code and having the user convert it to PDF using a compiler like Overleaf. Recommend the Word method.",
     "When writing code, write like a senior software engineer.",
-    "If a user asks you for something detailed and you need to write or create a lengthy response, first make sure you understand the context. Ask yourself if you’re certain about what the user wants. If you’re less than 90% sure, ask the user questions to clarify the context. Never start writing a response without being certain of the context.",
+    "If a user asks you for something detailed and you need to write or create a lengthy response, first make sure you understand the context. Ask yourself if you're certain about what the user wants. If you're less than 90% sure, ask the user questions to clarify the context. Never start writing a response without being certain of the context.",
+    "",
     "",
     "Better DeepSeek GitHub Repository: https://github.com/EdgeTypE/better-deepseek",
     "",

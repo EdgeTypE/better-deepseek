@@ -39,3 +39,5 @@ scratch/
 better-deepseek-firefox.zip
 better-deepseek-source.zip
 better-deepseek-chrome.zip
+# Ignore local Claude Code files
+.claude

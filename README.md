@@ -76,6 +76,7 @@ A sleek drawer slides out from a floating button on the DeepSeek page. Inside yo
 - Import, export, and manage skills.
 - Import, export, and manage memory entries.
 - Create, edit, and activate characters.
+- Define Claude-style Projects, define project-level instructions, and upload project files and attach them to chats.
 
 ![long work image](extension/4.png)
 

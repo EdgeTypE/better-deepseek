@@ -2,16 +2,15 @@
   import Drawer from "./Drawer.svelte";
   import ToastStack from "./ToastStack.svelte";
   import QuestionPanel from "./QuestionPanel.svelte";
+  import appState from "../state.js";
 
   let drawerOpen = $state(false);
-  let overlayVisible = $state(false);
 
   /** @type {Array<{id: number, message: string}>} */
   let toasts = $state([]);
   let toastId = 0;
 
   // ── Public API (called from non-Svelte code via mount.js) ──
-
 
   export function showToast(message) {
     const id = ++toastId;
@@ -21,6 +20,8 @@
       toasts = toasts.filter((t) => t.id !== id);
     }, 2880);
   }
+
+  export function showLongWorkOverlay(_visible) {}
 
   // Settings/skills/memories refresh — forwarded to Drawer
   let drawerRef = $state(null);
@@ -37,6 +38,10 @@
   export function refreshMemories() {
     if (drawerRef) drawerRef.refreshMemories();
   }
+  export function refreshProjects() {
+    if (drawerRef) drawerRef.refreshProjects();
+    if (appState.heroBarRef) appState.heroBarRef.refresh();
+  }
 
   function toggleDrawer() {
     drawerOpen = !drawerOpen;
@@ -51,9 +56,5 @@
 
 <Drawer bind:this={drawerRef} open={drawerOpen} onclose={closeDrawer} />
 
-
 <ToastStack {toasts} />
 <QuestionPanel />
-
-
- 

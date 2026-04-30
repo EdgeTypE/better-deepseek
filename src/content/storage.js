@@ -21,6 +21,8 @@ export async function loadStateFromStorage() {
     STORAGE_KEYS.skills,
     STORAGE_KEYS.memories,
     STORAGE_KEYS.characters,
+    STORAGE_KEYS.projects,
+    STORAGE_KEYS.projectFiles,
   ]);
 
   const storedSettings = values[STORAGE_KEYS.settings] || {};
@@ -56,6 +58,8 @@ export async function loadStateFromStorage() {
   state.skills = normalizeSkills(values[STORAGE_KEYS.skills]);
   state.memories = normalizeMemories(values[STORAGE_KEYS.memories]);
   state.characters = normalizeCharacters(values[STORAGE_KEYS.characters]);
+  state.projects = normalizeProjects(values[STORAGE_KEYS.projects]);
+  state.projectFiles = normalizeProjectFiles(values[STORAGE_KEYS.projectFiles]);
 }
 
 function shouldUpgradeSystemPrompt(storedSettings) {
@@ -180,6 +184,34 @@ export function normalizeMemories(raw) {
   return memories;
 }
 
+export function normalizeProjects(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item) => item && typeof item === "object" && item.id && item.name)
+    .map((item) => ({
+      id: String(item.id),
+      name: String(item.name),
+      description: String(item.description || ""),
+      customInstructions: String(item.customInstructions || ""),
+      createdAt: Number(item.createdAt) || Date.now(),
+      updatedAt: Number(item.updatedAt) || Date.now(),
+    }));
+}
+
+export function normalizeProjectFiles(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item) => item && typeof item === "object" && item.id && item.projectId && item.content)
+    .map((item) => ({
+      id: String(item.id),
+      projectId: String(item.projectId),
+      name: String(item.name || "file"),
+      content: String(item.content),
+      size: Number(item.size) || new TextEncoder().encode(String(item.content)).length,
+      createdAt: Number(item.createdAt) || Date.now(),
+    }));
+}
+
 export function sanitizeMemoryKey(input) {
   return String(input || "")
     .trim()
@@ -234,6 +266,16 @@ export function bindStorageChangeListener() {
       if (state.ui) {
         state.ui.refreshCharacters();
       }
+    }
+
+    if (changes[STORAGE_KEYS.projects]) {
+      state.projects = normalizeProjects(changes[STORAGE_KEYS.projects].newValue);
+      if (state.ui) state.ui.refreshProjects();
+    }
+
+    if (changes[STORAGE_KEYS.projectFiles]) {
+      state.projectFiles = normalizeProjectFiles(changes[STORAGE_KEYS.projectFiles].newValue);
+      if (state.ui) state.ui.refreshProjects();
     }
 
     pushConfigToPage();

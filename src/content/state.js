@@ -12,6 +12,14 @@ const state = {
   skills: [],
   memories: {},
   characters: [],
+  /** @type {Array<{id:string,name:string,description:string,customInstructions:string,createdAt:number,updatedAt:number}>} */
+  projects: [],
+  /** @type {Array<{id:string,projectId:string,name:string,content:string,size:number,createdAt:number}>} */
+  projectFiles: [],
+  /** @type {string|null} session-only, never persisted */
+  activeProjectId: null,
+  /** @type {string[]} session-only, never persisted */
+  activeFileIds: [],
   observer: null,
   scanTimer: 0,
   urlWatchTimer: 0,
@@ -29,6 +37,8 @@ const state = {
   },
   /** @type {import('./ui/mount.js').UiApi | null} */
   ui: null,
+  /** @type {{ refresh: () => void } | null} session-only ref to AttachMenu's project panel */
+  heroBarRef: null,
 };
 
 export default state;
