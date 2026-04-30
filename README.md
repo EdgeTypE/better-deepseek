@@ -206,7 +206,7 @@ Better DeepSeek does not collect, transmit, or sell any personal data. All setti
 ## Changelog
 
 ### v0.1.4 (2026-04-30)
-- **New Feature**: Projects menu for better organizational control (Thanks to [@WhiteLicorice](https://github.com/WhiteLicorice).
+- **New Feature**: Projects menu for better organizational control (Thanks to [@WhiteLicorice](https://github.com/WhiteLicorice)).
 - **New Feature**: Search functionality added to the session history sidebar.
 - **UX Improvement**: Settings menu rework with an "Advanced Settings" accordion to save drawer space.
 - **New Option**: Ability to disable the Hidden System Prompt entirely.
