@@ -85,20 +85,26 @@ function stripLeadingChatter(content) {
 export function unwrapMarkdownCodeFence(content) {
   let text = String(content || "");
 
-  // Try to extract the LARGEST fenced code block (greedy inner match)
-  // This handles: ```python\n...code...\n```
-  const fenceRegex = /```(?:[a-zA-Z0-9_+.-]*)\s*\r?\n([\s\S]*?)\r?\n?\s*```/g;
-  let bestMatch = null;
-  let match;
-  while ((match = fenceRegex.exec(text)) !== null) {
-    const inner = match[1] || "";
-    if (!bestMatch || inner.length > bestMatch.length) {
-      bestMatch = inner;
+  // Find the first and last occurrences of the code fence marker.
+  // This approach correctly handles nested code fences (e.g., inside a README.md)
+  // because the outer fences created by the AI inside the BDS tag will be
+  // the very first and very last markers in the string.
+  const firstFenceIndex = text.indexOf("```");
+  if (firstFenceIndex !== -1) {
+    // Find the end of the first fence's line (to skip the language tag)
+    let contentStartIndex = text.indexOf("\n", firstFenceIndex);
+    if (contentStartIndex === -1) {
+      contentStartIndex = firstFenceIndex + 3; // No newline, just start after ```
+    } else {
+      contentStartIndex += 1; // Start after the newline
     }
-  }
 
-  if (bestMatch !== null) {
-    return bestMatch.trim();
+    const lastFenceIndex = text.lastIndexOf("```");
+
+    // If there is a distinct closing fence, extract everything in between.
+    if (lastFenceIndex > firstFenceIndex) {
+      return text.substring(contentStartIndex, lastFenceIndex).trim();
+    }
   }
 
   // Handle unclosed fence: ```python\n...code... (no closing ```)
