@@ -59,6 +59,33 @@ export function injectSearchInput() {
   searchInput.addEventListener('input', (e) => {
     handleSearch(e.target.value);
   });
+
+  watchSidebarVisibility(container);
+}
+
+/**
+ * Use rAF to track the sidebar panel width and hide the search container
+ * when the sidebar is collapsed (width collapses to 0 via CSS transition).
+ * @param {HTMLElement} container
+ */
+function watchSidebarVisibility(container) {
+  const sidebarPanel = container.closest('.dc04ec1d');
+  if (!sidebarPanel) return;
+
+  const isHidden = () => sidebarPanel.getBoundingClientRect().width === 0;
+  let lastHidden = isHidden();
+  container.style.display = lastHidden ? 'none' : '';
+
+  function tick() {
+    const hidden = isHidden();
+    if (hidden !== lastHidden) {
+      container.style.display = hidden ? 'none' : '';
+      lastHidden = hidden;
+    }
+    requestAnimationFrame(tick);
+  }
+
+  requestAnimationFrame(tick);
 }
 
 let searchDebounceTimer = 0;
