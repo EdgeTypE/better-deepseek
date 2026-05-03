@@ -11,8 +11,27 @@
  * @returns {{ changed: boolean, payload: object }}
  */
 export function mutatePayload(payload, state) {
+  if (!state.sessionUserMsgCounts) state.sessionUserMsgCounts = {};
+
   const messages = resolveMessageArray(payload);
   const conversationId = resolveConversationId(payload);
+  
+  let userMsgCount = 1;
+  if (messages && messages.length > 0) {
+    userMsgCount = messages.filter(m => {
+      const role = String(m.role || m.author || "").toLowerCase();
+      return role === "user" || role === "human";
+    }).length;
+    state.sessionUserMsgCounts[conversationId] = userMsgCount;
+  } else if (typeof payload.prompt === "string") {
+    const isFirstMessageEdit = payload.message_id === 1 || payload.parent_message_id == null;
+    if (isFirstMessageEdit) {
+      userMsgCount = 1;
+    } else {
+      userMsgCount = (state.sessionUserMsgCounts[conversationId] || 0) + 1;
+    }
+    state.sessionUserMsgCounts[conversationId] = userMsgCount;
+  }
 
   let changed = false;
   let target = null;
@@ -34,10 +53,6 @@ export function mutatePayload(payload, state) {
       if (freq === "always") {
         forceSystemPrompt = true;
       } else if (freq === "every_x") {
-        const userMsgCount = messages.filter(m => {
-          const role = String(m.role || m.author || "").toLowerCase();
-          return role === "user" || role === "human";
-        }).length;
         const interval = state.config.systemPromptInjectionInterval || 3;
         
         if ((userMsgCount - 1) % interval === 0) {
@@ -85,7 +100,12 @@ export function mutatePayload(payload, state) {
     if (freq === "always") {
       forceSystemPrompt = true;
     } else if (freq === "every_x") {
-      forceSystemPrompt = isFirstMessageEdit;
+      const interval = state.config.systemPromptInjectionInterval || 3;
+      if (isFirstMessageEdit) {
+        forceSystemPrompt = true;
+      } else if ((userMsgCount - 1) % interval === 0) {
+        forceSystemPrompt = true;
+      }
     } else {
       forceSystemPrompt = isFirstMessageEdit;
     }
