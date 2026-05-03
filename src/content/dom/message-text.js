@@ -148,7 +148,12 @@ function scoreRawTextCandidate(value) {
   const text = String(value || "");
   const lineBreakCount = (text.match(/\n/g) || []).length;
   const tagCount = (text.match(/<BDS:|<BetterDeepSeek>/gi) || []).length;
-  return tagCount * 10000 + lineBreakCount * 100 + text.length;
+  
+  // Bonus points for structured markdown syntax to ensure markdownReconstructed wins
+  // matches headings (# ), bullets (- , * , 1. ), and table pipes (|...|)
+  const mdBonus = (text.match(/(?:^|\n)(?:#+ |\* |- |\d+\. |\|.*\|)/g) || []).length * 100;
+  
+  return tagCount * 10000 + mdBonus + lineBreakCount * 50 + text.length;
 }
 
 /**
@@ -215,7 +220,11 @@ function htmlToMarkdown(element) {
         case "p": markdown += `\n${content}\n`; break;
         case "ul": markdown += `\n${content}\n`; break;
         case "ol": markdown += `\n${content}\n`; break;
-        case "li": markdown += `\n- ${content}`; break;
+        case "li": 
+          const isOrdered = child.parentElement?.tagName.toLowerCase() === "ol";
+          const prefix = isOrdered ? "1. " : "- ";
+          markdown += `\n${prefix}${content.trim()}`; 
+          break;
         case "blockquote": markdown += `\n> ${content.trim()}\n`; break;
         case "a": markdown += `[${content}](${child.getAttribute("href") || "#"})`; break;
         case "br": markdown += `\n`; break;
