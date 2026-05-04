@@ -20,6 +20,7 @@
   let systemPromptInjectionFrequency = $state(appState.settings.systemPromptInjectionFrequency || "first");
   let systemPromptInjectionInterval = $state(Number(appState.settings.systemPromptInjectionInterval) || 3);
   let disableMemory = $state(Boolean(appState.settings.disableMemory));
+  let htmlToMarkdownMaxDepth = $state(Number(appState.settings.htmlToMarkdownMaxDepth) || 200);
   let advancedOpen = $state(false);
 
   let activeProject = $state(getActiveProject());
@@ -38,6 +39,7 @@
     systemPromptInjectionFrequency = appState.settings.systemPromptInjectionFrequency || "first";
     systemPromptInjectionInterval = Number(appState.settings.systemPromptInjectionInterval) || 3;
     disableMemory = Boolean(appState.settings.disableMemory);
+    htmlToMarkdownMaxDepth = Number(appState.settings.htmlToMarkdownMaxDepth) || 200;
   }
 
   export function refreshProject() {
@@ -70,6 +72,7 @@
     appState.settings.systemPromptInjectionFrequency = systemPromptInjectionFrequency;
     appState.settings.systemPromptInjectionInterval = systemPromptInjectionInterval;
     appState.settings.disableMemory = disableMemory;
+    appState.settings.htmlToMarkdownMaxDepth = Math.max(10, Math.floor(Number(htmlToMarkdownMaxDepth) || 200));
 
 
     await chrome.storage.local.set({
@@ -240,6 +243,22 @@
         bind:value={preferredLang}
       />
       <p style="font-size: 10px; opacity: 0.5; margin: 0;">Leave empty to let the model decide.</p>
+    </div>
+
+    <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+      <span class="bds-toggle-label">Markdown Walker Max Depth</span>
+      <input
+        id="bds-html-md-depth"
+        type="number"
+        min="10"
+        step="10"
+        class="bds-input"
+        style="width: 120px; box-sizing: border-box;"
+        bind:value={htmlToMarkdownMaxDepth}
+      />
+      <p style="font-size: 10px; opacity: 0.5; margin: 0;">
+        Hard cap on DOM recursion depth when reconstructing markdown from a message. Lower = safer against stack overflow on deeply nested content; higher = preserves structure of pathologically nested messages. Default 200. Takes effect immediately.
+      </p>
     </div>
   </div>
 </div>

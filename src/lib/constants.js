@@ -463,6 +463,7 @@ export const DEFAULT_SETTINGS = {
   disableMemory: false,
   systemPromptInjectionFrequency: "first",
   systemPromptInjectionInterval: 3,
+  htmlToMarkdownMaxDepth: 200,
 };
 
 // ── Code language → file extension map ──

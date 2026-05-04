@@ -1,6 +1,8 @@
 /**
  * Extract raw text from a message DOM node using the best available source.
  */
+import state from "../state.js";
+
 /**
  * Extract the raw text from a message node, choosing the best source.
  */
@@ -186,12 +188,21 @@ export function extractMessageMarkdown(node) {
   return htmlToMarkdown(container).trim();
 }
 
-const HTML_TO_MARKDOWN_MAX_DEPTH = 200;
+const HTML_TO_MARKDOWN_MAX_DEPTH_DEFAULT = 200;
+const HTML_TO_MARKDOWN_MAX_DEPTH_FLOOR = 10;
+
+function getHtmlToMarkdownMaxDepth() {
+  // Read at call time so changes via the Settings panel apply immediately
+  // without an extension reload. Clamped to a sane floor.
+  const raw = Number(state.settings?.htmlToMarkdownMaxDepth);
+  if (!Number.isFinite(raw) || raw <= 0) return HTML_TO_MARKDOWN_MAX_DEPTH_DEFAULT;
+  return Math.max(HTML_TO_MARKDOWN_MAX_DEPTH_FLOOR, Math.floor(raw));
+}
 
 function htmlToMarkdown(element, depth = 0) {
   // Hard depth cap so deeply-nested DOM (nested lists/blockquotes/KaTeX,
   // streamed long messages) cannot blow V8's stack. Falls back to plain text.
-  if (depth > HTML_TO_MARKDOWN_MAX_DEPTH) {
+  if (depth > getHtmlToMarkdownMaxDepth()) {
     return element.textContent || "";
   }
 
