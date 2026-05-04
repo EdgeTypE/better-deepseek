@@ -43,4 +43,22 @@ const state = {
   chatSessions: [],
 };
 
+/**
+ * Run `fn` with the chat-DOM MutationObserver paused, so DOM mutations the
+ * extension itself causes (mounting Svelte components, replaceWith ops) do
+ * not retrigger a scan. Defense-in-depth on top of the record-level filter
+ * in scanner.js.
+ */
+export function withObserverPaused(fn) {
+  const observer = state.observer;
+  if (observer) observer.disconnect();
+  try {
+    return fn();
+  } finally {
+    if (observer && document.body) {
+      observer.observe(document.body, { subtree: true, childList: true });
+    }
+  }
+}
+
 export default state;

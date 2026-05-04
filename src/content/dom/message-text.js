@@ -66,9 +66,9 @@ function parseNodeWithBestTextSource(node) {
 function getNodeTextCandidates(node) {
   // Instead of innerText (which fails on detached clones), 
   // we'll filter out thinking blocks and then use textContent.
-  
+
   const clone = node.cloneNode(true);
-  
+
   // Remove Thinking blocks, UI elements, and code block banners
   const selectorsToRemove = [
     ".ds-think-content",
@@ -148,11 +148,11 @@ function scoreRawTextCandidate(value) {
   const text = String(value || "");
   const lineBreakCount = (text.match(/\n/g) || []).length;
   const tagCount = (text.match(/<BDS:|<BetterDeepSeek>/gi) || []).length;
-  
+
   // Bonus points for structured markdown syntax to ensure markdownReconstructed wins
   // matches headings (# ), bullets (- , * , 1. ), and table pipes (|...|)
   const mdBonus = (text.match(/(?:^|\n)(?:#+ |\* |- |\d+\. |\|.*\|)/g) || []).length * 100;
-  
+
   return tagCount * 10000 + mdBonus + lineBreakCount * 50 + text.length;
 }
 
@@ -162,9 +162,9 @@ function scoreRawTextCandidate(value) {
  */
 export function extractMessageMarkdown(node) {
   if (!node) return "";
-  
+
   const clone = node.cloneNode(true);
-  
+
   // Remove noise first
   const noiseSelectors = [
     ".ds-think-content",
@@ -186,16 +186,36 @@ export function extractMessageMarkdown(node) {
   return htmlToMarkdown(container).trim();
 }
 
-function htmlToMarkdown(element) {
+const HTML_TO_MARKDOWN_MAX_DEPTH_FLOOR = 10;
+let HTML_TO_MARKDOWN_MAX_DEPTH = 200;
+
+/**
+ * Update the depth cap used by htmlToMarkdown. Called by the storage layer
+ * on initial settings load and whenever the user saves a new value via the
+ * Settings panel. Clamped to a sane floor.
+ */
+export function setHtmlToMarkdownMaxDepth(value) {
+  const raw = Number(value);
+  if (!Number.isFinite(raw) || raw <= 0) return;
+  HTML_TO_MARKDOWN_MAX_DEPTH = Math.max(HTML_TO_MARKDOWN_MAX_DEPTH_FLOOR, Math.floor(raw));
+}
+
+function htmlToMarkdown(element, depth = 0) {
+  // Hard depth cap so deeply-nested DOM (nested lists/blockquotes/KaTeX,
+  // streamed long messages) cannot blow V8's stack. Falls back to plain text.
+  if (depth > HTML_TO_MARKDOWN_MAX_DEPTH) {
+    return element.textContent || "";
+  }
+
   let markdown = "";
-  
+
   for (const child of element.childNodes) {
     if (child.nodeType === 3) { // TEXT_NODE
       markdown += child.textContent;
     } else if (child.nodeType === 1) { // ELEMENT_NODE
       const tag = child.tagName.toLowerCase();
-      const content = htmlToMarkdown(child);
-      
+      const content = htmlToMarkdown(child, depth + 1);
+
       switch (tag) {
         case "h1": markdown += `\n# ${content}\n`; break;
         case "h2": markdown += `\n## ${content}\n`; break;
@@ -205,7 +225,7 @@ function htmlToMarkdown(element) {
         case "h6": markdown += `\n###### ${content}\n`; break;
         case "strong": case "b": markdown += `**${content}**`; break;
         case "em": case "i": markdown += `*${content}*`; break;
-        case "code": 
+        case "code":
           // If it's inside a pre, we handle it in the pre case
           if (child.parentElement?.tagName.toLowerCase() === "pre") {
             markdown += content;
@@ -213,30 +233,30 @@ function htmlToMarkdown(element) {
             markdown += `\`${content}\``;
           }
           break;
-        case "pre": 
+        case "pre":
           const lang = child.querySelector("code")?.className?.match(/language-(\w+)/)?.[1] || "";
-          markdown += `\n\`\`\`${lang}\n${child.textContent.trim()}\n\`\`\`\n`; 
+          markdown += `\n\`\`\`${lang}\n${child.textContent.trim()}\n\`\`\`\n`;
           break;
         case "p": markdown += `\n${content}\n`; break;
         case "ul": markdown += `\n${content}\n`; break;
         case "ol": markdown += `\n${content}\n`; break;
-        case "li": 
+        case "li":
           const isOrdered = child.parentElement?.tagName.toLowerCase() === "ol";
           const prefix = isOrdered ? "1. " : "- ";
-          markdown += `\n${prefix}${content.trim()}`; 
+          markdown += `\n${prefix}${content.trim()}`;
           break;
         case "blockquote": markdown += `\n> ${content.trim()}\n`; break;
         case "a": markdown += `[${content}](${child.getAttribute("href") || "#"})`; break;
         case "br": markdown += `\n`; break;
         case "table": markdown += `\n\n${content}\n`; break;
-        case "thead": 
-        case "tbody": 
-          markdown += content; 
+        case "thead":
+        case "tbody":
+          markdown += content;
           break;
-        case "tr": 
+        case "tr":
           markdown += `|${content}\n`;
           if (
-            child.parentElement?.tagName.toLowerCase() === "thead" || 
+            child.parentElement?.tagName.toLowerCase() === "thead" ||
             (child.parentElement?.tagName.toLowerCase() === "table" && child === child.parentElement.firstElementChild)
           ) {
             const cellCount = child.querySelectorAll("th, td").length;
@@ -251,7 +271,7 @@ function htmlToMarkdown(element) {
       }
     }
   }
-  
+
   // Clean up excessive newlines
   return markdown.replace(/\n{3,}/g, "\n\n");
 }

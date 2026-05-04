@@ -3,7 +3,7 @@
  */
 
 import state from "./state.js";
-import { pushConfigToPage } from "./bridge.js";
+import { pushConfigToPage, setMaxChatSessions } from "./bridge.js";
 import {
   STORAGE_KEYS,
   DEFAULT_SETTINGS,
@@ -12,6 +12,7 @@ import {
   DOWNLOAD_BEHAVIOR_VERSION,
 } from "../lib/constants.js";
 import { makeId } from "../lib/utils/helpers.js";
+import { setHtmlToMarkdownMaxDepth } from "./dom/message-text.js";
 
 // ── Load ──
 
@@ -31,6 +32,8 @@ export async function loadStateFromStorage() {
     ...DEFAULT_SETTINGS,
     ...storedSettings,
   };
+  setHtmlToMarkdownMaxDepth(state.settings.htmlToMarkdownMaxDepth);
+  setMaxChatSessions(state.settings.maxChatSessions);
 
   if (shouldUpgradeSystemPrompt(storedSettings)) {
     state.settings.systemPrompt = DEFAULT_SYSTEM_PROMPT;
@@ -238,6 +241,8 @@ export function bindStorageChangeListener() {
         ...DEFAULT_SETTINGS,
         ...(changes[STORAGE_KEYS.settings].newValue || {}),
       };
+      setHtmlToMarkdownMaxDepth(state.settings.htmlToMarkdownMaxDepth);
+      setMaxChatSessions(state.settings.maxChatSessions);
       if (state.ui) {
         state.ui.refreshSettings();
       }

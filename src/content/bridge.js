@@ -41,6 +41,19 @@ export function setupBridgeEvents() {
 /**
  * Update global state with session data from API.
  */
+const MAX_CHAT_SESSIONS_FLOOR = 10;
+let MAX_CHAT_SESSIONS = 500;
+
+/**
+ * Update the session-list cap. Called by the storage layer on initial load
+ * and when the user saves a new value via the Settings panel.
+ */
+export function setMaxChatSessions(value) {
+  const raw = Number(value);
+  if (!Number.isFinite(raw) || raw <= 0) return;
+  MAX_CHAT_SESSIONS = Math.max(MAX_CHAT_SESSIONS_FLOOR, Math.floor(raw));
+}
+
 function handleSessionData(data) {
   const sessions = data?.data?.biz_data?.chat_sessions;
   if (!Array.isArray(sessions)) return;
@@ -55,7 +68,12 @@ function handleSessionData(data) {
       });
     }
   }
-  
+  // Simple FIFO eviction to prevent unbounded growth - keep most recent MAX_CHAT_SESSIONS sessions
+  if (state.chatSessions.length > MAX_CHAT_SESSIONS) {
+    state.chatSessions.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    state.chatSessions.length = MAX_CHAT_SESSIONS;
+  }
+
   // Trigger UI update if needed
   window.dispatchEvent(new CustomEvent("bds:sessions-updated"));
 }
@@ -83,17 +101,17 @@ export function pushConfigToPage() {
     systemPromptInjectionInterval: Number(state.settings.systemPromptInjectionInterval || 3),
     activeProject: activeProject
       ? {
-          name: activeProject.name,
-          instructions: activeProject.customInstructions,
-          files: getActiveFiles().map((f) => ({ name: f.name, content: f.content })),
-        }
+        name: activeProject.name,
+        instructions: activeProject.customInstructions,
+        files: getActiveFiles().map((f) => ({ name: f.name, content: f.content })),
+      }
       : null,
   };
 
   window.dispatchEvent(
-    new CustomEvent(BRIDGE_EVENTS.configUpdate, { 
+    new CustomEvent(BRIDGE_EVENTS.configUpdate, {
       // Stringify detail to cross the boundary in Firefox without Xray Vision issues
-      detail: JSON.stringify(detail) 
+      detail: JSON.stringify(detail)
     })
   );
 }
