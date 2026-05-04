@@ -186,72 +186,92 @@ export function extractMessageMarkdown(node) {
   return htmlToMarkdown(container).trim();
 }
 
-function htmlToMarkdown(element) {
-  let markdown = "";
-  
-  for (const child of element.childNodes) {
-    if (child.nodeType === 3) { // TEXT_NODE
-      markdown += child.textContent;
-    } else if (child.nodeType === 1) { // ELEMENT_NODE
-      const tag = child.tagName.toLowerCase();
-      const content = htmlToMarkdown(child);
-      
-      switch (tag) {
-        case "h1": markdown += `\n# ${content}\n`; break;
-        case "h2": markdown += `\n## ${content}\n`; break;
-        case "h3": markdown += `\n### ${content}\n`; break;
-        case "h4": markdown += `\n#### ${content}\n`; break;
-        case "h5": markdown += `\n##### ${content}\n`; break;
-        case "h6": markdown += `\n###### ${content}\n`; break;
-        case "strong": case "b": markdown += `**${content}**`; break;
-        case "em": case "i": markdown += `*${content}*`; break;
-        case "code": 
-          // If it's inside a pre, we handle it in the pre case
-          if (child.parentElement?.tagName.toLowerCase() === "pre") {
-            markdown += content;
-          } else {
-            markdown += `\`${content}\``;
-          }
-          break;
-        case "pre": 
-          const lang = child.querySelector("code")?.className?.match(/language-(\w+)/)?.[1] || "";
-          markdown += `\n\`\`\`${lang}\n${child.textContent.trim()}\n\`\`\`\n`; 
-          break;
-        case "p": markdown += `\n${content}\n`; break;
-        case "ul": markdown += `\n${content}\n`; break;
-        case "ol": markdown += `\n${content}\n`; break;
-        case "li": 
-          const isOrdered = child.parentElement?.tagName.toLowerCase() === "ol";
-          const prefix = isOrdered ? "1. " : "- ";
-          markdown += `\n${prefix}${content.trim()}`; 
-          break;
-        case "blockquote": markdown += `\n> ${content.trim()}\n`; break;
-        case "a": markdown += `[${content}](${child.getAttribute("href") || "#"})`; break;
-        case "br": markdown += `\n`; break;
-        case "table": markdown += `\n\n${content}\n`; break;
-        case "thead": 
-        case "tbody": 
-          markdown += content; 
-          break;
-        case "tr": 
-          markdown += `|${content}\n`;
-          if (
-            child.parentElement?.tagName.toLowerCase() === "thead" || 
-            (child.parentElement?.tagName.toLowerCase() === "table" && child === child.parentElement.firstElementChild)
-          ) {
-            const cellCount = child.querySelectorAll("th, td").length;
-            markdown += `|${Array(cellCount).fill("---").join("|")}|\n`;
-          }
-          break;
-        case "th":
-        case "td":
-          markdown += ` ${content.trim().replace(/\n/g, " ")} |`;
-          break;
-        default: markdown += content;
+const HTML_TO_MARKDOWN_MAX_DEPTH = 200;
+
+function wrapTag(element, content) {
+  const tag = element.tagName.toLowerCase();
+  switch (tag) {
+    case "h1": return `\n# ${content}\n`;
+    case "h2": return `\n## ${content}\n`;
+    case "h3": return `\n### ${content}\n`;
+    case "h4": return `\n#### ${content}\n`;
+    case "h5": return `\n##### ${content}\n`;
+    case "h6": return `\n###### ${content}\n`;
+    case "strong": case "b": return `**${content}**`;
+    case "em": case "i": return `*${content}*`;
+    case "code":
+      if (element.parentElement?.tagName.toLowerCase() === "pre") {
+        return content;
       }
+      return `\`${content}\``;
+    case "pre": {
+      const lang = element.querySelector("code")?.className?.match(/language-(\w+)/)?.[1] || "";
+      return `\n\`\`\`${lang}\n${element.textContent.trim()}\n\`\`\`\n`;
+    }
+    case "p": return `\n${content}\n`;
+    case "ul": return `\n${content}\n`;
+    case "ol": return `\n${content}\n`;
+    case "li": {
+      const isOrdered = element.parentElement?.tagName.toLowerCase() === "ol";
+      const prefix = isOrdered ? "1. " : "- ";
+      return `\n${prefix}${content.trim()}`;
+    }
+    case "blockquote": return `\n> ${content.trim()}\n`;
+    case "a": return `[${content}](${element.getAttribute("href") || "#"})`;
+    case "br": return `\n`;
+    case "table": return `\n\n${content}\n`;
+    case "thead":
+    case "tbody":
+      return content;
+    case "tr": {
+      let out = `|${content}\n`;
+      const parentTag = element.parentElement?.tagName.toLowerCase();
+      if (
+        parentTag === "thead" ||
+        (parentTag === "table" && element === element.parentElement.firstElementChild)
+      ) {
+        const cellCount = element.querySelectorAll("th, td").length;
+        out += `|${Array(cellCount).fill("---").join("|")}|\n`;
+      }
+      return out;
+    }
+    case "th":
+    case "td":
+      return ` ${content.trim().replace(/\n/g, " ")} |`;
+    default: return content;
+  }
+}
+
+function htmlToMarkdown(root) {
+  const stack = [{ node: root, idx: 0, acc: "", depth: 0 }];
+  let lastResult = "";
+
+  while (stack.length) {
+    const frame = stack[stack.length - 1];
+
+    if (frame.depth > HTML_TO_MARKDOWN_MAX_DEPTH) {
+      lastResult = frame.node.textContent || "";
+      stack.pop();
+      if (stack.length) stack[stack.length - 1].acc += lastResult;
+      continue;
+    }
+
+    const children = frame.node.childNodes;
+
+    if (frame.idx >= children.length) {
+      lastResult = stack.length === 1 ? frame.acc : wrapTag(frame.node, frame.acc);
+      stack.pop();
+      if (stack.length) stack[stack.length - 1].acc += lastResult;
+      continue;
+    }
+
+    const child = children[frame.idx++];
+    if (child.nodeType === 3) {
+      frame.acc += child.textContent;
+    } else if (child.nodeType === 1) {
+      stack.push({ node: child, idx: 0, acc: "", depth: frame.depth + 1 });
     }
   }
-  
-  // Clean up excessive newlines
-  return markdown.replace(/\n{3,}/g, "\n\n");
+
+  return lastResult.replace(/\n{3,}/g, "\n\n");
 }

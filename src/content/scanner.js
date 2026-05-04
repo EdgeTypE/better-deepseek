@@ -2,7 +2,7 @@
  * DOM observation and page scanning.
  */
 
-import state from "./state.js";
+import state, { withObserverPaused } from "./state.js";
 import { LONG_WORK_STALE_MS } from "../lib/constants.js";
 import { processMessageNode } from "./message-processor.svelte.js";
 import { enhanceCodeBlockDownloads } from "./files/code-blocks.js";
@@ -100,23 +100,28 @@ export function observeChatDom() {
     return;
   }
 
-  state.observer = new MutationObserver(() => {
-    scheduleScan();
+  state.observer = new MutationObserver((records) => {
+    for (const r of records) {
+      if (r.addedNodes.length || r.removedNodes.length) {
+        scheduleScan();
+        return;
+      }
+    }
   });
 
   state.observer.observe(document.body, {
     subtree: true,
     childList: true,
-    characterData: true,
   });
 }
 
 /**
- * Debounced page scan scheduler.
+ * Debounced page scan scheduler. Trailing-edge: coalesces bursts into one
+ * scan ~140ms after the LAST mutation.
  */
 export function scheduleScan() {
   if (state.scanTimer) {
-    return;
+    clearTimeout(state.scanTimer);
   }
 
   state.scanTimer = window.setTimeout(() => {
@@ -129,29 +134,31 @@ export function scheduleScan() {
  * Full page scan — process all message nodes.
  */
 function scanPage() {
-  enhanceCodeBlockDownloads();
+  withObserverPaused(() => {
+    enhanceCodeBlockDownloads();
 
-  if (
-    state.longWork.active &&
-    Date.now() - state.longWork.lastActivityAt > LONG_WORK_STALE_MS
-  ) {
-    state.longWork.active = false;
-    state.longWork.files.clear();
-    if (state.ui) {
-      state.ui.showLongWorkOverlay(false);
-      state.ui.showToast("LONG_WORK timeout cleared.");
+    if (
+      state.longWork.active &&
+      Date.now() - state.longWork.lastActivityAt > LONG_WORK_STALE_MS
+    ) {
+      state.longWork.active = false;
+      state.longWork.files.clear();
+      if (state.ui) {
+        state.ui.showLongWorkOverlay(false);
+        state.ui.showToast("LONG_WORK timeout cleared.");
+      }
     }
-  }
 
-  const nodes = collectMessageNodes();
-  for (const node of nodes) {
-    processMessageNode(node);
-  }
+    const nodes = collectMessageNodes();
+    for (const node of nodes) {
+      processMessageNode(node);
+    }
 
-  linkifyLogo();
-  linkifyNewChatButton();
-  injectSearchInput();
-  scanInputArea();
+    linkifyLogo();
+    linkifyNewChatButton();
+    injectSearchInput();
+    scanInputArea();
+  });
 }
 
 /**

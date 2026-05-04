@@ -41,6 +41,8 @@ export function setupBridgeEvents() {
 /**
  * Update global state with session data from API.
  */
+const MAX_CHAT_SESSIONS = 500;
+
 function handleSessionData(data) {
   const sessions = data?.data?.biz_data?.chat_sessions;
   if (!Array.isArray(sessions)) return;
@@ -55,7 +57,12 @@ function handleSessionData(data) {
       });
     }
   }
-  
+  // Simple FIFO eviction to prevent unbounded growth - keep most recent MAX_CHAT_SESSIONS sessions
+  if (state.chatSessions.length > MAX_CHAT_SESSIONS) {
+    state.chatSessions.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    state.chatSessions.length = MAX_CHAT_SESSIONS;
+  }
+
   // Trigger UI update if needed
   window.dispatchEvent(new CustomEvent("bds:sessions-updated"));
 }
