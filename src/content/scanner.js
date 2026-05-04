@@ -217,7 +217,7 @@ function linkifyLogo() {
   // In the snippet, _262baab seems like the main clickable block.
   let target = container;
   if (target.parentElement && target.parentElement.classList.contains('_262baab')) {
-     target = target.parentElement;
+    target = target.parentElement;
   }
 
   if (target.tagName === 'A') return;
@@ -226,7 +226,7 @@ function linkifyLogo() {
   const link = document.createElement('a');
   link.href = '/';
   link.className = 'bds-logo-link';
-  
+
   link.addEventListener('click', (e) => {
     if (e.button === 0 && !e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
       e.preventDefault();
@@ -236,7 +236,7 @@ function linkifyLogo() {
   // Copy some essential layout classes if needed, but mostly we want to wrap it
   target.parentNode.insertBefore(link, target);
   link.appendChild(target);
-  
+
   // Prevent the link from being processed multiple times
   link.setAttribute('data-bds-linkified', 'true');
 }
@@ -271,13 +271,13 @@ function linkifyNewChatButton() {
   link.href = '/';
   link.className = 'bds-logo-link'; // Reuse the same CSS for pass-through styling
   link.setAttribute('data-bds-linkified', 'true');
-  
+
   link.addEventListener('click', (e) => {
     if (e.button === 0 && !e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
       e.preventDefault();
     }
   });
-  
+
   container.parentNode.insertBefore(link, container);
   link.appendChild(container);
 }

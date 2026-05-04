@@ -90,17 +90,17 @@ export function pushConfigToPage() {
     systemPromptInjectionInterval: Number(state.settings.systemPromptInjectionInterval || 3),
     activeProject: activeProject
       ? {
-          name: activeProject.name,
-          instructions: activeProject.customInstructions,
-          files: getActiveFiles().map((f) => ({ name: f.name, content: f.content })),
-        }
+        name: activeProject.name,
+        instructions: activeProject.customInstructions,
+        files: getActiveFiles().map((f) => ({ name: f.name, content: f.content })),
+      }
       : null,
   };
 
   window.dispatchEvent(
-    new CustomEvent(BRIDGE_EVENTS.configUpdate, { 
+    new CustomEvent(BRIDGE_EVENTS.configUpdate, {
       // Stringify detail to cross the boundary in Firefox without Xray Vision issues
-      detail: JSON.stringify(detail) 
+      detail: JSON.stringify(detail)
     })
   );
 }

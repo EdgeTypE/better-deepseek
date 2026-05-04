@@ -66,9 +66,9 @@ function parseNodeWithBestTextSource(node) {
 function getNodeTextCandidates(node) {
   // Instead of innerText (which fails on detached clones), 
   // we'll filter out thinking blocks and then use textContent.
-  
+
   const clone = node.cloneNode(true);
-  
+
   // Remove Thinking blocks, UI elements, and code block banners
   const selectorsToRemove = [
     ".ds-think-content",
@@ -148,11 +148,11 @@ function scoreRawTextCandidate(value) {
   const text = String(value || "");
   const lineBreakCount = (text.match(/\n/g) || []).length;
   const tagCount = (text.match(/<BDS:|<BetterDeepSeek>/gi) || []).length;
-  
+
   // Bonus points for structured markdown syntax to ensure markdownReconstructed wins
   // matches headings (# ), bullets (- , * , 1. ), and table pipes (|...|)
   const mdBonus = (text.match(/(?:^|\n)(?:#+ |\* |- |\d+\. |\|.*\|)/g) || []).length * 100;
-  
+
   return tagCount * 10000 + mdBonus + lineBreakCount * 50 + text.length;
 }
 
@@ -162,9 +162,9 @@ function scoreRawTextCandidate(value) {
  */
 export function extractMessageMarkdown(node) {
   if (!node) return "";
-  
+
   const clone = node.cloneNode(true);
-  
+
   // Remove noise first
   const noiseSelectors = [
     ".ds-think-content",
