@@ -21,6 +21,7 @@
   let systemPromptInjectionInterval = $state(Number(appState.settings.systemPromptInjectionInterval) || 3);
   let disableMemory = $state(Boolean(appState.settings.disableMemory));
   let htmlToMarkdownMaxDepth = $state(Number(appState.settings.htmlToMarkdownMaxDepth) || 200);
+  let maxChatSessions = $state(Number(appState.settings.maxChatSessions) || 500);
   let advancedOpen = $state(false);
 
   let activeProject = $state(getActiveProject());
@@ -40,6 +41,7 @@
     systemPromptInjectionInterval = Number(appState.settings.systemPromptInjectionInterval) || 3;
     disableMemory = Boolean(appState.settings.disableMemory);
     htmlToMarkdownMaxDepth = Number(appState.settings.htmlToMarkdownMaxDepth) || 200;
+    maxChatSessions = Number(appState.settings.maxChatSessions) || 500;
   }
 
   export function refreshProject() {
@@ -73,6 +75,7 @@
     appState.settings.systemPromptInjectionInterval = systemPromptInjectionInterval;
     appState.settings.disableMemory = disableMemory;
     appState.settings.htmlToMarkdownMaxDepth = Math.max(10, Math.floor(Number(htmlToMarkdownMaxDepth) || 200));
+    appState.settings.maxChatSessions = Math.max(10, Math.floor(Number(maxChatSessions) || 500));
 
 
     await chrome.storage.local.set({
@@ -257,7 +260,23 @@
         bind:value={htmlToMarkdownMaxDepth}
       />
       <p style="font-size: 10px; opacity: 0.5; margin: 0;">
-        Hard cap on DOM recursion depth when reconstructing markdown from a message. Lower = safer against stack overflow on deeply nested content; higher = preserves structure of pathologically nested messages. Default 200. Takes effect immediately.
+        Hard cap on DOM recursion depth when reconstructing markdown from a message. Lower = safer against stack overflow on deeply nested content; higher = preserves structure of pathologically nested messages. Default 200.
+      </p>
+    </div>
+
+    <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+      <span class="bds-toggle-label">Chat Session List Cap</span>
+      <input
+        id="bds-max-chat-sessions"
+        type="number"
+        min="10"
+        step="50"
+        class="bds-input"
+        style="width: 120px; box-sizing: border-box;"
+        bind:value={maxChatSessions}
+      />
+      <p style="font-size: 10px; opacity: 0.5; margin: 0;">
+        Maximum number of chat sessions kept in memory for the sidebar. Older sessions beyond this cap are evicted (FIFO). Lower values reduce memory usage on long-lived tabs. Default 500.
       </p>
     </div>
   </div>

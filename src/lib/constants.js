@@ -464,6 +464,7 @@ export const DEFAULT_SETTINGS = {
   systemPromptInjectionFrequency: "first",
   systemPromptInjectionInterval: 3,
   htmlToMarkdownMaxDepth: 200,
+  maxChatSessions: 500,
 };
 
 // ── Code language → file extension map ──

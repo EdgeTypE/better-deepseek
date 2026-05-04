@@ -41,7 +41,18 @@ export function setupBridgeEvents() {
 /**
  * Update global state with session data from API.
  */
-const MAX_CHAT_SESSIONS = 500;
+const MAX_CHAT_SESSIONS_FLOOR = 10;
+let MAX_CHAT_SESSIONS = 500;
+
+/**
+ * Update the session-list cap. Called by the storage layer on initial load
+ * and when the user saves a new value via the Settings panel.
+ */
+export function setMaxChatSessions(value) {
+  const raw = Number(value);
+  if (!Number.isFinite(raw) || raw <= 0) return;
+  MAX_CHAT_SESSIONS = Math.max(MAX_CHAT_SESSIONS_FLOOR, Math.floor(raw));
+}
 
 function handleSessionData(data) {
   const sessions = data?.data?.biz_data?.chat_sessions;
