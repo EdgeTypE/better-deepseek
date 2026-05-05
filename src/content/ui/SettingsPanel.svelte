@@ -42,6 +42,7 @@
   let activeProject = $state(getActiveProject());
   let projectInstructions = $state(activeProject?.customInstructions || "");
   let projectSaveTimer = null;
+  const GITHUB_TOKEN_MASK_CHAR = "\u25cf";
 
   export function refresh() {
     systemPrompt = appState.settings.systemPrompt || "";
@@ -123,6 +124,22 @@
 
   function resetSystemPrompt() {
     systemPrompt = DEFAULT_SYSTEM_PROMPT;
+  }
+
+  function getGithubTokenDisplayValue() {
+    if (showGithubToken) {
+      return githubToken;
+    }
+
+    if (!githubToken) {
+      return "";
+    }
+
+    // Operational security: Don't show the actual token
+    // when "Show" is not active. 
+    // Instead, show a fixed number of mask characters to indicate
+    // that a token is set without revealing it.
+    return GITHUB_TOKEN_MASK_CHAR.repeat(999);
   }
 </script>
 
@@ -383,11 +400,17 @@
       <div class="bds-token-field">
         <input
           id="bds-github-token"
-          type={showGithubToken ? "text" : "password"}
-          class="bds-input"
+          type="text"
+          class="bds-input bds-token-text"
           style="width: 100%; box-sizing: border-box;"
           placeholder="ghp_..."
-          bind:value={githubToken}
+          value={getGithubTokenDisplayValue()}
+          readonly={!showGithubToken}
+          oninput={(e) => {
+            if (showGithubToken) {
+              githubToken = e.currentTarget.value;
+            }
+          }}
           autocomplete="off"
           autocapitalize="off"
           spellcheck="false"
@@ -448,6 +471,10 @@
   .bds-token-btn:disabled {
     opacity: 0.45;
     cursor: not-allowed;
+  }
+
+  .bds-token-text[readonly] {
+    cursor: default;
   }
 
   .bds-token-help {
