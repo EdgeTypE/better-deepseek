@@ -19,6 +19,8 @@
   );
   let autoSubmitVoice = $state(Boolean(appState.settings.autoSubmitVoice));
   let preferredLang = $state(appState.settings.preferredLang || "");
+  let githubToken = $state(appState.settings.githubToken || "");
+  let showGithubToken = $state(false);
   let disableSystemPrompt = $state(
     Boolean(appState.settings.disableSystemPrompt),
   );
@@ -51,6 +53,8 @@
       (typeof navigator !== "undefined" ? navigator.language : "en-US");
     autoSubmitVoice = Boolean(appState.settings.autoSubmitVoice);
     preferredLang = appState.settings.preferredLang || "";
+    githubToken = appState.settings.githubToken || "";
+    showGithubToken = false;
     disableSystemPrompt = Boolean(appState.settings.disableSystemPrompt);
     systemPromptInjectionFrequency =
       appState.settings.systemPromptInjectionFrequency || "first";
@@ -91,6 +95,7 @@
     appState.settings.voiceLanguage = voiceLanguage;
     appState.settings.autoSubmitVoice = autoSubmitVoice;
     appState.settings.preferredLang = preferredLang.trim();
+    appState.settings.githubToken = githubToken.trim();
     appState.settings.disableSystemPrompt = disableSystemPrompt;
     appState.settings.systemPromptInjectionFrequency =
       systemPromptInjectionFrequency;
@@ -369,9 +374,96 @@
         usage on long-lived tabs. Default 500.
       </p>
     </div>
+
+    <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+      <span class="bds-toggle-label">GitHub Personal Access Token</span>
+      <div class="bds-token-field">
+        <input
+          id="bds-github-token"
+          type={showGithubToken ? "text" : "password"}
+          class="bds-input"
+          style="width: 100%; box-sizing: border-box;"
+          placeholder="ghp_..."
+          bind:value={githubToken}
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+        />
+        <div class="bds-token-actions">
+          <button
+            type="button"
+            class="bds-btn-outlined bds-token-btn"
+            onclick={() => (showGithubToken = !showGithubToken)}
+          >
+            {showGithubToken ? "Hide" : "Show"}
+          </button>
+          <button
+            type="button"
+            class="bds-btn-outlined bds-token-btn"
+            onclick={() => {
+              githubToken = "";
+              showGithubToken = false;
+            }}
+            disabled={!githubToken}
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+      <p class="bds-token-help">Create a classic token with <code>repo</code> scope at GitHub Settings -> Tokens.</p>
+    </div>
   </div>
 </div>
 
 <button id="bds-save-settings" type="button" onclick={save}>
   Save Settings
 </button>
+
+<style>
+  .bds-token-field {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .bds-token-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .bds-token-btn {
+    min-width: 58px;
+    padding-inline: 10px;
+  }
+
+  .bds-token-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .bds-token-help {
+    margin: 0;
+    font-size: 10px;
+    opacity: 0.6;
+    line-height: 1.45;
+  }
+
+  .bds-token-help code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.95em;
+  }
+
+  @media (max-width: 560px) {
+    .bds-token-field {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .bds-token-actions {
+      justify-content: flex-end;
+    }
+  }
+</style>
