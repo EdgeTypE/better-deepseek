@@ -36,6 +36,16 @@ export function setupBridgeEvents() {
     }
     handleSessionData(data);
   });
+
+  window.addEventListener("bds:token-usage", (event) => {
+    let data = event.detail;
+    if (typeof data === "string") {
+      try { data = JSON.parse(data); } catch (e) { return; }
+    }
+    if (data && data.modelName) {
+      state.pricing.modelName = data.modelName;
+    }
+  });
 }
 
 /**

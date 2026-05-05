@@ -5,10 +5,12 @@
  * Svelte UI components will read from this and trigger updates via callbacks.
  */
 
-import { DEFAULT_SETTINGS } from "../lib/constants.js";
+import { DEFAULT_SETTINGS, EMBEDDED_PRICING, CHARS_PER_TOKEN } from "../lib/constants.js";
 
 const state = {
   settings: { ...DEFAULT_SETTINGS },
+  embeddedPricing: EMBEDDED_PRICING,
+  charsPerToken: CHARS_PER_TOKEN,
   skills: [],
   memories: {},
   characters: [],
@@ -41,6 +43,21 @@ const state = {
   heroBarRef: null,
   /** @type {Array<{id:string,title:string,updatedAt:number}>} persistent session cache */
   chatSessions: [],
+  /** Token price tracking — session-level totals */
+  pricing: {
+    /** @type {string|null} current model being used */
+    modelName: null,
+    /** @type {{inputCost:number,outputCost:number,totalCost:number}} session totals */
+    sessionTotals: { inputCost: 0, outputCost: 0, totalCost: 0 },
+    /** @type {number} total input tokens sent this session */
+    sessionInputTokens: 0,
+    /** @type {number} total output tokens received this session */
+    sessionOutputTokens: 0,
+    /** @type {Map<string, {inputTokens:number,outputTokens:number,inputCost:number,outputCost:number,totalCost:number}>} per-message token/cost data (keyed by message node's bds-price-id) */
+    messageData: new Map(),
+    /** @type {boolean} whether pricing data has been loaded */
+    pricingLoaded: false,
+  },
 };
 
 /**

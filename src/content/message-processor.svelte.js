@@ -56,15 +56,29 @@ export function processMessageNode(node) {
   }
 
   const role = detectMessageRole(node);
+  const stateData = getNodeState(node);
 
   // --- USER MESSAGE: strip <BetterDeepSeek> system prompt from view ---
   if (role === "user") {
+    const rawUserText = rawText;
     stripBdsTagsFromUserMessage(node);
+    if (state.settings.tokenPriceDisplay && !stateData.priceInjected) {
+      const modelName = detectModelInline(null);
+      // rawUserText already includes injected system prompt blocks from API payload
+      const newInputTokens = estimateTokensInline(rawUserText);
+      const cacheHitTokens = state.pricing.sessionInputTokens;
+      const { inputCost } = calcCostInlineWithCache(newInputTokens, cacheHitTokens, 0, modelName);
+      injectPriceUser(node, newInputTokens, inputCost);
+      state.pricing.sessionInputTokens += newInputTokens;
+      state.pricing.sessionTotals.inputCost += inputCost;
+      state.pricing.sessionTotals.totalCost += inputCost;
+      refreshSessionTotalDisplayInline();
+      stateData.priceInjected = true;
+    }
     return;
   }
 
   const isLatestAssistant = role === "assistant" && isLatestAssistantMessage(node);
-  const stateData = getNodeState(node);
 
   const now = Date.now();
   if (stateData.lastRawText !== rawText) {
@@ -249,8 +263,8 @@ export function processMessageNode(node) {
 
     // TAG-DRIVEN INTERFACE LOCK
     const isCurrentlyLoading = parsed.isStreamingTool || 
-                               stateData.isLongWorkActive || 
-                               (isLatestAssistant && isGenerating && !isSettled);
+                                stateData.isLongWorkActive || 
+                                (isLatestAssistant && isGenerating && !isSettled);
     const hasTags = parsed.containsControlTags || isCurrentlyLoading;
 
     if (hasTags) {
@@ -381,6 +395,22 @@ function syncVisibilityState(node, isLatestAssistant, stateData, isSettled) {
       playVoiceResponse(stateData.lastRawText);
     }
   }
+
+  // --- TOKEN PRICE DISPLAY (assistant messages) ---
+  if (isSettled && state.settings.tokenPriceDisplay && !stateData.priceInjected) {
+    stateData.priceInjected = true;
+    const modelName = detectModelInline(null);
+    const visibleText = stateData.lastRawText || "";
+    const thinkingText = extractThinkingTextInline(node);
+    const totalText = visibleText + thinkingText;
+    const outputTokens = estimateTokensInline(totalText);
+    const { outputCost } = calcCostInline(0, outputTokens, modelName);
+    injectPriceAssistant(node, outputTokens, outputCost);
+    state.pricing.sessionOutputTokens += outputTokens;
+    state.pricing.sessionTotals.outputCost += outputCost;
+    state.pricing.sessionTotals.totalCost += outputCost;
+    refreshSessionTotalDisplayInline();
+  }
 }
 
 /**
@@ -490,4 +520,134 @@ function stripBdsTagsFromUserMessage(node) {
     // If the entire message was the system prompt, hide the whole bubble
     node.style.display = 'none';
   }
+}
+
+// ── Inline Price Display Helpers ──
+
+function estimateTokensInline(text) {
+  if (!text) return 0;
+  return Math.max(1, Math.round(String(text).length / state.charsPerToken));
+}
+
+function calcCostInline(inputTokens, outputTokens, modelName) {
+  // Simple flat-rate cost (no cache split)
+  return calcCostInlineWithCache(inputTokens, 0, outputTokens, modelName);
+}
+
+function calcCostInlineWithCache(inputNewTokens, inputCachedTokens, outputTokens, modelName) {
+  const pricing = state.embeddedPricing;
+  const resolved = detectModelInline(modelName);
+  const m = pricing.models[resolved] || pricing.models["deepseek-v4-flash"];
+  const newCost = (inputNewTokens / 1e6) * m.inputPrice;
+  const cachedCost = (inputCachedTokens / 1e6) * (m.inputCacheHitPrice || 0.0028);
+  const outputCost = (outputTokens / 1e6) * m.outputPrice;
+  return { inputCost: newCost + cachedCost, outputCost, totalCost: newCost + cachedCost + outputCost };
+}
+
+function detectModelInline(hint) {
+  if (hint) {
+    const lo = String(hint).toLowerCase();
+    if (lo.includes("pro") || lo.includes("reasoner") || lo === "expert") return "deepseek-v4-pro";
+    if (lo.includes("flash") || lo.includes("chat") || lo === "instant") return "deepseek-v4-flash";
+  }
+  const modelSpan = document.querySelector("._46a12ab");
+  if (modelSpan) {
+    const text = (modelSpan.textContent || "").toLowerCase();
+    if (text === "expert") return "deepseek-v4-pro";
+    if (text === "instant") return "deepseek-v4-flash";
+  }
+  return state.pricing.modelName || "deepseek-v4-flash";
+}
+
+function extractThinkingTextInline(node) {
+  let text = "";
+  const blocks = node.querySelectorAll('.ds-think-content, [class*="think"]');
+  for (const b of blocks) text += (b.textContent || "") + "\n";
+  return text;
+}
+
+function injectPriceUser(node, tokens, cost) {
+  const container = node.parentElement || node;
+  if (container.querySelector(".bds-message-price")) return;
+  const priceText = formatCostDisplay(cost);
+  const target = container.querySelector("._11d6b3a .ds-flex") ||
+    container.querySelector(".ds-flex._78e0558") || container.querySelector("[class*='_78e0558']");
+  if (!target) return;
+  const el = document.createElement("span");
+  el.className = "bds-message-price bds-price-user";
+  el.innerHTML = `<span class="bds-price-label">API: ~${priceText}</span><span class="bds-token-count">${fmtTok(tokens)} tok</span>`;
+  target.appendChild(el);
+}
+
+function injectPriceAssistant(node, tokens, cost) {
+  const container = node.closest("._4f9bf79._43c05b5") || node.parentElement || node;
+  if (container.querySelector(".bds-message-price")) return;
+  const priceText = formatCostDisplay(cost);
+  
+  // Try to find a model badge in this message first
+  const modelBadge = container.querySelector("._46a12ab")?.parentElement;
+  if (modelBadge) {
+    const el = document.createElement("span");
+    el.className = "bds-message-price bds-price-assistant-inline";
+    el.innerHTML = `<span class="bds-price-label">~${priceText}</span>`;
+    modelBadge.appendChild(el);
+    return;
+  }
+
+  const target = container.querySelector("._0a3d93b") || container.querySelector(".ds-flex._0a3d93b");
+  if (!target) {
+    const bars = container.querySelectorAll(".ds-flex");
+    for (const bar of bars) {
+      if (bar.querySelector(".ds-icon-button") || bar.querySelector("[role='button']")) {
+        const el = document.createElement("span");
+        el.className = "bds-message-price bds-price-assistant";
+        el.innerHTML = `<span class="bds-price-label">API: ~${priceText}</span><span class="bds-token-count">${fmtTok(tokens)} tok</span>`;
+        bar.appendChild(el);
+        return;
+      }
+    }
+    return;
+  }
+  const el = document.createElement("span");
+  el.className = "bds-message-price bds-price-assistant";
+  el.innerHTML = `<span class="bds-price-label">API: ~${priceText}</span><span class="bds-token-count">${fmtTok(tokens)} tok</span>`;
+  target.appendChild(el);
+}
+
+function fmtTok(n) {
+  return n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1000 ? (n / 1000).toFixed(1) + "K" : String(n);
+}
+
+function formatCostDisplay(cost) {
+  if (cost <= 0 || cost < 1e-6) return "<$0.0001";
+  if (cost < 1e-3) return "$" + cost.toFixed(6);
+  if (cost < 0.01) return "$" + cost.toFixed(4);
+  return "$" + cost.toFixed(3);
+}
+
+function refreshSessionTotalDisplayInline() {
+  if (!state.settings.tokenPriceDisplay) return;
+  
+  let el = document.querySelector(".bds-session-total");
+  if (!el) {
+    const header = document.querySelector("._2be88ba .f8d1e4c0 ._9fcbeda._7ee190f");
+    // Look for the model badge pill container
+    const modelBadge = header?.querySelector("._46a12ab")?.parentElement;
+    const target = modelBadge || header;
+    
+    if (!target) return;
+    
+    el = document.createElement("div");
+    el.className = "bds-session-total";
+    target.appendChild(el);
+  }
+  
+  const total = state.pricing.sessionTotals.totalCost;
+  const allTok = state.pricing.sessionInputTokens + state.pricing.sessionOutputTokens;
+  const totalFmt = formatCostDisplay(total);
+  
+  el.innerHTML = `
+    <span class="bds-price-badge">~${totalFmt}</span>
+    <span class="bds-token-badge">${fmtTok(allTok)}</span>
+  `;
 }
