@@ -7,6 +7,7 @@ import { fetchAndConvertWebPage } from "./files/web-reader.js";
 import { fetchGitHubRepo } from "./files/github-reader.js";
 import { fetchTwitterTweet } from "./files/twitter-reader.js";
 import { fetchYouTubeData } from "./files/youtube-reader.js";
+import appState from "./state.js";
 
 // Keep track of already processing/processed URLs globally so we don't spam
 const processedWebFetches = new Set();
@@ -44,9 +45,14 @@ export async function handleAutoGitHubFetch(repoUrl) {
   console.log(`[BDS:AUTO] Starting automatic GitHub fetch for: ${repoUrl}`);
 
   try {
-    const file = await fetchGitHubRepo(repoUrl, (status) => {
-      console.log(`[BDS:AUTO] GitHub Fetch Status: ${status}`);
-    });
+    const token = String(appState.settings.githubToken || "").trim();
+    const file = await fetchGitHubRepo(
+      repoUrl,
+      (status) => {
+        console.log(`[BDS:AUTO] GitHub Fetch Status: ${status}`);
+      },
+      { token }
+    );
 
     if (file) {
       injectFileAndSend(file, `<BetterDeepSeek>\n[BDS:AUTO] GitHub Fetch Result for: ${repoUrl}\n</BetterDeepSeek>`);
@@ -118,7 +124,7 @@ export async function handleAutoErrorReport(toolName, error, originalCode) {
   ].join("\n");
 
   console.log(`[BDS:AUTO] Sending error report for ${toolName}...`);
-  
+
   // We use injectFileAndSend without a file for pure text injection
   injectPureTextAndSend(autoMessage);
 }
@@ -138,7 +144,7 @@ function injectPureTextAndSend(autoMessage) {
 
   // Phase 2: Wait for button and send
   let attempts = 0;
-  const maxAttempts = 50; 
+  const maxAttempts = 50;
 
   const attemptSend = () => {
     attempts++;
@@ -150,9 +156,9 @@ function injectPureTextAndSend(autoMessage) {
     });
 
     if (sendBtn) {
-      const isDisabled = sendBtn.getAttribute('aria-disabled') === 'true' || 
-                         sendBtn.classList.contains('ds-icon-button--disabled');
-      
+      const isDisabled = sendBtn.getAttribute('aria-disabled') === 'true' ||
+        sendBtn.classList.contains('ds-icon-button--disabled');
+
       if (!isDisabled) {
         sendBtn.click();
         console.log(`[BDS:AUTO] Error report sent successfully after ${attempts} attempts.`);
@@ -209,7 +215,7 @@ function injectFileAndSend(file, autoMessage = "") {
 
   const attemptSend = () => {
     attempts++;
-    
+
     // Find the send button
     // It usually has an arrow-up icon. We look for a role="button" that isn't the attach button.
     const buttons = Array.from(document.querySelectorAll('div[role="button"], button'));
@@ -220,9 +226,9 @@ function injectFileAndSend(file, autoMessage = "") {
     });
 
     if (sendBtn) {
-      const isDisabled = sendBtn.getAttribute('aria-disabled') === 'true' || 
-                         sendBtn.classList.contains('ds-icon-button--disabled');
-      
+      const isDisabled = sendBtn.getAttribute('aria-disabled') === 'true' ||
+        sendBtn.classList.contains('ds-icon-button--disabled');
+
       if (!isDisabled) {
         sendBtn.click();
         console.log(`[BDS:AUTO] Sent successfully after ${attempts} attempts.`);

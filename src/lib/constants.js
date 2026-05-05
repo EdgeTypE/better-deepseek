@@ -495,6 +495,7 @@ export const DEFAULT_SETTINGS = {
   downloadBehaviorVersion: DOWNLOAD_BEHAVIOR_VERSION,
   autoDownloadFiles: false,
   autoDownloadLongWorkZip: false,
+  githubToken: "",
   voiceMode: false,
   voiceLanguage: (typeof navigator !== 'undefined' ? navigator.language : 'en-US'),
   autoSubmitVoice: true,

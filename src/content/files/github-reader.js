@@ -1,7 +1,7 @@
 /**
  * GitHub Repository Reader
  *
- * Fetches a GitHub repo ZIP via codeload (no API key),
+ * Fetches a GitHub repo ZIP via codeload, optionally with a GitHub PAT,
  * extracts in-memory with fflate, filters via .gitignore,
  * and produces a gitingest-style concatenated text file.
  */
@@ -106,19 +106,61 @@ export function parseGitHubUrl(input) {
  * Fetch, extract, and concatenate a GitHub repo.
  * @param {string} repoUrl - GitHub URL or owner/repo
  * @param {(status: string) => void} onStatus - status callback
+ * @param {{ token?: string }} [options] - optional fetch overrides
  * @returns {Promise<File|null>}
  */
-export async function fetchGitHubRepo(repoUrl, onStatus = () => { }) {
+function decodeZipBase64(base64) {
+  const binaryStr = atob(base64);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function buildGitHubFetchError(result, fallbackMessage) {
+  if (result && result.authRejected) {
+    return new Error(
+      "GitHub rejected your token. Check that it has the `repo` scope and hasn't expired."
+    );
+  }
+
+  if (result && result.status === 404) {
+    return new Error(
+      "Repository not found or you may need a GitHub token for private repos. Add one in Advanced Settings."
+    );
+  }
+
+  return new Error(
+    result && result.error
+      ? result.error
+      : fallbackMessage
+  );
+}
+
+function preferGitHubFailure(current, next) {
+  if (!next) return current;
+  if (!current) return next;
+  if (next.authRejected && !current.authRejected) return next;
+  if (next.status === 404 && current.status !== 404) return next;
+  return next;
+}
+
+export async function fetchGitHubRepo(repoUrl, onStatus = () => { }, options = {}) {
   const parsed = parseGitHubUrl(repoUrl);
   if (!parsed) {
     throw new Error("Invalid GitHub URL. Use: https://github.com/owner/repo");
   }
 
   const { owner, repo, branch } = parsed;
+  const token = String(
+    typeof options.token === "string" ? options.token : ""
+  ).trim();
 
   // Try main, then master as fallback
   // Fetch via background service worker to bypass CORS
   let zipData = null;
+  let lastFailure = null;
   for (const b of [branch, branch === "main" ? "master" : null].filter(Boolean)) {
     const codeloadUrl = `https://codeload.github.com/${owner}/${repo}/zip/refs/heads/${b}`;
     onStatus(`Downloading ${owner}/${repo} (${b})...`);
@@ -127,25 +169,31 @@ export async function fetchGitHubRepo(repoUrl, onStatus = () => { }) {
       const result = await chrome.runtime.sendMessage({
         type: "bds-fetch-github-zip",
         url: codeloadUrl,
+        token: token || undefined,
       });
 
       if (result && result.ok && result.base64) {
-        // Decode base64 back to Uint8Array
-        const binaryStr = atob(result.base64);
-        const bytes = new Uint8Array(binaryStr.length);
-        for (let i = 0; i < binaryStr.length; i++) {
-          bytes[i] = binaryStr.charCodeAt(i);
-        }
-        zipData = bytes;
+        zipData = decodeZipBase64(result.base64);
         break;
       }
-    } catch {
+
+      lastFailure = preferGitHubFailure(lastFailure, result);
+      if (result && result.authRejected) {
+        break;
+      }
+    } catch (error) {
+      lastFailure = preferGitHubFailure(lastFailure, {
+        error: String(error && error.message ? error.message : error),
+      });
       // try next branch
     }
   }
 
   if (!zipData) {
-    throw new Error(`Could not download ${owner}/${repo}/${branch}. Check the URL and make sure the repo is public.`);
+    throw buildGitHubFetchError(
+      lastFailure,
+      `Could not download ${owner}/${repo}/${branch}. Check the URL and make sure the repo is public.`
+    );
   }
 
   onStatus("Extracting ZIP...");

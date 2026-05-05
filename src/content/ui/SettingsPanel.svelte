@@ -19,6 +19,8 @@
   );
   let autoSubmitVoice = $state(Boolean(appState.settings.autoSubmitVoice));
   let preferredLang = $state(appState.settings.preferredLang || "");
+  let githubToken = $state(appState.settings.githubToken || "");
+  let showGithubToken = $state(!String(appState.settings.githubToken || "").trim());
   let disableSystemPrompt = $state(
     Boolean(appState.settings.disableSystemPrompt),
   );
@@ -41,6 +43,11 @@
   let activeProject = $state(getActiveProject());
   let projectInstructions = $state(activeProject?.customInstructions || "");
   let projectSaveTimer = null;
+  const GITHUB_TOKEN_MASK_CHAR = "\u25cf";
+
+  function shouldShowGithubTokenByDefault(tokenValue = githubToken) {
+    return !String(tokenValue || "").trim();
+  }
 
   export function refresh() {
     systemPrompt = appState.settings.systemPrompt || "";
@@ -52,6 +59,8 @@
       (typeof navigator !== "undefined" ? navigator.language : "en-US");
     autoSubmitVoice = Boolean(appState.settings.autoSubmitVoice);
     preferredLang = appState.settings.preferredLang || "";
+    githubToken = appState.settings.githubToken || "";
+    showGithubToken = shouldShowGithubTokenByDefault(githubToken);
     disableSystemPrompt = Boolean(appState.settings.disableSystemPrompt);
     systemPromptInjectionFrequency =
       appState.settings.systemPromptInjectionFrequency || "first";
@@ -93,6 +102,7 @@
     appState.settings.voiceLanguage = voiceLanguage;
     appState.settings.autoSubmitVoice = autoSubmitVoice;
     appState.settings.preferredLang = preferredLang.trim();
+    appState.settings.githubToken = githubToken.trim();
     appState.settings.disableSystemPrompt = disableSystemPrompt;
     appState.settings.systemPromptInjectionFrequency =
       systemPromptInjectionFrequency;
@@ -121,6 +131,22 @@
 
   function resetSystemPrompt() {
     systemPrompt = DEFAULT_SYSTEM_PROMPT;
+  }
+
+  function getGithubTokenDisplayValue() {
+    if (showGithubToken) {
+      return githubToken;
+    }
+
+    if (!githubToken) {
+      return "";
+    }
+
+    // Operational security: Don't show the actual token
+    // when "Show" is not active. 
+    // Instead, show a fixed number of mask characters to indicate
+    // that a token is set without revealing it.
+    return GITHUB_TOKEN_MASK_CHAR.repeat(999);
   }
 </script>
 
@@ -373,6 +399,55 @@
       </p>
     </div>
 
+    <div
+      class="bds-toggle-row"
+      style="flex-direction: column; align-items: flex-start; gap: 8px;"
+    >
+      <span class="bds-toggle-label">GitHub Personal Access Token</span>
+      <div class="bds-token-field">
+        <input
+          id="bds-github-token"
+          type="text"
+          class="bds-input bds-token-text"
+          style="width: 100%; box-sizing: border-box;"
+          placeholder="ghp_..."
+          value={getGithubTokenDisplayValue()}
+          readonly={!showGithubToken}
+          oninput={(e) => {
+            if (showGithubToken) {
+              githubToken = e.currentTarget.value;
+            }
+          }}
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+        />
+        <div class="bds-token-actions">
+          <button
+            type="button"
+            class="bds-btn-outlined bds-token-btn"
+            onclick={() => (showGithubToken = !showGithubToken)}
+          >
+            {showGithubToken ? "Hide" : "Show"}
+          </button>
+          <button
+            type="button"
+            class="bds-btn-outlined bds-token-btn"
+            onclick={() => {
+              githubToken = "";
+              showGithubToken = true;
+            }}
+            disabled={!githubToken}
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+      <p class="bds-token-help">
+        Create a classic token with <code>repo</code> scope at GitHub Settings ->
+        Tokens.
+      </p>
+    </div>
     <div class="bds-toggle-row">
       <span class="bds-toggle-label">Token Price Estimation (Experimental)</span>
       <label class="bds-switch">
@@ -389,3 +464,56 @@
 <button id="bds-save-settings" type="button" onclick={save}>
   Save Settings
 </button>
+
+<style>
+  .bds-token-field {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .bds-token-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .bds-token-btn {
+    min-width: 58px;
+    padding-inline: 10px;
+  }
+
+  .bds-token-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .bds-token-text[readonly] {
+    cursor: default;
+  }
+
+  .bds-token-help {
+    margin: 0;
+    font-size: 10px;
+    opacity: 0.6;
+    line-height: 1.45;
+  }
+
+  .bds-token-help code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.95em;
+  }
+
+  @media (max-width: 560px) {
+    .bds-token-field {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .bds-token-actions {
+      justify-content: flex-end;
+    }
+  }
+</style>

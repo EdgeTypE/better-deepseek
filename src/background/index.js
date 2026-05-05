@@ -18,7 +18,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "bds-fetch-github-zip") {
-    fetchGithubZip(message.url)
+    fetchGithubZip(message.url, message.token)
       .then((base64) => {
         sendResponse({ ok: true, base64 });
       })
@@ -26,6 +26,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({
           ok: false,
           error: String(error && error.message ? error.message : error),
+          status:
+            error && Number.isFinite(error.status) ? Number(error.status) : null,
+          authRejected: Boolean(error && error.authRejected),
         });
       });
     return true;
@@ -65,12 +68,30 @@ function bytesToBase64(bytes) {
   return btoa(binary);
 }
 
-async function fetchGithubZip(url) {
-  if (!url) throw new Error("No URL provided.");
+function createGithubFetchError(message, options = {}) {
+  const error = new Error(message);
+  if (Number.isFinite(options.status)) {
+    error.status = Number(options.status);
+  }
+  if (options.authRejected) {
+    error.authRejected = true;
+  }
+  return error;
+}
 
-  const resp = await fetch(url);
+function canSendGithubToken(url) {
+  try {
+    return new URL(url).hostname === "codeload.github.com";
+  } catch {
+    return false;
+  }
+}
+
+async function readZipResponse(resp, url) {
   if (!resp.ok) {
-    throw new Error(`GitHub returned ${resp.status} for ${url}`);
+    throw createGithubFetchError(`GitHub returned ${resp.status} for ${url}`, {
+      status: resp.status,
+    });
   }
 
   const arrayBuffer = await resp.arrayBuffer();
@@ -80,6 +101,58 @@ async function fetchGithubZip(url) {
 
   const bytes = new Uint8Array(arrayBuffer);
   return bytesToBase64(bytes);
+}
+
+async function fetchGithubZip(url, token) {
+  if (!url) throw new Error("No URL provided.");
+
+  const trimmedToken = String(token || "").trim();
+  const shouldUseToken = Boolean(trimmedToken) && canSendGithubToken(url);
+
+  if (shouldUseToken) {
+    let authResponse = null;
+
+    try {
+      authResponse = await fetch(url, {
+        headers: {
+          Authorization: `token ${trimmedToken}`,
+        },
+      });
+
+      if (authResponse.ok) {
+        return await readZipResponse(authResponse, url);
+      }
+
+      if (authResponse.status === 401 || authResponse.status === 403) {
+        throw createGithubFetchError(
+          `GitHub rejected the supplied token for ${url}`,
+          {
+            status: authResponse.status,
+            authRejected: true,
+          }
+        );
+      }
+    } catch (error) {
+      if (error && error.authRejected) {
+        throw error;
+      }
+      authResponse = null;
+    }
+
+    const fallbackResponse = await fetch(url);
+    if (fallbackResponse.ok) {
+      return await readZipResponse(fallbackResponse, url);
+    }
+
+    throw createGithubFetchError(
+      `GitHub returned ${fallbackResponse.status} for ${url}`,
+      {
+        status: fallbackResponse.status,
+      }
+    );
+  }
+
+  return await readZipResponse(await fetch(url), url);
 }
 
 async function fetchPageContent(url, options = {}) {

@@ -4,7 +4,14 @@
   import { fetchGitHubRepo, parseGitHubUrl } from "../files/github-reader.js";
   import { fetchAndConvertWebPage } from "../files/web-reader.js";
   import { projectFilesToFile } from "../files/project-file-builder.js";
-  import { getFilesForProject, setActiveProject, clearActiveProject, tickFile, untickFile, clearActiveFiles } from "../project-manager.js";
+  import {
+    getFilesForProject,
+    setActiveProject,
+    clearActiveProject,
+    tickFile,
+    untickFile,
+    clearActiveFiles,
+  } from "../project-manager.js";
   import { pushConfigToPage } from "../bridge.js";
   import appState from "../state.js";
   import { BRIDGE_EVENTS } from "../../lib/constants.js";
@@ -46,8 +53,12 @@
   let isRecording = false;
   let recognition = null;
 
+  function hasGithubToken() {
+    return Boolean(String(appState.settings.githubToken || "").trim());
+  }
+
   function stopTTS() {
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
   }
@@ -59,16 +70,19 @@
       return;
     }
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      if (appState.ui) appState.ui.showToast("Browser does not support Speech Recognition.");
+      if (appState.ui)
+        appState.ui.showToast("Browser does not support Speech Recognition.");
       return;
     }
 
     stopTTS();
 
     recognition = new SpeechRecognition();
-    recognition.lang = appState.settings.voiceLanguage || navigator.language || 'en-US';
+    recognition.lang =
+      appState.settings.voiceLanguage || navigator.language || "en-US";
     recognition.interimResults = true;
     recognition.continuous = false;
 
@@ -78,10 +92,10 @@
 
     recognition.onresult = (event) => {
       const transcript = Array.from(event.results)
-        .map(result => result[0])
-        .map(result => result.transcript)
-        .join('');
-      
+        .map((result) => result[0])
+        .map((result) => result.transcript)
+        .join("");
+
       injectTextIntoDeepSeek(transcript, event.results[0].isFinal);
     };
 
@@ -99,20 +113,22 @@
   }
 
   function injectTextIntoDeepSeek(text, isFinal) {
-    // DeepSeek uses a <textarea> or a contenteditable div. 
+    // DeepSeek uses a <textarea> or a contenteditable div.
     // Usually it's #chat-input in modern DeepSeek.
-    const textarea = document.querySelector('textarea#chat-input') || 
-                     document.querySelector('.ds-textarea textarea') ||
-                     document.querySelector('textarea');
+    const textarea =
+      document.querySelector("textarea#chat-input") ||
+      document.querySelector(".ds-textarea textarea") ||
+      document.querySelector("textarea");
 
     if (!textarea) {
-      if (isFinal && appState.ui) appState.ui.showToast("Could not find input field.");
+      if (isFinal && appState.ui)
+        appState.ui.showToast("Could not find input field.");
       return;
     }
 
     // textarea.value = text;
     textarea.value = text;
-    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
 
     if (isFinal && appState.settings.autoSubmitVoice) {
       setTimeout(robustSend, 400);
@@ -128,21 +144,26 @@
 
     const attempt = () => {
       attempts++;
-      const buttons = Array.from(document.querySelectorAll('div[role="button"], button'));
-      const sendBtn = buttons.find(b => {
+      const buttons = Array.from(
+        document.querySelectorAll('div[role="button"], button'),
+      );
+      const sendBtn = buttons.find((b) => {
         // Match logic from auto.js
-        const isSend = b.querySelector('svg path[d*="M8.3125"], .ds-icon-send') || 
-                       b.querySelector('svg path[d*="M13.12 19.98"]') ||
-                       b.title === "Send message" || 
-                       b.ariaLabel === "Send Message";
-        const isAttach = b.classList.contains('bds-plus-btn') || b.querySelector('svg line');
+        const isSend =
+          b.querySelector('svg path[d*="M8.3125"], .ds-icon-send') ||
+          b.querySelector('svg path[d*="M13.12 19.98"]') ||
+          b.title === "Send message" ||
+          b.ariaLabel === "Send Message";
+        const isAttach =
+          b.classList.contains("bds-plus-btn") || b.querySelector("svg line");
         return isSend && !isAttach;
       });
 
       if (sendBtn) {
-        const isDisabled = sendBtn.getAttribute('aria-disabled') === 'true' || 
-                           sendBtn.classList.contains('ds-icon-button--disabled');
-        
+        const isDisabled =
+          sendBtn.getAttribute("aria-disabled") === "true" ||
+          sendBtn.classList.contains("ds-icon-button--disabled");
+
         if (!isDisabled) {
           sendBtn.click();
           return;
@@ -153,10 +174,17 @@
         setTimeout(attempt, 200);
       } else {
         // Fallback: Try Enter key on input
-        const textarea = document.querySelector('textarea#chat-input') || 
-                         document.querySelector('.ds-textarea textarea');
+        const textarea =
+          document.querySelector("textarea#chat-input") ||
+          document.querySelector(".ds-textarea textarea");
         if (textarea) {
-          textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, keyCode: 13 }));
+          textarea.dispatchEvent(
+            new KeyboardEvent("keydown", {
+              key: "Enter",
+              bubbles: true,
+              keyCode: 13,
+            }),
+          );
         }
       }
     };
@@ -187,7 +215,7 @@
         if (node.parentNode) {
           node.parentNode.removeChild(node);
         }
-      }
+      },
     };
   }
 
@@ -270,7 +298,8 @@
 
     const parsed = parseGitHubUrl(githubUrl);
     if (!parsed) {
-      githubError = "Invalid URL. Use: https://github.com/owner/repo or owner/repo";
+      githubError =
+        "Invalid URL. Use: https://github.com/owner/repo or owner/repo";
       return;
     }
 
@@ -278,9 +307,14 @@
     githubLoading = true;
 
     try {
-      const file = await fetchGitHubRepo(githubUrl, (status) => {
-        githubStatus = status;
-      });
+      const token = String(appState.settings.githubToken || "").trim();
+      const file = await fetchGitHubRepo(
+        githubUrl,
+        (status) => {
+          githubStatus = status;
+        },
+        { token },
+      );
 
       if (file) {
         showGithubDialog = false;
@@ -356,7 +390,10 @@
 
   function openProjectPanel(e) {
     e.stopPropagation();
-    if (showProjectPanel) { showProjectPanel = false; return; }
+    if (showProjectPanel) {
+      showProjectPanel = false;
+      return;
+    }
     refreshProjectPanel();
     if (projectBtnRef) {
       const rect = projectBtnRef.getBoundingClientRect();
@@ -368,7 +405,9 @@
   function refreshProjectPanel() {
     panelProjects = [...appState.projects];
     panelActiveProjectId = appState.activeProjectId || "";
-    panelFiles = panelActiveProjectId ? getFilesForProject(panelActiveProjectId) : [];
+    panelFiles = panelActiveProjectId
+      ? getFilesForProject(panelActiveProjectId)
+      : [];
     panelTickedIds = [...appState.activeFileIds];
   }
 
@@ -380,7 +419,9 @@
     if (id) setActiveProject(id);
     else clearActiveProject();
     panelActiveProjectId = appState.activeProjectId || "";
-    panelFiles = panelActiveProjectId ? getFilesForProject(panelActiveProjectId) : [];
+    panelFiles = panelActiveProjectId
+      ? getFilesForProject(panelActiveProjectId)
+      : [];
     panelTickedIds = [...appState.activeFileIds];
     pushConfigToPage();
     if (appState.ui) appState.ui.refreshProjects();
@@ -397,8 +438,13 @@
     if (!nativeInput || !panelTickedIds.length) return;
     const activeFiles = panelFiles.filter((f) => panelTickedIds.includes(f.id));
     if (!activeFiles.length) return;
-    const activeProject = panelProjects.find((p) => p.id === panelActiveProjectId);
-    const file = projectFilesToFile(activeFiles, activeProject?.name || "Project");
+    const activeProject = panelProjects.find(
+      (p) => p.id === panelActiveProjectId,
+    );
+    const file = projectFilesToFile(
+      activeFiles,
+      activeProject?.name || "Project",
+    );
     if (!file) return;
     injectFile(file);
     showProjectPanel = false;
@@ -427,7 +473,17 @@
 
 <div class="bds-attach-wrapper" bind:this={menuRef}>
   <button class="bds-plus-btn" on:click={toggleMenu} title="Advanced Upload">
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
       <line x1="12" y1="5" x2="12" y2="19"></line>
       <line x1="5" y1="12" x2="19" y2="12"></line>
     </svg>
@@ -439,21 +495,40 @@
     on:click={openProjectPanel}
     title="Attach Project"
   >
-    <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24"
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
       fill="none"
-      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
       style="opacity:0.65"
     >
-      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+      <path
+        d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+      />
     </svg>
   </button>
 
   <button
     class="bds-mic-btn {isRecording ? 'bds-recording' : ''}"
-    on:click={toggleSpeechRecognition} 
+    on:click={toggleSpeechRecognition}
     title={isRecording ? "Stop Recording" : "Voice Prompt"}
   >
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill={isRecording ? "currentColor" : "none"} stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill={isRecording ? "currentColor" : "none"}
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
       <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
       <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
       <line x1="12" y1="19" x2="12" y2="23"></line>
@@ -463,26 +538,121 @@
       <div class="bds-recording-pulse"></div>
     {/if}
   </button>
-  
+
   {#if isOpen}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <div class="bds-attach-dropdown" style={dropdownStyle} use:portal on:click|stopPropagation>
+    <div
+      class="bds-attach-dropdown"
+      style={dropdownStyle}
+      use:portal
+      on:click|stopPropagation
+    >
       <button class="bds-attach-item" on:click={handleUploadFile}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="bds-item-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="bds-item-icon"
+          ><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+          ></path><polyline points="14 2 14 8 20 8"></polyline><line
+            x1="12"
+            y1="18"
+            x2="12"
+            y2="12"
+          ></line><line x1="9" y1="15" x2="15" y2="15"></line></svg
+        >
         Upload File
       </button>
       <button class="bds-attach-item" on:click={handleUploadFolder}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="bds-item-icon"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="bds-item-icon"
+          ><path
+            d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+          ></path><line x1="12" y1="11" x2="12" y2="17"></line><line
+            x1="9"
+            y1="14"
+            x2="15"
+            y2="14"
+          ></line></svg
+        >
         Upload Folder
       </button>
       <div class="bds-attach-divider"></div>
       <button class="bds-attach-item" on:click={handleGithubImport}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="bds-item-icon"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"></path></svg>
-        GitHub Repo
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          class="bds-item-icon"
+          ><path
+            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+          ></path></svg
+        >
+        <span class="bds-attach-item-label">
+          <span>GitHub Repo</span>
+          {#if hasGithubToken()}
+            <span
+              class="bds-github-auth-icon"
+              aria-label="Authenticated GitHub access"
+              title="Authenticated GitHub access"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.15"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="5" y="11" width="14" height="10" rx="2"></rect>
+                <path d="M8 11V8a4 4 0 0 1 8 0v3"></path>
+              </svg>
+            </span>
+          {/if}
+        </span>
       </button>
       <button class="bds-attach-item" on:click={handleWebImport}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="bds-item-icon"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="bds-item-icon"
+          ><circle cx="12" cy="12" r="10"></circle><line
+            x1="2"
+            y1="12"
+            x2="22"
+            y2="12"
+          ></line><path
+            d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+          ></path></svg
+        >
         Fetch Web Page
       </button>
     </div>
@@ -492,13 +662,56 @@
 {#if showGithubDialog}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <div class="bds-github-overlay" use:portal on:click|self={() => { if (!githubLoading) showGithubDialog = false; }}>
-    <div class="bds-github-dialog" bind:this={dialogRef} on:click|stopPropagation on:keydown|stopPropagation>
+  <div
+    class="bds-github-overlay"
+    use:portal
+    on:click|self={() => {
+      if (!githubLoading) showGithubDialog = false;
+    }}
+  >
+    <div
+      class="bds-github-dialog"
+      bind:this={dialogRef}
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+    >
       <div class="bds-github-header">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="bds-github-logo"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"></path></svg>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          class="bds-github-logo"
+          ><path
+            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+          ></path></svg
+        >
         <span>GitHub Repo Import</span>
+        {#if hasGithubToken()}
+          <span class="bds-github-auth-pill">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.15"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="5" y="11" width="14" height="10" rx="2"></rect>
+              <path d="M8 11V8a4 4 0 0 1 8 0v3"></path>
+            </svg>
+            Authenticated
+          </span>
+        {/if}
         {#if !githubLoading}
-          <button class="bds-github-close" on:click={() => showGithubDialog = false}>&times;</button>
+          <button
+            class="bds-github-close"
+            on:click={() => (showGithubDialog = false)}>&times;</button
+          >
         {/if}
       </div>
 
@@ -508,7 +721,7 @@
           type="text"
           placeholder="https://github.com/owner/repo or owner/repo"
           bind:value={githubUrl}
-          on:keydown={(e) => handleDialogKeydown(e, 'github')}
+          on:keydown={(e) => handleDialogKeydown(e, "github")}
           disabled={githubLoading}
           autofocus
         />
@@ -528,7 +741,9 @@
       <div class="bds-github-footer">
         <button
           class="bds-github-btn bds-github-btn-cancel"
-          on:click={() => { if (!githubLoading) showGithubDialog = false; }}
+          on:click={() => {
+            if (!githubLoading) showGithubDialog = false;
+          }}
           disabled={githubLoading}
         >
           Close
@@ -548,10 +763,20 @@
 {#if showProjectPanel}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <div class="bds-project-panel" style={projectPanelStyle} use:portal bind:this={projectPanelRef} on:click|stopPropagation>
+  <div
+    class="bds-project-panel"
+    style={projectPanelStyle}
+    use:portal
+    bind:this={projectPanelRef}
+    on:click|stopPropagation
+  >
     <div class="bds-pp-header">
       <span class="bds-pp-label">Project</span>
-      <select class="bds-pp-select" value={panelActiveProjectId} on:change={handlePanelProjectChange}>
+      <select
+        class="bds-pp-select"
+        value={panelActiveProjectId}
+        on:change={handlePanelProjectChange}
+      >
         <option value="">None</option>
         {#each panelProjects as p (p.id)}
           <option value={p.id}>{p.name}</option>
@@ -559,13 +784,19 @@
       </select>
     </div>
 
-    <p class="bds-pp-hint">Instructions from selected project apply at first message only.</p>
+    <p class="bds-pp-hint">
+      Instructions from selected project apply at first message only.
+    </p>
 
     {#if panelActiveProjectId && panelFiles.length > 0}
       <div class="bds-pp-files-header">
-        <span class="bds-pp-files-count">{panelFiles.length} file{panelFiles.length === 1 ? '' : 's'}</span>
+        <span class="bds-pp-files-count"
+          >{panelFiles.length} file{panelFiles.length === 1 ? "" : "s"}</span
+        >
         <button class="bds-pp-select-all" on:click={toggleSelectAll}>
-          {panelTickedIds.length === panelFiles.length ? 'Deselect all' : 'Select all'}
+          {panelTickedIds.length === panelFiles.length
+            ? "Deselect all"
+            : "Select all"}
         </button>
       </div>
       <div class="bds-pp-files">
@@ -573,18 +804,27 @@
           <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <label
-            class="bds-pp-pill{panelTickedIds.includes(file.id) ? ' bds-pp-pill--active' : ''}"
+            class="bds-pp-pill{panelTickedIds.includes(file.id)
+              ? ' bds-pp-pill--active'
+              : ''}"
             title={file.name}
           >
             <input
               type="checkbox"
               class="bds-sr-only"
               checked={panelTickedIds.includes(file.id)}
-              on:change={(e) => handlePanelFileToggle(file.id, e.target.checked)}
+              on:change={(e) =>
+                handlePanelFileToggle(file.id, e.target.checked)}
             />
             <span class="bds-pp-pill-check" aria-hidden="true">
               {#if panelTickedIds.includes(file.id)}
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M8.5 2L4 7 1.5 4.5l-.7.7L4 8.5 9.2 2.7z"/></svg>
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 10 10"
+                  fill="currentColor"
+                  ><path d="M8.5 2L4 7 1.5 4.5l-.7.7L4 8.5 9.2 2.7z" /></svg
+                >
               {:else}
                 <span class="bds-pp-pill-box"></span>
               {/if}
@@ -596,8 +836,20 @@
       {#if panelTickedIds.length > 0}
         <div class="bds-pp-footer">
           <button class="bds-pp-attach" on:click={attachPanelFiles}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"
+              />
             </svg>
             Attach ({panelTickedIds.length})
           </button>
@@ -614,13 +866,45 @@
 {#if showWebDialog}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <div class="bds-github-overlay" use:portal on:click|self={() => { if (!webLoading) showWebDialog = false; }}>
-    <div class="bds-github-dialog" bind:this={dialogRef} on:click|stopPropagation on:keydown|stopPropagation>
+  <div
+    class="bds-github-overlay"
+    use:portal
+    on:click|self={() => {
+      if (!webLoading) showWebDialog = false;
+    }}
+  >
+    <div
+      class="bds-github-dialog"
+      bind:this={dialogRef}
+      on:click|stopPropagation
+      on:keydown|stopPropagation
+    >
       <div class="bds-github-header">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          ><circle cx="12" cy="12" r="10"></circle><line
+            x1="2"
+            y1="12"
+            x2="22"
+            y2="12"
+          ></line><path
+            d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+          ></path></svg
+        >
         <span>Fetch Web Page</span>
         {#if !webLoading}
-          <button class="bds-github-close" on:click={() => showWebDialog = false}>&times;</button>
+          <button
+            class="bds-github-close"
+            on:click={() => (showWebDialog = false)}>&times;</button
+          >
         {/if}
       </div>
 
@@ -630,7 +914,7 @@
           type="text"
           placeholder="https://example.com/article"
           bind:value={webUrl}
-          on:keydown={(e) => handleDialogKeydown(e, 'web')}
+          on:keydown={(e) => handleDialogKeydown(e, "web")}
           disabled={webLoading}
           autofocus
         />
@@ -650,7 +934,9 @@
       <div class="bds-github-footer">
         <button
           class="bds-github-btn bds-github-btn-cancel"
-          on:click={() => { if (!webLoading) showWebDialog = false; }}
+          on:click={() => {
+            if (!webLoading) showWebDialog = false;
+          }}
           disabled={webLoading}
         >
           Close
@@ -687,7 +973,9 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: background-color var(--bds-transition, 0.18s ease), transform 0.1s ease;
+    transition:
+      background-color var(--bds-transition, 0.18s ease),
+      transform 0.1s ease;
   }
 
   .bds-plus-btn:hover {
@@ -733,8 +1021,14 @@
   }
 
   @keyframes bds-pulse {
-    0% { transform: scale(1); opacity: 0.6; }
-    100% { transform: scale(1.5); opacity: 0; }
+    0% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    100% {
+      transform: scale(1.5);
+      opacity: 0;
+    }
   }
 
   .bds-attach-dropdown {
@@ -772,6 +1066,25 @@
 
   .bds-item-icon {
     opacity: 0.8;
+    flex-shrink: 0;
+  }
+
+  .bds-attach-item-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .bds-github-auth-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    color: var(--bds-accent);
+    background: var(--bds-accent-glow);
+    border: 1px solid var(--bds-border);
     flex-shrink: 0;
   }
 
@@ -834,6 +1147,20 @@
     color: var(--bds-text-primary);
   }
 
+  .bds-github-auth-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--bds-border);
+    background: var(--bds-accent-glow);
+    color: var(--bds-accent);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+  }
+
   .bds-github-body {
     padding: 16px;
     display: flex;
@@ -841,7 +1168,14 @@
     gap: 10px;
   }
 
+  .bds-github-body > * {
+    min-width: 0;
+  }
+
   .bds-github-input {
+    display: block;
+    box-sizing: border-box;
+    max-width: 100%;
     background: var(--bds-bg-input);
     border: 1px solid var(--bds-border);
     border-radius: 8px;
@@ -849,7 +1183,9 @@
     font-size: 13px;
     color: var(--bds-text-primary);
     outline: none;
-    transition: border-color var(--bds-transition, 0.18s ease), box-shadow var(--bds-transition, 0.18s ease);
+    transition:
+      border-color var(--bds-transition, 0.18s ease),
+      box-shadow var(--bds-transition, 0.18s ease);
     font-family: inherit;
     width: 100%;
   }
@@ -889,7 +1225,9 @@
   }
 
   @keyframes bds-spin {
-    to { transform: rotate(360deg); }
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   .bds-github-footer {
@@ -1018,7 +1356,8 @@
     max-width: 300px;
     z-index: 999999;
     overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
   }
 
   .bds-pp-header {
@@ -1050,7 +1389,9 @@
     outline: none;
     min-width: 0;
     font-family: inherit;
-    transition: border-color var(--bds-transition, 0.18s ease), box-shadow var(--bds-transition, 0.18s ease);
+    transition:
+      border-color var(--bds-transition, 0.18s ease),
+      box-shadow var(--bds-transition, 0.18s ease);
   }
 
   .bds-pp-select:focus {

@@ -88,7 +88,7 @@ Every code block in DeepSeek responses gains a "Download" button, making it easy
 ### Advanced File Upload
 The extension adds a "+" button next to the chat input, offering:
 - Upload a folder (concatenates all text files into a single workspace file).
-- Import a GitHub repository (fetches and packages the repo as a text file).
+- Import a GitHub repository (fetches and packages the repo as a text file, with optional GitHub token support for private repositories).
 - Fetch a web page (converts the main content to markdown).
 
 ## Installation
@@ -161,6 +161,8 @@ When DeepSeek writes to memory using `<BDS:memory_write>`, the entries appear in
 ### Uploading Folders and GitHub Repos
 Click the "+" button next to the chat input to reveal the advanced upload menu. Choose "Upload Folder" to select a local directory; the extension will concatenate all text files into a single upload. On browsers without the File System Access API (Firefox), the folder picker falls back to the browser's native directory input so the flow still works. "GitHub Repo" fetches the repository as a ZIP and converts it to a gitingest-style text file for context.
 
+For private repositories, add a classic GitHub personal access token with `repo` scope in Advanced Settings. The token is stored locally in the extension and is only sent to GitHub when you explicitly fetch a repository.
+
 ## Development
 
 ### Project Structure
@@ -201,7 +203,7 @@ After making changes, rebuild the extension and reload it from `chrome://extensi
 
 ## Privacy
 
-Better DeepSeek does not collect, transmit, or sell any personal data. All settings, memories, skills, and characters are stored locally on your device. The extension only communicates with DeepSeek's official API and the external services you explicitly request (e.g., GitHub for repository fetching). See the full [Privacy Policy](extension/PRIVACY.md) for details.
+Better DeepSeek does not collect, transmit, or sell any personal data. All settings, memories, skills, and characters are stored locally on your device. If you configure a GitHub personal access token for private repository support, it is stored locally and only sent to GitHub when you explicitly fetch a repository. See the full [Privacy Policy](extension/PRIVACY.md) for details.
 
 ## Changelog
 
