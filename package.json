@@ -22,6 +22,7 @@
     "fflate": "^0.8.2",
     "html2canvas": "^1.4.1",
     "ignore": "^7.0.5",
+    "marked": "^18.0.3",
     "pptxgenjs": "^4.0.1",
     "turndown": "^7.2.4",
     "xlsx": "^0.18.5",
