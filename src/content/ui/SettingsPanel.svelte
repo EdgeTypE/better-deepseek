@@ -20,7 +20,7 @@
   let autoSubmitVoice = $state(Boolean(appState.settings.autoSubmitVoice));
   let preferredLang = $state(appState.settings.preferredLang || "");
   let githubToken = $state(appState.settings.githubToken || "");
-  let showGithubToken = $state(false);
+  let showGithubToken = $state(!String(appState.settings.githubToken || "").trim());
   let disableSystemPrompt = $state(
     Boolean(appState.settings.disableSystemPrompt),
   );
@@ -44,6 +44,10 @@
   let projectSaveTimer = null;
   const GITHUB_TOKEN_MASK_CHAR = "\u25cf";
 
+  function shouldShowGithubTokenByDefault(tokenValue = githubToken) {
+    return !String(tokenValue || "").trim();
+  }
+
   export function refresh() {
     systemPrompt = appState.settings.systemPrompt || "";
     autoFiles = Boolean(appState.settings.autoDownloadFiles);
@@ -55,7 +59,7 @@
     autoSubmitVoice = Boolean(appState.settings.autoSubmitVoice);
     preferredLang = appState.settings.preferredLang || "";
     githubToken = appState.settings.githubToken || "";
-    showGithubToken = false;
+    showGithubToken = shouldShowGithubTokenByDefault(githubToken);
     disableSystemPrompt = Boolean(appState.settings.disableSystemPrompt);
     systemPromptInjectionFrequency =
       appState.settings.systemPromptInjectionFrequency || "first";
@@ -428,7 +432,7 @@
             class="bds-btn-outlined bds-token-btn"
             onclick={() => {
               githubToken = "";
-              showGithubToken = false;
+              showGithubToken = true;
             }}
             disabled={!githubToken}
           >
