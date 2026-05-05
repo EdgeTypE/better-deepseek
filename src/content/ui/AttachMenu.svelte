@@ -1168,7 +1168,14 @@
     gap: 10px;
   }
 
+  .bds-github-body > * {
+    min-width: 0;
+  }
+
   .bds-github-input {
+    display: block;
+    box-sizing: border-box;
+    max-width: 100%;
     background: var(--bds-bg-input);
     border: 1px solid var(--bds-border);
     border-radius: 8px;
