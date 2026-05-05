@@ -915,9 +915,13 @@ textarea.bds-input,
 .bds-message-price {
   font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", monospace;
   white-space: nowrap;
-  opacity: 0.7;
+  opacity: 0.85;
   transition: opacity var(--bds-transition);
   user-select: none;
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .bds-message-price:hover {
@@ -938,6 +942,18 @@ textarea.bds-input,
   font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", monospace;
   white-space: nowrap;
   user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.bds-session-total::before {
+  content: "•";
+  opacity: 0.3;
+  margin-right: 2px;
 }
 
 .bds-price-badge {
@@ -947,6 +963,20 @@ textarea.bds-input,
 
 .bds-token-badge {
   color: var(--bds-text-tertiary);
+  opacity: 0.7;
+}
+
+/* Inline assistant price (next to model name) */
+.bds-price-assistant-inline {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  opacity: 0.8;
   font-size: 10px;
-  opacity: 0.6;
+}
+
+.bds-price-assistant-inline::before {
+  content: "•";
+  opacity: 0.3;
+  margin-right: 4px;
 }

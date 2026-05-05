@@ -263,8 +263,8 @@ export function processMessageNode(node) {
 
     // TAG-DRIVEN INTERFACE LOCK
     const isCurrentlyLoading = parsed.isStreamingTool || 
-                               stateData.isLongWorkActive || 
-                               (isLatestAssistant && isGenerating && !isSettled);
+                                stateData.isLongWorkActive || 
+                                (isLatestAssistant && isGenerating && !isSettled);
     const hasTags = parsed.containsControlTags || isCurrentlyLoading;
 
     if (hasTags) {
@@ -575,7 +575,6 @@ function injectPriceUser(node, tokens, cost) {
   if (!target) return;
   const el = document.createElement("span");
   el.className = "bds-message-price bds-price-user";
-  el.style.cssText = "font-size:11px;color:var(--bds-text-tertiary,#999);display:inline-flex;align-items:center;gap:4px;margin-left:8px;";
   el.innerHTML = `<span class="bds-price-label">API: ~${priceText}</span><span class="bds-token-count">${fmtTok(tokens)} tok</span>`;
   target.appendChild(el);
 }
@@ -584,6 +583,17 @@ function injectPriceAssistant(node, tokens, cost) {
   const container = node.closest("._4f9bf79._43c05b5") || node.parentElement || node;
   if (container.querySelector(".bds-message-price")) return;
   const priceText = formatCostDisplay(cost);
+  
+  // Try to find a model badge in this message first
+  const modelBadge = container.querySelector("._46a12ab")?.parentElement;
+  if (modelBadge) {
+    const el = document.createElement("span");
+    el.className = "bds-message-price bds-price-assistant-inline";
+    el.innerHTML = `<span class="bds-price-label">~${priceText}</span>`;
+    modelBadge.appendChild(el);
+    return;
+  }
+
   const target = container.querySelector("._0a3d93b") || container.querySelector(".ds-flex._0a3d93b");
   if (!target) {
     const bars = container.querySelectorAll(".ds-flex");
@@ -591,7 +601,6 @@ function injectPriceAssistant(node, tokens, cost) {
       if (bar.querySelector(".ds-icon-button") || bar.querySelector("[role='button']")) {
         const el = document.createElement("span");
         el.className = "bds-message-price bds-price-assistant";
-        el.style.cssText = "font-size:11px;color:var(--bds-text-tertiary,#999);display:inline-flex;align-items:center;gap:4px;";
         el.innerHTML = `<span class="bds-price-label">API: ~${priceText}</span><span class="bds-token-count">${fmtTok(tokens)} tok</span>`;
         bar.appendChild(el);
         return;
@@ -601,7 +610,6 @@ function injectPriceAssistant(node, tokens, cost) {
   }
   const el = document.createElement("span");
   el.className = "bds-message-price bds-price-assistant";
-  el.style.cssText = "font-size:11px;color:var(--bds-text-tertiary,#999);display:inline-flex;align-items:center;gap:4px;";
   el.innerHTML = `<span class="bds-price-label">API: ~${priceText}</span><span class="bds-token-count">${fmtTok(tokens)} tok</span>`;
   target.appendChild(el);
 }
@@ -619,17 +627,27 @@ function formatCostDisplay(cost) {
 
 function refreshSessionTotalDisplayInline() {
   if (!state.settings.tokenPriceDisplay) return;
+  
   let el = document.querySelector(".bds-session-total");
   if (!el) {
     const header = document.querySelector("._2be88ba .f8d1e4c0 ._9fcbeda._7ee190f");
-    if (!header) return;
+    // Look for the model badge pill container
+    const modelBadge = header?.querySelector("._46a12ab")?.parentElement;
+    const target = modelBadge || header;
+    
+    if (!target) return;
+    
     el = document.createElement("div");
     el.className = "bds-session-total";
-    el.style.cssText = "display:flex;align-items:center;gap:6px;font-size:11px;color:var(--bds-text-tertiary,#999);margin-left:8px;flex-shrink:0;";
-    header.appendChild(el);
+    target.appendChild(el);
   }
+  
   const total = state.pricing.sessionTotals.totalCost;
   const allTok = state.pricing.sessionInputTokens + state.pricing.sessionOutputTokens;
   const totalFmt = formatCostDisplay(total);
-  el.innerHTML = `<span class="bds-price-badge">API: ~${totalFmt}</span><span class="bds-token-badge">${fmtTok(allTok)} tokens</span>`;
+  
+  el.innerHTML = `
+    <span class="bds-price-badge">~${totalFmt}</span>
+    <span class="bds-token-badge">${fmtTok(allTok)}</span>
+  `;
 }
