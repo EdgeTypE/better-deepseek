@@ -294,17 +294,34 @@ export function startUrlWatcher() {
     if (location.href === state.lastUrl) {
       return;
     }
-
+    const oldUrl = state.lastUrl;
     state.lastUrl = location.href;
     window.dispatchEvent(new CustomEvent("bds:urlChanged"));
+
+    const isNewSessionTransition = (oldUrl === "https://chat.deepseek.com/" || oldUrl === "https://chat.deepseek.com") && state.lastUrl.includes("/chat/s/");
 
     state.longWork.active = false;
     state.longWork.files.clear();
     state.longWork.lastActivityAt = 0;
-    // Reset session pricing
-    state.pricing.sessionTotals = { inputCost: 0, outputCost: 0, totalCost: 0 };
-    state.pricing.sessionInputTokens = 0;
-    state.pricing.sessionOutputTokens = 0;
+    
+    // Only reset session pricing if it's NOT the first message transition
+    if (!isNewSessionTransition) {
+      state.pricing.sessionTotals = { inputCost: 0, outputCost: 0, totalCost: 0 };
+      state.pricing.sessionInputTokens = 0;
+      state.pricing.sessionOutputTokens = 0;
+      state.pricing.pendingInjections.clear();
+    } else {
+      // Migrate "default" pending injection to the new real ID
+      const defaultPending = state.pricing.pendingInjections.get("default");
+      if (defaultPending) {
+        const newId = location.href.match(/\/chat\/s\/([^\/]+)/)?.[1];
+        if (newId) {
+          state.pricing.pendingInjections.set(newId, defaultPending);
+          state.pricing.pendingInjections.delete("default");
+        }
+      }
+    }
+    
     if (state.ui) {
       state.ui.showLongWorkOverlay(false);
     }

@@ -8,7 +8,8 @@ import {
   detectMessageRole,
   isLatestAssistantMessage,
   isAbsoluteLastMessage,
-  scheduleScan
+  scheduleScan,
+  collectMessageNodes
 } from "./scanner.js";
 import { extractMessageRawText } from "./dom/message-text.js";
 import { injectPythonRunButtons } from "./dom/python-injector.js";
@@ -64,14 +65,30 @@ export function processMessageNode(node) {
     stripBdsTagsFromUserMessage(node);
     if (state.settings.tokenPriceDisplay && !stateData.priceInjected) {
       const modelName = detectModelInline(null);
-      // rawUserText already includes injected system prompt blocks from API payload
-      const newInputTokens = estimateTokensInline(rawUserText);
-      const cacheHitTokens = state.pricing.sessionInputTokens;
-      const { inputCost } = calcCostInlineWithCache(newInputTokens, cacheHitTokens, 0, modelName);
+      
+      // Predict if we have a pending injection that isn't in the DOM yet
+      let totalUserText = rawUserText;
+      if (!totalUserText.includes("<BetterDeepSeek>")) {
+        const convId = getCurrentConversationIdInline();
+        const pending = state.pricing.pendingInjections.get(convId);
+        
+        // Match by text content to ensure we don't apply an old injection to a new message
+        if (pending && pending.userPrompt && rawUserText.trim() === pending.userPrompt.trim()) {
+          if (pending.injectedText) {
+            totalUserText = pending.injectedText + "\n\n" + totalUserText;
+          }
+        }
+      }
+
+      const newInputTokens = estimateTokensInline(totalUserText);
+      const cacheHitTokens = 0; // We will handle cache hit logic differently or just ignore for user display
+      const { inputCost } = calcCostInline(newInputTokens, 0, modelName);
+      
+      stateData.tokens = newInputTokens;
+      stateData.cost = inputCost;
+      stateData.role = "user";
+      
       injectPriceUser(node, newInputTokens, inputCost);
-      state.pricing.sessionInputTokens += newInputTokens;
-      state.pricing.sessionTotals.inputCost += inputCost;
-      state.pricing.sessionTotals.totalCost += inputCost;
       refreshSessionTotalDisplayInline();
       stateData.priceInjected = true;
     }
@@ -405,10 +422,12 @@ function syncVisibilityState(node, isLatestAssistant, stateData, isSettled) {
     const totalText = visibleText + thinkingText;
     const outputTokens = estimateTokensInline(totalText);
     const { outputCost } = calcCostInline(0, outputTokens, modelName);
+    
+    stateData.tokens = outputTokens;
+    stateData.cost = outputCost;
+    stateData.role = "assistant";
+    
     injectPriceAssistant(node, outputTokens, outputCost);
-    state.pricing.sessionOutputTokens += outputTokens;
-    state.pricing.sessionTotals.outputCost += outputCost;
-    state.pricing.sessionTotals.totalCost += outputCost;
     refreshSessionTotalDisplayInline();
   }
 }
@@ -566,6 +585,12 @@ function extractThinkingTextInline(node) {
   return text;
 }
 
+function getCurrentConversationIdInline() {
+  const match = location.href.match(/\/chat\/s\/([^\/]+)/);
+  return match ? match[1] : "default";
+}
+
+
 function injectPriceUser(node, tokens, cost) {
   const container = node.parentElement || node;
   if (container.querySelector(".bds-message-price")) return;
@@ -628,6 +653,28 @@ function formatCostDisplay(cost) {
 function refreshSessionTotalDisplayInline() {
   if (!state.settings.tokenPriceDisplay) return;
   
+  const nodes = collectMessageNodes();
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let totalCost = 0;
+
+  for (const node of nodes) {
+    const sd = nodeStates.get(node);
+    if (sd && sd.tokens) {
+      if (sd.role === "user") {
+        totalInputTokens += sd.tokens;
+      } else {
+        totalOutputTokens += sd.tokens;
+      }
+      totalCost += sd.cost || 0;
+    }
+  }
+
+  // Update global state for other components that might read it
+  state.pricing.sessionInputTokens = totalInputTokens;
+  state.pricing.sessionOutputTokens = totalOutputTokens;
+  state.pricing.sessionTotals.totalCost = totalCost;
+
   let el = document.querySelector(".bds-session-total");
   if (!el) {
     const header = document.querySelector("._2be88ba .f8d1e4c0 ._9fcbeda._7ee190f");
@@ -642,12 +689,33 @@ function refreshSessionTotalDisplayInline() {
     target.appendChild(el);
   }
   
-  const total = state.pricing.sessionTotals.totalCost;
-  const allTok = state.pricing.sessionInputTokens + state.pricing.sessionOutputTokens;
-  const totalFmt = formatCostDisplay(total);
+  const allTok = totalInputTokens + totalOutputTokens;
+  const totalFmt = formatCostDisplay(totalCost);
   
+  // Context Usage Calculation
+  const modelName = detectModelInline(null);
+  const pricingData = state.embeddedPricing;
+  const m = pricingData.models[modelName] || pricingData.models["deepseek-v4-flash"];
+  const contextLimit = m.contextLength || 1000000;
+  const usagePercent = Math.min(1, allTok / contextLimit);
+  
+  // SVG Ring Parameters (Radius 7, Circumference ~44)
+  const radius = 7;
+  const circ = 2 * Math.PI * radius;
+  const offset = circ * (1 - usagePercent);
+  const ringClass = usagePercent > 0.9 ? "danger" : usagePercent > 0.7 ? "warning" : "";
+  const usageText = `${fmtTok(allTok)} / ${fmtTok(contextLimit)} (${(usagePercent * 100).toFixed(1)}%)`;
+
   el.innerHTML = `
     <span class="bds-price-badge">~${totalFmt}</span>
     <span class="bds-token-badge">${fmtTok(allTok)}</span>
+    <div class="bds-context-ring-container" data-tooltip="Context: ${usageText}">
+      <svg class="bds-context-ring ${ringClass}" width="18" height="18" viewBox="0 0 18 18">
+        <circle class="bg" cx="9" cy="9" r="${radius}" />
+        <circle class="progress" cx="9" cy="9" r="${radius}" 
+                stroke-dasharray="${circ}" 
+                stroke-dashoffset="${offset}" />
+      </svg>
+    </div>
   `;
 }

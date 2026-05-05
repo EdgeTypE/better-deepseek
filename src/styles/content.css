@@ -980,3 +980,64 @@ textarea.bds-input,
   opacity: 0.3;
   margin-right: 4px;
 }
+
+/* ── Context Ring ── */
+.bds-context-ring-container {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+  cursor: help;
+}
+
+.bds-context-ring {
+  transform: rotate(-90deg);
+}
+
+.bds-context-ring circle {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.bds-context-ring .bg {
+  stroke: var(--bds-border);
+  opacity: 0.5;
+}
+
+.bds-context-ring .progress {
+  stroke: var(--bds-accent);
+  transition: stroke-dashoffset 0.5s ease;
+}
+
+.bds-context-ring.warning .progress {
+  stroke: #f59e0b; /* Amber */
+}
+
+.bds-context-ring.danger .progress {
+  stroke: #ef4444; /* Red */
+}
+
+/* Tooltip on hover */
+.bds-context-ring-container:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  transform: translateY(-8px);
+  background: var(--bds-bg-panel);
+  color: var(--bds-text-primary);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: var(--bds-shadow);
+  border: 1px solid var(--bds-border);
+  z-index: 1000;
+  pointer-events: none;
+}
+

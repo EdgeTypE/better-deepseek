@@ -46,6 +46,19 @@ export function setupBridgeEvents() {
       state.pricing.modelName = data.modelName;
     }
   });
+  
+  window.addEventListener("bds:mutation-applied", (event) => {
+    let data = event.detail;
+    if (typeof data === "string") {
+      try { data = JSON.parse(data); } catch (e) { return; }
+    }
+    if (data && data.conversationId && data.userPrompt !== undefined) {
+      state.pricing.pendingInjections.set(data.conversationId, {
+        injectedText: data.injectedText || "",
+        userPrompt: data.userPrompt
+      });
+    }
+  });
 }
 
 /**

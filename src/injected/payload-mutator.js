@@ -81,6 +81,10 @@ export function mutatePayload(payload, state) {
         target
       );
 
+      window.dispatchEvent(new CustomEvent("bds:mutation-applied", {
+        detail: JSON.stringify({ conversationId, injectedText: prefix || "", userPrompt: cleanText })
+      }));
+
       if (prefix) {
         setMessageText(target, `${prefix}\n\n${cleanText}`);
         changed = true;
@@ -111,6 +115,10 @@ export function mutatePayload(payload, state) {
     }
     
     const prefix = buildHiddenPrefix(cleanText, conversationId, state, forceSystemPrompt, null, null);
+    window.dispatchEvent(new CustomEvent("bds:mutation-applied", {
+      detail: JSON.stringify({ conversationId, injectedText: prefix || "", userPrompt: cleanText })
+    }));
+
     if (prefix) {
       payload.prompt = `${prefix}\n\n${cleanText}`;
       changed = true;

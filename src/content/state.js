@@ -55,6 +55,8 @@ const state = {
     sessionOutputTokens: 0,
     /** @type {Map<string, {inputTokens:number,outputTokens:number,inputCost:number,outputCost:number,totalCost:number}>} per-message token/cost data (keyed by message node's bds-price-id) */
     messageData: new Map(),
+    /** @type {Map<string, string>} pending system prompt injections keyed by conversationId */
+    pendingInjections: new Map(),
     /** @type {boolean} whether pricing data has been loaded */
     pricingLoaded: false,
   },

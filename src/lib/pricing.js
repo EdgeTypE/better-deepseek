@@ -39,6 +39,7 @@ export function getModelPricing(modelName) {
     inputCacheHitPrice: model.inputCacheHitPrice || 0.0028,
     outputPrice: model.outputPrice || 0.28,
     displayName: model.displayName || resolved,
+    contextLength: model.contextLength || 1000000,
   };
 }
 

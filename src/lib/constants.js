@@ -457,24 +457,28 @@ export const EMBEDDED_PRICING = {
       inputPrice: 0.14,
       inputCacheHitPrice: 0.0028,
       outputPrice: 0.28,
+      contextLength: 1000000,
     },
     "deepseek-v4-pro": {
       displayName: "DeepSeek V4 Pro",
       inputPrice: 0.435,
       inputCacheHitPrice: 0.003625,
       outputPrice: 0.87,
+      contextLength: 1000000,
     },
     "deepseek-chat": {
       displayName: "DeepSeek Chat",
       inputPrice: 0.14,
       inputCacheHitPrice: 0.0028,
       outputPrice: 0.28,
+      contextLength: 1000000,
     },
     "deepseek-reasoner": {
       displayName: "DeepSeek Reasoner",
       inputPrice: 0.435,
       inputCacheHitPrice: 0.003625,
       outputPrice: 0.87,
+      contextLength: 1000000,
     },
   },
 };
