@@ -16,6 +16,7 @@
 
 import "../styles/content.css";
 
+import state from "./state.js";
 import { loadStateFromStorage, bindStorageChangeListener } from "./storage.js";
 import { injectHookScript, setupBridgeEvents, pushConfigToPage } from "./bridge.js";
 import { mountUi } from "./ui/mount.js";
@@ -23,6 +24,7 @@ import { observeChatDom, scheduleScan, startUrlWatcher } from "./scanner.js";
 import { initSidebarMenuInjector } from "./ui/SidebarMenuInjector.js";
 import { initSidebarSearch } from "./ui/SidebarSearch.js";
 import { checkPendingExport } from "./tools/pending-export.js";
+import { initPricing } from "../lib/pricing.js";
 
 init().catch((error) => {
   console.error("[BetterDeepSeek] Init error:", error);
@@ -43,6 +45,14 @@ async function init() {
   scheduleScan();
   checkPendingExport();
   pushConfigToPage();
+
+  // Dynamically fetch pricing and update embedded fallback
+  initPricing().then((pricing) => {
+    if (pricing && pricing.models) {
+      state.embeddedPricing = pricing;
+      scheduleScan();
+    }
+  }).catch(() => {});
 }
 
 async function waitForBody() {

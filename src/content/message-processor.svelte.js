@@ -64,10 +64,14 @@ export function processMessageNode(node) {
     stripBdsTagsFromUserMessage(node);
     if (state.settings.tokenPriceDisplay && !stateData.priceInjected) {
       const modelName = detectModelInline(null);
-      const inputTokens = estimateTokensInline(rawUserText);
-      const { inputCost } = calcCostInline(inputTokens, 0, modelName);
-      injectPriceUser(node, inputTokens, inputCost);
-      state.pricing.sessionInputTokens += inputTokens;
+      // Estimate hidden prompt overhead (system prompt + skills + memory + RP)
+      const overheadTokens = estimateHiddenPromptTokens();
+      // New user input is a cache miss; previous context is cache hit
+      const newInputTokens = estimateTokensInline(rawUserText);
+      const cacheHitTokens = state.pricing.sessionInputTokens;
+      const { inputCost } = calcCostInlineWithCache(newInputTokens, cacheHitTokens, 0, modelName);
+      injectPriceUser(node, newInputTokens + overheadTokens, inputCost);
+      state.pricing.sessionInputTokens += newInputTokens + overheadTokens;
       state.pricing.sessionTotals.inputCost += inputCost;
       state.pricing.sessionTotals.totalCost += inputCost;
       refreshSessionTotalDisplayInline();
@@ -528,12 +532,76 @@ function estimateTokensInline(text) {
 }
 
 function calcCostInline(inputTokens, outputTokens, modelName) {
+  // Simple flat-rate cost (no cache split)
+  return calcCostInlineWithCache(inputTokens, 0, outputTokens, modelName);
+}
+
+function calcCostInlineWithCache(inputNewTokens, inputCachedTokens, outputTokens, modelName) {
   const pricing = state.embeddedPricing;
   const resolved = detectModelInline(modelName);
   const m = pricing.models[resolved] || pricing.models["deepseek-v4-flash"];
-  const inputCost = (inputTokens / 1e6) * m.inputPrice;
+  const newCost = (inputNewTokens / 1e6) * m.inputPrice;
+  const cachedCost = (inputCachedTokens / 1e6) * (m.inputCacheHitPrice || 0.0028);
   const outputCost = (outputTokens / 1e6) * m.outputPrice;
-  return { inputCost, outputCost, totalCost: inputCost + outputCost };
+  return { inputCost: newCost + cachedCost, outputCost, totalCost: newCost + cachedCost + outputCost };
+}
+
+/**
+ * Estimate token overhead from hidden injected prompt blocks.
+ * First user message: full system prompt + skills + memory + RP + data block.
+ * Subsequent messages: only memory matches (always injected) + RP changes.
+ */
+function estimateHiddenPromptTokens() {
+  // After first call, only count continuous overhead (memory, RP changes)
+  if (state.pricing.overheadCounted) {
+    return estimateContinuousOverhead();
+  }
+  state.pricing.overheadCounted = true;
+  return estimateFirstTurnOverhead();
+}
+
+function estimateFirstTurnOverhead() {
+  let text = "";
+  const freq = state.settings.systemPromptInjectionFrequency || "first";
+  const disablePrompt = state.settings.disableSystemPrompt;
+
+  // System prompt (only when not disabled and frequency allows)
+  if (!disablePrompt && freq !== "every_x" && state.settings.systemPrompt) {
+    text += "<BetterDeepSeek>\n" + state.settings.systemPrompt + "\n</BetterDeepSeek>\n";
+  }
+  // Skills (only with system prompt on first turn)
+  if (!disablePrompt) {
+    for (const s of state.skills) {
+      if (s.active && s.content) text += "<BDS:SKILL name=\"" + s.name + "\">" + s.content + "</BDS:SKILL>\n";
+    }
+  }
+  // Memory (always if not disabled)
+  if (!state.settings.disableMemory) {
+    for (const [key, m] of Object.entries(state.memories)) {
+      if (m && m.value) text += "<BDS:memory key=\"" + key + "\" importance=\"" + (m.importance || "called") + "\">" + m.value + "</BDS:memory>\n";
+    }
+  }
+  // RP character
+  const activeChar = state.characters.find(c => c.active);
+  if (activeChar && activeChar.content) {
+    text += "<BDS:RP name=\"" + activeChar.name + "\">" + activeChar.content + "</BDS:RP>\n";
+  }
+  // User data block (only on first/system prompt turn)
+  text += "<BetterDeepSeek>\nUser's System Date & Time: " + new Date().toLocaleString() + "\n";
+  if (state.settings.preferredLang) text += "Preferred Language: " + state.settings.preferredLang + "\n";
+  text += "</BetterDeepSeek>\n";
+  return estimateTokensInline(text);
+}
+
+function estimateContinuousOverhead() {
+  let text = "";
+  // Memory is injected every turn (if not disabled)
+  if (!state.settings.disableMemory) {
+    for (const [key, m] of Object.entries(state.memories)) {
+      if (m && m.value) text += "<BDS:memory key=\"" + key + "\" importance=\"" + (m.importance || "called") + "\">" + m.value + "</BDS:memory>\n";
+    }
+  }
+  return estimateTokensInline(text);
 }
 
 function detectModelInline(hint) {
@@ -561,7 +629,7 @@ function extractThinkingTextInline(node) {
 function injectPriceUser(node, tokens, cost) {
   const container = node.parentElement || node;
   if (container.querySelector(".bds-message-price")) return;
-  const priceText = cost < 1e-4 ? "$0.0000" : cost < 0.01 ? "$" + cost.toFixed(4) : "$" + cost.toFixed(3);
+  const priceText = formatCostDisplay(cost);
   const target = container.querySelector("._11d6b3a .ds-flex") ||
     container.querySelector(".ds-flex._78e0558") || container.querySelector("[class*='_78e0558']");
   if (!target) return;
@@ -575,7 +643,7 @@ function injectPriceUser(node, tokens, cost) {
 function injectPriceAssistant(node, tokens, cost) {
   const container = node.closest("._4f9bf79._43c05b5") || node.parentElement || node;
   if (container.querySelector(".bds-message-price")) return;
-  const priceText = cost < 1e-4 ? "$0.0000" : cost < 0.01 ? "$" + cost.toFixed(4) : "$" + cost.toFixed(3);
+  const priceText = formatCostDisplay(cost);
   const target = container.querySelector("._0a3d93b") || container.querySelector(".ds-flex._0a3d93b");
   if (!target) {
     const bars = container.querySelectorAll(".ds-flex");
@@ -602,6 +670,13 @@ function fmtTok(n) {
   return n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1000 ? (n / 1000).toFixed(1) + "K" : String(n);
 }
 
+function formatCostDisplay(cost) {
+  if (cost <= 0 || cost < 1e-6) return "<$0.0001";
+  if (cost < 1e-3) return "$" + cost.toFixed(6);
+  if (cost < 0.01) return "$" + cost.toFixed(4);
+  return "$" + cost.toFixed(3);
+}
+
 function refreshSessionTotalDisplayInline() {
   if (!state.settings.tokenPriceDisplay) return;
   let el = document.querySelector(".bds-session-total");
@@ -615,6 +690,6 @@ function refreshSessionTotalDisplayInline() {
   }
   const total = state.pricing.sessionTotals.totalCost;
   const allTok = state.pricing.sessionInputTokens + state.pricing.sessionOutputTokens;
-  const totalFmt = total < 1e-4 ? "$0.0000" : total < 0.01 ? "$" + total.toFixed(4) : "$" + total.toFixed(3);
+  const totalFmt = formatCostDisplay(total);
   el.innerHTML = `<span class="bds-price-badge">API: ~${totalFmt}</span><span class="bds-token-badge">${fmtTok(allTok)} tokens</span>`;
 }

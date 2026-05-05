@@ -305,6 +305,7 @@ export function startUrlWatcher() {
     state.pricing.sessionTotals = { inputCost: 0, outputCost: 0, totalCost: 0 };
     state.pricing.sessionInputTokens = 0;
     state.pricing.sessionOutputTokens = 0;
+    state.pricing.overheadCounted = false;
     if (state.ui) {
       state.ui.showLongWorkOverlay(false);
     }
