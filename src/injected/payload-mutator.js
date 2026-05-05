@@ -278,8 +278,14 @@ export function buildHiddenPrefix(
     }
   }
 
-  // Only inject static skills on the first turn to prevent context bloat on every message
-  if (forceSystemPrompt) {
+  // Inject skills if it's the first turn OR if skills have changed
+  const currentSkillsFingerprint = getSkillsFingerprint(state.config.skills);
+  let lastSkillsFingerprint = null;
+  if (!forceSystemPrompt && messages) {
+    lastSkillsFingerprint = getLastSkillsFingerprintInHistory(messages, excludeTarget);
+  }
+
+  if (forceSystemPrompt || (currentSkillsFingerprint && currentSkillsFingerprint !== lastSkillsFingerprint)) {
     const skillsBlock = buildSkillsBlock(state);
     if (skillsBlock) {
       blocks.push(skillsBlock);
@@ -323,12 +329,23 @@ export function buildHiddenPrefix(
     state.isNextVoiceMessage = false;
   }
 
-  if (forceSystemPrompt) {
-    const projectBlock = buildProjectBlock(state);
-    if (projectBlock) {
-      blocks.push(projectBlock);
+  // Inject project context if first turn OR if project changed
+  const project = state.config && state.config.activeProject;
+  if (project) {
+    let lastProjectName = null;
+    if (!forceSystemPrompt && messages) {
+      lastProjectName = getLastProjectNameInHistory(messages, excludeTarget);
     }
 
+    if (forceSystemPrompt || !lastProjectName || lastProjectName !== project.name) {
+      const projectBlock = buildProjectBlock(state);
+      if (projectBlock) {
+        blocks.push(projectBlock);
+      }
+    }
+  }
+
+  if (forceSystemPrompt) {
     const userDataBlock = buildUserDataBlock(state);
     if (userDataBlock) {
       blocks.push(userDataBlock);
@@ -350,7 +367,21 @@ export function buildSkillsBlock(state) {
     .map((skill) => `## ${skill.name}\n${skill.content.trim()}`)
     .join("\n\n");
 
-  return `<BetterDeepSeek> <BDS:SKILLS>\n${skillsText}\n</BDS:SKILLS> </BetterDeepSeek>`;
+  return `<BetterDeepSeek> <BDS:SKILLS fingerprint="${getSkillsFingerprint(state.config.skills)}">\n${skillsText}\n</BDS:SKILLS> </BetterDeepSeek>`;
+}
+
+/**
+ * Generate a semi-stable fingerprint for a set of skills to detect changes.
+ */
+export function getSkillsFingerprint(skills) {
+  if (!Array.isArray(skills) || !skills.length) {
+    return "";
+  }
+  // Use name + content length as a simple heuristic for "same skill version"
+  return skills
+    .map((s) => `${s.name}:${(s.content || "").length}`)
+    .sort()
+    .join("|");
 }
 
 /**
@@ -451,6 +482,44 @@ export function getLastCharacterInHistory(messages, excludeTarget = null) {
     const match = text.match(/Character Name:\s*(.*?)\n/);
     if (match && match[1]) {
       return match[1].trim();
+    }
+  }
+  return null;
+}
+
+/**
+ * Scan history backwards to find the fingerprint of the last injected skills.
+ */
+export function getLastSkillsFingerprintInHistory(messages, excludeTarget = null) {
+  if (!Array.isArray(messages)) return null;
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg === excludeTarget) continue;
+
+    const text = extractMessageText(msg);
+    const match = text.match(/<BDS:SKILLS fingerprint="(.*?)">/);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  return null;
+}
+
+/**
+ * Scan history backwards to find the name of the last injected project.
+ */
+export function getLastProjectNameInHistory(messages, excludeTarget = null) {
+  if (!Array.isArray(messages)) return null;
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg === excludeTarget) continue;
+
+    const text = extractMessageText(msg);
+    const match = text.match(/<BDS:PROJECT name="(.*?)">/);
+    if (match && match[1]) {
+      return match[1];
     }
   }
   return null;
