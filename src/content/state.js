@@ -57,8 +57,6 @@ const state = {
     messageData: new Map(),
     /** @type {boolean} whether pricing data has been loaded */
     pricingLoaded: false,
-    /** @type {boolean} whether the first-turn overhead has been counted */
-    overheadCounted: false,
   },
 };
 

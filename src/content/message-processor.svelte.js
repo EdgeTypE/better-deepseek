@@ -64,14 +64,12 @@ export function processMessageNode(node) {
     stripBdsTagsFromUserMessage(node);
     if (state.settings.tokenPriceDisplay && !stateData.priceInjected) {
       const modelName = detectModelInline(null);
-      // Estimate hidden prompt overhead (system prompt + skills + memory + RP)
-      const overheadTokens = estimateHiddenPromptTokens();
-      // New user input is a cache miss; previous context is cache hit
+      // rawUserText already includes injected system prompt blocks from API payload
       const newInputTokens = estimateTokensInline(rawUserText);
       const cacheHitTokens = state.pricing.sessionInputTokens;
       const { inputCost } = calcCostInlineWithCache(newInputTokens, cacheHitTokens, 0, modelName);
-      injectPriceUser(node, newInputTokens + overheadTokens, inputCost);
-      state.pricing.sessionInputTokens += newInputTokens + overheadTokens;
+      injectPriceUser(node, newInputTokens, inputCost);
+      state.pricing.sessionInputTokens += newInputTokens;
       state.pricing.sessionTotals.inputCost += inputCost;
       state.pricing.sessionTotals.totalCost += inputCost;
       refreshSessionTotalDisplayInline();
@@ -544,64 +542,6 @@ function calcCostInlineWithCache(inputNewTokens, inputCachedTokens, outputTokens
   const cachedCost = (inputCachedTokens / 1e6) * (m.inputCacheHitPrice || 0.0028);
   const outputCost = (outputTokens / 1e6) * m.outputPrice;
   return { inputCost: newCost + cachedCost, outputCost, totalCost: newCost + cachedCost + outputCost };
-}
-
-/**
- * Estimate token overhead from hidden injected prompt blocks.
- * First user message: full system prompt + skills + memory + RP + data block.
- * Subsequent messages: only memory matches (always injected) + RP changes.
- */
-function estimateHiddenPromptTokens() {
-  // After first call, only count continuous overhead (memory, RP changes)
-  if (state.pricing.overheadCounted) {
-    return estimateContinuousOverhead();
-  }
-  state.pricing.overheadCounted = true;
-  return estimateFirstTurnOverhead();
-}
-
-function estimateFirstTurnOverhead() {
-  let text = "";
-  const freq = state.settings.systemPromptInjectionFrequency || "first";
-  const disablePrompt = state.settings.disableSystemPrompt;
-
-  // System prompt (only when not disabled and frequency allows)
-  if (!disablePrompt && freq !== "every_x" && state.settings.systemPrompt) {
-    text += "<BetterDeepSeek>\n" + state.settings.systemPrompt + "\n</BetterDeepSeek>\n";
-  }
-  // Skills (only with system prompt on first turn)
-  if (!disablePrompt) {
-    for (const s of state.skills) {
-      if (s.active && s.content) text += "<BDS:SKILL name=\"" + s.name + "\">" + s.content + "</BDS:SKILL>\n";
-    }
-  }
-  // Memory (always if not disabled)
-  if (!state.settings.disableMemory) {
-    for (const [key, m] of Object.entries(state.memories)) {
-      if (m && m.value) text += "<BDS:memory key=\"" + key + "\" importance=\"" + (m.importance || "called") + "\">" + m.value + "</BDS:memory>\n";
-    }
-  }
-  // RP character
-  const activeChar = state.characters.find(c => c.active);
-  if (activeChar && activeChar.content) {
-    text += "<BDS:RP name=\"" + activeChar.name + "\">" + activeChar.content + "</BDS:RP>\n";
-  }
-  // User data block (only on first/system prompt turn)
-  text += "<BetterDeepSeek>\nUser's System Date & Time: " + new Date().toLocaleString() + "\n";
-  if (state.settings.preferredLang) text += "Preferred Language: " + state.settings.preferredLang + "\n";
-  text += "</BetterDeepSeek>\n";
-  return estimateTokensInline(text);
-}
-
-function estimateContinuousOverhead() {
-  let text = "";
-  // Memory is injected every turn (if not disabled)
-  if (!state.settings.disableMemory) {
-    for (const [key, m] of Object.entries(state.memories)) {
-      if (m && m.value) text += "<BDS:memory key=\"" + key + "\" importance=\"" + (m.importance || "called") + "\">" + m.value + "</BDS:memory>\n";
-    }
-  }
-  return estimateTokensInline(text);
 }
 
 function detectModelInline(hint) {

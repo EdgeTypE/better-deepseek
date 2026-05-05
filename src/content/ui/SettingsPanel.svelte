@@ -374,7 +374,7 @@
     </div>
 
     <div class="bds-toggle-row">
-      <span class="bds-toggle-label">Token Price Estimation (API Cost)</span>
+      <span class="bds-toggle-label">Token Price Estimation (Experimental)</span>
       <label class="bds-switch">
         <input id="bds-token-price" type="checkbox" bind:checked={tokenPriceDisplay} />
         <span class="bds-switch-track"></span>

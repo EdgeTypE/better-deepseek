@@ -43,7 +43,7 @@ export const DEFAULT_SYSTEM_PROMPT = [
   "- Do NOT generate data: URLs for file delivery.",
   "- Do NOT try to build zip files with python/js/html tools.",
   "- Do NOT ask the user to zip files manually for project requests.",
-  "- Do NOT output <thinking> tags or internal planning text.",
+  // "- Do NOT output <thinking> tags or internal planning text.",
   "- Do NOT generate until you are at least 90% sure about the user's request. If not sure, use ask_question tool.",
   "",
   "THINKING PROTOCOL:",
