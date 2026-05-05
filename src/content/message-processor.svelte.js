@@ -56,15 +56,27 @@ export function processMessageNode(node) {
   }
 
   const role = detectMessageRole(node);
+  const stateData = getNodeState(node);
 
   // --- USER MESSAGE: strip <BetterDeepSeek> system prompt from view ---
   if (role === "user") {
+    const rawUserText = rawText;
     stripBdsTagsFromUserMessage(node);
+    if (state.settings.tokenPriceDisplay && !stateData.priceInjected) {
+      const modelName = detectModelInline(null);
+      const inputTokens = estimateTokensInline(rawUserText);
+      const { inputCost } = calcCostInline(inputTokens, 0, modelName);
+      injectPriceUser(node, inputTokens, inputCost);
+      state.pricing.sessionInputTokens += inputTokens;
+      state.pricing.sessionTotals.inputCost += inputCost;
+      state.pricing.sessionTotals.totalCost += inputCost;
+      refreshSessionTotalDisplayInline();
+      stateData.priceInjected = true;
+    }
     return;
   }
 
   const isLatestAssistant = role === "assistant" && isLatestAssistantMessage(node);
-  const stateData = getNodeState(node);
 
   const now = Date.now();
   if (stateData.lastRawText !== rawText) {
@@ -381,6 +393,22 @@ function syncVisibilityState(node, isLatestAssistant, stateData, isSettled) {
       playVoiceResponse(stateData.lastRawText);
     }
   }
+
+  // --- TOKEN PRICE DISPLAY (assistant messages) ---
+  if (isSettled && state.settings.tokenPriceDisplay && !stateData.priceInjected) {
+    stateData.priceInjected = true;
+    const modelName = detectModelInline(null);
+    const visibleText = stateData.lastRawText || "";
+    const thinkingText = extractThinkingTextInline(node);
+    const totalText = visibleText + thinkingText;
+    const outputTokens = estimateTokensInline(totalText);
+    const { outputCost } = calcCostInline(0, outputTokens, modelName);
+    injectPriceAssistant(node, outputTokens, outputCost);
+    state.pricing.sessionOutputTokens += outputTokens;
+    state.pricing.sessionTotals.outputCost += outputCost;
+    state.pricing.sessionTotals.totalCost += outputCost;
+    refreshSessionTotalDisplayInline();
+  }
 }
 
 /**
@@ -490,4 +518,103 @@ function stripBdsTagsFromUserMessage(node) {
     // If the entire message was the system prompt, hide the whole bubble
     node.style.display = 'none';
   }
+}
+
+// ── Inline Price Display Helpers ──
+
+function estimateTokensInline(text) {
+  if (!text) return 0;
+  return Math.max(1, Math.round(String(text).length / state.charsPerToken));
+}
+
+function calcCostInline(inputTokens, outputTokens, modelName) {
+  const pricing = state.embeddedPricing;
+  const resolved = detectModelInline(modelName);
+  const m = pricing.models[resolved] || pricing.models["deepseek-v4-flash"];
+  const inputCost = (inputTokens / 1e6) * m.inputPrice;
+  const outputCost = (outputTokens / 1e6) * m.outputPrice;
+  return { inputCost, outputCost, totalCost: inputCost + outputCost };
+}
+
+function detectModelInline(hint) {
+  if (hint) {
+    const lo = String(hint).toLowerCase();
+    if (lo.includes("pro") || lo.includes("reasoner") || lo === "expert") return "deepseek-v4-pro";
+    if (lo.includes("flash") || lo.includes("chat") || lo === "instant") return "deepseek-v4-flash";
+  }
+  const modelSpan = document.querySelector("._46a12ab");
+  if (modelSpan) {
+    const text = (modelSpan.textContent || "").toLowerCase();
+    if (text === "expert") return "deepseek-v4-pro";
+    if (text === "instant") return "deepseek-v4-flash";
+  }
+  return state.pricing.modelName || "deepseek-v4-flash";
+}
+
+function extractThinkingTextInline(node) {
+  let text = "";
+  const blocks = node.querySelectorAll('.ds-think-content, [class*="think"]');
+  for (const b of blocks) text += (b.textContent || "") + "\n";
+  return text;
+}
+
+function injectPriceUser(node, tokens, cost) {
+  const container = node.parentElement || node;
+  if (container.querySelector(".bds-message-price")) return;
+  const priceText = cost < 1e-4 ? "$0.0000" : cost < 0.01 ? "$" + cost.toFixed(4) : "$" + cost.toFixed(3);
+  const target = container.querySelector("._11d6b3a .ds-flex") ||
+    container.querySelector(".ds-flex._78e0558") || container.querySelector("[class*='_78e0558']");
+  if (!target) return;
+  const el = document.createElement("span");
+  el.className = "bds-message-price bds-price-user";
+  el.style.cssText = "font-size:11px;color:var(--bds-text-tertiary,#999);display:inline-flex;align-items:center;gap:4px;margin-left:8px;";
+  el.innerHTML = `<span class="bds-price-label">API: ~${priceText}</span><span class="bds-token-count">${fmtTok(tokens)} tok</span>`;
+  target.appendChild(el);
+}
+
+function injectPriceAssistant(node, tokens, cost) {
+  const container = node.closest("._4f9bf79._43c05b5") || node.parentElement || node;
+  if (container.querySelector(".bds-message-price")) return;
+  const priceText = cost < 1e-4 ? "$0.0000" : cost < 0.01 ? "$" + cost.toFixed(4) : "$" + cost.toFixed(3);
+  const target = container.querySelector("._0a3d93b") || container.querySelector(".ds-flex._0a3d93b");
+  if (!target) {
+    const bars = container.querySelectorAll(".ds-flex");
+    for (const bar of bars) {
+      if (bar.querySelector(".ds-icon-button") || bar.querySelector("[role='button']")) {
+        const el = document.createElement("span");
+        el.className = "bds-message-price bds-price-assistant";
+        el.style.cssText = "font-size:11px;color:var(--bds-text-tertiary,#999);display:inline-flex;align-items:center;gap:4px;";
+        el.innerHTML = `<span class="bds-price-label">API: ~${priceText}</span><span class="bds-token-count">${fmtTok(tokens)} tok</span>`;
+        bar.appendChild(el);
+        return;
+      }
+    }
+    return;
+  }
+  const el = document.createElement("span");
+  el.className = "bds-message-price bds-price-assistant";
+  el.style.cssText = "font-size:11px;color:var(--bds-text-tertiary,#999);display:inline-flex;align-items:center;gap:4px;";
+  el.innerHTML = `<span class="bds-price-label">API: ~${priceText}</span><span class="bds-token-count">${fmtTok(tokens)} tok</span>`;
+  target.appendChild(el);
+}
+
+function fmtTok(n) {
+  return n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1000 ? (n / 1000).toFixed(1) + "K" : String(n);
+}
+
+function refreshSessionTotalDisplayInline() {
+  if (!state.settings.tokenPriceDisplay) return;
+  let el = document.querySelector(".bds-session-total");
+  if (!el) {
+    const header = document.querySelector("._2be88ba .f8d1e4c0 ._9fcbeda._7ee190f");
+    if (!header) return;
+    el = document.createElement("div");
+    el.className = "bds-session-total";
+    el.style.cssText = "display:flex;align-items:center;gap:6px;font-size:11px;color:var(--bds-text-tertiary,#999);margin-left:8px;flex-shrink:0;";
+    header.appendChild(el);
+  }
+  const total = state.pricing.sessionTotals.totalCost;
+  const allTok = state.pricing.sessionInputTokens + state.pricing.sessionOutputTokens;
+  const totalFmt = total < 1e-4 ? "$0.0000" : total < 0.01 ? "$" + total.toFixed(4) : "$" + total.toFixed(3);
+  el.innerHTML = `<span class="bds-price-badge">API: ~${totalFmt}</span><span class="bds-token-badge">${fmtTok(allTok)} tokens</span>`;
 }

@@ -448,6 +448,46 @@ export const DEFAULT_SYSTEM_PROMPT = [
   "The system prompt has ended. User prompt:"
 ].join("\n");
 
+// ── Embedded Pricing (fallback when external sources unavailable) ──
+export const EMBEDDED_PRICING = {
+  updatedAt: "2026-05-05",
+  models: {
+    "deepseek-v4-flash": {
+      displayName: "DeepSeek V4 Flash",
+      inputPrice: 0.14,
+      inputCacheHitPrice: 0.0028,
+      outputPrice: 0.28,
+    },
+    "deepseek-v4-pro": {
+      displayName: "DeepSeek V4 Pro",
+      inputPrice: 0.435,
+      inputCacheHitPrice: 0.003625,
+      outputPrice: 0.87,
+    },
+    "deepseek-chat": {
+      displayName: "DeepSeek Chat",
+      inputPrice: 0.14,
+      inputCacheHitPrice: 0.0028,
+      outputPrice: 0.28,
+    },
+    "deepseek-reasoner": {
+      displayName: "DeepSeek Reasoner",
+      inputPrice: 0.435,
+      inputCacheHitPrice: 0.003625,
+      outputPrice: 0.87,
+    },
+  },
+};
+
+// ── Token estimation: approx 3.5 chars per token ──
+export const CHARS_PER_TOKEN = 3.5;
+
+// ── Pricing fetch URLs ──
+export const PRICING_URLS = {
+  official: "https://api-docs.deepseek.com/quick_start/pricing/",
+  github: "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/extension/pricing.json",
+};
+
 // ── Default Settings ──
 export const DEFAULT_SETTINGS = {
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
@@ -465,6 +505,7 @@ export const DEFAULT_SETTINGS = {
   systemPromptInjectionInterval: 3,
   htmlToMarkdownMaxDepth: 200,
   maxChatSessions: 500,
+  tokenPriceDisplay: false,
 };
 
 // ── Code language → file extension map ──

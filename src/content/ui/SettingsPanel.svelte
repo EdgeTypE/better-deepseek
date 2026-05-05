@@ -35,6 +35,7 @@
   let maxChatSessions = $state(
     Number(appState.settings.maxChatSessions) || 500,
   );
+  let tokenPriceDisplay = $state(Boolean(appState.settings.tokenPriceDisplay));
   let advancedOpen = $state(false);
 
   let activeProject = $state(getActiveProject());
@@ -60,6 +61,7 @@
     htmlToMarkdownMaxDepth =
       Number(appState.settings.htmlToMarkdownMaxDepth) || 200;
     maxChatSessions = Number(appState.settings.maxChatSessions) || 500;
+    tokenPriceDisplay = Boolean(appState.settings.tokenPriceDisplay);
   }
 
   export function refreshProject() {
@@ -105,6 +107,7 @@
       10,
       Math.floor(Number(maxChatSessions) || 500),
     );
+    appState.settings.tokenPriceDisplay = tokenPriceDisplay;
 
     await chrome.storage.local.set({
       [STORAGE_KEYS.settings]: appState.settings,
@@ -369,6 +372,17 @@
         usage on long-lived tabs. Default 500.
       </p>
     </div>
+
+    <div class="bds-toggle-row">
+      <span class="bds-toggle-label">Token Price Estimation (API Cost)</span>
+      <label class="bds-switch">
+        <input id="bds-token-price" type="checkbox" bind:checked={tokenPriceDisplay} />
+        <span class="bds-switch-track"></span>
+      </label>
+    </div>
+    <p style="font-size: 10px; opacity: 0.5; margin: -8px 0 8px; padding-left: 0;">
+      Shows estimated DeepSeek API cost per message and session total. Input/output token prices are used for estimation. Pricing data is fetched dynamically with fallbacks.
+    </p>
   </div>
 </div>
 

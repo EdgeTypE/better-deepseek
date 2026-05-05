@@ -301,9 +301,15 @@ export function startUrlWatcher() {
     state.longWork.active = false;
     state.longWork.files.clear();
     state.longWork.lastActivityAt = 0;
+    // Reset session pricing
+    state.pricing.sessionTotals = { inputCost: 0, outputCost: 0, totalCost: 0 };
+    state.pricing.sessionInputTokens = 0;
+    state.pricing.sessionOutputTokens = 0;
     if (state.ui) {
       state.ui.showLongWorkOverlay(false);
     }
+    const oldTotal = document.querySelector(".bds-session-total");
+    if (oldTotal) oldTotal.remove();
     scheduleScan();
     checkPendingExport();
   }, 1000);

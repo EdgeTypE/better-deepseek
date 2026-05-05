@@ -60,12 +60,26 @@ export function patchXmlHttpRequest(
       }
 
       const payload = JSON.parse(bodyText);
+      const requestModelName = payload.model || null;
+
       const mutation = mutatePayload(payload, state);
       if (!mutation.changed) {
         return originalSend.call(this, body);
       }
 
       const nextBody = JSON.stringify(mutation.payload);
+
+      const xhrRef = this;
+      // Intercept response for token usage
+      this.addEventListener("load", () => {
+        try {
+          const responseText = xhrRef.responseText;
+          if (responseText) {
+            extractXhrUsageContent(responseText, xhrRef, requestModelName);
+          }
+        } catch (e) {}
+      }, { once: true });
+
       return originalSend.call(this, nextBody);
     } catch (error) {
       const meta = this.__bdsRequestMeta || {};
@@ -95,4 +109,34 @@ function getXhrBodyText(body) {
   }
 
   return "";
+}
+
+function extractXhrUsageContent(responseText, xhr, modelName) {
+  try {
+    const contentType = xhr.getResponseHeader?.("content-type") || "";
+    if (contentType.includes("text/event-stream") || responseText.startsWith("data: ")) {
+      const lines = responseText.split("\n");
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const line = lines[i].trim();
+        if (!line.startsWith("data: ")) continue;
+        const jsonStr = line.slice(6).trim();
+        if (jsonStr === "[DONE]") continue;
+        try {
+          const chunk = JSON.parse(jsonStr);
+          const usage = chunk?.usage;
+          if (usage) {
+            window.dispatchEvent(new CustomEvent("bds:token-usage", {
+              detail: JSON.stringify({
+                inputTokens: usage.prompt_tokens || usage.input_tokens || 0,
+                outputTokens: usage.completion_tokens || usage.output_tokens || 0,
+                modelName: modelName || chunk?.model || null,
+                timestamp: Date.now(),
+              }),
+            }));
+            break;
+          }
+        } catch (e) {}
+      }
+    }
+  } catch (e) {}
 }

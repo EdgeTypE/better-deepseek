@@ -36,15 +36,20 @@ export function patchFetch(state, isChatCompletionUrl, markStart, markEnd) {
           init,
           state
         );
+
         if (!requestInfo) {
-          return await originalFetch.apply(this, arguments);
+          const response = await originalFetch.apply(this, arguments);
+          tryCaptureTokenUsage(response, url, requestInfo?.modelName);
+          return response;
         }
 
-        return await originalFetch.call(
+        const response = await originalFetch.call(
           this,
           requestInfo.input,
           requestInfo.init
         );
+        tryCaptureTokenUsage(response, url, requestInfo.modelName);
+        return response;
       } finally {
         markEnd(url);
       }
@@ -53,6 +58,19 @@ export function patchFetch(state, isChatCompletionUrl, markStart, markEnd) {
       return originalFetch.apply(this, arguments);
     }
   };
+}
+
+/**
+ * Try to capture token usage from the API response stream.
+ */
+function tryCaptureTokenUsage(response, url, modelName) {
+  if (!response || !response.clone) return;
+  try {
+    const cloned = response.clone();
+    readResponseForUsage(cloned, modelName).catch(() => {});
+  } catch (e) {
+    // clone might fail if body already consumed; ignore
+  }
 }
 
 /**
@@ -86,6 +104,8 @@ async function buildMutatedFetchRequest(input, init, state) {
   } catch {
     return null;
   }
+
+  const requestModelName = payload.model || null;
 
   const mutation = mutatePayload(payload, state);
   if (!mutation.changed) {
@@ -139,7 +159,78 @@ async function buildMutatedFetchRequest(input, init, state) {
 
   const nextInput =
     typeof input === "string" || input instanceof URL ? input : input.url;
-  return { input: nextInput, init: nextInit };
+  return { input: nextInput, init: nextInit, modelName: requestModelName };
+}
+
+/**
+ * Read the response body (handles both streaming SSE and JSON) to extract token usage info.
+ */
+async function readResponseForUsage(response, modelName) {
+  try {
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("text/event-stream") || contentType.includes("stream")) {
+      await parseSSEUsage(response, modelName);
+    } else {
+      const text = await response.text();
+      try {
+        const data = JSON.parse(text);
+        const usage = data?.usage || data?.token_usage;
+        if (usage) {
+          emitTokenUsage(usage.prompt_tokens || usage.input_tokens || 0,
+            usage.completion_tokens || usage.output_tokens || 0,
+            modelName);
+        }
+      } catch (e) { /* ignore parse errors */ }
+    }
+  } catch (e) { /* silently ignore */ }
+}
+
+/**
+ * Parse SSE stream to find the final chunk with usage data.
+ */
+async function parseSSEUsage(response, modelName) {
+  const reader = response.body?.getReader();
+  if (!reader) return;
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (value) buffer += decoder.decode(value, { stream: !done });
+      if (done) break;
+    }
+  } catch (e) { return; }
+
+  const lines = buffer.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (!line.startsWith("data: ")) continue;
+    const jsonStr = line.slice(6).trim();
+    if (jsonStr === "[DONE]") continue;
+    try {
+      const chunk = JSON.parse(jsonStr);
+      const usage = chunk?.usage || chunk?.token_usage;
+      if (usage) {
+        emitTokenUsage(usage.prompt_tokens || usage.input_tokens || 0,
+          usage.completion_tokens || usage.output_tokens || 0,
+          modelName || chunk?.model);
+        break;
+      }
+    } catch (e) { /* ignore */ }
+  }
+}
+
+function emitTokenUsage(inputTokens, outputTokens, modelName) {
+  if (typeof inputTokens !== "number" && typeof outputTokens !== "number") return;
+  window.dispatchEvent(new CustomEvent("bds:token-usage", {
+    detail: JSON.stringify({
+      inputTokens: Number(inputTokens) || 0,
+      outputTokens: Number(outputTokens) || 0,
+      modelName: modelName || null,
+      timestamp: Date.now(),
+    }),
+  }));
 }
 
 /**

@@ -908,3 +908,45 @@ textarea.bds-input,
   outline: none;
   padding: 0;
 }
+
+/* ══════════════════════════════════
+   Token Price Display
+   ══════════════════════════════════ */
+.bds-message-price {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", monospace;
+  white-space: nowrap;
+  opacity: 0.7;
+  transition: opacity var(--bds-transition);
+  user-select: none;
+}
+
+.bds-message-price:hover {
+  opacity: 1;
+}
+
+.bds-price-label {
+  color: var(--bds-text-tertiary);
+}
+
+.bds-token-count {
+  color: var(--bds-text-secondary);
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.bds-session-total {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", "Roboto Mono", monospace;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.bds-price-badge {
+  color: var(--bds-accent);
+  font-weight: 600;
+}
+
+.bds-token-badge {
+  color: var(--bds-text-tertiary);
+  font-size: 10px;
+  opacity: 0.6;
+}

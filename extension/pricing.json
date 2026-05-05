@@ -1,0 +1,39 @@
+{
+  "updatedAt": "2026-05-05",
+  "pricingPage": "https://api-docs.deepseek.com/quick_start/pricing/",
+  "models": {
+    "deepseek-v4-flash": {
+      "displayName": "DeepSeek V4 Flash",
+      "inputPrice": 0.14,
+      "inputCacheHitPrice": 0.0028,
+      "outputPrice": 0.28,
+      "contextLength": 1000000,
+      "maxOutputTokens": 384000
+    },
+    "deepseek-v4-pro": {
+      "displayName": "DeepSeek V4 Pro",
+      "inputPrice": 0.435,
+      "inputCacheHitPrice": 0.003625,
+      "outputPrice": 0.87,
+      "contextLength": 1000000,
+      "maxOutputTokens": 384000,
+      "discountNote": "75% off until 2026/05/31"
+    },
+    "deepseek-chat": {
+      "displayName": "DeepSeek Chat (legacy)",
+      "inputPrice": 0.14,
+      "inputCacheHitPrice": 0.0028,
+      "outputPrice": 0.28,
+      "deprecated": true,
+      "mapsTo": "deepseek-v4-flash"
+    },
+    "deepseek-reasoner": {
+      "displayName": "DeepSeek Reasoner (legacy)",
+      "inputPrice": 0.435,
+      "inputCacheHitPrice": 0.003625,
+      "outputPrice": 0.87,
+      "deprecated": true,
+      "mapsTo": "deepseek-v4-pro"
+    }
+  }
+}
