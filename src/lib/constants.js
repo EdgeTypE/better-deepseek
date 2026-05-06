@@ -6,6 +6,7 @@ export const STORAGE_KEYS = {
   characters: "bds_characters",
   projects: "bds_projects",
   projectFiles: "bds_project_files",
+  whatsNewPending: "bds_whats_new_pending",
 };
 
 

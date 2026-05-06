@@ -60,6 +60,7 @@ const state = {
     /** @type {boolean} whether pricing data has been loaded */
     pricingLoaded: false,
   },
+  whatsNewPending: false,
 };
 
 /**

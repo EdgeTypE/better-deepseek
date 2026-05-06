@@ -2,9 +2,11 @@
   import Drawer from "./Drawer.svelte";
   import ToastStack from "./ToastStack.svelte";
   import QuestionPanel from "./QuestionPanel.svelte";
+  import WhatsNewModal from "./WhatsNewModal.svelte";
   import appState from "../state.js";
 
   let drawerOpen = $state(false);
+  let whatsNewPending = $state(appState.whatsNewPending);
 
   /** @type {Array<{id: number, message: string}>} */
   let toasts = $state([]);
@@ -43,6 +45,10 @@
     if (appState.heroBarRef) appState.heroBarRef.refresh();
   }
 
+  export function refreshWhatsNew() {
+    whatsNewPending = appState.whatsNewPending;
+  }
+
   function toggleDrawer() {
     drawerOpen = !drawerOpen;
   }
@@ -58,3 +64,7 @@
 
 <ToastStack {toasts} />
 <QuestionPanel />
+
+{#if whatsNewPending}
+  <WhatsNewModal onDismiss={() => whatsNewPending = false} />
+{/if}
