@@ -9,12 +9,23 @@
     "build:chrome": "node build.js --target=chrome",
     "build:firefox": "node build.js --target=firefox",
     "build:source": "node build.js --source",
-    "sanitize": "node scripts/sanitize-dist.js"
+    "sanitize": "node scripts/sanitize-dist.js",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "vitest run --coverage",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:e2e": "playwright test",
+    "test:ci": "npm run build:chrome && npm run test:unit && npm run test:e2e"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@playwright/test": "^1.54.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/ui": "^3.2.4",
+    "jsdom": "^26.1.0",
     "svelte": "^5.28.2",
-    "vite": "^6.3.1"
+    "vite": "^6.3.1",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",

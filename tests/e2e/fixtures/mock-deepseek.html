@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mock DeepSeek Session - DeepSeek</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #f3f4f6;
+        color: #111827;
+      }
+
+      .app-shell {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        min-height: 100vh;
+      }
+
+      .dc04ec1d {
+        border-right: 1px solid #d1d5db;
+        background: #ffffff;
+        padding: 16px 12px;
+      }
+
+      .mock-sidebar-title {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #6b7280;
+        margin-bottom: 12px;
+      }
+
+      .mock-new-chat {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        cursor: pointer;
+        background: #f9fafb;
+      }
+
+      .mock-history-list {
+        margin-top: 16px;
+      }
+
+      ._3098d02 {
+        display: grid;
+        gap: 8px;
+      }
+
+      a._546d736 {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        color: inherit;
+        text-decoration: none;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+      }
+
+      .c08e6e93 {
+        font-size: 13px;
+        font-weight: 500;
+      }
+
+      ._2090548 {
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        border: 1px solid #d1d5db;
+        cursor: pointer;
+        background: #fff;
+      }
+
+      .mock-main {
+        padding: 24px 28px 120px;
+      }
+
+      .mock-header {
+        margin-bottom: 18px;
+      }
+
+      .mock-header h1 {
+        margin: 0;
+        font-size: 24px;
+      }
+
+      .mock-header p {
+        margin: 6px 0 0;
+        color: #6b7280;
+      }
+
+      #chat-messages {
+        display: grid;
+        gap: 18px;
+        min-height: 300px;
+      }
+
+      .ds-message {
+        background: #ffffff;
+        border: 1px solid #d1d5db;
+        border-radius: 16px;
+        padding: 16px;
+      }
+
+      .ds-message.d29f3d7d {
+        background: #eff6ff;
+      }
+
+      .ds-markdown {
+        white-space: pre-wrap;
+        line-height: 1.6;
+      }
+
+      .md-code-block {
+        border: 1px solid #d1d5db;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #111827;
+        color: #f9fafb;
+      }
+
+      .md-code-block-banner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        background: #1f2937;
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+
+      .md-code-block pre {
+        margin: 0;
+        padding: 14px;
+        overflow-x: auto;
+      }
+
+      .composer-shell {
+        position: fixed;
+        left: 320px;
+        right: 28px;
+        bottom: 20px;
+        display: grid;
+        grid-template-columns: auto auto 1fr auto;
+        gap: 12px;
+        align-items: center;
+        padding: 16px;
+        background: #ffffff;
+        border: 1px solid #d1d5db;
+        border-radius: 18px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      }
+
+      .native-attach-btn,
+      #send-button {
+        padding: 10px 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        background: #f9fafb;
+        cursor: pointer;
+      }
+
+      .ds-textarea {
+        width: 100%;
+      }
+
+      #chat-input {
+        width: 100%;
+        min-height: 56px;
+        padding: 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 12px;
+        resize: vertical;
+      }
+
+      .ds-dropdown-menu {
+        position: fixed;
+        top: 120px;
+        right: 28px;
+        width: 220px;
+        border-radius: 12px;
+        border: 1px solid #d1d5db;
+        background: #ffffff;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+        padding: 8px;
+        z-index: 99999;
+      }
+
+      .ds-dropdown-menu-option {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+
+      .ds-dropdown-menu-option:hover {
+        background: #f3f4f6;
+      }
+
+      .ds-dropdown-menu-option__icon {
+        width: 16px;
+        height: 16px;
+      }
+
+      .ds-dropdown-menu-option__label {
+        font-size: 13px;
+      }
+    </style>
+    <script>
+      (() => {
+        function removeMenus() {
+          document.querySelectorAll(".ds-dropdown-menu").forEach((menu) => menu.remove());
+        }
+
+        function createMessageNode(role) {
+          const node = document.createElement("div");
+          node.className = role === "user" ? "ds-message d29f3d7d _63c77b1" : "ds-message _63c77b1";
+          node.setAttribute("data-message-author-role", role);
+          return node;
+        }
+
+        function createTextMessage(role, text) {
+          const node = createMessageNode(role);
+          const markdown = document.createElement("div");
+          markdown.className = role === "user" ? "fbb737a4 ds-markdown" : "ds-markdown";
+          markdown.textContent = text;
+          node.appendChild(markdown);
+          return node;
+        }
+
+        function createCodeMessage(language, code) {
+          const node = createMessageNode("assistant");
+          const markdown = document.createElement("div");
+          markdown.className = "ds-markdown";
+
+          const block = document.createElement("div");
+          block.className = "md-code-block";
+
+          const banner = document.createElement("div");
+          banner.className = "md-code-block-banner";
+
+          const languageLabel = document.createElement("span");
+          languageLabel.textContent = language;
+
+          const actions = document.createElement("div");
+          const copyButton = document.createElement("button");
+          copyButton.type = "button";
+          copyButton.className = "ds-atom-button";
+          copyButton.innerHTML = '<span class="code-info-button-text">Copy</span>';
+          actions.appendChild(copyButton);
+
+          banner.append(languageLabel, actions);
+
+          const pre = document.createElement("pre");
+          const codeEl = document.createElement("code");
+          codeEl.className = `language-${language}`;
+          codeEl.textContent = code;
+          pre.appendChild(codeEl);
+
+          block.append(banner, pre);
+          markdown.appendChild(block);
+          node.appendChild(markdown);
+          return node;
+        }
+
+        function appendMessage(node) {
+          document.querySelector("#chat-messages").appendChild(node);
+          return node;
+        }
+
+        function updateLastAssistantMessage(text) {
+          const nodes = Array.from(document.querySelectorAll(".ds-message")).filter(
+            (node) => node.getAttribute("data-message-author-role") === "assistant",
+          );
+          const node = nodes[nodes.length - 1];
+          if (!node) return false;
+
+          const markdown = node.querySelector(".ds-markdown");
+          if (!markdown) return false;
+
+          markdown.textContent = text;
+          return true;
+        }
+
+        function getAttachedFiles() {
+          const input = document.querySelector("#native-file-input");
+          return Array.from(input?.files || []).map((file) => file.name);
+        }
+
+        function buildMenu(targetUrl) {
+          removeMenus();
+
+          const menu = document.createElement("div");
+          menu.className = "ds-dropdown-menu";
+
+          const labels = ["Rename", "Pin", "Share", "Delete"];
+          for (const label of labels) {
+            const option = document.createElement("div");
+            option.className = "ds-dropdown-menu-option";
+            option.innerHTML = `
+              <div class="ds-dropdown-menu-option__icon"></div>
+              <div class="ds-dropdown-menu-option__label">${label}</div>
+            `;
+            menu.appendChild(option);
+          }
+
+          menu.dataset.targetUrl = targetUrl;
+          document.body.appendChild(menu);
+          return menu;
+        }
+
+        function wireHistoryMenus() {
+          document.querySelectorAll("div._2090548").forEach((button) => {
+            button.addEventListener("click", (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              const chatItem = button.closest("a._546d736");
+              if (!chatItem) return;
+              buildMenu(chatItem.href);
+            });
+          });
+        }
+
+        function init() {
+          let sendCount = 0;
+          const sendButton = document.querySelector("#send-button");
+          sendButton.addEventListener("click", () => {
+            sendCount += 1;
+            window.__mockDeepSeek.lastSubmittedText = document.querySelector("#chat-input").value;
+          });
+
+          document.addEventListener("click", (event) => {
+            if (!event.target.closest(".ds-dropdown-menu") && !event.target.closest("div._2090548")) {
+              removeMenus();
+            }
+          });
+
+          wireHistoryMenus();
+
+          window.__mockDeepSeek = {
+            addAssistantMessage(text) {
+              return appendMessage(createTextMessage("assistant", text));
+            },
+            addUserMessage(text) {
+              return appendMessage(createTextMessage("user", text));
+            },
+            addCodeMessage(language, code) {
+              return appendMessage(createCodeMessage(language, code));
+            },
+            updateLastAssistantMessage,
+            getAttachedFiles,
+            getSendCount() {
+              return sendCount;
+            },
+            lastSubmittedText: "",
+          };
+        }
+
+        window.addEventListener("DOMContentLoaded", init);
+      })();
+    </script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="dc04ec1d">
+        <div class="mock-sidebar-title">History</div>
+        <div tabindex="0" class="mock-new-chat">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 0.599609L8 15.4" stroke="currentColor" stroke-width="1.5"></path>
+            <path d="M0.600098 8H15.4001" stroke="currentColor" stroke-width="1.5"></path>
+          </svg>
+          <span>New Chat</span>
+        </div>
+
+        <div class="mock-history-list">
+          <div class="_3098d02">
+            <a class="_546d736" data-session-id="mock-chat-1" href="/chat/s/mock-chat-1">
+              <span class="c08e6e93">Alpha Session</span>
+              <div class="_2090548" role="button" tabindex="0" aria-label="Open menu">...</div>
+            </a>
+            <a class="_546d736" data-session-id="mock-chat-2" href="/chat/s/mock-chat-2">
+              <span class="c08e6e93">Beta Session</span>
+              <div class="_2090548" role="button" tabindex="0" aria-label="Open menu">...</div>
+            </a>
+          </div>
+        </div>
+      </aside>
+
+      <main class="mock-main">
+        <header class="mock-header">
+          <h1>Mock DeepSeek Workspace</h1>
+          <p>Fixture page used for Better DeepSeek browser-extension E2E coverage.</p>
+        </header>
+
+        <section id="chat-messages"></section>
+      </main>
+    </div>
+
+    <section class="composer-shell">
+      <div class="native-attach-btn" role="button" tabindex="0">Native Upload</div>
+      <input id="native-file-input" type="file" multiple />
+      <div class="ds-textarea">
+        <textarea id="chat-input" placeholder="Message DeepSeek"></textarea>
+      </div>
+      <button id="send-button" title="Send message" type="button">Send</button>
+    </section>
+  </body>
+</html>

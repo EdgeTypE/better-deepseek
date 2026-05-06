@@ -109,7 +109,7 @@ export function parseGitHubUrl(input) {
  * @param {{ token?: string }} [options] - optional fetch overrides
  * @returns {Promise<File|null>}
  */
-function decodeZipBase64(base64) {
+export function decodeZipBase64(base64) {
   const binaryStr = atob(base64);
   const bytes = new Uint8Array(binaryStr.length);
   for (let i = 0; i < binaryStr.length; i++) {
@@ -118,7 +118,7 @@ function decodeZipBase64(base64) {
   return bytes;
 }
 
-function buildGitHubFetchError(result, fallbackMessage) {
+export function buildGitHubFetchError(result, fallbackMessage) {
   if (result && result.authRejected) {
     return new Error(
       "GitHub rejected your token. Check that it has the `repo` scope and hasn't expired."
@@ -138,7 +138,7 @@ function buildGitHubFetchError(result, fallbackMessage) {
   );
 }
 
-function preferGitHubFailure(current, next) {
+export function preferGitHubFailure(current, next) {
   if (!next) return current;
   if (!current) return next;
   if (next.authRejected && !current.authRejected) return next;

@@ -438,7 +438,7 @@ function exportToPdf(messages, title, dark = false) {
 /**
  * Very basic Markdown to HTML converter for PDF export.
  */
-function formatContentForHtml(content) {
+export function formatContentForHtml(content) {
   return content
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

@@ -42,7 +42,7 @@ export function triggerUrlDownload(url) {
 /**
  * Flatten a path for use as a download filename.
  */
-function flattenPathForDownload(path) {
+export function flattenPathForDownload(path) {
   return String(path || "file.txt")
     .replace(/[<>:"|?*]/g, "_")
     .replace(/\//g, "__");
