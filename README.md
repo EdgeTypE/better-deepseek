@@ -235,6 +235,17 @@ Better DeepSeek does not collect, transmit, or sell any personal data. All setti
 
 Contributions are welcome! Please open an issue or submit a pull request on GitHub. Before submitting a PR, ensure that your code builds without errors and follows the existing style.
 
+## Testing
+
+Run the main test commands before opening a PR:
+
+- `npm run test:unit` - runs the Vitest unit and integration suite with coverage.
+- `npm run test:e2e` - runs the Playwright browser-extension end-to-end suite.
+- `npm run test` - runs the full test stack.
+- `npm run test:ci` - runs the CI-equivalent flow: Chrome build, Vitest, then Playwright.
+
+For fuller testing notes, suite layout, and conventions, see [TESTING.md](TESTING.md).
+
 ## Acknowledgements and Disclaimer
 
 Use it at your own risk. Better DeepSeek is an independent project and is not affiliated with DeepSeek. It uses several open-source libraries, including:

@@ -1,0 +1,231 @@
+import { test, expect } from "./helpers/extension.js";
+
+async function addAssistantMessage(page, text) {
+  await page.evaluate((rawText) => {
+    window.__mockDeepSeek.addAssistantMessage(rawText);
+  }, text);
+}
+
+async function addUserMessage(page, text) {
+  await page.evaluate((rawText) => {
+    window.__mockDeepSeek.addUserMessage(rawText);
+  }, text);
+}
+
+async function addCodeMessage(page, language, code) {
+  await page.evaluate(
+    ({ lang, source }) => {
+      window.__mockDeepSeek.addCodeMessage(lang, source);
+    },
+    { lang: language, source: code },
+  );
+}
+
+async function updateLastAssistantMessage(page, text) {
+  await page.evaluate((rawText) => {
+    window.__mockDeepSeek.updateLastAssistantMessage(rawText);
+  }, text);
+}
+
+async function openDrawer(page) {
+  const drawer = page.locator("#bds-drawer");
+  if (await drawer.evaluate((node) => node.classList.contains("bds-open"))) {
+    return;
+  }
+  await page.locator("#bds-toggle").click();
+  await expect(drawer).toHaveClass(/bds-open/);
+}
+
+async function closeDrawer(page) {
+  const drawer = page.locator("#bds-drawer");
+  if (!(await drawer.evaluate((node) => node.classList.contains("bds-open")))) {
+    return;
+  }
+  await page.locator("#bds-close").click();
+  await expect(drawer).toHaveClass(/bds-closed/);
+}
+
+test("loads the extension and toggles the drawer", async ({ page }) => {
+  await expect(page.locator("#bds-toggle")).toBeVisible();
+  await openDrawer(page);
+  await closeDrawer(page);
+});
+
+test("renders visualizer and HTML tool cards from tagged assistant messages", async ({ page }) => {
+  await addAssistantMessage(
+    page,
+    [
+      "Lead text before tools.",
+      '<BDS:VISUALIZER><div class="v-card"><h2 class="v-title">Chart</h2></div></BDS:VISUALIZER>',
+      "<BDS:HTML><section><h1>Embedded Report</h1></section></BDS:HTML>",
+    ].join("\n"),
+  );
+
+  await expect(page.locator(".bds-visualizer-card")).toBeVisible();
+  await expect(page.locator(".bds-tool-card h4")).toContainText("HTML");
+});
+
+test("renders PPTX, Excel, and Docx cards for office-generation tags", async ({ page }) => {
+  await addAssistantMessage(
+    page,
+    [
+      '<BDS:pptx>fileName: "deck.pptx"</BDS:pptx>',
+      '<BDS:excel>const wb = {}; XLSX.writeFile(wb, "report.xlsx")</BDS:excel>',
+      '<BDS:docx>const doc = {}; DOCX.save(doc, "brief.docx")</BDS:docx>',
+    ].join("\n"),
+  );
+
+  await expect(page.locator(".bds-pptx-card")).toContainText("deck.pptx");
+  await expect(page.locator(".bds-excel-card")).toContainText("report.xlsx");
+  await expect(page.locator(".bds-docx-card")).toContainText("brief.docx");
+});
+
+test("adds code download buttons and opens the JavaScript runner", async ({ page }) => {
+  await addCodeMessage(page, "python", 'print("hello")');
+  await addCodeMessage(page, "javascript", 'console.log("runner");');
+
+  await expect(page.getByRole("button", { name: "Run Python" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Run JS" })).toBeVisible();
+  await expect(page.locator(".bds-code-download")).toHaveCount(2);
+
+  const codeDownload = page.waitForEvent("download");
+  await page.locator(".md-code-block .bds-code-download").first().click();
+  await expect(await codeDownload).toBeTruthy();
+
+  await page.getByRole("button", { name: "Run JS" }).click();
+  await expect(page.locator(".bds-code-runner-card")).toBeVisible();
+
+  const runnerDownload = page.waitForEvent("download");
+  await page.locator(".bds-code-runner-card .bds-btn-small").click();
+  await expect(await runnerDownload).toBeTruthy();
+});
+
+test("imports a GitHub repository through the attach menu flow", async ({ page }) => {
+  await page.locator(".bds-plus-btn").click();
+  await page.locator(".bds-attach-dropdown .bds-attach-item").filter({ hasText: "GitHub Repo" }).click();
+  await page.locator(".bds-github-input").fill("octocat/Hello-World");
+  await page.locator(".bds-github-btn-import").click();
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.getAttachedFiles()))
+    .toEqual(["Hello-World_github.txt"]);
+});
+
+test("creates standalone download cards for create_file outputs", async ({ page }) => {
+  await addAssistantMessage(
+    page,
+    '<BDS:create_file fileName="notes.txt">standalone body</BDS:create_file>',
+  );
+
+  await expect(page.locator(".bds-download-card")).toContainText("notes.txt");
+
+  const download = page.waitForEvent("download");
+  await page.locator(".bds-download-card .bds-btn").click();
+  await expect(await download).toBeTruthy();
+});
+
+test("shows LONG_WORK progress and emits a ZIP download card after close", async ({ page }) => {
+  await addAssistantMessage(
+    page,
+    [
+      "Starting long work.",
+      "<BDS:LONG_WORK>",
+      '<BDS:create_file fileName="src/app.js">console.log("alpha");</BDS:create_file>',
+    ].join("\n"),
+  );
+
+  await expect(page.locator(".bds-loading-indicator")).toBeVisible();
+
+  await updateLastAssistantMessage(
+    page,
+    [
+      "Starting long work.",
+      "<BDS:LONG_WORK>",
+      '<BDS:create_file fileName="src/app.js">console.log("alpha");</BDS:create_file>',
+      '<BDS:create_file fileName="src/util.js">console.log("beta");</BDS:create_file>',
+      "</BDS:LONG_WORK>",
+    ].join("\n"),
+  );
+
+  await expect(page.locator(".bds-download-card")).toContainText("LONG_WORK project");
+  await expect(page.locator(".bds-download-card")).toContainText("2 files packaged");
+});
+
+test("updates stored memory entries when memory_write tags are processed", async ({ page }) => {
+  await addAssistantMessage(
+    page,
+    '<BDS:memory_write key_name="favorite_tool" value="Visualizer" importance="always" />',
+  );
+
+  await page.waitForTimeout(500);
+  await openDrawer(page);
+
+  await expect(page.locator("#bds-memory-list")).toContainText("favorite_tool");
+  await expect(page.locator("#bds-memory-list")).toContainText("Visualizer");
+});
+
+test("renders the voice prompt control in the composer", async ({ page }) => {
+  await expect(page.locator(".bds-mic-btn")).toBeVisible();
+  await expect(page.locator(".bds-mic-btn")).toHaveAttribute("title", "Voice Prompt");
+});
+
+test("persists settings across reloads", async ({ page }) => {
+  await openDrawer(page);
+  await page.locator("#bds-system-prompt").fill("System prompt from Playwright");
+  await page.locator("#bds-save-settings").click();
+
+  await page.reload();
+  await page.waitForSelector("#bds-toggle");
+  await openDrawer(page);
+  await expect(page.locator("#bds-system-prompt")).toHaveValue("System prompt from Playwright");
+});
+
+test("filters sidebar history through the injected search box", async ({ page }) => {
+  await expect(page.locator("#bds-sidebar-search-input")).toBeVisible();
+  await page.locator("#bds-sidebar-search-input").fill("Alpha");
+  await page.waitForTimeout(150);
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        alpha: document.querySelector('a[href="/chat/s/mock-chat-1"]').style.display,
+        beta: document.querySelector('a[href="/chat/s/mock-chat-2"]').style.display,
+      })),
+    )
+    .toEqual({ alpha: "", beta: "none" });
+});
+
+test("exports a chat as markdown from the sidebar menu", async ({ page }) => {
+  await page.goto("https://chat.deepseek.com/chat/s/mock-chat-1");
+  await page.waitForSelector("#bds-toggle");
+
+  await addUserMessage(page, "How do exports work?");
+  await addAssistantMessage(page, "Exports are generated from the visible session transcript.");
+
+  await page.locator('a[href="/chat/s/mock-chat-1"] ._2090548').click();
+  await expect(
+    page.locator(".bds-export-option").filter({ hasText: "Export as Markdown (.md)" }),
+  ).toBeVisible();
+
+  const download = page.waitForEvent("download");
+  await page.locator(".bds-export-option").filter({ hasText: "Export as Markdown (.md)" }).click();
+  const artifact = await download;
+
+  expect(artifact.suggestedFilename()).toMatch(/\.md$/);
+});
+
+test("creates the PDF export iframe from the sidebar menu", async ({ page }) => {
+  await page.goto("https://chat.deepseek.com/chat/s/mock-chat-1");
+  await page.waitForSelector("#bds-toggle");
+
+  await addUserMessage(page, "Generate a PDF snapshot.");
+  await addAssistantMessage(page, "This transcript should render into the PDF export iframe.");
+
+  await page.locator('a[href="/chat/s/mock-chat-1"] ._2090548').click();
+  await expect(
+    page.locator(".bds-export-option").filter({ hasText: "Export as PDF Document" }),
+  ).toBeVisible();
+  await page.locator(".bds-export-option").filter({ hasText: "Export as PDF Document" }).click();
+
+  await expect(page.locator("#bds-print-iframe")).toHaveCount(1);
+});

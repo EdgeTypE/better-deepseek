@@ -142,7 +142,7 @@ export function pushConfigToPage() {
 /**
  * Handle network state updates from the injected script.
  */
-function handleNetworkState(detail) {
+export function handleNetworkState(detail) {
   const activeCompletionRequests = Math.max(
     0,
     Number(
