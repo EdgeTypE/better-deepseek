@@ -174,3 +174,10 @@ async function fetchPageContent(url, options = {}) {
 
   return await resp.text();
 }
+
+// Update detection for "What's New" popup
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === "update") {
+    chrome.storage.local.set({ bds_whats_new_pending: true });
+  }
+});

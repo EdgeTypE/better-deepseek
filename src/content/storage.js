@@ -24,6 +24,7 @@ export async function loadStateFromStorage() {
     STORAGE_KEYS.characters,
     STORAGE_KEYS.projects,
     STORAGE_KEYS.projectFiles,
+    STORAGE_KEYS.whatsNewPending,
   ]);
 
   const storedSettings = values[STORAGE_KEYS.settings] || {};
@@ -63,6 +64,7 @@ export async function loadStateFromStorage() {
   state.characters = normalizeCharacters(values[STORAGE_KEYS.characters]);
   state.projects = normalizeProjects(values[STORAGE_KEYS.projects]);
   state.projectFiles = normalizeProjectFiles(values[STORAGE_KEYS.projectFiles]);
+  state.whatsNewPending = !!values[STORAGE_KEYS.whatsNewPending];
 }
 
 function shouldUpgradeSystemPrompt(storedSettings) {
@@ -281,6 +283,13 @@ export function bindStorageChangeListener() {
     if (changes[STORAGE_KEYS.projectFiles]) {
       state.projectFiles = normalizeProjectFiles(changes[STORAGE_KEYS.projectFiles].newValue);
       if (state.ui) state.ui.refreshProjects();
+    }
+
+    if (changes[STORAGE_KEYS.whatsNewPending]) {
+      state.whatsNewPending = !!changes[STORAGE_KEYS.whatsNewPending].newValue;
+      if (state.ui) {
+        state.ui.refreshWhatsNew();
+      }
     }
 
     pushConfigToPage();
