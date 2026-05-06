@@ -64,6 +64,19 @@
             <div class="bds-question-subtitle">Please provide your answers in the interaction panel below.</div>
           </div>
         </div>
+      {:else if block.name === 'character_create'}
+        <div class="bds-question-info-card bds-character-card">
+          <div class="bds-question-icon bds-character-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </div>
+          <div class="bds-question-content">
+            <div class="bds-question-title">Character/Persona created.</div>
+            <div class="bds-question-subtitle">Active character: <strong>{block.attrs.name || 'New Character'}</strong></div>
+          </div>
+        </div>
       {:else}
         <ToolCard name={block.name} content={block.content} />
       {/if}
@@ -113,6 +126,15 @@
     font-size: 13px;
     color: var(--bds-text-secondary, #8e8ea0);
     margin-top: 2px;
+  }
+
+  .bds-character-icon {
+    color: #10b981; /* Emerald Green for success/creation */
+    background: rgba(16, 185, 129, 0.1);
+  }
+
+  .bds-character-card {
+    border-left: 3px solid #10b981;
   }
 
   .bds-message-overlay {

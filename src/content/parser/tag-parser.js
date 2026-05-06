@@ -37,7 +37,8 @@ export function normalizeTaggedCodeContent(content, tagName) {
     name === "visualizer" ||
     name === "docx" ||
     name === "pptx" ||
-    name === "excel"
+    name === "excel" ||
+    name === "character_create"
   ) {
     output = unwrapMarkdownCodeFence(output);
   }
