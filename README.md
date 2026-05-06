@@ -213,7 +213,7 @@ Better DeepSeek does not collect, transmit, or sell any personal data. All setti
 - **New Feature**: Token price estimation and context window display for API-equivalent usage.
 - **New Feature**: What's New popup in the extension.
 - **New Option**: "Disable Memory" toggle in Settings.
-- **Bug Fixes and UX Improvements**: Resolved critical issues with message handling and UI state. General UI polishing and various bug fixes. (Thanks to [@WhiteLicorice](https://github.com/WhiteLicorice) and [@ferxal](https://github.com/ferxal)).
+- **Bug Fixes and UX Improvements**: Resolved critical issues with message handling and UI state. General UI polishing and various bug fixes. (Thanks to [@WhiteLicorice](https://github.com/WhiteLicorice) and [@ferxal](https://github.com/ferxal))
 
 ### v0.1.4 (2026-04-30)
 - **New Feature**: Projects menu for better organizational control (Thanks to [@WhiteLicorice](https://github.com/WhiteLicorice)).
