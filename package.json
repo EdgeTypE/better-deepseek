@@ -8,6 +8,7 @@
     "build": "npm run build:chrome && npm run build:firefox",
     "build:chrome": "node build.js --target=chrome",
     "build:firefox": "node build.js --target=firefox",
+    "build:android": "node build.js --target=android && node scripts/copy-to-android-assets.js",
     "build:source": "node build.js --source",
     "sanitize": "node scripts/sanitize-dist.js",
     "test": "npm run test:unit && npm run test:e2e",

@@ -169,23 +169,41 @@ For private repositories, add a classic GitHub personal access token with `repo`
 ```
 better-deepseek/
 ├── src/
-│   ├── background/       # Service worker for cross-origin requests
-│   ├── content/          # Content script (runs on DeepSeek page)
-│   │   ├── dom/          # DOM manipulation utilities
-│   │   ├── files/        # File/folder/GitHub readers and code block downloads
-│   │   ├── parser/       # BDS tag parsing and sanitization
-│   │   ├── tools/        # Tool card renderers (HTML, Python, PPTX, etc.)
-│   │   ├── ui/           # Svelte components for the drawer and overlays
-│   │   └── index.js      # Content script entry point
-│   ├── injected/         # Script injected into the page's MAIN world
-│   ├── lib/              # Shared utilities (ZIP, download, hashing, etc.)
-│   ├── sandbox/          # Sandboxed iframe for PPTX/Excel/DOCX generation
-│   └── styles/           # CSS files
+│ ├── background/                      # Service worker for cross-origin requests
+│ ├── content/                         # Content script (runs on DeepSeek page)
+│ │ ├── dom/                           # DOM manipulation utilities
+│ │ ├── files/                         # File/folder/GitHub readers and code block downloads
+│ │ ├── parser/                        # BDS tag parsing and sanitization
+│ │ ├── tools/                         # Tool card renderers (HTML, Python, PPTX, etc.)
+│ │ ├── ui/                            # Svelte components for the drawer and overlays
+│ │ └── index.js                       # Content script entry point
+│ ├── injected/                        # Script injected into the page's MAIN world
+│ ├── lib/                             # Shared utilities (ZIP, download, hashing, etc.)
+│ ├── platform/                        # Platform-specific globals and polyfills
+│ │ ├── android-bridge-shim.js         # Android native bridge wrappers
+│ │ ├── android-chrome-polyfill.js     # chrome.* API polyfill for Android
+│ │ ├── globals-android.js             # Android platform globals entry
+│ │ └── globals-chrome.js              # Chrome platform globals entry
+│ ├── sandbox/                         # Sandboxed iframe for PPTX/Excel/DOCX generation
+│ └── styles/                          # CSS files
+├── android/                           # Android WebView app
+│ ├── app/
+│ │ ├── src/main/
+│ │ │ ├── java/com/betterdeepseek/app/
+│ │ │ │ ├── MainActivity.kt            # Full-screen WebView Activity
+│ │ │ │ └── WebViewBridge.kt           # @JavascriptInterface bridge
+│ │ │ ├── assets/bds/                  # Auto-populated by build:android
+│ │ │ └── res/ # Android resources
+│ │ └── build.gradle.kts
+│ ├── build.gradle.kts
+│ ├── settings.gradle.kts
+│ └── gradle/
 ├── static/
-│   ├── manifest.json     # Extension manifest
-│   └── sandbox.html      # Sandbox page
-├── scripts/              # Build helper scripts
-├── build.js              # Vite build configuration
+│ ├── manifest.json                    # Extension manifest
+│ └── sandbox.html                     # Sandbox page
+├── scripts/                           # Build helper scripts
+├── tests/                             # Test suites (unit, integration, E2E)
+├── build.js                           # Vite multi-target build configuration
 └── package.json
 ```
 
@@ -194,6 +212,121 @@ better-deepseek/
 - `npm run dev` – Development build with watch mode.
 
 After making changes, rebuild the extension and reload it from `chrome://extensions` (click the refresh icon on the extension card).
+
+### Building for Android
+
+Better DeepSeek can run as a standalone Android app. It wraps
+`chat.deepseek.com` in a WebView and injects the BDS enhancement layer.
+
+#### Prerequisites
+
+| Tool | Version | How to install |
+|------|---------|----------------|
+| Node.js | ≥18 | `winget install OpenJS.NodeJS.LTS` |
+| Java JDK | 17 | `winget install EclipseAdoptium.Temurin.17.JDK` |
+| Android SDK | API 34 | Install Android Studio, then SDK Manager → Android 14.0 (API 34), Build-Tools 34.0.0, Command-line Tools |
+| Gradle | 8.7 (one-time) | Download the binary-only ZIP from https://gradle.org/releases, extract, and add `bin/` to your PATH |
+
+#### Environment Variables
+
+Set these in your system or user environment variables (Windows — use `setx` in
+Command Prompt, not PowerShell):
+
+```
+JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot
+ANDROID_HOME=C:\Users\YourName\AppData\Local\Android\Sdk
+```
+
+Also add `%ANDROID_HOME%\platform-tools` to your `Path`.
+
+> **PowerShell pitfall:** In PowerShell, use `$env:JAVA_HOME` and `&` to call
+> executables. In Command Prompt, use `%JAVA_HOME%` and double‑quote paths with
+> spaces: `"%JAVA_HOME%\bin\java" -version`.
+
+#### Verify the toolchain
+
+Open a **Command Prompt** (cmd.exe) and run:
+
+```cmd
+echo %JAVA_HOME%
+"%JAVA_HOME%\bin\java" -version
+echo %ANDROID_HOME%
+dir %ANDROID_HOME%\platforms
+dir %ANDROID_HOME%\build-tools
+dir %ANDROID_HOME%\cmdline-tools
+gradle --version
+```
+
+You should see OpenJDK 17, `android-34`, `34.0.0` in build‑tools, `latest` in
+cmdline‑tools, and Gradle 8.7.
+
+#### Create local.properties
+
+In the `android/` directory, create a file named `local.properties`:
+
+```
+sdk.dir=C:\\Users\\YourName\\AppData\\Local\\Android\\Sdk
+```
+
+Use **double backslashes** — this is a Java properties file. This file is
+gitignored and must never be committed.
+
+#### Bootstrap the Gradle wrapper (one-time)
+
+```cmd
+cd android
+gradle wrapper --gradle-version 8.7 --distribution-type bin
+```
+
+This creates `gradlew.bat` and the `gradle/wrapper/` folder. After this you can
+build with `gradlew` — the system Gradle is no longer needed.
+
+#### Build the JavaScript bundles
+
+```cmd
+npm run build:android
+```
+
+This runs Vite with `--target=android` and copies the output (content.js,
+injected.js, sandbox.js, sandbox.html, content.css) into
+`android/app/src/main/assets/bds/`.
+
+#### Build the APK
+
+```cmd
+cd android
+gradlew assembleDebug
+```
+
+The first build downloads Gradle and Android dependencies — expect a few minutes.
+Subsequent builds are fast. The debug APK lands at:
+
+```
+android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+#### Install and run
+
+```cmd
+adb install android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+Requires a physical device with USB debugging enabled, or an Android emulator
+(create one via Android Studio's Device Manager — API 34, x86_64, Google Play
+system image recommended).
+
+#### Common pitfalls
+
+| Problem | Fix |
+|---------|-----|
+| `%JAVA_HOME%` prints literally in PowerShell | Use `$env:JAVA_HOME` in PowerShell, or switch to cmd.exe |
+| `'C:\Program' is not recognized` | Wrap the path in double quotes: `"%JAVA_HOME%\bin\java"` |
+| Winget Temurin install fails with exit code 1602 | Run the downloaded MSI directly from `%TEMP%\WinGet\...` |
+| `sdkmanager` doesn't show license prompt | Run it again; the prompt sometimes scrolls past. Type `y` and Enter |
+| `Unresolved reference: BuildConfig` | Add `buildFeatures { buildConfig = true }` to `android { }` in `app/build.gradle.kts` |
+| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | Uninstall the existing app first: `adb uninstall com.betterdeepseek.app` |
+| Play Protect blocks installation | Tap "Install anyway" — debug APKs are unsigned |
+| BDS toggle doesn't appear after login | Wait a few seconds; injection happens after the page fully loads |
 
 ### Design Principles
 - The content script uses Svelte 5 for reactive UI components.

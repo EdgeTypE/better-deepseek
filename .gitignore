@@ -36,6 +36,7 @@ scratch/
 *.bak
 /dist-chrome
 /dist-firefox
+/dist-android
 better-deepseek-firefox.zip
 better-deepseek-source.zip
 better-deepseek-chrome.zip
@@ -45,3 +46,8 @@ test-results/
 # Ignore local Claude Code files
 .claude
 AGENTS.md
+CLAUDE.md
+
+# Ignore local development files
+.vscode/
+.idea/

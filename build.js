@@ -18,15 +18,34 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const targetArg = process.argv.find(arg => arg.startsWith('--target='));
 const target = targetArg ? targetArg.split('=')[1] : 'chrome';
-console.log(`\n🎯 Target Browser: ${target.toUpperCase()}`);
+console.log(`\n🎯 Target: ${target.toUpperCase()}`);
 
 const distFolderName = `dist-${target}`;
+const isAndroid = target === "android";
+
+// Vite alias for the platform globals entry imported by src/content/index.js.
+// Android swaps in the chrome.* polyfill that routes through the native bridge.
+const platformGlobalsFile = isAndroid
+  ? "src/platform/globals-android.js"
+  : "src/platform/globals-chrome.js";
+
+const sharedResolve = {
+  alias: {
+    "bds-platform-globals": resolve(__dirname, platformGlobalsFile),
+  },
+};
+
+const sharedDefine = {
+  "process.env.NODE_ENV": '"production"',
+  "process.env.BDS_TARGET": JSON.stringify(target),
+};
 
 /** @type {Array<import('vite').InlineConfig>} */
 const builds = [
   // ── Content Script ──
   {
     plugins: [svelte()],
+    resolve: sharedResolve,
     esbuild: {
       charset: 'ascii'
     },
@@ -48,14 +67,13 @@ const builds = [
       minify: true,
       sourcemap: false,
     },
-    define: {
-      "process.env.NODE_ENV": '"production"',
-    },
+    define: sharedDefine,
   },
 
-  // ── Background Service Worker ──
-  {
+  // ── Background Service Worker (chrome/firefox only) ──
+  ...(isAndroid ? [] : [{
     plugins: [],
+    resolve: sharedResolve,
     esbuild: {
       charset: 'ascii'
     },
@@ -74,11 +92,13 @@ const builds = [
       minify: true,
       sourcemap: false,
     },
-  },
+    define: sharedDefine,
+  }]),
 
   // ── Injected Script (MAIN world) ──
   {
     plugins: [],
+    resolve: sharedResolve,
     esbuild: {
       charset: 'ascii'
     },
@@ -97,11 +117,13 @@ const builds = [
       minify: true,
       sourcemap: false,
     },
+    define: sharedDefine,
   },
 
   // ── Sandbox Script (Safe Eval World) ──
   {
     plugins: [],
+    resolve: sharedResolve,
     esbuild: {
       charset: 'ascii'
     },
@@ -120,6 +142,7 @@ const builds = [
       minify: true,
       sourcemap: false,
     },
+    define: sharedDefine,
   },
 ];
 
@@ -157,10 +180,11 @@ async function run() {
     }
   }
 
-  // Handle manifest based on target
+  // Handle manifest based on target. Android has no extension manifest.
+  if (!isAndroid) {
   const manifestPath = resolve(__dirname, "static/manifest.json");
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-  
+
   if (target === "firefox") {
     // Firefox MV3 specific settings
     manifest.browser_specific_settings = {
@@ -191,8 +215,9 @@ async function run() {
     resolve(distDir, "manifest.json"),
     JSON.stringify(manifest, null, 2)
   );
+  } // end !isAndroid manifest block
 
-  // Copy sandbox.html to root dist
+  // Copy sandbox.html to root dist (used by all targets — Android iframes still load it)
   copyFileSync(
     resolve(__dirname, "static/sandbox.html"),
     resolve(distDir, "sandbox.html")
@@ -205,7 +230,12 @@ async function run() {
     console.error("Sanitization failed:", e.message);
   }
 
-  console.log(`\n✅ All builds complete. Extension ready in ${distFolderName}/`);
+  console.log(`\n✅ All builds complete. Output ready in ${distFolderName}/`);
+
+  if (isAndroid) {
+    console.log(`\nℹ️  Run scripts/copy-to-android-assets.js to stage the bundle for Gradle.`);
+    return;
+  }
 
   // ── Create ZIP Archive ──
   console.log(`\n📦 Creating ZIP archive: better-deepseek-${target}.zip...`);
