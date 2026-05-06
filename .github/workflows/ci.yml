@@ -22,7 +22,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright browser
+      # Cache Playwright browsers so they aren't re-downloaded every run
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browser & deps
         run: npx playwright install --with-deps chromium
 
       - name: Build Chrome extension
