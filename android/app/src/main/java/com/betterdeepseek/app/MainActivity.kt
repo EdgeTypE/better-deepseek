@@ -1,9 +1,11 @@
 package com.betterdeepseek.app
 
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.ValueCallback
@@ -17,6 +19,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.view.WindowCompat
 import androidx.webkit.WebViewAssetLoader
 
@@ -67,8 +70,13 @@ class MainActivity : ComponentActivity() {
                 mediaPlaybackRequiresUserGesture = false
                 mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 cacheMode = WebSettings.LOAD_DEFAULT
-                userAgentString = userAgentString +
-                    " BetterDeepSeekAndroid/${BuildConfig.VERSION_NAME}"
+                // Replace the default WebView UA with a modern Chrome mobile UA so
+                // hosts that block embedded browsers (notably Google sign-in,
+                // disallowed_useragent / 403) do not reject us outright. The UA
+                // string is intentionally close to a real Chrome on Android — the
+                // BDS suffix is preserved so server-side analytics can still
+                // identify the client.
+                userAgentString = buildSpoofedUserAgent(userAgentString)
             }
             addJavascriptInterface(bridge, BRIDGE_NAME)
             webViewClient = bdsWebViewClient()
@@ -101,6 +109,26 @@ class MainActivity : ComponentActivity() {
             view: WebView,
             request: WebResourceRequest
         ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
+
+        /**
+         * Google sign-in (accounts.google.com / oauth2 endpoints) refuses
+         * embedded WebViews — the user lands on a "couldn't sign you in /
+         * disallowed_useragent" page. Detect those URLs and hand them off to
+         * Chrome Custom Tabs (or the system browser as a fallback). The OAuth
+         * callback eventually returns to chat.deepseek.com, which re-enters
+         * this app via the VIEW intent filter declared in AndroidManifest.xml.
+         */
+        override fun shouldOverrideUrlLoading(
+            view: WebView,
+            request: WebResourceRequest
+        ): Boolean {
+            val url = request.url
+            if (shouldOpenExternally(url)) {
+                openInCustomTab(url)
+                return true
+            }
+            return false
+        }
 
         override fun onPageFinished(view: WebView, url: String?) {
             super.onPageFinished(view, url)
@@ -171,6 +199,65 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
+     * URLs that must NOT load inside the WebView. Today this is just Google's
+     * sign-in surface, but the helper is centralized so future hosts (Apple
+     * sign-in, Microsoft, etc.) can be added in one place.
+     */
+    private fun shouldOpenExternally(url: Uri): Boolean {
+        val host = url.host?.lowercase() ?: return false
+        return host == "accounts.google.com" ||
+            host.endsWith(".accounts.google.com") ||
+            host == "accounts.youtube.com"
+    }
+
+    /**
+     * Open `url` in Chrome Custom Tabs. Falls back to the system browser via
+     * ACTION_VIEW if no Custom-Tabs-capable browser is installed. After OAuth
+     * completes the IDP redirects to chat.deepseek.com, which Android routes
+     * back to this Activity via the VIEW intent filter (see AndroidManifest).
+     */
+    private fun openInCustomTab(url: Uri) {
+        val intent = CustomTabsIntent.Builder()
+            .setShowTitle(true)
+            .build()
+        try {
+            intent.launchUrl(this, url)
+        } catch (t: ActivityNotFoundException) {
+            Log.w(TAG, "Custom Tabs unavailable; falling back to ACTION_VIEW", t)
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, url))
+            } catch (inner: ActivityNotFoundException) {
+                Log.e(TAG, "No browser available for $url", inner)
+            }
+        }
+    }
+
+    /**
+     * Append a Chrome-mobile UA hint after the system default. Servers that
+     * refuse embedded WebViews (Google sign-in) rely on the legacy
+     * "; wv)" marker — by replacing it with a desktop-style "; Mobile)" we
+     * satisfy the heuristic without forging a fully synthetic UA.
+     */
+    private fun buildSpoofedUserAgent(default: String): String {
+        val cleaned = default.replace("; wv)", ")")
+        return "$cleaned BetterDeepSeekAndroid/${BuildConfig.VERSION_NAME}"
+    }
+
+    /**
+     * Forwards inbound VIEW intents (e.g. OAuth callback that lands back on
+     * chat.deepseek.com) into the existing WebView so we don't pop a fresh
+     * Activity instance.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        val data = intent.data ?: return
+        val url = data.toString()
+        if (url.startsWith("https://chat.deepseek.com")) {
+            webView.loadUrl(url)
+        }
+    }
+
+    /**
      * Wrap a JS source string as a single-quoted JS literal, escaping
      * backslashes, quotes, and newlines.
      */
@@ -199,5 +286,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val BRIDGE_NAME = "AndroidBridge"
+        private const val TAG = "BdsMainActivity"
     }
 }

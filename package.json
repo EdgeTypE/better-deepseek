@@ -16,6 +16,8 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
+    "test:e2e:android": "playwright test --config=playwright.android.config.js",
+    "test:android": "npm run build:android && npm run test:e2e:android",
     "test:ci": "npm run build:chrome && npm run test:unit && npm run test:e2e"
   },
   "devDependencies": {

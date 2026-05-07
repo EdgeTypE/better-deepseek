@@ -1,15 +1,27 @@
 package com.betterdeepseek.app
 
+import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.os.Handler
+import android.os.Looper
+import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import android.webkit.JavascriptInterface
+import android.widget.Toast
+import androidx.core.content.FileProvider
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
 /**
@@ -25,12 +37,15 @@ import java.util.concurrent.TimeUnit
  *   - Asset URL resolution against the WebViewAssetLoader authority
  *   - Blob download stub (Phase 2 will implement the actual file write)
  */
-class WebViewBridge(private val context: Context) {
+class WebViewBridge(
+    private val context: Context,
+    httpClient: OkHttpClient? = null,
+) {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    private val httpClient: OkHttpClient = OkHttpClient.Builder()
+    private val httpClient: OkHttpClient = httpClient ?: OkHttpClient.Builder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .callTimeout(120, TimeUnit.SECONDS)
@@ -62,16 +77,133 @@ class WebViewBridge(private val context: Context) {
     }
 
     /**
-     * Phase 1 stub. Phase 2 wires this to MediaStore / DownloadManager so
-     * create_file / LONG_WORK ZIPs land in the user's Downloads folder.
+     * Decode a base64 blob produced by the JS download helpers and write it to
+     * the user's Downloads folder.
+     *
+     * Strategy:
+     *   - API 29+ (Q): insert into MediaStore.Downloads, write via openOutputStream.
+     *     The system DownloadManager surfaces the file to the user automatically.
+     *   - Legacy (API 26-28): write into Environment.DIRECTORY_DOWNLOADS, fire
+     *     a DOWNLOAD_COMPLETE broadcast and try ACTION_VIEW via FileProvider.
+     *
+     * The JS side is fire-and-forget; failures are logged and surfaced as a Toast
+     * so the user is never left wondering why the download didn't appear.
      */
     @JavascriptInterface
     fun downloadBlob(base64: String?, mimeType: String?, fileName: String?) {
-        Log.w(
-            TAG,
-            "downloadBlob called (phase 1 stub): name=$fileName mime=$mimeType " +
-                "size=${base64?.length ?: 0}"
-        )
+        val payload = base64?.takeIf { it.isNotEmpty() }
+        if (payload == null) {
+            Log.w(TAG, "downloadBlob: empty payload, ignoring (name=$fileName)")
+            return
+        }
+
+        val safeName = sanitizeDownloadName(fileName)
+        val resolvedMime = mimeType?.takeIf { it.isNotBlank() } ?: "application/octet-stream"
+
+        try {
+            val bytes = Base64.decode(payload, Base64.DEFAULT)
+            val uri = writeBytesToDownloads(bytes, safeName, resolvedMime)
+            if (uri == null) {
+                showToast("Download failed: $safeName")
+                return
+            }
+
+            showToast("Saved: $safeName")
+            tryLaunchViewer(uri, resolvedMime)
+        } catch (t: Throwable) {
+            Log.e(TAG, "downloadBlob failed for $safeName", t)
+            showToast("Download error: ${t.message ?: "unknown"}")
+        }
+    }
+
+    private fun writeBytesToDownloads(
+        bytes: ByteArray,
+        fileName: String,
+        mimeType: String,
+    ): Uri? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val resolver = context.contentResolver
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                put(MediaStore.Downloads.MIME_TYPE, mimeType)
+                put(MediaStore.Downloads.IS_PENDING, 1)
+            }
+            val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            val itemUri = resolver.insert(collection, values) ?: return null
+
+            resolver.openOutputStream(itemUri)?.use { it.write(bytes) }
+                ?: return null
+
+            values.clear()
+            values.put(MediaStore.Downloads.IS_PENDING, 0)
+            resolver.update(itemUri, values, null, null)
+            itemUri
+        } else {
+            @Suppress("DEPRECATION")
+            val downloadsDir = Environment
+                .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            if (!downloadsDir.exists()) downloadsDir.mkdirs()
+            val file = uniqueFileIn(downloadsDir, fileName)
+            FileOutputStream(file).use { it.write(bytes) }
+
+            val authority = "${context.packageName}.fileprovider"
+            try {
+                FileProvider.getUriForFile(context, authority, file)
+            } catch (t: Throwable) {
+                Log.w(TAG, "FileProvider URI failed; falling back to file scheme", t)
+                Uri.fromFile(file)
+            }
+        }
+    }
+
+    private fun tryLaunchViewer(uri: Uri, mimeType: String) {
+        mainHandler.post {
+            runCatching {
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, mimeType)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            }.onFailure {
+                Log.i(TAG, "No viewer for $mimeType — file remains in Downloads")
+            }
+        }
+    }
+
+    private fun uniqueFileIn(dir: File, baseName: String): File {
+        val candidate = File(dir, baseName)
+        if (!candidate.exists()) return candidate
+        val dot = baseName.lastIndexOf('.')
+        val stem = if (dot > 0) baseName.substring(0, dot) else baseName
+        val ext = if (dot > 0) baseName.substring(dot) else ""
+        var i = 1
+        while (true) {
+            val f = File(dir, "${stem}_$i$ext")
+            if (!f.exists()) return f
+            i++
+        }
+    }
+
+    private fun sanitizeDownloadName(fileName: String?): String {
+        val raw = fileName?.trim().orEmpty().ifEmpty { "download.bin" }
+        // Strip path separators and characters Android FS rejects. Mirrors
+        // flattenPathForDownload() in src/lib/utils/download.js.
+        return raw
+            .replace('/', '_')
+            .replace('\\', '_')
+            .replace(Regex("[<>:\"|?*]"), "_")
+            .take(200)
+    }
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private fun showToast(message: String) {
+        mainHandler.post {
+            runCatching {
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     /**

@@ -53,6 +53,21 @@
   let isRecording = false;
   let recognition = null;
 
+  // Replaced at build time by Vite's `define` (see build.js sharedDefine).
+  // Vite inlines the literal string, e.g. `process.env.BDS_TARGET` → `"android"`,
+  // so `"android" || "chrome"` → `"android"`. In Vitest the env var is undefined
+  // so the `"chrome"` fallback is hit, which mirrors the default extension target.
+  const BDS_TARGET = process.env.BDS_TARGET || "chrome";
+  const isAndroidTarget = BDS_TARGET === "android";
+
+  // Folder upload uses window.showDirectoryPicker — unavailable in Android
+  // WebView. Voice input is hidden on Android because SpeechRecognition isn't
+  // wired up in WebView; the on-screen keyboard mic is always reachable.
+  // On non-Android targets we keep the buttons visible and let the existing
+  // runtime fallbacks (toast on missing API) handle older Chromium variants.
+  const supportsFolderUpload = !isAndroidTarget;
+  const supportsVoiceInput = !isAndroidTarget;
+
   function hasGithubToken() {
     return Boolean(String(appState.settings.githubToken || "").trim());
   }
@@ -265,6 +280,16 @@
 
   async function handleUploadFolder() {
     closeMenu();
+
+    if (!supportsFolderUpload) {
+      if (appState.ui) {
+        appState.ui.showToast(
+          "Folder upload is not supported on Android yet.",
+        );
+      }
+      return;
+    }
+
     if (!nativeInput) return;
 
     try {
@@ -513,31 +538,33 @@
     </svg>
   </button>
 
-  <button
-    class="bds-mic-btn {isRecording ? 'bds-recording' : ''}"
-    on:click={toggleSpeechRecognition}
-    title={isRecording ? "Stop Recording" : "Voice Prompt"}
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill={isRecording ? "currentColor" : "none"}
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
+  {#if supportsVoiceInput}
+    <button
+      class="bds-mic-btn {isRecording ? 'bds-recording' : ''}"
+      on:click={toggleSpeechRecognition}
+      title={isRecording ? "Stop Recording" : "Voice Prompt"}
     >
-      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-      <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-      <line x1="12" y1="19" x2="12" y2="23"></line>
-      <line x1="8" y1="23" x2="16" y2="23"></line>
-    </svg>
-    {#if isRecording}
-      <div class="bds-recording-pulse"></div>
-    {/if}
-  </button>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill={isRecording ? "currentColor" : "none"}
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+        <line x1="12" y1="19" x2="12" y2="23"></line>
+        <line x1="8" y1="23" x2="16" y2="23"></line>
+      </svg>
+      {#if isRecording}
+        <div class="bds-recording-pulse"></div>
+      {/if}
+    </button>
+  {/if}
 
   {#if isOpen}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -570,29 +597,31 @@
         >
         Upload File
       </button>
-      <button class="bds-attach-item" on:click={handleUploadFolder}>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="bds-item-icon"
-          ><path
-            d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
-          ></path><line x1="12" y1="11" x2="12" y2="17"></line><line
-            x1="9"
-            y1="14"
-            x2="15"
-            y2="14"
-          ></line></svg
-        >
-        Upload Folder
-      </button>
+      {#if supportsFolderUpload}
+        <button class="bds-attach-item" on:click={handleUploadFolder}>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="bds-item-icon"
+            ><path
+              d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+            ></path><line x1="12" y1="11" x2="12" y2="17"></line><line
+              x1="9"
+              y1="14"
+              x2="15"
+              y2="14"
+            ></line></svg
+          >
+          Upload Folder
+        </button>
+      {/if}
       <div class="bds-attach-divider"></div>
       <button class="bds-attach-item" on:click={handleGithubImport}>
         <svg

@@ -42,6 +42,7 @@ better-deepseek-source.zip
 better-deepseek-chrome.zip
 coverage/
 playwright-report/
+playwright-report-android/
 test-results/
 # Ignore local Claude Code files
 .claude

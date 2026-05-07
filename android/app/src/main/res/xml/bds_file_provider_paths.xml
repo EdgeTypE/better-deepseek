@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Pre-Q (<=API 28) downloads land in the public Downloads folder via
+         Environment.getExternalStoragePublicDirectory; FileProvider has to
+         be allowed to hand them out as content:// URIs to ACTION_VIEW. -->
+    <external-path name="downloads" path="Download/" />
+    <external-files-path name="external_files" path="." />
+    <files-path name="internal_files" path="." />
+    <cache-path name="cache" path="." />
+</paths>
