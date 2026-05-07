@@ -1,5 +1,6 @@
 import { exportSession } from "../tools/exporter.js";
 import { setPendingExport, checkPendingExport } from "../tools/pending-export.js";
+import { openTagEditor } from "../tags/tag-editor.js";
 
 // Keep track of which chat item's menu was opened
 let lastClickedChatUrl = null;
@@ -9,6 +10,13 @@ const SELECTION_ICON = `
 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
   <path d="M9 11l3 3L22 4"></path>
   <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+</svg>`;
+
+// Tag Icon
+const TAG_ICON = `
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+  <line x1="7" y1="7" x2="7.01" y2="7"/>
 </svg>`;
 
 export function initSidebarMenuInjector() {
@@ -88,20 +96,34 @@ function injectOptions(menu) {
 
   const insertBefore = deleteOption || null;
 
-  const exportOption = createMenuOption("Export Chat (BDS)", SELECTION_ICON, () => {
+  // Tags option
+  const tagsOption = createMenuOption("Tags (BDS)", TAG_ICON, "bds-tags-option", () => {
+    if (lastClickedChatUrl) {
+      // Dismiss the dropdown by clicking the body — lets React close it naturally
+      // (force-removing DOM nodes crashes React's reconciliation)
+      document.body.click();
+      // Open the tag editor after a small delay to let React clean up
+      const url = lastClickedChatUrl;
+      setTimeout(() => openTagEditor(url), 50);
+    }
+  });
+
+  const exportOption = createMenuOption("Export Chat (BDS)", SELECTION_ICON, "bds-export-option", () => {
     handleExportAction("selection");
   });
 
+  // Insert: Tags first, then Export, both before Delete
+  tagsOption.style.borderTop = "1px solid rgba(0,0,0,0.05)";
+  tagsOption.style.marginTop = "4px";
+  tagsOption.style.paddingTop = "8px";
+
+  menu.insertBefore(tagsOption, insertBefore);
   menu.insertBefore(exportOption, insertBefore);
-  
-  exportOption.style.borderTop = "1px solid rgba(0,0,0,0.05)";
-  exportOption.style.marginTop = "4px";
-  exportOption.style.paddingTop = "8px";
 }
 
-function createMenuOption(label, iconHtml, onClick) {
+function createMenuOption(label, iconHtml, className, onClick) {
   const opt = document.createElement("div");
-  opt.className = "ds-dropdown-menu-option ds-dropdown-menu-option--none bds-export-option";
+  opt.className = `ds-dropdown-menu-option ds-dropdown-menu-option--none ${className}`;
   
   opt.innerHTML = `
     <div class="ds-dropdown-menu-option__icon">${iconHtml}</div>

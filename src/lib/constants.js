@@ -7,6 +7,7 @@ export const STORAGE_KEYS = {
   projects: "bds_projects",
   projectFiles: "bds_project_files",
   whatsNewPending: "bds_whats_new_pending",
+  chatTags: "bds_chat_tags",
 };
 
 

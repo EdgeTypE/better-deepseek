@@ -10,6 +10,7 @@ import { mount } from "svelte";
 import AttachMenu from "./ui/AttachMenu.svelte";
 import { injectSearchInput } from "./ui/SidebarSearch.js";
 import { checkPendingExport } from "./tools/pending-export.js";
+import { hideTagsInSidebar, hideTagsInHeader } from "./tags/tag-hider.js";
 
 /**
  * Collect all message nodes from the chat DOM.
@@ -158,6 +159,8 @@ function scanPage() {
     linkifyNewChatButton();
     injectSearchInput();
     scanInputArea();
+    hideTagsInSidebar();
+    hideTagsInHeader();
   });
 }
 

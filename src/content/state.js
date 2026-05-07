@@ -64,6 +64,8 @@ const state = {
   /** @type {Set<string>} Set of message IDs or indices */
   selectedMessageIds: new Set(),
   whatsNewPending: false,
+  /** @type {Object<string, string[]>} session ID -> tag names */
+  chatTags: {},
 };
 
 /**

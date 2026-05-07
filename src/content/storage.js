@@ -25,6 +25,7 @@ export async function loadStateFromStorage() {
     STORAGE_KEYS.projects,
     STORAGE_KEYS.projectFiles,
     STORAGE_KEYS.whatsNewPending,
+    STORAGE_KEYS.chatTags,
   ]);
 
   const storedSettings = values[STORAGE_KEYS.settings] || {};
@@ -65,6 +66,7 @@ export async function loadStateFromStorage() {
   state.projects = normalizeProjects(values[STORAGE_KEYS.projects]);
   state.projectFiles = normalizeProjectFiles(values[STORAGE_KEYS.projectFiles]);
   state.whatsNewPending = !!values[STORAGE_KEYS.whatsNewPending];
+  state.chatTags = normalizeChatTags(values[STORAGE_KEYS.chatTags]);
 }
 
 function shouldUpgradeSystemPrompt(storedSettings) {
@@ -230,6 +232,23 @@ export function sanitizeMemoryImportance(input) {
     : "called";
 }
 
+export function normalizeChatTags(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {};
+  }
+  const result = {};
+  for (const [sessionId, tags] of Object.entries(raw)) {
+    if (!sessionId || !Array.isArray(tags)) continue;
+    const cleaned = tags
+      .map((t) => String(t || "").trim())
+      .filter((t) => t.length > 0);
+    if (cleaned.length > 0) {
+      result[sessionId] = cleaned;
+    }
+  }
+  return result;
+}
+
 // ── Storage change listener ──
 
 export function bindStorageChangeListener() {
@@ -290,6 +309,10 @@ export function bindStorageChangeListener() {
       if (state.ui) {
         state.ui.refreshWhatsNew();
       }
+    }
+
+    if (changes[STORAGE_KEYS.chatTags]) {
+      state.chatTags = normalizeChatTags(changes[STORAGE_KEYS.chatTags].newValue);
     }
 
     pushConfigToPage();

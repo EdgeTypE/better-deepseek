@@ -17,7 +17,6 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
   const EVENTS = {
     configUpdate: "bds:config-update",
     requestConfig: "bds:request-config",
-    networkState: "bds:network-state",
     markVoiceMessage: "bds:mark-voice-message",
     sessionData: "bds:session-data",
   };

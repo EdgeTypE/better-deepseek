@@ -1,9 +1,11 @@
 /**
  * Sidebar Search functionality.
  * Injects a search bar that filters the native chat list.
+ * Supports tag-based filtering with #tagname syntax.
  */
 
 import state from "../state.js";
+import { extractSessionId } from "../tags/tag-manager.js";
 
 let searchInput = null;
 
@@ -46,7 +48,7 @@ export function injectSearchInput() {
       <input 
         type="text" 
         id="bds-sidebar-search-input" 
-        placeholder="Search history..." 
+        placeholder="Search history... (#tag)" 
         autocomplete="off"
       />
     </div>
@@ -102,14 +104,31 @@ function handleSearch(query) {
 function performFiltering(query) {
   const chatItems = document.querySelectorAll('a._546d736');
   
+  // Check if this is a tag search (#tagname)
+  const tagSearch = query.startsWith("#") ? query.slice(1).trim() : null;
+
   chatItems.forEach(item => {
     const titleEl = item.querySelector('.c08e6e93');
-    const title = titleEl ? titleEl.textContent.toLowerCase() : '';
+    // Use the full title (with tags) if available, otherwise textContent
+    const fullTitle = titleEl?.getAttribute("data-bds-full-title") || "";
+    const visibleTitle = titleEl ? titleEl.textContent.toLowerCase() : '';
+    const searchableTitle = fullTitle.toLowerCase() || visibleTitle;
     
-    if (!query || title.includes(query)) {
+    if (!query) {
       item.style.display = '';
+      return;
+    }
+
+    if (tagSearch) {
+      // Tag search: check if the session has the matching tag
+      const sessionId = extractSessionId(item.href);
+      const tags = sessionId ? (state.chatTags[sessionId] || []) : [];
+      const hasTag = tags.some(t => t.toLowerCase().includes(tagSearch));
+      item.style.display = hasTag ? '' : 'none';
     } else {
-      item.style.display = 'none';
+      // Normal text search — search in both visible title and full title (with tags)
+      const matches = searchableTitle.includes(query) || visibleTitle.includes(query);
+      item.style.display = matches ? '' : 'none';
     }
   });
 
