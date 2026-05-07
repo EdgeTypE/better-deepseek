@@ -4,8 +4,6 @@
   import { fetchGitHubRepo, parseGitHubUrl } from "../files/github-reader.js";
   import {
     DEFAULT_GITHUB_COMMIT_COUNT,
-    MAX_GITHUB_COMMIT_COUNT,
-    MIN_GITHUB_COMMIT_COUNT,
     fetchGitHubCommits,
     normalizeGitHubCommitCount,
   } from "../files/github-commits.js";
@@ -37,7 +35,7 @@
   let githubLoading = false;
   let githubError = "";
   let includeCommits = false;
-  let commitCount = DEFAULT_GITHUB_COMMIT_COUNT;
+  let commitCountInput = "";
 
   // Web Import dialog state
   let showWebDialog = false;
@@ -325,27 +323,12 @@
     githubError = "";
     githubLoading = false;
     includeCommits = false;
-    commitCount = DEFAULT_GITHUB_COMMIT_COUNT;
+    commitCountInput = "";
     showGithubDialog = true;
   }
 
-  function clampCommitCount(value) {
-    return normalizeGitHubCommitCount(
-      value,
-      DEFAULT_GITHUB_COMMIT_COUNT,
-    );
-  }
-
   function handleCommitCountInput(event) {
-    const rawValue = event.currentTarget.value;
-    if (rawValue === "") {
-      commitCount = DEFAULT_GITHUB_COMMIT_COUNT;
-      event.currentTarget.value = String(commitCount);
-      return;
-    }
-
-    commitCount = clampCommitCount(rawValue);
-    event.currentTarget.value = String(commitCount);
+    commitCountInput = event.currentTarget.value;
   }
 
   async function submitGithubUrl() {
@@ -379,9 +362,13 @@
         try {
           const resolvedBranch =
             sourceFile.bdsGitHub?.branch || parsed.branch || "main";
+          const requestedCommitCount = normalizeGitHubCommitCount(
+            commitCountInput,
+            DEFAULT_GITHUB_COMMIT_COUNT,
+          );
           const commitFile = await fetchGitHubCommits(
             githubUrl,
-            commitCount,
+            requestedCommitCount,
             (status) => {
               githubStatus = status;
             },
@@ -840,15 +827,11 @@
             <input
               class="bds-github-number-input"
               type="number"
-              min={MIN_GITHUB_COMMIT_COUNT}
-              max={MAX_GITHUB_COMMIT_COUNT}
               step="1"
               inputmode="numeric"
-              bind:value={commitCount}
+              value={commitCountInput}
+              placeholder={String(DEFAULT_GITHUB_COMMIT_COUNT)}
               on:input={handleCommitCountInput}
-              on:blur={() => {
-                commitCount = clampCommitCount(commitCount);
-              }}
               on:keydown={(e) => handleDialogKeydown(e, "github")}
               disabled={githubLoading}
             />

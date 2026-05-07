@@ -100,6 +100,6 @@ describe("background GitHub commits fetch", () => {
 
   it("normalizes background commit counts to the supported range", () => {
     expect(normalizeGithubCommitCount(0)).toBe(1);
-    expect(normalizeGithubCommitCount(600)).toBe(500);
+    expect(normalizeGithubCommitCount(600)).toBe(600);
   });
 });

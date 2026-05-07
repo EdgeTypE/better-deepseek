@@ -2,14 +2,12 @@ import { fetchTranscript } from "youtube-transcript";
 import {
   DEFAULT_GITHUB_COMMIT_COUNT,
   GITHUB_COMMITS_PAGE_SIZE,
-  MAX_GITHUB_COMMIT_COUNT,
   normalizeGitHubCommitCount,
 } from "../lib/github-commits.js";
 
 export {
   DEFAULT_GITHUB_COMMIT_COUNT,
   GITHUB_COMMITS_PAGE_SIZE,
-  MAX_GITHUB_COMMIT_COUNT,
 };
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

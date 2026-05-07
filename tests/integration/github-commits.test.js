@@ -2,7 +2,6 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  MAX_GITHUB_COMMIT_COUNT,
   MIN_GITHUB_COMMIT_COUNT,
   buildGitHubCommitsFetchError,
   buildGitHubCommitsText,
@@ -24,9 +23,10 @@ describe("github-commits integration", () => {
     chrome.runtime.sendMessage.mockReset();
   });
 
-  it("normalizes commit counts into the supported UI range", () => {
+  it("normalizes commit counts with a default fallback and no hard upper cap", () => {
     expect(normalizeGitHubCommitCount(0)).toBe(MIN_GITHUB_COMMIT_COUNT);
-    expect(normalizeGitHubCommitCount(999)).toBe(MAX_GITHUB_COMMIT_COUNT);
+    expect(normalizeGitHubCommitCount("")).toBe(100);
+    expect(normalizeGitHubCommitCount(999)).toBe(999);
     expect(normalizeGitHubCommitCount("42")).toBe(42);
   });
 

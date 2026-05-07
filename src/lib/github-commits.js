@@ -1,6 +1,5 @@
 export const DEFAULT_GITHUB_COMMIT_COUNT = 100;
 export const MIN_GITHUB_COMMIT_COUNT = 1;
-export const MAX_GITHUB_COMMIT_COUNT = 500;
 export const GITHUB_COMMITS_PAGE_SIZE = 100;
 
 export function normalizeGitHubCommitCount(
@@ -13,8 +12,5 @@ export function normalizeGitHubCommitCount(
     : DEFAULT_GITHUB_COMMIT_COUNT;
   const parsed = Number.parseInt(String(count), 10);
   const normalized = Number.isFinite(parsed) ? parsed : safeFallback;
-  return Math.min(
-    MAX_GITHUB_COMMIT_COUNT,
-    Math.max(MIN_GITHUB_COMMIT_COUNT, normalized),
-  );
+  return Math.max(MIN_GITHUB_COMMIT_COUNT, normalized);
 }

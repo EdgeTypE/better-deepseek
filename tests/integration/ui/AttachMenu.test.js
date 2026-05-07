@@ -16,11 +16,10 @@ const githubCommitMocks = vi.hoisted(() => ({
   normalizeGitHubCommitCount: vi.fn((value) => {
     const parsed = Number.parseInt(String(value), 10);
     if (!Number.isFinite(parsed)) return 100;
-    return Math.min(500, Math.max(1, parsed));
+    return Math.max(1, parsed);
   }),
   DEFAULT_GITHUB_COMMIT_COUNT: 100,
   MIN_GITHUB_COMMIT_COUNT: 1,
-  MAX_GITHUB_COMMIT_COUNT: 500,
 }));
 
 const webMocks = vi.hoisted(() => ({
@@ -182,6 +181,62 @@ describe("AttachMenu integration", () => {
       "repo.txt",
       "repo_commits.txt",
     ]);
+    cleanup();
+  });
+
+  it("keeps the commit input blank while editing and defaults to 100 on fetch", async () => {
+    const nativeInput = setupNativeInput();
+    const repoFile = new File(["repo"], "repo.txt", { type: "text/plain" });
+    Object.defineProperty(repoFile, "bdsGitHub", {
+      value: { owner: "owner", repo: "repo", branch: "main" },
+      configurable: true,
+    });
+    const commitFile = new File(["commits"], "repo_commits.txt", {
+      type: "text/plain",
+    });
+    githubMocks.parseGitHubUrl.mockReturnValue({ owner: "owner", repo: "repo", branch: "main" });
+    githubMocks.fetchGitHubRepo.mockResolvedValue(repoFile);
+    githubCommitMocks.fetchGitHubCommits.mockResolvedValue(commitFile);
+    const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+
+    target.querySelector(".bds-plus-btn").click();
+    await flushUi();
+    const items = Array.from(document.querySelectorAll(".bds-attach-item"));
+    items.find((item) => item.textContent.includes("GitHub Repo")).click();
+    await flushUi();
+
+    const dialogInput = document.querySelector(".bds-github-input");
+    dialogInput.value = "owner/repo";
+    dialogInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await flushUi();
+
+    document.querySelector(".bds-github-checkbox input").click();
+    await flushUi();
+
+    const countInput = document.querySelector(".bds-github-number-input");
+    expect(countInput.value).toBe("");
+    expect(countInput.placeholder).toBe("100");
+
+    countInput.value = "1000";
+    countInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await flushUi();
+    expect(countInput.value).toBe("1000");
+
+    countInput.value = "";
+    countInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await flushUi();
+    expect(countInput.value).toBe("");
+
+    document.querySelector(".bds-github-btn-import").click();
+    await flushUi();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(githubCommitMocks.fetchGitHubCommits).toHaveBeenCalledWith(
+      "owner/repo",
+      100,
+      expect.any(Function),
+      { token: "", branch: "main" },
+    );
     cleanup();
   });
 

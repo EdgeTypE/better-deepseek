@@ -1,14 +1,12 @@
 import { parseGitHubUrl } from "./github-reader.js";
 import {
   DEFAULT_GITHUB_COMMIT_COUNT,
-  MAX_GITHUB_COMMIT_COUNT,
   MIN_GITHUB_COMMIT_COUNT,
   normalizeGitHubCommitCount,
 } from "../../lib/github-commits.js";
 
 export {
   DEFAULT_GITHUB_COMMIT_COUNT,
-  MAX_GITHUB_COMMIT_COUNT,
   MIN_GITHUB_COMMIT_COUNT,
   normalizeGitHubCommitCount,
 };

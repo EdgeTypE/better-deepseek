@@ -471,7 +471,7 @@ class WebViewBridge(
                     is String -> rawCount.toIntOrNull()
                     else -> null
                 } ?: DEFAULT_GITHUB_COMMIT_COUNT
-        return parsed.coerceIn(1, MAX_GITHUB_COMMIT_COUNT)
+        return maxOf(1, parsed)
     }
 
     private fun buildGithubCommitsUrl(
@@ -540,6 +540,5 @@ class WebViewBridge(
         private const val DEFAULT_GITHUB_API_BASE_URL = "https://api.github.com"
         private const val DEFAULT_GITHUB_COMMIT_COUNT = 100
         private const val GITHUB_COMMITS_PAGE_SIZE = 100
-        private const val MAX_GITHUB_COMMIT_COUNT = 500
     }
 }
