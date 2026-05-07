@@ -8,6 +8,7 @@ on:
 
 jobs:
   test:
+    name: Web / Extension
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -65,4 +66,132 @@ jobs:
         with:
           name: test-results
           path: test-results
+          if-no-files-found: ignore
+
+  android:
+    name: Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ANDROID_HOME: ${{ github.workspace }}/.android-sdk
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/.android-sdk
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+          cache-dependency-path: |
+            android/**/*.gradle*
+            android/**/gradle-wrapper.properties
+
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.android-sdk
+          key: ${{ runner.os }}-android-sdk-34-build-tools-34.0.0-v1
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools platforms;android-34 build-tools;34.0.0
+
+      - name: Write Android local.properties
+        run: printf 'sdk.dir=%s\n' "$ANDROID_SDK_ROOT" > android/local.properties
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browser & deps
+        run: npx playwright install --with-deps chromium
+
+      - name: Ensure Gradle wrapper files exist
+        working-directory: android
+        run: |
+          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "Bootstrapping Gradle wrapper..."
+            mkdir -p gradle/wrapper
+            curl -sSL "https://github.com/gradle/gradle/raw/v8.7.0/gradle/wrapper/gradle-wrapper.jar" \
+              -o gradle/wrapper/gradle-wrapper.jar
+            echo "distributionBase=GRADLE_USER_HOME" > gradle/wrapper/gradle-wrapper.properties
+            echo "distributionPath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
+            echo "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.7-bin.zip" >> gradle/wrapper/gradle-wrapper.properties
+            echo "networkTimeout=10000" >> gradle/wrapper/gradle-wrapper.properties
+            echo "validateDistributionUrl=true" >> gradle/wrapper/gradle-wrapper.properties
+            echo "zipStoreBase=GRADLE_USER_HOME" >> gradle/wrapper/gradle-wrapper.properties
+            echo "zipStorePath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
+          fi
+
+      - name: Make Gradle wrapper executable
+        working-directory: android
+        run: chmod +x ./gradlew
+
+      - name: Build Android web bundle
+        run: npm run build:android
+
+      - name: Build Android APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Run Android Playwright simulator suite
+        run: npm run test:e2e:android
+
+      - name: Run Kotlin unit tests
+        working-directory: android
+        run: ./gradlew --no-daemon test
+
+      - name: Upload Android APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: ignore
+
+      - name: Upload Android Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-android
+          path: playwright-report-android
+          if-no-files-found: ignore
+
+      - name: Upload Android Playwright traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-android
+          path: test-results
+          if-no-files-found: ignore
+
+      - name: Upload Android unit test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-unit-test-report
+          path: android/app/build/reports/tests
+          if-no-files-found: ignore
+
+      - name: Upload Android unit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-unit-test-results
+          path: android/app/build/test-results
           if-no-files-found: ignore

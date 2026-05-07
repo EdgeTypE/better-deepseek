@@ -1,0 +1,18 @@
+# Gradle
+.gradle/
+build/
+local.properties
+gradle/
+
+# IDE
+.idea/
+*.iml
+captures/
+
+# Generated
+app/release/
+app/build/
+app/src/main/assets/bds/
+
+*.apk
+*.aab

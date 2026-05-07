@@ -14,6 +14,7 @@
  * - Push config to injected script
  */
 
+import "bds-platform-globals";
 import "../styles/content.css";
 
 import state from "./state.js";

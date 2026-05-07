@@ -5,13 +5,14 @@ on:
     branches:
       - main
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,23 +21,78 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+          cache-dependency-path: |
+            android/**/*.gradle*
+            android/**/gradle-wrapper.properties
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools platforms;android-34 build-tools;34.0.0
+
+      - name: Write Android local.properties
+        run: printf 'sdk.dir=%s\n' "$ANDROID_HOME" > android/local.properties
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Build extension
+      - name: Build browser bundles
         run: npm run build
 
-      - name: Rename and Prepare Artifacts
+      - name: Build Android web bundle
+        run: npm run build:android
+
+      - name: Ensure Gradle wrapper files exist
+        working-directory: android
+        run: |
+          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "Bootstrapping Gradle wrapper..."
+            mkdir -p gradle/wrapper
+            curl -sSL "https://github.com/gradle/gradle/raw/v8.7.0/gradle/wrapper/gradle-wrapper.jar" \
+              -o gradle/wrapper/gradle-wrapper.jar
+            echo "distributionBase=GRADLE_USER_HOME" > gradle/wrapper/gradle-wrapper.properties
+            echo "distributionPath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
+            echo "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.7-bin.zip" >> gradle/wrapper/gradle-wrapper.properties
+            echo "networkTimeout=10000" >> gradle/wrapper/gradle-wrapper.properties
+            echo "validateDistributionUrl=true" >> gradle/wrapper/gradle-wrapper.properties
+            echo "zipStoreBase=GRADLE_USER_HOME" >> gradle/wrapper/gradle-wrapper.properties
+            echo "zipStorePath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
+          fi
+
+      - name: Make Gradle wrapper executable
+        working-directory: android
+        run: chmod +x ./gradlew
+
+      - name: Build Android APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Compute version and prepare artifact names
+        id: prep
         run: |
           VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            mv better-deepseek-chrome.zip better-deepseek-chrome-latest.zip
-            mv better-deepseek-firefox.zip better-deepseek-firefox-latest.zip
+            mv better-deepseek-chrome.zip   better-deepseek-chrome-latest.zip
+            mv better-deepseek-firefox.zip  better-deepseek-firefox-latest.zip
+            mv android/app/build/outputs/apk/debug/app-debug.apk \
+               better-deepseek-android-latest-debug.apk
+            echo "is_tag=false" >> "$GITHUB_OUTPUT"
           else
-            mv better-deepseek-chrome.zip better-deepseek-chrome-v${VERSION}.zip
-            mv better-deepseek-firefox.zip better-deepseek-firefox-v${VERSION}.zip
+            mv better-deepseek-chrome.zip   "better-deepseek-chrome-v${VERSION}.zip"
+            mv better-deepseek-firefox.zip  "better-deepseek-firefox-v${VERSION}.zip"
+            mv android/app/build/outputs/apk/debug/app-debug.apk \
+               "better-deepseek-android-v${VERSION}-debug.apk"
+            echo "is_tag=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Update Latest Release
@@ -45,10 +101,14 @@ jobs:
         with:
           tag_name: latest
           name: Latest Build
-          body: "This release contains the latest automated build from the main branch. It is updated on every commit."
+          body: |
+            This release contains the latest automated build from the `main` branch.
+
+            Android is distributed as an unofficial debug-signed APK through GitHub Releases only. Until permanent signing is added, Android upgrades may require uninstalling the previous APK before reinstalling.
           files: |
             better-deepseek-chrome-latest.zip
             better-deepseek-firefox-latest.zip
+            better-deepseek-android-latest-debug.apk
           prerelease: true
           make_latest: true
         env:
@@ -58,9 +118,14 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          body: |
+            This release includes browser extension bundles plus an unofficial debug-signed Android APK.
+
+            Android builds are distributed through GitHub Releases only. Until permanent signing is added, Android upgrades may require uninstalling the previous APK before reinstalling.
           files: |
-            better-deepseek-chrome-v*.zip
-            better-deepseek-firefox-v*.zip
+            better-deepseek-chrome-v${{ steps.prep.outputs.version }}.zip
+            better-deepseek-firefox-v${{ steps.prep.outputs.version }}.zip
+            better-deepseek-android-v${{ steps.prep.outputs.version }}-debug.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

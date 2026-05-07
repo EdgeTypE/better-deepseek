@@ -36,12 +36,20 @@ scratch/
 *.bak
 /dist-chrome
 /dist-firefox
+/dist-android
+android/local.properties
 better-deepseek-firefox.zip
 better-deepseek-source.zip
 better-deepseek-chrome.zip
 coverage/
 playwright-report/
+playwright-report-android/
 test-results/
 # Ignore local Claude Code files
 .claude
 AGENTS.md
+CLAUDE.md
+
+# Ignore local development files
+.vscode/
+.idea/

@@ -1,25 +1,24 @@
 import { mount } from "svelte";
 import CodeRunner from "../ui/CodeRunner.svelte";
 
-const processedBlocks = new WeakSet();
+const INJECTED_ATTR = "data-bds-py-run-injected";
 
 /**
  * Scan a DOM subtree for Python code blocks and inject Run buttons.
+ * Uses a DOM data attribute for dedup — survives WeakSet GC and DOM re-render.
  */
 export function injectPythonRunButtons(rootNode) {
   if (!rootNode) return;
 
-  const codeBlocks = rootNode.querySelectorAll(".md-code-block");
+  const codeBlocks = rootNode.querySelectorAll(`.md-code-block:not([${INJECTED_ATTR}])`);
 
   for (const block of codeBlocks) {
-    if (processedBlocks.has(block)) continue;
-
     if (!isPythonCodeBlock(block)) continue;
 
     const preEl = block.querySelector("pre");
     if (!preEl) continue;
 
-    processedBlocks.add(block);
+    block.setAttribute(INJECTED_ATTR, "1");
     injectButton(block, preEl);
   }
 }
@@ -128,14 +127,24 @@ function injectButton(block, preEl) {
 }
 
 function findButtonContainer(block) {
-  const btnText = block.querySelector(".code-info-button-text");
+  // Find the Copy button that DeepSeek renders — skip buttons we injected.
+  const btnText = block.querySelector(
+    `.code-info-button-text:not(.bds-run-btn-text)`,
+  );
   if (btnText) {
     const btn = btnText.closest("button");
-    if (btn && btn.parentElement) return btn.parentElement;
+    if (btn && btn.parentElement && !btn.classList.contains("bds-run-btn")) {
+      return btn.parentElement;
+    }
   }
 
-  const dsBtn = block.querySelector(".ds-atom-button");
-  if (dsBtn && dsBtn.parentElement) return dsBtn.parentElement;
+  // Look for any ds-atom-button that isn't ours.
+  const dsBtns = block.querySelectorAll(".ds-atom-button");
+  for (const b of dsBtns) {
+    if (!b.classList.contains("bds-run-btn") && b.parentElement) {
+      return b.parentElement;
+    }
+  }
 
   return null;
 }
