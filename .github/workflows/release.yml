@@ -50,6 +50,25 @@ jobs:
       - name: Build Android web bundle
         run: npm run build:android
 
+      - name: Ensure Gradle wrapper files exist
+        working-directory: android
+        run: |
+          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "Bootstrapping Gradle wrapper..."
+            mkdir -p gradle/wrapper
+            curl -sSL "https://github.com/gradle/gradle/raw/v8.7.0/gradle/wrapper/gradle-wrapper.jar" \
+              -o gradle/wrapper/gradle-wrapper.jar
+            cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
+            distributionBase=GRADLE_USER_HOME
+            distributionPath=wrapper/dists
+            distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-bin.zip
+            networkTimeout=10000
+            validateDistributionUrl=true
+            zipStoreBase=GRADLE_USER_HOME
+            zipStorePath=wrapper/dists
+            EOF
+          fi
+
       - name: Make Gradle wrapper executable
         working-directory: android
         run: chmod +x ./gradlew
