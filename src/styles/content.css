@@ -1369,4 +1369,118 @@ textarea.bds-input,
   transform: translateY(-1px);
 }
 
+/* ── Sidebar Search Wrapper ── */
+.bds-sidebar-search-wrapper {
+  position: relative;
+  margin-bottom: 8px;
+  overflow: visible !important; /* Önerilerin görünmesi için şart */
+}
+
+/* ── Sidebar Tag Bar ── */
+.bds-tag-chips-wrapper {
+  display: flex;
+  flex-wrap: nowrap; /* Yatay dizilim */
+  gap: 6px;
+  padding: 8px 12px;
+  overflow-x: auto; /* Yatay scroll */
+  border-bottom: 1px solid var(--bds-border);
+  scrollbar-width: none; /* Firefox için scrollbar gizle */
+  transition: all 0.2s ease-in-out;
+  opacity: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  pointer-events: none;
+}
+
+
+/* Aktif veya Focus durumunda göster */
+.bds-sidebar-search-wrapper--active .bds-tag-chips-wrapper,
+.bds-sidebar-search-wrapper--has-filter .bds-tag-chips-wrapper {
+  opacity: 1;
+  max-height: 50px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  pointer-events: auto;
+}
+
+.bds-tag-chips-wrapper::-webkit-scrollbar {
+  display: none; /* Chrome/Safari için scrollbar gizle */
+}
+
+.bds-tag-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  background: var(--bds-bg-elevated);
+  border: 1px solid var(--bds-border);
+  color: var(--bds-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all var(--bds-transition);
+  user-select: none;
+  white-space: nowrap; /* Metin taşmasın */
+  flex-shrink: 0; /* Küçülmesin */
+}
+
+.bds-tag-chip:hover {
+  background: var(--bds-bg-hover);
+  border-color: var(--bds-text-tertiary);
+}
+
+.bds-tag-chip--active {
+  background: var(--bds-accent-glow);
+  border-color: var(--bds-accent);
+  color: var(--bds-accent);
+}
+
+.bds-tag-chip-count {
+  font-size: 9px;
+  opacity: 0.6;
+  background: rgba(0, 0, 0, 0.1);
+  padding: 0 4px;
+  border-radius: 6px;
+}
+
+.bds-tag-chip--active .bds-tag-chip-count {
+  background: var(--bds-accent);
+  color: white;
+  opacity: 1;
+}
+
+/* ── Search Suggestions ── */
+.bds-search-suggestions {
+  position: absolute;
+  top: 100%; /* Input'un tam altına */
+  left: 12px;
+  right: 12px;
+  z-index: 9999; /* En üstte */
+  max-height: 250px;
+  overflow-y: auto;
+  background: var(--bds-bg-elevated); /* Arka plan şart */
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3); /* Daha belirgin gölge */
+  border: 1px solid var(--bds-border);
+  border-radius: 8px;
+  margin-top: 4px;
+}
+
+.bds-tag-suggestion-label {
+  font-weight: 600;
+  color: var(--bds-accent);
+}
+
+.bds-tag-suggestion-count {
+  font-size: 10px;
+  padding: 1px 6px;
+  background: var(--bds-bg-hover);
+  border-radius: 10px;
+  color: var(--bds-text-tertiary);
+}
+
+
+
+
+
 

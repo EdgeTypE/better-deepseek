@@ -313,6 +313,13 @@ export function bindStorageChangeListener() {
 
     if (changes[STORAGE_KEYS.chatTags]) {
       state.chatTags = normalizeChatTags(changes[STORAGE_KEYS.chatTags].newValue);
+      
+      // Update sidebar tag chips if search is active
+      import("./ui/SidebarSearch.js").then(m => {
+        if (typeof m.renderTagChips === 'function') {
+          m.renderTagChips();
+        }
+      });
     }
 
     pushConfigToPage();
