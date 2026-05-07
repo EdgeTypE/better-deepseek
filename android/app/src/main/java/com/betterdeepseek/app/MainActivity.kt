@@ -33,6 +33,12 @@ class MainActivity : ComponentActivity() {
     private lateinit var assetLoader: WebViewAssetLoader
     private lateinit var bridge: WebViewBridge
 
+    // Non-zero when a Custom Tab was opened for auth. On resume, if the
+    // flag is still set (no onNewIntent callback arrived), we reload the
+    // page to reset the spinner.
+    private var customTabOpenedAt: Long = 0
+    private val customTabTimeoutMs: Long = 120_000
+
     private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
     private val fileChooserLauncher: ActivityResultLauncher<Array<String>> =
         registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -70,13 +76,11 @@ class MainActivity : ComponentActivity() {
                 mediaPlaybackRequiresUserGesture = false
                 mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 cacheMode = WebSettings.LOAD_DEFAULT
-                // Replace the default WebView UA with a modern Chrome mobile UA so
-                // hosts that block embedded browsers (notably Google sign-in,
-                // disallowed_useragent / 403) do not reject us outright. The UA
-                // string is intentionally close to a real Chrome on Android — the
-                // BDS suffix is preserved so server-side analytics can still
-                // identify the client.
-                userAgentString = buildSpoofedUserAgent(userAgentString)
+                // Replace the entire WebView UA with a Chrome-mobile synthetic so
+                // hosts that block embedded browsers (Google sign-in, 403) never
+                // see the legacy "; wv)" or "Version/4.0" markers.
+                userAgentString = String.format(
+                    SPOOFED_UA, BuildConfig.VERSION_NAME)
             }
             addJavascriptInterface(bridge, BRIDGE_NAME)
             webViewClient = bdsWebViewClient()
@@ -97,6 +101,19 @@ class MainActivity : ComponentActivity() {
                 }
             }
         })
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val opened = customTabOpenedAt
+        if (opened > 0 && System.currentTimeMillis() - opened > 2_500) {
+            customTabOpenedAt = 0
+            // Custom Tab was opened but no onNewIntent callback arrived —
+            // the user aborted or the auth flow failed. Reload to reset
+            // the loading spinner so the user can try again immediately.
+            Log.d(TAG, "Custom Tab returned without auth callback; reloading page")
+            webView.reload()
+        }
     }
 
     override fun onDestroy() {
@@ -160,6 +177,36 @@ class MainActivity : ComponentActivity() {
                 false
             }
         }
+
+        /**
+         * Intercept JS-initiated popups (e.g. window.open for Google OAuth).
+         * Without this, the WebView opens a blank browser window and the
+         * OAuth flow stalls. We route popup URLs that should go to Custom
+         * Tabs through the same external-opening path.
+         */
+        override fun onCreateWindow(
+            view: WebView?,
+            isDialog: Boolean,
+            isUserGesture: Boolean,
+            resultMsg: android.os.Message?
+        ): Boolean {
+            // The resultMsg contains a WebViewTransport — we have to supply
+            // a WebView to avoid crashing, but we cancel the popup and
+            // handle the URL ourselves.
+            val transport = resultMsg?.obj as? WebView.WebViewTransport
+            val newWebView = WebView(this@MainActivity)
+            transport?.webView = newWebView
+            resultMsg?.sendToTarget()
+
+            val url = view?.url ?: view?.originalUrl
+            if (url != null) {
+                val uri = Uri.parse(url)
+                if (shouldOpenExternally(uri)) {
+                    openInCustomTab(uri)
+                }
+            }
+            return true
+        }
     }
 
     /**
@@ -215,8 +262,12 @@ class MainActivity : ComponentActivity() {
      * ACTION_VIEW if no Custom-Tabs-capable browser is installed. After OAuth
      * completes the IDP redirects to chat.deepseek.com, which Android routes
      * back to this Activity via the VIEW intent filter (see AndroidManifest).
+     *
+     * On opening, customTabOpenedAt is set. onResume checks whether the user
+     * returned without completing auth and reloads the page to stop the spinner.
      */
     private fun openInCustomTab(url: Uri) {
+        customTabOpenedAt = System.currentTimeMillis()
         val intent = CustomTabsIntent.Builder()
             .setShowTitle(true)
             .build()
@@ -228,28 +279,20 @@ class MainActivity : ComponentActivity() {
                 startActivity(Intent(Intent.ACTION_VIEW, url))
             } catch (inner: ActivityNotFoundException) {
                 Log.e(TAG, "No browser available for $url", inner)
+                customTabOpenedAt = 0
             }
         }
     }
 
     /**
-     * Append a Chrome-mobile UA hint after the system default. Servers that
-     * refuse embedded WebViews (Google sign-in) rely on the legacy
-     * "; wv)" marker — by replacing it with a desktop-style "; Mobile)" we
-     * satisfy the heuristic without forging a fully synthetic UA.
-     */
-    private fun buildSpoofedUserAgent(default: String): String {
-        val cleaned = default.replace("; wv)", ")")
-        return "$cleaned BetterDeepSeekAndroid/${BuildConfig.VERSION_NAME}"
-    }
-
-    /**
      * Forwards inbound VIEW intents (e.g. OAuth callback that lands back on
      * chat.deepseek.com) into the existing WebView so we don't pop a fresh
-     * Activity instance.
+     * Activity instance. Clears customTabOpenedAt so onResume knows auth
+     * completed.
      */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        customTabOpenedAt = 0
         val data = intent.data ?: return
         val url = data.toString()
         if (url.startsWith("https://chat.deepseek.com")) {
@@ -287,5 +330,17 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val BRIDGE_NAME = "AndroidBridge"
         private const val TAG = "BdsMainActivity"
+
+        /**
+         * Fully synthetic Chrome-mobile UA string. Servers that block embedded
+         * WebViews (notably Google OAuth) check for the legacy "; wv)" marker
+         * AND for the `Version/4.0` part that Android WebView adds even when
+         * the stock UA is customised. We replace the entire string.
+         */
+        private const val SPOOFED_UA =
+            "Mozilla/5.0 (Linux; Android 14; Pixel 9 Pro) " +
+            "AppleWebKit/537.36 (KHTML, like Gecko) " +
+            "Chrome/132.0.6834.122 Mobile Safari/537.36 " +
+            "BetterDeepSeekAndroid/%s"
     }
 }
