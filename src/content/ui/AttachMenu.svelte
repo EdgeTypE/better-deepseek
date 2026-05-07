@@ -422,7 +422,16 @@
     refreshProjectPanel();
     if (projectBtnRef) {
       const rect = projectBtnRef.getBoundingClientRect();
-      projectPanelStyle = `bottom: calc(100vh - ${rect.top}px + 8px); left: ${rect.left}px;`;
+      // Guard against overflow on narrow viewports: if the panel would
+      // extend past the right edge, align it to the right instead.
+      const panelW = 300;
+      const viewportW = window.innerWidth;
+      let left = rect.left;
+      if (left + panelW > viewportW - 8) {
+        left = Math.max(8, viewportW - panelW - 8);
+      }
+      projectPanelStyle =
+        `bottom: calc(100vh - ${rect.top}px + 8px); left: ${left}px; max-width: ${Math.min(panelW, viewportW - 16)}px;`;
     }
     showProjectPanel = true;
   }
