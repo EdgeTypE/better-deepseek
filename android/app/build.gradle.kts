@@ -16,7 +16,7 @@ android {
         minSdk = 26 
         targetSdk = 34
         versionCode = 1
-        // Keep in sync with package.json "version".
+        // Keep in sync with package.json "version" and static/manifest.json "version".
         versionName = "0.1.5"
     }
 

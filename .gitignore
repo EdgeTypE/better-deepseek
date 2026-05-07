@@ -37,6 +37,7 @@ scratch/
 /dist-chrome
 /dist-firefox
 /dist-android
+android/local.properties
 better-deepseek-firefox.zip
 better-deepseek-source.zip
 better-deepseek-chrome.zip

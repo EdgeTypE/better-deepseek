@@ -1,6 +1,6 @@
 # Privacy Policy for Better DeepSeek
 
-**Last updated:** 5 May 2026
+**Last updated:** 7 May 2026
 
 Better DeepSeek ("the Extension") respects your privacy and is fully committed to protecting your personal data. 
 
@@ -17,5 +17,19 @@ If you explicitly use the GitHub repository import feature, the Extension may co
 **3. Permissions**
 - `storage`: Used solely to save your local extension settings.
 - `host_permissions`: Used to interface with the DeepSeek chat DOM, to allow the "Web Fetch" tool to read sites you explicitly ask it to summarize, and to download GitHub repository archives you explicitly request.
+
+**4. Android App**
+Better DeepSeek is also available as an unofficial Android app that wraps `chat.deepseek.com` inside an Android `WebView`. The Android build reuses the same local-first Better DeepSeek UI and logic, but stores app state through Android's local storage mechanisms instead of browser extension storage.
+
+On Android:
+- The app loads `chat.deepseek.com` in a `WebView` and injects the Better DeepSeek interface locally on your device.
+- Settings and related app state are stored locally in Android `SharedPreferences`.
+- If you save a GitHub personal access token for private repository imports, it is stored locally on the device and is only sent to GitHub when you explicitly initiate a GitHub repository fetch.
+- Downloads are written locally to Android-managed storage locations so you can open or share generated files.
+
+Android permissions are used as follows:
+- `INTERNET`: Required to load `chat.deepseek.com`, GitHub imports, and other network-backed Better DeepSeek features.
+- `RECORD_AUDIO`: Optional. Declared for voice-related functionality and future native voice integrations.
+- Storage access: Used only to save generated downloads to Android-managed storage. On modern Android versions this is handled through `MediaStore`; legacy devices may use the app's external files area when needed.
 
 If you have any questions or concerns, please open an issue on our GitHub repository.

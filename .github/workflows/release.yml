@@ -5,13 +5,17 @@ on:
     branches:
       - main
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      ANDROID_HOME: ${{ github.workspace }}/.android-sdk
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/.android-sdk
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,23 +24,50 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+          cache-dependency-path: |
+            android/**/*.gradle*
+            android/**/gradle-wrapper.properties
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools platforms;android-34 build-tools;34.0.0
+
+      - name: Write Android local.properties
+        run: printf 'sdk.dir=%s\n' "$ANDROID_SDK_ROOT" > android/local.properties
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Build extension
+      - name: Build browser bundles
         run: npm run build
 
-      - name: Rename and Prepare Artifacts
+      - name: Build Android web bundle
+        run: npm run build:android
+
+      - name: Build Android APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Rename and prepare artifacts
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             mv better-deepseek-chrome.zip better-deepseek-chrome-latest.zip
             mv better-deepseek-firefox.zip better-deepseek-firefox-latest.zip
+            mv android/app/build/outputs/apk/debug/app-debug.apk better-deepseek-android-latest-debug.apk
           else
             mv better-deepseek-chrome.zip better-deepseek-chrome-v${VERSION}.zip
             mv better-deepseek-firefox.zip better-deepseek-firefox-v${VERSION}.zip
+            mv android/app/build/outputs/apk/debug/app-debug.apk better-deepseek-android-v${VERSION}-debug.apk
           fi
 
       - name: Update Latest Release
@@ -45,10 +76,14 @@ jobs:
         with:
           tag_name: latest
           name: Latest Build
-          body: "This release contains the latest automated build from the main branch. It is updated on every commit."
+          body: |
+            This release contains the latest automated build from the `main` branch.
+
+            Android is distributed as an unofficial debug-signed APK through GitHub Releases only. Until permanent signing is added, Android upgrades may require uninstalling the previous APK before reinstalling.
           files: |
             better-deepseek-chrome-latest.zip
             better-deepseek-firefox-latest.zip
+            better-deepseek-android-latest-debug.apk
           prerelease: true
           make_latest: true
         env:
@@ -58,9 +93,14 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          body: |
+            This release includes browser extension bundles plus an unofficial debug-signed Android APK.
+
+            Android builds are distributed through GitHub Releases only. Until permanent signing is added, Android upgrades may require uninstalling the previous APK before reinstalling.
           files: |
             better-deepseek-chrome-v*.zip
             better-deepseek-firefox-v*.zip
+            better-deepseek-android-v*-debug.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
