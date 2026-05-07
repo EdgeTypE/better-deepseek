@@ -121,6 +121,10 @@ jobs:
       - name: Install Playwright browser & deps
         run: npx playwright install --with-deps chromium
 
+      - name: Make Gradle wrapper executable
+        working-directory: android
+        run: chmod +x ./gradlew
+
       - name: Build Android web bundle
         run: npm run build:android
 

@@ -50,6 +50,10 @@ jobs:
       - name: Build Android web bundle
         run: npm run build:android
 
+      - name: Make Gradle wrapper executable
+        working-directory: android
+        run: chmod +x ./gradlew
+
       - name: Build Android APK
         working-directory: android
         run: ./gradlew --no-daemon assembleDebug
