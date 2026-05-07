@@ -123,7 +123,6 @@ export function normalizeGithubCommitCount(count) {
 function buildGithubApiHeaders(token) {
   const headers = {
     Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
   };
   const trimmedToken = String(token || "").trim();
   if (trimmedToken) {

@@ -65,6 +65,8 @@ describe("background GitHub commits fetch", () => {
     expect(fetch.mock.calls[1][0]).toContain("per_page=20");
     expect(fetch.mock.calls[1][0]).toContain("page=2");
     expect(fetch.mock.calls[0][1].headers.Authorization).toBe("token ghp_secret");
+    expect(fetch.mock.calls[0][1].headers.Accept).toBe("application/vnd.github+json");
+    expect(fetch.mock.calls[0][1].headers["X-GitHub-Api-Version"]).toBeUndefined();
     expect(commits).toHaveLength(120);
     expect(commits[0]).toEqual({
       sha: "abcdef0",

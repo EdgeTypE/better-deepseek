@@ -116,7 +116,8 @@ test("imports GitHub commit history as a second attachment when enabled", async 
   await page.locator(".bds-attach-dropdown .bds-attach-item").filter({ hasText: "GitHub Repo" }).click();
   await page.locator(".bds-github-input").fill("octocat/Hello-World");
   await page.locator(".bds-github-checkbox input").check();
-  await expect(page.locator(".bds-github-number-input")).toHaveValue("100");
+  await expect(page.locator(".bds-github-number-input")).toHaveValue("");
+  await expect(page.locator(".bds-github-number-input")).toHaveAttribute("placeholder", "100");
   await page.locator(".bds-github-btn-import").click();
 
   await expect
