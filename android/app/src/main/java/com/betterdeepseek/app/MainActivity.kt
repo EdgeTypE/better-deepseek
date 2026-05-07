@@ -261,7 +261,7 @@ class MainActivity : ComponentActivity() {
             // to succeed. The critical GET-based OAuth authorization requests
             // are fully proxied with X-Requested-With stripped.
             if (!method.equals("GET", ignoreCase = true) &&
-                !method.equals("HEAD", ignoreCase = true)
+                            !method.equals("HEAD", ignoreCase = true)
             ) {
                 return null
             }
