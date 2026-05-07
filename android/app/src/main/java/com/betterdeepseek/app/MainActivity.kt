@@ -22,6 +22,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.view.WindowCompat
 import androidx.webkit.WebViewAssetLoader
+import okhttp3.OkHttpClient
+import okhttp3.Request as OkRequest
+import java.util.concurrent.TimeUnit
 
 /**
  * Single-activity host. Loads chat.deepseek.com inside a full-screen WebView and
@@ -125,15 +128,32 @@ class MainActivity : ComponentActivity() {
         override fun shouldInterceptRequest(
             view: WebView,
             request: WebResourceRequest
-        ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
+        ): WebResourceResponse? {
+            // BDS bundled assets (sandbox.html, etc.) go through the native
+            // asset loader first.
+            assetLoader.shouldInterceptRequest(request.url)?.let { return it }
+
+            // For Google OAuth pages, proxy the request through OkHttp to
+            // suppress the X-Requested-With header that Android WebView
+            // automatically injects. Google uses this header to detect
+            // embedded browsers and shows a "disallowed_useragent" error.
+            // We proxy both main-frame and subresource requests; POST
+            // navigations are handled by shouldOverrideUrlLoading which
+            // now lets them load inside the WebView.
+            val host = request.url.host?.lowercase() ?: ""
+            if (host == "accounts.google.com" ||
+                host.endsWith(".accounts.google.com")
+            ) {
+                val proxied = proxyGoogleOAuthPage(request)
+                if (proxied != null) return proxied
+            }
+            return null
+        }
 
         /**
-         * Google sign-in (accounts.google.com / oauth2 endpoints) refuses
-         * embedded WebViews — the user lands on a "couldn't sign you in /
-         * disallowed_useragent" page. Detect those URLs and hand them off to
-         * Chrome Custom Tabs (or the system browser as a fallback). The OAuth
-         * callback eventually returns to chat.deepseek.com, which re-enters
-         * this app via the VIEW intent filter declared in AndroidManifest.xml.
+         * Any URL on shouldOpenExternally is routed to Custom Tabs instead
+         * of the WebView. Currently empty — the synthetic Chrome UA and
+         * shouldInterceptRequest proxy are sufficient for Google OAuth.
          */
         override fun shouldOverrideUrlLoading(
             view: WebView,
@@ -153,6 +173,81 @@ class MainActivity : ComponentActivity() {
             if (url.startsWith("https://chat.deepseek.com")) {
                 injectBdsScripts(view)
             }
+        }
+    }
+
+    /**
+     * Fetch a Google OAuth page via OkHttp (which does not add the
+     * X-Requested-With header) and return the response as a
+     * WebResourceResponse. Cookies from the WebView's cookie manager are
+     * forwarded so the OAuth flow keeps session continuity.
+     */
+    private fun proxyGoogleOAuthPage(request: WebResourceRequest): WebResourceResponse? {
+        // Only proxy GET — POST/XHR requests don't expose a body through
+        // WebResourceRequest and can't be reliably proxied. Google's bot
+        // detection is triggered on the initial page load (GET), so
+        // subsequent XHRs within the page are less critical.
+        if (request.method != "GET") return null
+
+        return try {
+            val authClient = OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .followRedirects(false)
+                .build()
+
+            val builder = OkRequest.Builder().url(request.url.toString())
+            // Mirror only Safe-header values from the original request so
+            // we don't pass X-Requested-With and other WebView markers.
+            val safeHeaders = listOf("Accept", "Accept-Language", "Cookie", "Referer")
+            for (header in request.requestHeaders) {
+                if (safeHeaders.any { it.equals(header.key, ignoreCase = true) }) {
+                    builder.header(header.key, header.value)
+                }
+            }
+
+            // Forward WebView cookies for accounts.google.com so Google
+            // recognises returning users and saved account sessions.
+            val cookieManager = android.webkit.CookieManager.getInstance()
+            val cookies = cookieManager.getCookie(request.url.toString())
+            if (!cookies.isNullOrEmpty()) {
+                builder.header("Cookie", cookies)
+            }
+
+            authClient.newCall(builder.build()).execute().use { response ->
+                val body = response.body?.bytes() ?: ByteArray(0)
+                val mime = response.header("Content-Type") ?: "text/html"
+                val charset = response.header("Content-Type")
+                    ?.substringAfter("charset=")
+                    ?.takeIf { it.isNotBlank() }
+                    ?: "utf-8"
+
+                // Feed cookies from the proxied response back into the
+                // WebView's cookie jar so subsequent requests carry them.
+                val setCookieHeaders = response.headers("Set-Cookie")
+                for (setCookie in setCookieHeaders) {
+                    cookieManager.setCookie(request.url.toString(), setCookie)
+                }
+                cookieManager.flush()
+
+                WebResourceResponse(
+                    mime.substringBefore(";"),
+                    charset,
+                    body.inputStream(),
+                ).apply {
+                    responseHeaders = mapOf(
+                        "Content-Type" to "$mime; charset=$charset",
+                    )
+                    for (setCookie in setCookieHeaders) {
+                        responseHeaders = responseHeaders + ("Set-Cookie" to setCookie)
+                    }
+                    responseHeaders = responseHeaders +
+                        ("X-Bds-Proxied" to "1")
+                }
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "Failed to proxy Google OAuth page: ${t.message}")
+            null
         }
     }
 
@@ -180,9 +275,10 @@ class MainActivity : ComponentActivity() {
 
         /**
          * Intercept JS-initiated popups (e.g. window.open for Google OAuth).
-         * Without this, the WebView opens a blank browser window and the
-         * OAuth flow stalls. We route popup URLs that should go to Custom
-         * Tabs through the same external-opening path.
+         * The popup URL is NOT available here — it will be the dummy WebView's
+         * first load. We supply a dummy WebView whose shouldOverrideUrlLoading
+         * checks the actual destination. If it's a Google auth URL we open
+         * it in Custom Tabs instead of the WebView.
          */
         override fun onCreateWindow(
             view: WebView?,
@@ -190,21 +286,69 @@ class MainActivity : ComponentActivity() {
             isUserGesture: Boolean,
             resultMsg: android.os.Message?
         ): Boolean {
-            // The resultMsg contains a WebViewTransport — we have to supply
-            // a WebView to avoid crashing, but we cancel the popup and
-            // handle the URL ourselves.
-            val transport = resultMsg?.obj as? WebView.WebViewTransport
-            val newWebView = WebView(this@MainActivity)
-            transport?.webView = newWebView
-            resultMsg?.sendToTarget()
+            val transport = resultMsg?.obj as? WebView.WebViewTransport ?: run {
+                resultMsg?.sendToTarget()
+                return false
+            }
 
-            val url = view?.url ?: view?.originalUrl
-            if (url != null) {
-                val uri = Uri.parse(url)
-                if (shouldOpenExternally(uri)) {
-                    openInCustomTab(uri)
+            val newWebView = WebView(this@MainActivity).apply {
+                settings.apply {
+                    javaScriptEnabled = true
+                    domStorageEnabled = true
+                    userAgentString = String.format(SPOOFED_UA, BuildConfig.VERSION_NAME)
+                }
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                )
+                setBackgroundColor(0xFF000000.toInt())
+
+                webViewClient = object : WebViewClient() {
+                    override fun shouldInterceptRequest(
+                        popupView: WebView,
+                        req: WebResourceRequest
+                    ): WebResourceResponse? {
+                        val host = req.url.host?.lowercase() ?: ""
+                        if (host == "accounts.google.com" ||
+                            host.endsWith(".accounts.google.com")
+                        ) {
+                            return proxyGoogleOAuthPage(req)
+                        }
+                        return null
+                    }
+
+                    override fun shouldOverrideUrlLoading(
+                        popupView: WebView,
+                        request: WebResourceRequest
+                    ): Boolean {
+                        val targetUrl = request.url
+                        if (shouldOpenExternally(targetUrl)) {
+                            openInCustomTab(targetUrl)
+                            return true
+                        }
+                        return false
+                    }
+
+                    override fun onPageFinished(popupView: WebView, url: String?) {
+                        Log.d(TAG, "onCreateWindow popup finished: $url")
+                        if (url != null && url.startsWith("https://chat.deepseek.com")) {
+                            // OAuth complete — remove the popup and reload
+                            // the main WebView to pick up login cookies.
+                            popupView.post {
+                                (popupView.parent as? ViewGroup)?.removeView(popupView)
+                                popupView.destroy()
+                                webView.reload()
+                            }
+                        }
+                    }
                 }
             }
+
+            // Show the popup as a full-screen overlay so the user can
+            // interact with Google's sign-in UI.
+            (findViewById<ViewGroup>(android.R.id.content)).addView(newWebView)
+            transport.webView = newWebView
+            resultMsg?.sendToTarget()
             return true
         }
     }
@@ -246,15 +390,15 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * URLs that must NOT load inside the WebView. Today this is just Google's
-     * sign-in surface, but the helper is centralized so future hosts (Apple
-     * sign-in, Microsoft, etc.) can be added in one place.
+     * URLs that must NOT load inside the WebView. Currently empty — the
+     * synthetic Chrome UA (see SPOOFED_UA) is sufficient to pass Google's
+     * embedded-browser checks. If a future OAuth provider requires Custom
+     * Tabs, add hosts here. Do NOT route Google OAuth externally: the
+     * Custom Tab has a separate cookie jar, which breaks the OAuth state
+     * validation on the callback.
      */
     private fun shouldOpenExternally(url: Uri): Boolean {
-        val host = url.host?.lowercase() ?: return false
-        return host == "accounts.google.com" ||
-            host.endsWith(".accounts.google.com") ||
-            host == "accounts.youtube.com"
+        return false
     }
 
     /**
