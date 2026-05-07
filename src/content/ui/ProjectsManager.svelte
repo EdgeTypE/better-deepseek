@@ -13,6 +13,10 @@
 
   let { onback } = $props();
 
+  const BDS_TARGET = process.env.BDS_TARGET || "chrome";
+  const isAndroidTarget = BDS_TARGET === "android";
+  const supportsFolderUpload = !isAndroidTarget;
+
   // view: "list" | "detail"
   let view = $state("list");
   let projects = $state([...appState.projects]);
@@ -175,6 +179,15 @@
   }
 
   async function handleFolderUpload() {
+    if (!supportsFolderUpload) {
+      if (appState.ui) {
+        appState.ui.showToast(
+          "Folder upload is not supported on Android yet.",
+        );
+      }
+      return;
+    }
+
     uploading = true;
     fileError = "";
 
@@ -512,14 +525,16 @@
   >
     + Upload File
   </button>
-  <button
-    type="button"
-    class="bds-btn-outlined"
-    style="width: 100%; margin-top: 6px;"
-    onclick={handleFolderUpload}
-  >
-    + Upload Folder
-  </button>
+  {#if supportsFolderUpload}
+    <button
+      type="button"
+      class="bds-btn-outlined"
+      style="width: 100%; margin-top: 6px;"
+      onclick={handleFolderUpload}
+    >
+      + Upload Folder
+    </button>
+  {/if}
 
   <input
     type="file"
