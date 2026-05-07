@@ -60,6 +60,9 @@ const state = {
     /** @type {boolean} whether pricing data has been loaded */
     pricingLoaded: false,
   },
+  selectionMode: false,
+  /** @type {Set<string>} Set of message IDs or indices */
+  selectedMessageIds: new Set(),
   whatsNewPending: false,
 };
 

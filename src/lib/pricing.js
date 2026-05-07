@@ -80,7 +80,7 @@ export async function initPricing() {
       const pricing = await fetchOfficialPricing();
       if (pricing && pricing.models && Object.keys(pricing.models).length > 0) {
         pricingCache = pricing;
-        console.log("[BDS] Pricing loaded from official site");
+        // console.log("[BDS] Pricing loaded from official site");
         return pricingCache;
       }
     } catch (e) {
@@ -92,7 +92,7 @@ export async function initPricing() {
       const pricing = await fetchGitHubPricing();
       if (pricing && pricing.models && Object.keys(pricing.models).length > 0) {
         pricingCache = pricing;
-        console.log("[BDS] Pricing loaded from GitHub");
+        // console.log("[BDS] Pricing loaded from GitHub");
         return pricingCache;
       }
     } catch (e) {
@@ -101,7 +101,7 @@ export async function initPricing() {
 
     // Tier 3: Use embedded fallback
     pricingCache = EMBEDDED_PRICING;
-    console.log("[BDS] Using embedded fallback pricing");
+    // console.log("[BDS] Using embedded fallback pricing");
     return pricingCache;
   })();
 

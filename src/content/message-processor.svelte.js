@@ -50,6 +50,7 @@ export function processMessageNode(node) {
   // Inject Run buttons into any Python/JS code blocks in this message
   injectPythonRunButtons(node);
   injectJavaScriptRunButtons(node);
+  injectSelectionCheckbox(node);
 
   const rawText = extractMessageRawText(node);
   if (!rawText.trim()) {
@@ -718,4 +719,41 @@ function refreshSessionTotalDisplayInline() {
       </svg>
     </div>
   `;
+}
+
+function injectSelectionCheckbox(node) {
+  if (node.querySelector(".bds-selection-checkbox-container")) return;
+
+  const container = document.createElement("div");
+  container.className = "bds-selection-checkbox-container";
+  
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.className = "bds-selection-checkbox";
+  
+  // Use a stable random ID for this session
+  let id = node.getAttribute("data-bds-msg-id");
+  if (!id) {
+    id = "msg-" + Math.random().toString(36).substring(2, 11);
+    node.setAttribute("data-bds-msg-id", id);
+  }
+  checkbox.setAttribute("data-bds-message-id", id);
+
+  checkbox.addEventListener("change", (e) => {
+    if (e.target.checked) {
+      state.selectedMessageIds.add(id);
+    } else {
+      state.selectedMessageIds.delete(id);
+    }
+    window.dispatchEvent(new CustomEvent("bds:selectionChanged"));
+  });
+
+  container.appendChild(checkbox);
+  
+  // Inser at the very beginning of the message node
+  if (node.firstChild) {
+    node.insertBefore(container, node.firstChild);
+  } else {
+    node.appendChild(container);
+  }
 }

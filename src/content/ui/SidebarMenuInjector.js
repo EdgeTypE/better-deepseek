@@ -4,34 +4,33 @@ import { setPendingExport, checkPendingExport } from "../tools/pending-export.js
 // Keep track of which chat item's menu was opened
 let lastClickedChatUrl = null;
 
-// Markdown Icon (Document-like)
-const MD_ICON = `
+// Selection Icon
+const SELECTION_ICON = `
 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-  <polyline points="14 2 14 8 20 8"></polyline>
-  <line x1="16" y1="13" x2="8" y2="13"></line>
-  <line x1="16" y1="17" x2="8" y2="17"></line>
-  <polyline points="10 9 9 9 8 9"></polyline>
-</svg>`;
-
-// PDF Icon
-const PDF_ICON = `
-<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-  <polyline points="14 2 14 8 20 8"></polyline>
-  <path d="M9 15h3a2 2 0 0 0 0-4H9v4Z"></path>
+  <path d="M9 11l3 3L22 4"></path>
+  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
 </svg>`;
 
 export function initSidebarMenuInjector() {
   // Capture the chat URL when the menu button is clicked
-  document.addEventListener("mousedown", (e) => {
-    const btn = e.target.closest("div._2090548");
+  const captureUrl = (e) => {
+    const btn = e.target.closest("div._2090548") || e.target.closest('button[aria-label*="menu" i]');
     if (btn) {
-      const chatItem = btn.closest("a._546d736");
+      const chatItem = btn.closest("a._546d736") || btn.closest('a[href*="/chat/s/"]');
       if (chatItem) {
         lastClickedChatUrl = chatItem.href;
       }
     }
+  };
+
+  document.addEventListener("mousedown", captureUrl, true);
+  document.addEventListener("click", captureUrl, true);
+
+  // Secondary backup for menu injection on any click
+  document.addEventListener("click", () => {
+    setTimeout(() => {
+      document.querySelectorAll(".ds-dropdown-menu").forEach(injectOptions);
+    }, 100);
   }, true);
 
   const observer = new MutationObserver((mutations) => {
@@ -39,10 +38,10 @@ export function initSidebarMenuInjector() {
       for (const node of mutation.addedNodes) {
         if (node.nodeType === 1) {
           if (node.classList.contains("ds-dropdown-menu")) {
-            checkAndInject(node);
+            injectOptions(node);
           } else {
             const menu = node.querySelector(".ds-dropdown-menu");
-            if (menu) checkAndInject(menu);
+            if (menu) injectOptions(menu);
           }
         }
       }
@@ -59,6 +58,17 @@ async function handleExportAction(format) {
   const targetUrl = lastClickedChatUrl;
   if (!targetUrl) return;
 
+  // For selection mode
+  if (format === "selection") {
+    if (window.location.href === targetUrl) {
+      window.dispatchEvent(new CustomEvent("bds:toggleSelectionMode"));
+    } else {
+      await setPendingExport(targetUrl, format);
+      window.location.href = targetUrl;
+    }
+    return;
+  }
+
   if (window.location.href === targetUrl) {
     exportSession(format);
   } else {
@@ -67,25 +77,9 @@ async function handleExportAction(format) {
   }
 }
 
-function checkAndInject(menu) {
+function injectOptions(menu) {
   if (menu.querySelector(".bds-export-option")) return;
 
-  const labels = Array.from(
-    menu.querySelectorAll(".ds-dropdown-menu-option__label")
-  ).map((el) => el.textContent.trim().toLowerCase());
-
-  const isChatMenu =
-    labels.includes("rename") ||
-    labels.includes("pin") ||
-    labels.includes("share") ||
-    labels.includes("delete");
-
-  if (isChatMenu) {
-    injectOptions(menu);
-  }
-}
-
-function injectOptions(menu) {
   const deleteOption = Array.from(
     menu.querySelectorAll(".ds-dropdown-menu-option")
   ).find((opt) =>
@@ -94,20 +88,15 @@ function injectOptions(menu) {
 
   const insertBefore = deleteOption || null;
 
-  const mdOption = createMenuOption("Export as Markdown (.md)", MD_ICON, () => {
-    handleExportAction("markdown");
+  const exportOption = createMenuOption("Export Chat (BDS)", SELECTION_ICON, () => {
+    handleExportAction("selection");
   });
 
-  const pdfOption = createMenuOption("Export as PDF Document", PDF_ICON, () => {
-    handleExportAction("pdf");
-  });
-
-  menu.insertBefore(mdOption, insertBefore);
-  menu.insertBefore(pdfOption, insertBefore);
+  menu.insertBefore(exportOption, insertBefore);
   
-  mdOption.style.borderTop = "1px solid rgba(0,0,0,0.05)";
-  mdOption.style.marginTop = "4px";
-  mdOption.style.paddingTop = "8px";
+  exportOption.style.borderTop = "1px solid rgba(0,0,0,0.05)";
+  exportOption.style.marginTop = "4px";
+  exportOption.style.paddingTop = "8px";
 }
 
 function createMenuOption(label, iconHtml, onClick) {

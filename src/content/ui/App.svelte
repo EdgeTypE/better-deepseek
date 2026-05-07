@@ -3,6 +3,7 @@
   import ToastStack from "./ToastStack.svelte";
   import QuestionPanel from "./QuestionPanel.svelte";
   import WhatsNewModal from "./WhatsNewModal.svelte";
+  import SelectionOverlay from "./SelectionOverlay.svelte";
   import appState from "../state.js";
 
   let drawerOpen = $state(false);
@@ -56,6 +57,12 @@
   function closeDrawer() {
     drawerOpen = false;
   }
+
+  // Handle external selection mode toggle
+  window.addEventListener("bds:toggleSelectionMode", () => {
+    appState.selectionMode = true;
+    closeDrawer();
+  });
 </script>
 
 <button id="bds-toggle" type="button" onclick={toggleDrawer}>BDS</button>
@@ -68,3 +75,5 @@
 {#if whatsNewPending}
   <WhatsNewModal onDismiss={() => whatsNewPending = false} />
 {/if}
+
+<SelectionOverlay />

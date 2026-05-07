@@ -202,13 +202,34 @@ test("exports a chat as markdown from the sidebar menu", async ({ page }) => {
   await addUserMessage(page, "How do exports work?");
   await addAssistantMessage(page, "Exports are generated from the visible session transcript.");
 
-  await page.locator('a[href="/chat/s/mock-chat-1"] ._2090548').click();
-  await expect(
-    page.locator(".bds-export-option").filter({ hasText: "Export as Markdown (.md)" }),
-  ).toBeVisible();
+  // Hover and open chat menu
+  const chatItem = page.locator('a._546d736[data-session-id="mock-chat-1"]');
+  await chatItem.hover();
+  
+  // Click the three-dots/menu button (using exact class from mock)
+  const menuBtn = chatItem.locator('div._2090548');
+  await menuBtn.click({ force: true });
+
+  // Small delay for the mock script and our injector to process
+  await page.waitForTimeout(500);
+
+  // Wait for the injected BDS option
+  const exportOption = page.locator(".bds-export-option");
+  await expect(exportOption).toBeVisible({ timeout: 10000 });
+  await exportOption.click();
+
+  // Wait for selection overlay
+  await expect(page.locator(".bds-selection-bar")).toBeVisible();
+
+  // Wait for checkboxes to be added by scanner
+  await page.waitForSelector(".bds-selection-checkbox", { timeout: 5000 });
+
+  // Select all messages
+  await page.locator('button:has-text("Select All")').click();
 
   const download = page.waitForEvent("download");
-  await page.locator(".bds-export-option").filter({ hasText: "Export as Markdown (.md)" }).click();
+  // Click MD button in the overlay
+  await page.locator('.bds-export-btn[title="Markdown (.md)"]').click();
   const artifact = await download;
 
   expect(artifact.suggestedFilename()).toMatch(/\.md$/);
@@ -221,11 +242,30 @@ test("creates the PDF export iframe from the sidebar menu", async ({ page }) => 
   await addUserMessage(page, "Generate a PDF snapshot.");
   await addAssistantMessage(page, "This transcript should render into the PDF export iframe.");
 
-  await page.locator('a[href="/chat/s/mock-chat-1"] ._2090548').click();
-  await expect(
-    page.locator(".bds-export-option").filter({ hasText: "Export as PDF Document" }),
-  ).toBeVisible();
-  await page.locator(".bds-export-option").filter({ hasText: "Export as PDF Document" }).click();
+  // Hover and open chat menu
+  const chatItem = page.locator('a._546d736[data-session-id="mock-chat-1"]');
+  await chatItem.hover();
+  const menuBtn = chatItem.locator('div._2090548');
+  await menuBtn.click({ force: true });
+
+  await page.waitForTimeout(500);
+
+  // Wait for the injected BDS option
+  const exportOption = page.locator(".bds-export-option");
+  await expect(exportOption).toBeVisible({ timeout: 10000 });
+  await exportOption.click();
+
+  // Wait for selection overlay
+  await expect(page.locator(".bds-selection-bar")).toBeVisible();
+  
+  // Wait for checkboxes
+  await page.waitForSelector(".bds-selection-checkbox", { timeout: 5000 });
+
+  // Select all messages
+  await page.locator('button:has-text("Select All")').click();
+
+  // Click PDF button in the overlay
+  await page.locator('.bds-export-btn[title="PDF Document"]').click();
 
   await expect(page.locator("#bds-print-iframe")).toHaveCount(1);
 });

@@ -1041,3 +1041,69 @@ textarea.bds-input,
   pointer-events: none;
 }
 
+
+/* ══════════════════════════════════
+   Selection Mode & Export
+   ══════════════════════════════════ */
+
+.bds-selection-checkbox-container {
+  display: none;
+  position: absolute;
+  left: -40px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 100;
+}
+
+.bds-selection-mode-active .bds-selection-checkbox-container {
+  display: block;
+}
+
+.bds-selection-checkbox {
+  width: 22px !important;
+  height: 22px !important;
+  cursor: pointer;
+  accent-color: var(--bds-accent);
+}
+
+.bds-selection-mode-active .ds-message {
+  position: relative;
+  transition: transform 0.2s;
+}
+
+.bds-selection-mode-active .ds-message:has(.bds-selection-checkbox:checked) {
+  background: var(--bds-accent-glow) !important;
+  border-radius: 12px;
+}
+
+.bds-export-row {
+  margin: 16px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.bds-btn-export {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--bds-accent);
+  border-radius: 10px;
+  background: var(--bds-accent-glow);
+  color: var(--bds-accent);
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bds-btn-export:hover {
+  background: var(--bds-accent);
+  color: white;
+}
+
+.bds-btn-export svg {
+  flex-shrink: 0;
+}

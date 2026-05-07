@@ -34,7 +34,11 @@ export async function checkPendingExport() {
     
     // Final check to make sure we haven't navigated away during load
     if (window.location.href === pendingExport.url) {
-      exportSession(pendingExport.format);
+      if (pendingExport.format === "selection") {
+        window.dispatchEvent(new CustomEvent("bds:toggleSelectionMode"));
+      } else {
+        exportSession(pendingExport.format);
+      }
       await chrome.storage.local.remove("pendingExport");
     }
   }
