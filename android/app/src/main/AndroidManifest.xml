@@ -12,16 +12,13 @@
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
-    <!-- Android 11+ package visibility: required to resolve a Custom Tabs
-         provider and to launch ACTION_VIEW intents (file viewers, browsers). -->
+    <!-- Android 11+ package visibility: required to launch ACTION_VIEW
+         intents (file viewers for downloads, external browsers). -->
     <queries>
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="https" />
-        </intent>
-        <intent>
-            <action android:name="android.support.customtabs.action.CustomTabsService" />
         </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
@@ -49,8 +46,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Catches the OAuth callback redirect after Custom Tabs sign-in
-                 so we can return into the existing WebView session. -->
+            <!-- Deep-link handler: opens chat.deepseek.com URLs in the
+                 existing WebView session (e.g. from other apps). -->
             <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
