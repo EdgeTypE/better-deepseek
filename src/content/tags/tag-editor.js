@@ -108,6 +108,7 @@ export function openTagEditor(chatUrl) {
 
   function renderPills() {
     pillsContainer.innerHTML = "";
+    renderMemoryTags();
 
     if (currentTags.length === 0) {
       const empty = document.createElement("div");
@@ -140,10 +141,7 @@ export function openTagEditor(chatUrl) {
       pill.appendChild(removeBtn);
       pillsContainer.appendChild(pill);
     }
-
-    renderMemoryTags();
   }
-
   function renderMemoryTags() {
     memoryTagsContainer.innerHTML = "";
     
