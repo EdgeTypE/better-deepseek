@@ -1,8 +1,16 @@
 import { fetchTranscript } from "youtube-transcript";
+import {
+  DEFAULT_GITHUB_COMMIT_COUNT,
+  GITHUB_COMMITS_PAGE_SIZE,
+  MAX_GITHUB_COMMIT_COUNT,
+  normalizeGitHubCommitCount,
+} from "../lib/github-commits.js";
 
-export const DEFAULT_GITHUB_COMMIT_COUNT = 100;
-export const GITHUB_COMMITS_PAGE_SIZE = 100;
-export const MAX_GITHUB_COMMIT_COUNT = 500;
+export {
+  DEFAULT_GITHUB_COMMIT_COUNT,
+  GITHUB_COMMITS_PAGE_SIZE,
+  MAX_GITHUB_COMMIT_COUNT,
+};
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.type) return false;
@@ -111,14 +119,7 @@ function createGithubFetchError(message, options = {}) {
 }
 
 export function normalizeGithubCommitCount(count) {
-  const parsed = Number.parseInt(String(count), 10);
-  const normalized = Number.isFinite(parsed)
-    ? parsed
-    : DEFAULT_GITHUB_COMMIT_COUNT;
-  return Math.min(
-    MAX_GITHUB_COMMIT_COUNT,
-    Math.max(1, normalized),
-  );
+  return normalizeGitHubCommitCount(count);
 }
 
 function buildGithubApiHeaders(token) {

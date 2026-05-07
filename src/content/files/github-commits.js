@@ -1,24 +1,17 @@
 import { parseGitHubUrl } from "./github-reader.js";
+import {
+  DEFAULT_GITHUB_COMMIT_COUNT,
+  MAX_GITHUB_COMMIT_COUNT,
+  MIN_GITHUB_COMMIT_COUNT,
+  normalizeGitHubCommitCount,
+} from "../../lib/github-commits.js";
 
-export const DEFAULT_GITHUB_COMMIT_COUNT = 100;
-export const MIN_GITHUB_COMMIT_COUNT = 1;
-export const MAX_GITHUB_COMMIT_COUNT = 500;
-
-export function normalizeGitHubCommitCount(
-  count,
-  fallback = DEFAULT_GITHUB_COMMIT_COUNT,
-) {
-  const fallbackValue = Number.parseInt(String(fallback), 10);
-  const safeFallback = Number.isFinite(fallbackValue)
-    ? fallbackValue
-    : DEFAULT_GITHUB_COMMIT_COUNT;
-  const parsed = Number.parseInt(String(count), 10);
-  const normalized = Number.isFinite(parsed) ? parsed : safeFallback;
-  return Math.min(
-    MAX_GITHUB_COMMIT_COUNT,
-    Math.max(MIN_GITHUB_COMMIT_COUNT, normalized),
-  );
-}
+export {
+  DEFAULT_GITHUB_COMMIT_COUNT,
+  MAX_GITHUB_COMMIT_COUNT,
+  MIN_GITHUB_COMMIT_COUNT,
+  normalizeGitHubCommitCount,
+};
 
 function normalizeCommitField(value, fallback) {
   const normalized = String(value || "").trim();
@@ -115,7 +108,7 @@ export function buildGitHubCommitsFetchError(
 export async function fetchGitHubCommits(
   repoUrl,
   count,
-  onStatus = () => {},
+  onStatus = () => { },
   options = {},
 ) {
   const parsed = parseGitHubUrl(repoUrl);
