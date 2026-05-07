@@ -12,11 +12,11 @@ If you choose to save a GitHub personal access token for private repository fetc
 **2. Third-Party Services**
 The Extension operates on `chat.deepseek.com`. Please refer to DeepSeek's own privacy policy regarding how they handle your chat data. To provide advanced features (like Python execution or HTML rendering), the Extension may fetch open-source libraries from standard CDNs (e.g., PyScript, jsDelivr).
 
-If you explicitly use the GitHub repository import feature, the Extension may contact GitHub over HTTPS to download repository archives. When you have configured a GitHub token, the token is used only for authenticated GitHub repository requests and is sent only to GitHub's repository download endpoint.
+If you explicitly use the GitHub repository import feature, the Extension may contact GitHub over HTTPS to download repository archives and, when requested, to fetch recent repository commit history. When you have configured a GitHub token, the token is used only for authenticated GitHub repository requests and is sent only to GitHub endpoints involved in those explicit repository imports.
 
 **3. Permissions**
 - `storage`: Used solely to save your local extension settings.
-- `host_permissions`: Used to interface with the DeepSeek chat DOM, to allow the "Web Fetch" tool to read sites you explicitly ask it to summarize, and to download GitHub repository archives you explicitly request.
+- `host_permissions`: Used to interface with the DeepSeek chat DOM, to allow the "Web Fetch" tool to read sites you explicitly ask it to summarize, and to download GitHub repository archives or commit history you explicitly request.
 
 **4. Android App**
 Better DeepSeek is also available as an unofficial Android app that wraps `chat.deepseek.com` inside an Android `WebView`. The Android build reuses the same local-first Better DeepSeek UI and logic, but stores app state through Android's local storage mechanisms instead of browser extension storage.
@@ -24,7 +24,7 @@ Better DeepSeek is also available as an unofficial Android app that wraps `chat.
 On Android:
 - The app loads `chat.deepseek.com` in a `WebView` and injects the Better DeepSeek interface locally on your device.
 - Settings and related app state are stored locally in Android `SharedPreferences`.
-- If you save a GitHub personal access token for private repository imports, it is stored locally on the device and is only sent to GitHub when you explicitly initiate a GitHub repository fetch.
+- If you save a GitHub personal access token for private repository imports, it is stored locally on the device and is only sent to GitHub when you explicitly initiate a GitHub repository or commit-history fetch.
 - Downloads are written locally to Android-managed storage locations so you can open or share generated files.
 
 Android permissions are used as follows:

@@ -1,5 +1,9 @@
 import { fetchTranscript } from "youtube-transcript";
 
+export const DEFAULT_GITHUB_COMMIT_COUNT = 100;
+export const GITHUB_COMMITS_PAGE_SIZE = 100;
+export const MAX_GITHUB_COMMIT_COUNT = 500;
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.type) return false;
 
@@ -29,6 +33,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           status:
             error && Number.isFinite(error.status) ? Number(error.status) : null,
           authRejected: Boolean(error && error.authRejected),
+        });
+      });
+    return true;
+  }
+
+  if (message.type === "bds-fetch-github-commits") {
+    fetchGithubCommits(
+      message.owner,
+      message.repo,
+      message.branch,
+      message.count,
+      message.token,
+    )
+      .then((commits) => {
+        sendResponse({ ok: true, commits });
+      })
+      .catch((error) => {
+        sendResponse({
+          ok: false,
+          error: String(error && error.message ? error.message : error),
+          status:
+            error && Number.isFinite(error.status) ? Number(error.status) : null,
+          authRejected: Boolean(error && error.authRejected),
+          rateLimited: Boolean(error && error.rateLimited),
         });
       });
     return true;
@@ -76,7 +104,71 @@ function createGithubFetchError(message, options = {}) {
   if (options.authRejected) {
     error.authRejected = true;
   }
+  if (options.rateLimited) {
+    error.rateLimited = true;
+  }
   return error;
+}
+
+export function normalizeGithubCommitCount(count) {
+  const parsed = Number.parseInt(String(count), 10);
+  const normalized = Number.isFinite(parsed)
+    ? parsed
+    : DEFAULT_GITHUB_COMMIT_COUNT;
+  return Math.min(
+    MAX_GITHUB_COMMIT_COUNT,
+    Math.max(1, normalized),
+  );
+}
+
+function buildGithubApiHeaders(token) {
+  const headers = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
+  const trimmedToken = String(token || "").trim();
+  if (trimmedToken) {
+    headers.Authorization = `token ${trimmedToken}`;
+  }
+  return headers;
+}
+
+function buildGithubCommitsUrl(owner, repo, branch, perPage, page) {
+  const url = new URL(`https://api.github.com/repos/${owner}/${repo}/commits`);
+  url.searchParams.set("sha", branch);
+  url.searchParams.set("per_page", String(perPage));
+  url.searchParams.set("page", String(page));
+  return url.toString();
+}
+
+function isGithubRateLimitResponse(resp, bodyText) {
+  const remaining = Number.parseInt(
+    String(resp.headers.get("x-ratelimit-remaining") || ""),
+    10,
+  );
+  return (
+    (resp.status === 403 || resp.status === 429) &&
+    (
+      remaining === 0 ||
+      String(bodyText || "").toLowerCase().includes("api rate limit exceeded")
+    )
+  );
+}
+
+function normalizeGithubCommit(commit) {
+  const commitData = commit && commit.commit ? commit.commit : {};
+  const authorData = commitData.author || commitData.committer || {};
+  const sha = String(commit && commit.sha ? commit.sha : "").trim();
+  const author = String(authorData.name || "").trim() || "Unknown author";
+  const date = String(authorData.date || "").trim() || "unknown date";
+  const message = String(commitData.message || "").trim() || "(no message)";
+
+  return {
+    sha: sha ? sha.slice(0, 7) : "unknown",
+    author,
+    date,
+    message,
+  };
 }
 
 function canSendGithubToken(url) {
@@ -153,6 +245,98 @@ async function fetchGithubZip(url, token) {
   }
 
   return await readZipResponse(await fetch(url), url);
+}
+
+export async function fetchGithubCommits(owner, repo, branch, count, token) {
+  const safeOwner = String(owner || "").trim();
+  const safeRepo = String(repo || "").trim();
+  const safeBranch = String(branch || "").trim() || "main";
+  const trimmedToken = String(token || "").trim();
+  const normalizedCount = normalizeGithubCommitCount(count);
+
+  if (!safeOwner || !safeRepo) {
+    throw new Error("Missing GitHub repository.");
+  }
+
+  const commits = [];
+  let page = 1;
+
+  // GitHub's commits REST endpoint is capped at 100 items per page, so
+  // counts above that require pagination even though the UI allows up to 500.
+  while (commits.length < normalizedCount) {
+    const remaining = normalizedCount - commits.length;
+    const perPage = Math.min(GITHUB_COMMITS_PAGE_SIZE, remaining);
+    const url = buildGithubCommitsUrl(
+      safeOwner,
+      safeRepo,
+      safeBranch,
+      perPage,
+      page,
+    );
+    const resp = await fetch(url, {
+      headers: buildGithubApiHeaders(trimmedToken),
+    });
+
+    if (!resp.ok) {
+      const bodyText = await resp.text();
+
+      if (isGithubRateLimitResponse(resp, bodyText)) {
+        throw createGithubFetchError(
+          "GitHub API rate limit hit. Add a token for more requests.",
+          {
+            status: resp.status,
+            rateLimited: true,
+          }
+        );
+      }
+
+      if (trimmedToken && (resp.status === 401 || resp.status === 403)) {
+        throw createGithubFetchError(
+          `GitHub rejected the supplied token for ${safeOwner}/${safeRepo}`,
+          {
+            status: resp.status,
+            authRejected: true,
+          }
+        );
+      }
+
+      if (resp.status === 404) {
+        throw createGithubFetchError(
+          "Repository not found or you may need a GitHub token for private repos. Add one in Advanced Settings.",
+          {
+            status: resp.status,
+          }
+        );
+      }
+
+      throw createGithubFetchError(
+        `GitHub returned ${resp.status} ${resp.statusText}`.trim(),
+        {
+          status: resp.status,
+        }
+      );
+    }
+
+    const data = await resp.json();
+    if (!Array.isArray(data)) {
+      throw new Error("Unexpected GitHub commits response.");
+    }
+
+    for (const item of data) {
+      if (commits.length >= normalizedCount) {
+        break;
+      }
+      commits.push(normalizeGithubCommit(item));
+    }
+
+    if (data.length < perPage) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return commits;
 }
 
 async function fetchPageContent(url, options = {}) {

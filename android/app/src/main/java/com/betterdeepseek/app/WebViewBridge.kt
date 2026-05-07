@@ -22,6 +22,7 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -40,6 +41,7 @@ import org.json.JSONObject
 class WebViewBridge(
         private val context: Context,
         httpClient: OkHttpClient? = null,
+        private val githubApiBaseUrl: String = DEFAULT_GITHUB_API_BASE_URL,
 ) {
 
     private val prefs: SharedPreferences =
@@ -209,9 +211,9 @@ class WebViewBridge(
      * Single entry point for sendMessage-shaped payloads. The JS polyfill calls this with the
      * JSON-encoded message and parses the JSON response.
      *
-     * Supported types (Phase 1): bds-fetch-url -> { ok, html } bds-fetch-github-zip -> { ok,
-     * base64, status?, authRejected? } bds-get-youtube-transcript -> { ok: false, error: "..." }
-     * (Phase 2)
+     * Supported types: bds-fetch-url -> { ok, html } bds-fetch-github-zip -> { ok, base64,
+     * status?, authRejected? } bds-fetch-github-commits -> { ok, commits, status?,
+     * authRejected?, rateLimited? } bds-get-youtube-transcript -> { ok: false, error: "..." }
      *
      * Unknown types return { ok: false, error: "..." } so the JS side never sees an exception cross
      * the bridge.
@@ -224,6 +226,7 @@ class WebViewBridge(
             when (val type = payload.optString("type")) {
                 "bds-fetch-url" -> handleFetchUrl(payload, response)
                 "bds-fetch-github-zip" -> handleFetchGithubZip(payload, response)
+                "bds-fetch-github-commits" -> handleFetchGithubCommits(payload, response)
                 "bds-get-youtube-transcript" -> {
                     response.put("ok", false)
                     response.put(
@@ -345,6 +348,103 @@ class WebViewBridge(
         }
     }
 
+    private fun handleFetchGithubCommits(payload: JSONObject, response: JSONObject) {
+        val owner = payload.optString("owner").trim()
+        val repo = payload.optString("repo").trim()
+        val branch = payload.optString("branch").trim().ifEmpty { "main" }
+        val token = payload.optString("token").trim()
+        val count = normalizeGithubCommitCount(payload.opt("count"))
+
+        if (owner.isEmpty() || repo.isEmpty()) {
+            response.put("ok", false)
+            response.put("error", "Missing GitHub repository.")
+            return
+        }
+
+        val commits = JSONArray()
+        var page = 1
+
+        // GitHub's commits API only returns up to 100 items per page, so
+        // larger UI counts must be assembled across multiple requests.
+        while (commits.length() < count) {
+            val remaining = count - commits.length()
+            val perPage = minOf(GITHUB_COMMITS_PAGE_SIZE, remaining)
+            var fetchedThisPage = perPage
+            val requestBuilder =
+                    Request.Builder()
+                            .url(buildGithubCommitsUrl(owner, repo, branch, perPage, page))
+                            .header("Accept", "application/vnd.github+json")
+                            .header("X-GitHub-Api-Version", "2022-11-28")
+
+            if (token.isNotEmpty()) {
+                requestBuilder.header("Authorization", "token $token")
+            }
+
+            httpClient.newCall(requestBuilder.build()).execute().use { resp ->
+                val bodyText = resp.body?.string() ?: ""
+
+                if (!resp.isSuccessful) {
+                    if (isGithubRateLimitResponse(resp.code, resp.header("X-RateLimit-Remaining"), bodyText)) {
+                        putGithubError(
+                                response,
+                                "GitHub API rate limit hit. Add a token for more requests.",
+                                resp.code,
+                                rateLimited = true,
+                        )
+                        return
+                    }
+
+                    if (token.isNotEmpty() && (resp.code == 401 || resp.code == 403)) {
+                        putGithubError(
+                                response,
+                                "GitHub rejected the supplied token for $owner/$repo",
+                                resp.code,
+                                authRejected = true,
+                        )
+                        return
+                    }
+
+                    if (resp.code == 404) {
+                        putGithubError(
+                                response,
+                                "Repository not found or you may need a GitHub token for private repos. Add one in Advanced Settings.",
+                                resp.code,
+                        )
+                        return
+                    }
+
+                    putGithubError(
+                            response,
+                            "GitHub returned ${resp.code} ${resp.message}".trim(),
+                            resp.code,
+                    )
+                    return
+                }
+
+                val pageCommits =
+                        try {
+                            JSONArray(bodyText)
+                        } catch (t: Throwable) {
+                            response.put("ok", false)
+                            response.put("error", "Unexpected GitHub commits response.")
+                            return
+                        }
+
+                for (i in 0 until pageCommits.length()) {
+                    if (commits.length() >= count) break
+                    commits.put(normalizeGithubCommit(pageCommits.getJSONObject(i)))
+                }
+                fetchedThisPage = pageCommits.length()
+            }
+
+            if (fetchedThisPage < perPage) break
+            page += 1
+        }
+
+        response.put("ok", true)
+        response.put("commits", commits)
+    }
+
     private fun encodeZipToResponse(resp: okhttp3.Response, url: String, response: JSONObject) {
         val bytes = resp.body?.bytes() ?: ByteArray(0)
         if (bytes.size < 100) {
@@ -364,8 +464,82 @@ class WebViewBridge(
                 false
             }
 
+    private fun normalizeGithubCommitCount(rawCount: Any?): Int {
+        val parsed =
+                when (rawCount) {
+                    is Number -> rawCount.toInt()
+                    is String -> rawCount.toIntOrNull()
+                    else -> null
+                } ?: DEFAULT_GITHUB_COMMIT_COUNT
+        return parsed.coerceIn(1, MAX_GITHUB_COMMIT_COUNT)
+    }
+
+    private fun buildGithubCommitsUrl(
+            owner: String,
+            repo: String,
+            branch: String,
+            perPage: Int,
+            page: Int,
+    ): String {
+        val encodedBranch = Uri.encode(branch)
+        return "$githubApiBaseUrl/repos/$owner/$repo/commits?sha=$encodedBranch&per_page=$perPage&page=$page"
+    }
+
+    private fun isGithubRateLimitResponse(
+            statusCode: Int,
+            remainingHeader: String?,
+            bodyText: String,
+    ): Boolean {
+        val remaining = remainingHeader?.toIntOrNull()
+        return (statusCode == 403 || statusCode == 429) &&
+                (remaining == 0 || bodyText.contains("API rate limit exceeded", ignoreCase = true))
+    }
+
+    private fun normalizeGithubCommit(commit: JSONObject): JSONObject {
+        val commitData = commit.optJSONObject("commit") ?: JSONObject()
+        val authorData =
+                commitData.optJSONObject("author")
+                        ?: commitData.optJSONObject("committer")
+                        ?: JSONObject()
+        val sha = commit.optString("sha").trim()
+        val author = authorData.optString("name").trim().ifEmpty { "Unknown author" }
+        val date = authorData.optString("date").trim().ifEmpty { "unknown date" }
+        val message = commitData.optString("message").trim().ifEmpty { "(no message)" }
+
+        return JSONObject().apply {
+            put("sha", if (sha.isNotEmpty()) sha.take(7) else "unknown")
+            put("author", author)
+            put("date", date)
+            put("message", message)
+        }
+    }
+
+    private fun putGithubError(
+            response: JSONObject,
+            message: String,
+            status: Int? = null,
+            authRejected: Boolean = false,
+            rateLimited: Boolean = false,
+    ) {
+        response.put("ok", false)
+        response.put("error", message)
+        if (status != null) {
+            response.put("status", status)
+        }
+        if (authRejected) {
+            response.put("authRejected", true)
+        }
+        if (rateLimited) {
+            response.put("rateLimited", true)
+        }
+    }
+
     companion object {
         private const val TAG = "BdsWebViewBridge"
         private const val PREFS_NAME = "bds_storage"
+        private const val DEFAULT_GITHUB_API_BASE_URL = "https://api.github.com"
+        private const val DEFAULT_GITHUB_COMMIT_COUNT = 100
+        private const val GITHUB_COMMITS_PAGE_SIZE = 100
+        private const val MAX_GITHUB_COMMIT_COUNT = 500
     }
 }

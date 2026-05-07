@@ -2,6 +2,13 @@
   import { onMount } from "svelte";
   import { pickFolderAndConcatenate } from "../files/folder-reader.js";
   import { fetchGitHubRepo, parseGitHubUrl } from "../files/github-reader.js";
+  import {
+    DEFAULT_GITHUB_COMMIT_COUNT,
+    MAX_GITHUB_COMMIT_COUNT,
+    MIN_GITHUB_COMMIT_COUNT,
+    fetchGitHubCommits,
+    normalizeGitHubCommitCount,
+  } from "../files/github-commits.js";
   import { fetchAndConvertWebPage } from "../files/web-reader.js";
   import { projectFilesToFile } from "../files/project-file-builder.js";
   import {
@@ -29,6 +36,8 @@
   let githubStatus = "";
   let githubLoading = false;
   let githubError = "";
+  let includeCommits = false;
+  let commitCount = DEFAULT_GITHUB_COMMIT_COUNT;
 
   // Web Import dialog state
   let showWebDialog = false;
@@ -315,7 +324,28 @@
     githubStatus = "";
     githubError = "";
     githubLoading = false;
+    includeCommits = false;
+    commitCount = DEFAULT_GITHUB_COMMIT_COUNT;
     showGithubDialog = true;
+  }
+
+  function clampCommitCount(value) {
+    return normalizeGitHubCommitCount(
+      value,
+      DEFAULT_GITHUB_COMMIT_COUNT,
+    );
+  }
+
+  function handleCommitCountInput(event) {
+    const rawValue = event.currentTarget.value;
+    if (rawValue === "") {
+      commitCount = DEFAULT_GITHUB_COMMIT_COUNT;
+      event.currentTarget.value = String(commitCount);
+      return;
+    }
+
+    commitCount = clampCommitCount(rawValue);
+    event.currentTarget.value = String(commitCount);
   }
 
   async function submitGithubUrl() {
@@ -333,7 +363,7 @@
 
     try {
       const token = String(appState.settings.githubToken || "").trim();
-      const file = await fetchGitHubRepo(
+      const sourceFile = await fetchGitHubRepo(
         githubUrl,
         (status) => {
           githubStatus = status;
@@ -341,9 +371,40 @@
         { token },
       );
 
-      if (file) {
+      if (sourceFile) {
+        injectFile(sourceFile);
+      }
+
+      if (includeCommits && sourceFile) {
+        try {
+          const resolvedBranch =
+            sourceFile.bdsGitHub?.branch || parsed.branch || "main";
+          const commitFile = await fetchGitHubCommits(
+            githubUrl,
+            commitCount,
+            (status) => {
+              githubStatus = status;
+            },
+            {
+              token,
+              branch: resolvedBranch,
+            },
+          );
+
+          if (commitFile) {
+            injectFile(commitFile);
+          }
+        } catch (error) {
+          if (appState.ui) {
+            appState.ui.showToast(
+              error?.message || "Failed to fetch commit history.",
+            );
+          }
+        }
+      }
+
+      if (sourceFile) {
         showGithubDialog = false;
-        injectFile(file);
       }
     } catch (err) {
       githubError = err.message || "Failed to fetch repository.";
@@ -763,6 +824,36 @@
           disabled={githubLoading}
           autofocus
         />
+
+        <label class="bds-github-checkbox">
+          <input
+            type="checkbox"
+            bind:checked={includeCommits}
+            disabled={githubLoading}
+          />
+          <span>Include commit history</span>
+        </label>
+
+        {#if includeCommits}
+          <label class="bds-github-number">
+            <span>Number of commits:</span>
+            <input
+              class="bds-github-number-input"
+              type="number"
+              min={MIN_GITHUB_COMMIT_COUNT}
+              max={MAX_GITHUB_COMMIT_COUNT}
+              step="1"
+              inputmode="numeric"
+              bind:value={commitCount}
+              on:input={handleCommitCountInput}
+              on:blur={() => {
+                commitCount = clampCommitCount(commitCount);
+              }}
+              on:keydown={(e) => handleDialogKeydown(e, "github")}
+              disabled={githubLoading}
+            />
+          </label>
+        {/if}
 
         {#if githubError}
           <div class="bds-github-error">{githubError}</div>
@@ -1241,6 +1332,54 @@
     color: var(--bds-danger, #f87171);
     font-size: 13px;
     padding: 0 2px;
+  }
+
+  .bds-github-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--bds-text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .bds-github-checkbox input {
+    margin: 0;
+    accent-color: var(--bds-accent);
+  }
+
+  .bds-github-number {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--bds-text-secondary);
+    font-size: 13px;
+    flex-wrap: wrap;
+  }
+
+  .bds-github-number-input {
+    width: 96px;
+    min-width: 0;
+    background: var(--bds-bg-input);
+    border: 1px solid var(--bds-border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--bds-text-primary);
+    outline: none;
+    transition:
+      border-color var(--bds-transition, 0.18s ease),
+      box-shadow var(--bds-transition, 0.18s ease);
+  }
+
+  .bds-github-number-input:focus {
+    border-color: var(--bds-accent);
+    box-shadow: 0 0 0 3px var(--bds-accent-glow);
+  }
+
+  .bds-github-number-input:disabled {
+    opacity: 0.6;
   }
 
   .bds-github-status {

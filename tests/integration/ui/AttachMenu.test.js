@@ -11,6 +11,18 @@ const githubMocks = vi.hoisted(() => ({
   parseGitHubUrl: vi.fn(),
 }));
 
+const githubCommitMocks = vi.hoisted(() => ({
+  fetchGitHubCommits: vi.fn(),
+  normalizeGitHubCommitCount: vi.fn((value) => {
+    const parsed = Number.parseInt(String(value), 10);
+    if (!Number.isFinite(parsed)) return 100;
+    return Math.min(500, Math.max(1, parsed));
+  }),
+  DEFAULT_GITHUB_COMMIT_COUNT: 100,
+  MIN_GITHUB_COMMIT_COUNT: 1,
+  MAX_GITHUB_COMMIT_COUNT: 500,
+}));
+
 const webMocks = vi.hoisted(() => ({
   fetchAndConvertWebPage: vi.fn(),
 }));
@@ -34,6 +46,7 @@ const bridgeMocks = vi.hoisted(() => ({
 
 vi.mock("../../../src/content/files/folder-reader.js", () => folderMocks);
 vi.mock("../../../src/content/files/github-reader.js", () => githubMocks);
+vi.mock("../../../src/content/files/github-commits.js", () => githubCommitMocks);
 vi.mock("../../../src/content/files/web-reader.js", () => webMocks);
 vi.mock("../../../src/content/files/project-file-builder.js", () => projectFileBuilderMocks);
 vi.mock("../../../src/content/project-manager.js", () => projectManagerMocks);
@@ -76,6 +89,7 @@ describe("AttachMenu integration", () => {
     projectManagerMocks.untickFile.mockReset();
     githubMocks.fetchGitHubRepo.mockReset();
     githubMocks.parseGitHubUrl.mockReset();
+    githubCommitMocks.fetchGitHubCommits.mockReset();
     webMocks.fetchAndConvertWebPage.mockReset();
     projectFileBuilderMocks.projectFilesToFile.mockReset();
     bridgeMocks.pushConfigToPage.mockReset();
@@ -121,6 +135,53 @@ describe("AttachMenu integration", () => {
       { token: "" },
     );
     expect(nativeInput.files).toHaveLength(1);
+    expect(Array.from(nativeInput.files, (item) => item.name)).toEqual(["repo.txt"]);
+    expect(githubCommitMocks.fetchGitHubCommits).not.toHaveBeenCalled();
+    cleanup();
+  });
+
+  it("injects repo and commit files when commit history is enabled", async () => {
+    const nativeInput = setupNativeInput();
+    const repoFile = new File(["repo"], "repo.txt", { type: "text/plain" });
+    Object.defineProperty(repoFile, "bdsGitHub", {
+      value: { owner: "owner", repo: "repo", branch: "master" },
+      configurable: true,
+    });
+    const commitFile = new File(["commits"], "repo_commits.txt", {
+      type: "text/plain",
+    });
+    githubMocks.parseGitHubUrl.mockReturnValue({ owner: "owner", repo: "repo", branch: "main" });
+    githubMocks.fetchGitHubRepo.mockResolvedValue(repoFile);
+    githubCommitMocks.fetchGitHubCommits.mockResolvedValue(commitFile);
+    const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+
+    target.querySelector(".bds-plus-btn").click();
+    await flushUi();
+    const items = Array.from(document.querySelectorAll(".bds-attach-item"));
+    items.find((item) => item.textContent.includes("GitHub Repo")).click();
+    await flushUi();
+
+    const dialogInput = document.querySelector(".bds-github-input");
+    dialogInput.value = "owner/repo";
+    dialogInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await flushUi();
+
+    document.querySelector(".bds-github-checkbox input").click();
+    await flushUi();
+    document.querySelector(".bds-github-btn-import").click();
+    await flushUi();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(githubCommitMocks.fetchGitHubCommits).toHaveBeenCalledWith(
+      "owner/repo",
+      100,
+      expect.any(Function),
+      { token: "", branch: "master" },
+    );
+    expect(Array.from(nativeInput.files, (item) => item.name)).toEqual([
+      "repo.txt",
+      "repo_commits.txt",
+    ]);
     cleanup();
   });
 

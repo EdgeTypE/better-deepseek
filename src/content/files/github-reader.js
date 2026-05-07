@@ -160,6 +160,7 @@ export async function fetchGitHubRepo(repoUrl, onStatus = () => { }, options = {
   // Try main, then master as fallback
   // Fetch via background service worker to bypass CORS
   let zipData = null;
+  let resolvedBranch = branch;
   let lastFailure = null;
   for (const b of [branch, branch === "main" ? "master" : null].filter(Boolean)) {
     const codeloadUrl = `https://codeload.github.com/${owner}/${repo}/zip/refs/heads/${b}`;
@@ -174,6 +175,7 @@ export async function fetchGitHubRepo(repoUrl, onStatus = () => { }, options = {
 
       if (result && result.ok && result.base64) {
         zipData = decodeZipBase64(result.base64);
+        resolvedBranch = b;
         break;
       }
 
@@ -262,7 +264,7 @@ export async function fetchGitHubRepo(repoUrl, onStatus = () => { }, options = {
   validEntries.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
 
   // Build file tree
-  let output = `Repository: ${owner}/${repo}/${branch}\n`;
+  let output = `Repository: ${owner}/${repo}/${resolvedBranch}\n`;
   output += `${"=".repeat(48)}\n\n`;
   output += "Directory Tree:\n";
   output += buildTree(validEntries.map((e) => e.relativePath));
@@ -287,7 +289,16 @@ export async function fetchGitHubRepo(repoUrl, onStatus = () => { }, options = {
   onStatus("Creating file...");
 
   const blob = new Blob([output], { type: "text/plain" });
-  return new File([blob], `${repo}_github.txt`, { type: "text/plain" });
+  const file = new File([blob], `${repo}_github.txt`, { type: "text/plain" });
+  Object.defineProperty(file, "bdsGitHub", {
+    value: {
+      owner,
+      repo,
+      branch: resolvedBranch,
+    },
+    configurable: true,
+  });
+  return file;
 }
 
 /** Strip the common ZIP root prefix from a path */

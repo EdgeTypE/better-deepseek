@@ -70,6 +70,16 @@ export const chromeMock = {
   runtime: {
     sendMessage: vi.fn(async () => undefined),
     getURL: vi.fn((path = "") => `${chromeMockState.extensionBaseUrl}${path}`),
+    onMessage: {
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      hasListener: vi.fn(() => false),
+    },
+    onInstalled: {
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      hasListener: vi.fn(() => false),
+    },
   },
 };
 
@@ -88,6 +98,12 @@ export function resetChromeMock() {
   chromeMock.storage.onChanged.removeListener.mockClear();
   chromeMock.runtime.sendMessage.mockClear();
   chromeMock.runtime.getURL.mockClear();
+  chromeMock.runtime.onMessage.addListener.mockClear();
+  chromeMock.runtime.onMessage.removeListener.mockClear();
+  chromeMock.runtime.onMessage.hasListener.mockClear();
+  chromeMock.runtime.onInstalled.addListener.mockClear();
+  chromeMock.runtime.onInstalled.removeListener.mockClear();
+  chromeMock.runtime.onInstalled.hasListener.mockClear();
   listeners.clear();
 }
 

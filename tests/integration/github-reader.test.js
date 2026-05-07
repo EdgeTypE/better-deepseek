@@ -91,10 +91,17 @@ describe("github-reader integration", () => {
       .mockResolvedValueOnce({ ok: false, status: 404 })
       .mockResolvedValueOnce({ ok: true, base64 });
 
-    await fetchGitHubRepo("owner/repo");
+    const file = await fetchGitHubRepo("owner/repo");
+    const text = await readFileText(file);
 
     expect(chrome.runtime.sendMessage.mock.calls[0][0].url).toContain("/main");
     expect(chrome.runtime.sendMessage.mock.calls[1][0].url).toContain("/master");
+    expect(text).toContain("Repository: owner/repo/master");
+    expect(file.bdsGitHub).toEqual({
+      owner: "owner",
+      repo: "repo",
+      branch: "master",
+    });
   });
 
   it("surfaces auth failures and invalid urls", async () => {
