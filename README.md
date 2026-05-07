@@ -382,8 +382,14 @@ Run the main test commands before opening a PR:
 
 - `npm run test:unit` - runs the Vitest unit and integration suite with coverage.
 - `npm run test:e2e` - runs the Playwright browser-extension end-to-end suite.
-- `npm run test` - runs the full test stack.
-- `npm run test:ci` - runs the CI-equivalent flow: Chrome build, Vitest, then Playwright.
+- `npm run test` - runs the default browser-focused local test stack.
+- `npm run test:e2e:android` - runs the Android WebView simulator Playwright suite against `dist-android/`.
+- `npm run test:android` - builds the Android web bundle and runs the Android simulator suite.
+- `npm run android:test` - runs the Kotlin unit tests in `android/`.
+- `npm run android:assemble:debug` - builds the debug APK through the Gradle wrapper.
+- `npm run test:ci:web` - runs the web CI-equivalent flow: Chrome build, Vitest, then Playwright.
+- `npm run test:ci:android` - runs the Android CI-equivalent flow: Android bundle build, APK assembly, Android Playwright, then Kotlin unit tests.
+- `npm run test:ci` - runs both CI-equivalent jobs locally.
 
 For fuller testing notes, suite layout, and conventions, see [TESTING.md](TESTING.md).
 

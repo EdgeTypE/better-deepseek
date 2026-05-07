@@ -17,8 +17,12 @@
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
     "test:e2e:android": "playwright test --config=playwright.android.config.js",
+    "android:test": "node scripts/run-android-gradle.js test",
+    "android:assemble:debug": "node scripts/run-android-gradle.js assembleDebug",
     "test:android": "npm run build:android && npm run test:e2e:android",
-    "test:ci": "npm run build:chrome && npm run test:unit && npm run test:e2e"
+    "test:ci:web": "npm run build:chrome && npm run test:unit && npm run test:e2e",
+    "test:ci:android": "npm run build:android && npm run android:assemble:debug && npm run test:e2e:android && npm run android:test",
+    "test:ci": "npm run test:ci:web && npm run test:ci:android"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
