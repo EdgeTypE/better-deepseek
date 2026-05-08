@@ -46,7 +46,7 @@ export function setupBridgeEvents() {
       state.pricing.modelName = data.modelName;
     }
   });
-  
+
   window.addEventListener("bds:mutation-applied", (event) => {
     let data = event.detail;
     if (typeof data === "string") {
@@ -58,6 +58,17 @@ export function setupBridgeEvents() {
         userPrompt: data.userPrompt
       });
     }
+  });
+
+  window.addEventListener("bds:network-error", (event) => {
+    let detail = event.detail;
+    if (typeof detail === "string") {
+      try { detail = JSON.parse(detail); } catch (e) { return; }
+    }
+    console.warn("[BDS] Network error detected:", detail);
+
+    // Trigger immediate status check
+    import("./status-monitor.js").then(m => m.fetchServerStatus());
   });
 }
 
