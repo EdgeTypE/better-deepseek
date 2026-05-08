@@ -4,6 +4,7 @@
   import QuestionPanel from "./QuestionPanel.svelte";
   import WhatsNewModal from "./WhatsNewModal.svelte";
   import SelectionOverlay from "./SelectionOverlay.svelte";
+  import StatusBanner from "./StatusBanner.svelte";
   import appState from "../state.js";
 
   let drawerOpen = $state(false);
@@ -77,3 +78,4 @@
 {/if}
 
 <SelectionOverlay />
+<StatusBanner />

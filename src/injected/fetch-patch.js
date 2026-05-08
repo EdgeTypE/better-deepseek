@@ -48,8 +48,31 @@ export function patchFetch(state, isChatCompletionUrl, markStart, markEnd) {
           requestInfo.input,
           requestInfo.init
         );
+        
+        // Detect server errors
+        if (response && response.status >= 500) {
+          window.dispatchEvent(new CustomEvent("bds:network-error", {
+            detail: JSON.stringify({
+              url,
+              status: response.status,
+              type: 'fetch'
+            })
+          }));
+        }
+        
         tryCaptureTokenUsage(response, url, requestInfo.modelName);
         return response;
+      } catch (innerError) {
+        // Detect network failures
+        window.dispatchEvent(new CustomEvent("bds:network-error", {
+          detail: JSON.stringify({
+            url,
+            status: 0,
+            type: 'fetch',
+            error: String(innerError)
+          })
+        }));
+        throw innerError;
       } finally {
         markEnd(url);
       }
