@@ -111,6 +111,20 @@ test("imports a GitHub repository through the attach menu flow", async ({ page }
     .toEqual(["Hello-World_github.txt"]);
 });
 
+test("imports GitHub commit history as a second attachment when enabled", async ({ page }) => {
+  await page.locator(".bds-plus-btn").click();
+  await page.locator(".bds-attach-dropdown .bds-attach-item").filter({ hasText: "GitHub Repo" }).click();
+  await page.locator(".bds-github-input").fill("octocat/Hello-World");
+  await page.locator(".bds-github-checkbox input").check();
+  await expect(page.locator(".bds-github-number-input")).toHaveValue("");
+  await expect(page.locator(".bds-github-number-input")).toHaveAttribute("placeholder", "100");
+  await page.locator(".bds-github-btn-import").click();
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.getAttachedFiles()))
+    .toEqual(["Hello-World_github.txt", "Hello-World_commits.txt"]);
+});
+
 test("creates standalone download cards for create_file outputs", async ({ page }) => {
   await addAssistantMessage(
     page,

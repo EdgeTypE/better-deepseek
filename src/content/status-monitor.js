@@ -21,22 +21,22 @@ export async function fetchServerStatus() {
   try {
     const response = await fetch(STATUS_API);
     if (!response.ok) throw new Error("Status API returned " + response.status);
-    
+
     const data = await response.json();
     const { status } = data;
-    
+
     if (status) {
       state.serverStatus = {
         indicator: status.indicator || "none",
         description: status.description || "Operational",
         lastChecked: Date.now()
       };
-      
+
       // Dispatch event for UI components
-      window.dispatchEvent(new CustomEvent("bds:status-updated", { 
-        detail: state.serverStatus 
+      window.dispatchEvent(new CustomEvent("bds:status-updated", {
+        detail: state.serverStatus
       }));
-      
+
       console.log("[BDS] Server status updated:", state.serverStatus);
     }
   } catch (error) {
@@ -49,6 +49,7 @@ export async function fetchServerStatus() {
  */
 export function startStatusMonitor() {
   if (pollTimer) return;
+
   
   // TODO: Replace with proper Playwright network mocking (page.route) in E2E suite
   if (window.__mockDeepSeek) {
@@ -58,7 +59,7 @@ export function startStatusMonitor() {
   
   // Initial check
   fetchServerStatus();
-  
+
   // Set up interval
   pollTimer = setInterval(fetchServerStatus, POLL_INTERVAL);
 }

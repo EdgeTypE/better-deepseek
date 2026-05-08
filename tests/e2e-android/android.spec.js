@@ -7,6 +7,14 @@
  * regression is caught without needing a device farm.
  */
 import { test, expect } from "./helpers/android.js";
+import { strToU8, zipSync } from "fflate";
+
+const githubZipBase64 = Buffer.from(
+  zipSync({
+    "Hello-World-main/README.md": strToU8("# Hello World\n\nAndroid fixture repo.\n"),
+    "Hello-World-main/src/index.js": strToU8('console.log("android fixture");\n'),
+  }),
+).toString("base64");
 
 async function addAssistantMessage(page, text) {
   await page.evaluate((rawText) => {
@@ -69,6 +77,41 @@ test("Upload Folder button is hidden in Projects panel on Android", async ({ pag
 
 test("hides the voice prompt mic button on Android", async ({ page }) => {
   await expect(page.locator(".bds-mic-btn")).toHaveCount(0);
+});
+
+test("imports a GitHub repository and commit history through the Android bridge", async ({ page }) => {
+  await page.evaluate((zipBase64) => {
+    window.__bdsBridgeRoute = {
+      "bds-fetch-github-zip": () => ({
+        ok: true,
+        base64: zipBase64,
+      }),
+      "bds-fetch-github-commits": () => ({
+        ok: true,
+        commits: [
+          {
+            sha: "abcdef1",
+            author: "Android Fixture",
+            date: "2026-05-07T10:00:00Z",
+            message: "Bridge commit fixture",
+          },
+        ],
+      }),
+    };
+  }, githubZipBase64);
+
+  await page.locator(".bds-plus-btn").click({ force: true });
+  await page
+    .locator(".bds-attach-dropdown .bds-attach-item")
+    .filter({ hasText: "GitHub Repo" })
+    .click({ force: true });
+  await page.locator(".bds-github-input").fill("octocat/Hello-World");
+  await page.locator(".bds-github-checkbox input").check();
+  await page.locator(".bds-github-btn-import").click({ force: true });
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.getAttachedFiles()))
+    .toEqual(["Hello-World_github.txt", "Hello-World_commits.txt"]);
 });
 
 test("renders standalone create_file download cards", async ({ page }) => {

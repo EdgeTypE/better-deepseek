@@ -59,7 +59,7 @@ class WebViewBridgeTest {
             .readTimeout(2, TimeUnit.SECONDS)
             .callTimeout(5, TimeUnit.SECONDS)
             .build()
-        bridge = WebViewBridge(context, client)
+        bridge = WebViewBridge(context, client, server.url("").toString().removeSuffix("/"))
     }
 
     @After
@@ -249,5 +249,73 @@ class WebViewBridgeTest {
 
         assertFalse(response.getBoolean("ok"))
         assertTrue(response.getString("error").contains("empty"))
+    }
+
+    @Test
+    fun `github commits fetch returns structured commit summaries`() {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setBody(
+                    """
+                    [
+                      {
+                        "sha": "abcdef1234567890",
+                        "commit": {
+                          "author": {
+                            "name": "Alice",
+                            "date": "2026-05-06T10:00:00Z"
+                          },
+                          "message": "Fix sidebar"
+                        }
+                      }
+                    ]
+                    """.trimIndent(),
+                ),
+        )
+
+        val payload = JSONObject().apply {
+            put("type", "bds-fetch-github-commits")
+            put("owner", "octocat")
+            put("repo", "Hello-World")
+            put("branch", "feature/ui")
+            put("count", 150)
+        }
+        val response = JSONObject(bridge.fetch(payload.toString()))
+
+        assertTrue(response.getBoolean("ok"))
+        val commits = response.getJSONArray("commits")
+        assertEquals(1, commits.length())
+        val commit = commits.getJSONObject(0)
+        assertEquals("abcdef1", commit.getString("sha"))
+        assertEquals("Alice", commit.getString("author"))
+        assertEquals("2026-05-06T10:00:00Z", commit.getString("date"))
+        assertEquals("Fix sidebar", commit.getString("message"))
+
+        val request = server.takeRequest()
+        assertEquals("GET", request.method)
+        assertEquals("/repos/octocat/Hello-World/commits", request.requestUrl?.encodedPath)
+        assertTrue(request.requestUrl.toString().contains("sha="))
+        assertEquals("100", request.requestUrl?.queryParameter("per_page"))
+        assertEquals("1", request.requestUrl?.queryParameter("page"))
+    }
+
+    @Test
+    fun `github commits fetch returns authRejected on 401`() {
+        server.enqueue(MockResponse().setResponseCode(401).setBody("""{"message":"bad creds"}"""))
+
+        val payload = JSONObject().apply {
+            put("type", "bds-fetch-github-commits")
+            put("owner", "octocat")
+            put("repo", "Hello-World")
+            put("branch", "main")
+            put("count", 5)
+            put("token", "ghp_secret")
+        }
+        val response = JSONObject(bridge.fetch(payload.toString()))
+
+        assertFalse(response.getBoolean("ok"))
+        assertEquals(401, response.getInt("status"))
+        assertTrue(response.getBoolean("authRejected"))
     }
 }

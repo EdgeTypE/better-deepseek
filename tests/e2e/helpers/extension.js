@@ -51,6 +51,17 @@ const githubZip = Buffer.from(
   }),
 );
 
+const githubCommits = Array.from({ length: 3 }, (_, index) => ({
+  sha: `abcdef${index}1234567890`,
+  commit: {
+    author: {
+      name: `Fixture Author ${index + 1}`,
+      date: `2026-05-0${index + 1}T10:00:00Z`,
+    },
+    message: `Fixture commit ${index + 1}`,
+  },
+}));
+
 async function routeFixtureRequests(context) {
   await context.route("https://chat.deepseek.com/**", async (route) => {
     await route.fulfill({
@@ -89,6 +100,17 @@ async function routeFixtureRequests(context) {
           "content-length": String(githubZip.length),
         },
         body: githubZip,
+      });
+    },
+  );
+
+  await context.route(
+    "https://api.github.com/repos/octocat/Hello-World/commits**",
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json; charset=utf-8",
+        body: JSON.stringify(githubCommits),
       });
     },
   );

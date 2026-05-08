@@ -49,7 +49,7 @@ export function patchXmlHttpRequest(
           return;
         }
         requestFinalized = true;
-        
+
         // Detect server errors or network failure
         if (this.status >= 500 || this.status === 0) {
           window.dispatchEvent(new CustomEvent("bds:network-error", {
@@ -60,7 +60,7 @@ export function patchXmlHttpRequest(
             })
           }));
         }
-        
+
         markEnd(meta.url);
       };
 

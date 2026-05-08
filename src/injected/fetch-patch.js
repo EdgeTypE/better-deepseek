@@ -48,7 +48,7 @@ export function patchFetch(state, isChatCompletionUrl, markStart, markEnd) {
           requestInfo.input,
           requestInfo.init
         );
-        
+
         // Detect server errors
         if (response && response.status >= 500) {
           window.dispatchEvent(new CustomEvent("bds:network-error", {
@@ -59,7 +59,7 @@ export function patchFetch(state, isChatCompletionUrl, markStart, markEnd) {
             })
           }));
         }
-        
+
         tryCaptureTokenUsage(response, url, requestInfo.modelName);
         return response;
       } catch (innerError) {
