@@ -39,7 +39,8 @@
     transform: translateX(-50%);
     width: 92%;
     max-width: 480px;
-    z-index: 2147483647;
+    z-index: 9999;
+    pointer-events: none;
     padding: 14px 20px;
     border-radius: 12px;
     display: flex;
