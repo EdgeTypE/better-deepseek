@@ -15,6 +15,9 @@ let pollTimer = null;
  * Fetch current status from DeepSeek.
  */
 export async function fetchServerStatus() {
+  // TODO: Replace with proper Playwright network mocking (page.route) in E2E suite
+  // to avoid embedding test-specific logic in production code.
+  if (window.__mockDeepSeek) return;
   try {
     const response = await fetch(STATUS_API);
     if (!response.ok) throw new Error("Status API returned " + response.status);
@@ -47,6 +50,13 @@ export async function fetchServerStatus() {
 export function startStatusMonitor() {
   if (pollTimer) return;
 
+  
+  // TODO: Replace with proper Playwright network mocking (page.route) in E2E suite
+  if (window.__mockDeepSeek) {
+    console.log("[BDS] Skipping status monitor in test environment");
+    return;
+  }
+  
   // Initial check
   fetchServerStatus();
 
