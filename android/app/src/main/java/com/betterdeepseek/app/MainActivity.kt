@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.ValueCallback
@@ -30,6 +31,16 @@ import java.io.ByteArrayInputStream
 import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import okhttp3.Request
+
+internal fun applyRootWindowInsets(view: View, windowInsets: WindowInsetsCompat): WindowInsetsCompat {
+    val systemBars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+    val imeInsets = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
+
+    view.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+    // Edge-to-edge WebViews do not resize reliably for IME insets, so shift the wrapper instead.
+    view.translationY = -imeInsets.bottom.toFloat()
+    return WindowInsetsCompat.CONSUMED
+}
 
 /**
  * Single-activity host. Loads chat.deepseek.com inside a full-screen WebView and injects the BDS
@@ -111,9 +122,9 @@ class MainActivity : ComponentActivity() {
                     setBackgroundColor(if (isPageDark) PAGE_BG_DARK else PAGE_BG_LIGHT)
                 }
 
-        // FrameLayout wrapper receives system-bar insets and applies them as padding.
-        // WebView.setPadding() does not shift the WebView viewport reliably, so the wrapper
-        // is the inset target. Its background fills the padding band behind the system bars.
+        // FrameLayout wrapper receives system-bar padding and IME translation.
+        // WebView.setPadding() does not shift the viewport reliably, so the wrapper is the
+        // inset target. Its background fills the padding band behind the system bars.
         val rootLayout = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -123,11 +134,7 @@ class MainActivity : ComponentActivity() {
             addView(webView)
         }
 
-        ViewCompat.setOnApplyWindowInsetsListener(rootLayout) { view, windowInsets ->
-            val bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
-            WindowInsetsCompat.CONSUMED
-        }
+        ViewCompat.setOnApplyWindowInsetsListener(rootLayout, ::applyRootWindowInsets)
 
         WindowInsetsControllerCompat(window, window.decorView).apply {
             isAppearanceLightStatusBars = !isPageDark
