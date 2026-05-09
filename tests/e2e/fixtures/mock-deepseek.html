@@ -249,6 +249,30 @@
         cursor: pointer;
         font-size: 13px;
       }
+
+      .mock-settings-trigger {
+        position: fixed;
+        bottom: 16px;
+        left: 16px;
+        width: 36px;
+        height: 36px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #ffffff;
+        cursor: pointer;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+      }
+
+      .mock-settings-menu {
+        position: fixed;
+        bottom: 60px;
+        left: 16px;
+        z-index: 200;
+      }
     </style>
     <script>
       (() => {
@@ -381,6 +405,47 @@
 
           wireHistoryMenus();
 
+          // Settings menu: builds a real .ds-dropdown-menu on each open (same structure
+          // as per-chat menus) so the hide-drawer-app-item MutationObserver fires.
+          const SETTINGS_ITEMS = [
+            { text: "Settings", testid: "drawer-item-settings" },
+            { text: "Report issue", testid: "drawer-item-report" },
+            { text: "Download mobile App", testid: "drawer-item-download" },
+            { text: "Log out", testid: "drawer-item-logout" },
+          ];
+
+          function buildSettingsMenu() {
+            document.querySelectorAll(".mock-settings-menu").forEach((m) => m.remove());
+            const wrapper = document.createElement("div");
+            wrapper.className = "mock-settings-menu";
+            const menu = document.createElement("div");
+            menu.className = "ds-dropdown-menu";
+            menu.dataset.testid = "settings-drawer";
+            for (const { text, testid } of SETTINGS_ITEMS) {
+              const opt = document.createElement("div");
+              opt.className = "ds-dropdown-menu-option";
+              if (testid) opt.dataset.testid = testid;
+              opt.innerHTML = `
+                <div class="ds-dropdown-menu-option__icon"></div>
+                <div class="ds-dropdown-menu-option__label">${text}</div>
+              `;
+              menu.appendChild(opt);
+            }
+            wrapper.appendChild(menu);
+            document.body.appendChild(wrapper);
+          }
+
+          const settingsTrigger = document.getElementById("mock-settings-trigger");
+          settingsTrigger.addEventListener("click", (event) => {
+            event.stopPropagation();
+            buildSettingsMenu();
+          });
+          document.addEventListener("click", (event) => {
+            if (!event.target.closest(".mock-settings-menu") && !event.target.closest("#mock-settings-trigger")) {
+              document.querySelectorAll(".mock-settings-menu").forEach((m) => m.remove());
+            }
+          });
+
           window.__mockDeepSeek = {
             addAssistantMessage(text) {
               return appendMessage(createTextMessage("assistant", text));
@@ -405,6 +470,8 @@
     </script>
   </head>
   <body>
+    <button id="mock-settings-trigger" class="mock-settings-trigger" data-testid="settings-trigger" title="Settings">&#8943;</button>
+
     <div class="mock-get-app-bar" data-testid="get-app-container">
       <button type="button">
         <span aria-hidden="true">&#128241;</span>
