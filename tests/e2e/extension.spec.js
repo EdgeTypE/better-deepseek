@@ -249,6 +249,35 @@ test("exports a chat as markdown from the sidebar menu", async ({ page }) => {
   expect(artifact.suggestedFilename()).toMatch(/\.md$/);
 });
 
+test("hides the Get App promotional button when the Android hide script runs", async ({ page }) => {
+  const container = page.locator('[data-testid="get-app-container"]');
+  await expect(container).toBeVisible();
+
+  // Simulate MainActivity.injectBdsScripts() evaluating the hide-get-app snippet.
+  await page.evaluate(() => {
+    if (window.__bdsGetAppHidden) return;
+    function attempt() {
+      const spans = document.querySelectorAll("span");
+      for (const span of spans) {
+        if (span.textContent.trim() !== "Get App") continue;
+        let el = span.parentElement;
+        while (el && el.tagName !== "BUTTON") {
+          el = el.parentElement;
+        }
+        if (el && el.parentElement) {
+          el.parentElement.style.display = "none";
+          window.__bdsGetAppHidden = true;
+          return true;
+        }
+      }
+      return false;
+    }
+    attempt();
+  });
+
+  await expect(container).not.toBeVisible();
+});
+
 test("creates the PDF export iframe from the sidebar menu", async ({ page }) => {
   await page.goto("https://chat.deepseek.com/chat/s/mock-chat-1");
   await page.waitForSelector("#bds-toggle");

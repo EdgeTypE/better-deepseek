@@ -339,9 +339,43 @@ class MainActivity : ComponentActivity() {
             })();
         """.trimIndent()
 
+        // Hides the "Get App" promotional button shown on mobile viewports.
+        // Detection is text-based so it survives DeepSeek's dynamic class renames.
+        // A MutationObserver retries if the element is not yet present at injection time.
+        val hideGetApp =
+                """
+            (function () {
+                if (window.__bdsGetAppHidden) return;
+                function attempt() {
+                    var spans = document.querySelectorAll('span');
+                    for (var i = 0; i < spans.length; i++) {
+                        var span = spans[i];
+                        if (span.textContent.trim() !== 'Get App') continue;
+                        var el = span.parentElement;
+                        while (el && el.tagName !== 'BUTTON') { el = el.parentElement; }
+                        if (el && el.parentElement) {
+                            el.parentElement.style.display = 'none';
+                            window.__bdsGetAppHidden = true;
+                            console.log('[BDS] Hidden Get App container');
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+                if (attempt()) return;
+                var timeout;
+                var observer = new MutationObserver(function () {
+                    if (attempt()) { observer.disconnect(); clearTimeout(timeout); }
+                });
+                observer.observe(document.body, { subtree: true, childList: true });
+                timeout = setTimeout(function () { observer.disconnect(); }, 10000);
+            })();
+        """.trimIndent()
+
         view.evaluateJavascript(injected, null)
         view.evaluateJavascript(bootstrap, null)
         view.evaluateJavascript(content, null)
+        view.evaluateJavascript(hideGetApp, null)
     }
 
     private fun readAsset(path: String): String? =

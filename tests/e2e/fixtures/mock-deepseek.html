@@ -228,6 +228,27 @@
       .ds-dropdown-menu-option__label {
         font-size: 13px;
       }
+
+      .mock-get-app-bar {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding: 8px 16px;
+        background: #ffffff;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .mock-get-app-bar button {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #f9fafb;
+        cursor: pointer;
+        font-size: 13px;
+      }
     </style>
     <script>
       (() => {
@@ -384,6 +405,12 @@
     </script>
   </head>
   <body>
+    <div class="mock-get-app-bar" data-testid="get-app-container">
+      <button type="button">
+        <span aria-hidden="true">&#128241;</span>
+        <span>Get App</span>
+      </button>
+    </div>
     <div class="app-shell">
       <aside class="dc04ec1d">
         <div class="mock-sidebar-title">History</div>
