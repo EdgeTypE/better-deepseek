@@ -49,8 +49,26 @@ describe("startThemeWatcher", () => {
     );
   });
 
+  it("body 'light' beats system dark mode — explicit choice wins", () => {
+    document.body.className = "en_US light";
+    mediaQueryDark = true;
+    startThemeWatcher();
+    expect(storageSet).toHaveBeenCalledWith(
+      expect.objectContaining({ [STORAGE_KEYS.pageIsDark]: false })
+    );
+  });
+
+  it("body 'dark' beats system light mode — explicit choice wins", () => {
+    document.body.className = "en_US dark";
+    mediaQueryDark = false;
+    startThemeWatcher();
+    expect(storageSet).toHaveBeenCalledWith(
+      expect.objectContaining({ [STORAGE_KEYS.pageIsDark]: true })
+    );
+  });
+
   it("falls back to matchMedia when body has no theme class", () => {
-    document.body.className = "";
+    document.body.className = "en_US";
     mediaQueryDark = true;
     startThemeWatcher();
     expect(storageSet).toHaveBeenCalledWith(

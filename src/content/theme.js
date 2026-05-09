@@ -14,14 +14,13 @@
 import { STORAGE_KEYS } from "../lib/constants.js";
 
 export function startThemeWatcher() {
-  // DeepSeek sets the theme class on <body> (e.g. "en_US dark"), not on <html>.
-  // matchMedia is retained as a fallback for the "System" setting where no explicit
-  // body class may be present, and for OS-level theme changes.
+  // DeepSeek sets the theme class on <body> (e.g. "en_US dark" / "en_US light"), not on <html>.
+  // Explicit body class always wins; matchMedia is a last-resort fallback for the "System"
+  // setting or when no class is present yet.
   function detect() {
-    return (
-      document.body.classList.contains("dark") ||
-      window.matchMedia("(prefers-color-scheme: dark)").matches
-    );
+    if (document.body.classList.contains("dark")) return true;
+    if (document.body.classList.contains("light")) return false;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
   }
 
   function apply(isDark) {
