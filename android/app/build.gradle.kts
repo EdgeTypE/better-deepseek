@@ -13,11 +13,12 @@ android {
     
     defaultConfig {
         applicationId = "com.betterdeepseek.app"
-        minSdk = 26 
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         // Keep in sync with package.json "version" and static/manifest.json "version".
         versionName = "0.1.5"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -69,4 +70,9 @@ dependencies {
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     testImplementation("org.json:json:20240303")
+
+    androidTestImplementation("androidx.test.ext:junit-ktx:1.2.1")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 }

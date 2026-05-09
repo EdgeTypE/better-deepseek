@@ -47,6 +47,7 @@ class WebViewBridgeTest {
         prefsEditor = mock(SharedPreferences.Editor::class.java)
         `when`(prefs.edit()).thenReturn(prefsEditor)
         `when`(prefsEditor.putString(any(), any())).thenReturn(prefsEditor)
+        `when`(prefsEditor.putBoolean(any(), any())).thenReturn(prefsEditor)
         `when`(prefsEditor.remove(any())).thenReturn(prefsEditor)
 
         context = mock(Context::class.java)
@@ -167,6 +168,48 @@ class WebViewBridgeTest {
         val response = JSONObject(bridge.fetch("not-json"))
         assertFalse(response.getBoolean("ok"))
         assertTrue(response.getString("error").contains("Bridge error"))
+    }
+
+    // ── theme ───────────────────────────────────────────────────────────
+
+    @Test
+    fun `reportTheme fires callback and does not touch prefs`() {
+        var reported: Boolean? = null
+        bridge.onThemeChanged = { isDark -> reported = isDark }
+
+        bridge.reportTheme(true)
+
+        // Persistence is handled by theme.js via chrome.storage — bridge must not double-write.
+        verify(prefsEditor, never()).putBoolean(any(), any<Boolean>())
+        assertEquals(true, reported)
+    }
+
+    @Test
+    fun `reportTheme false fires callback`() {
+        var reported: Boolean? = null
+        bridge.onThemeChanged = { isDark -> reported = isDark }
+        bridge.reportTheme(false)
+        assertEquals(false, reported)
+    }
+
+    @Test
+    fun `getLastKnownIsDark returns true when polyfill stored json true string`() {
+        // The Android storage polyfill calls setStorage(key, JSON.stringify(true)) = "true".
+        `when`(prefs.getString(WebViewBridge.KEY_LAST_PAGE_DARK, null)).thenReturn("true")
+        assertTrue(bridge.getLastKnownIsDark(default = false))
+    }
+
+    @Test
+    fun `getLastKnownIsDark returns false when polyfill stored json false string`() {
+        `when`(prefs.getString(WebViewBridge.KEY_LAST_PAGE_DARK, null)).thenReturn("false")
+        assertFalse(bridge.getLastKnownIsDark(default = true))
+    }
+
+    @Test
+    fun `getLastKnownIsDark forwards default when prefs has no entry`() {
+        `when`(prefs.getString(WebViewBridge.KEY_LAST_PAGE_DARK, null)).thenReturn(null)
+        assertFalse(bridge.getLastKnownIsDark(default = false))
+        assertTrue(bridge.getLastKnownIsDark(default = true))
     }
 
     // ── github zip ──────────────────────────────────────────────────────

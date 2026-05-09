@@ -27,6 +27,7 @@ import { initSidebarSearch } from "./ui/SidebarSearch.js";
 import { checkPendingExport } from "./tools/pending-export.js";
 import { initPricing } from "../lib/pricing.js";
 import { startStatusMonitor } from "./status-monitor.js";
+import { startThemeWatcher } from "./theme.js";
 
 init().catch((error) => {
   console.error("[BetterDeepSeek] Init error:", error);
@@ -48,6 +49,7 @@ async function init() {
   checkPendingExport();
   pushConfigToPage();
   startStatusMonitor();
+  startThemeWatcher();
 
   // Dynamically fetch pricing and update embedded fallback
   initPricing().then((pricing) => {

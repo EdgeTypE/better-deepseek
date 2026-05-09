@@ -2,6 +2,8 @@ package com.betterdeepseek.app
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.res.Configuration
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -18,7 +20,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.FrameLayout
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebViewAssetLoader
 import java.io.ByteArrayInputStream
 import java.util.concurrent.TimeUnit
@@ -61,7 +67,9 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, true)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
 
         bridge = WebViewBridge(applicationContext)
         cookieManager = CookieManager.getInstance()
@@ -71,6 +79,12 @@ class MainActivity : ComponentActivity() {
                         .setDomain(getString(R.string.bds_asset_authority))
                         .addPathHandler("/", WebViewAssetLoader.AssetsPathHandler(this))
                         .build()
+
+        val isSystemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+        // DeepSeek's persisted theme drives colours; system dark mode is only the first-launch
+        // fallback (before any reportTheme call has been persisted to prefs).
+        val isPageDark = bridge.getLastKnownIsDark(default = isSystemDark)
 
         webView =
                 WebView(this).apply {
@@ -94,10 +108,45 @@ class MainActivity : ComponentActivity() {
                     webViewClient = bdsWebViewClient()
                     webChromeClient = bdsWebChromeClient()
                     isVerticalScrollBarEnabled = true
-                    setBackgroundColor(0x00000000)
+                    setBackgroundColor(if (isPageDark) PAGE_BG_DARK else PAGE_BG_LIGHT)
                 }
 
-        setContentView(webView)
+        // FrameLayout wrapper receives system-bar insets and applies them as padding.
+        // WebView.setPadding() does not shift the WebView viewport reliably, so the wrapper
+        // is the inset target. Its background fills the padding band behind the system bars.
+        val rootLayout = FrameLayout(this).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+            setBackgroundColor(if (isPageDark) PAGE_BG_DARK else PAGE_BG_LIGHT)
+            addView(webView)
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(rootLayout) { view, windowInsets ->
+            val bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
+
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !isPageDark
+            isAppearanceLightNavigationBars = !isPageDark
+        }
+
+        bridge.onThemeChanged = { isDark ->
+            runOnUiThread {
+                val bg = if (isDark) PAGE_BG_DARK else PAGE_BG_LIGHT
+                rootLayout.setBackgroundColor(bg)
+                webView.setBackgroundColor(bg)
+                WindowInsetsControllerCompat(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !isDark
+                    isAppearanceLightNavigationBars = !isDark
+                }
+            }
+        }
+
+        setContentView(rootLayout)
         webView.loadUrl(getString(R.string.bds_target_url))
 
         onBackPressedDispatcher.addCallback(
@@ -115,6 +164,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        bridge.onThemeChanged = null
         webView.removeJavascriptInterface(BRIDGE_NAME)
         super.onDestroy()
     }
@@ -341,6 +391,8 @@ class MainActivity : ComponentActivity() {
 
         view.evaluateJavascript(injected, null)
         view.evaluateJavascript(bootstrap, null)
+        // content.js calls startThemeWatcher() which persists pageIsDark via chrome.storage and
+        // fires AndroidBridge.reportTheme() for the live native bar-icon colour update.
         view.evaluateJavascript(content, null)
     }
 
@@ -382,6 +434,12 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val BRIDGE_NAME = "AndroidBridge"
         private const val TAG = "BdsMainActivity"
+
+        // Default WebView background colours used in the inset-padding area behind transparent
+        // system bars. Approximates DeepSeek's own page backgrounds so the status/nav bar region
+        // blends seamlessly before (and if) the page reports its live theme via reportTheme().
+        private val PAGE_BG_DARK = Color.rgb(0x15, 0x15, 0x17)
+        private val PAGE_BG_LIGHT = Color.WHITE
 
         /**
          * Fully synthetic Chrome-mobile UA string. Servers that block embedded WebViews (notably

@@ -12,11 +12,12 @@
  *
  * Native bridge methods (see WebViewBridge.kt):
  *   getStorage(key: String): String?
- *   setStorage(key: String, value: String): void
+ *   setStorage(key: String, value: String): void   // value is JSON.stringify(jsValue)
  *   removeStorage(key: String): void
  *   fetch(payloadJson: String): String   // JSON-encoded { ok, ... }
  *   getAssetUrl(relativePath: String): String
  *   downloadBlob(base64, mimeType, fileName): void
+ *   reportTheme(isDark: Boolean): void  // live bar-icon colour update; persistence via setStorage
  */
 
 function getBridge() {
