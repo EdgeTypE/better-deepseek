@@ -563,7 +563,9 @@ class WebViewBridge(
         private const val DEFAULT_GITHUB_API_BASE_URL = "https://api.github.com"
         private const val DEFAULT_GITHUB_COMMIT_COUNT = 100
         private const val GITHUB_COMMITS_PAGE_SIZE = 100
-        // Double-underscore prefix marks this as internal bridge state, not user chrome.storage data.
-        internal const val KEY_LAST_PAGE_DARK = "__bds_page_is_dark"
+        // Must match STORAGE_KEYS.pageIsDark in src/lib/constants.js — the Android chrome.storage
+        // polyfill routes chrome.storage.local.set({ bds_page_is_dark: ... }) through setStorage,
+        // so getLastKnownIsDark() and the polyfill share the same SharedPreferences key.
+        internal const val KEY_LAST_PAGE_DARK = "bds_page_is_dark"
     }
 }

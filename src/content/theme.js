@@ -24,12 +24,11 @@ export function startThemeWatcher() {
   function apply(isDark) {
     chrome.storage.local.set({ [STORAGE_KEYS.pageIsDark]: isDark });
     // Live notification for Android native bar icon colours. No-op on other platforms.
-    if (
-      typeof window.AndroidBridge !== "undefined" &&
-      typeof window.AndroidBridge.reportTheme === "function"
-    ) {
-      window.AndroidBridge.reportTheme(isDark);
-    }
+    // Avoid typeof-function check: JavascriptInterface methods on some WebView versions
+    // are callable but do not report as "function" via typeof.
+    try {
+      window.AndroidBridge?.reportTheme(isDark);
+    } catch (_) {}
   }
 
   function run() {
