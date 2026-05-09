@@ -341,12 +341,13 @@ class MainActivity : ComponentActivity() {
 
         // Hides the "Get App" promotional button shown on mobile viewports.
         // Detection is text-based so it survives DeepSeek's dynamic class renames.
-        // A MutationObserver retries if the element is not yet present at injection time.
+        // The observer stays alive for the lifetime of the page so SPA navigations that
+        // re-insert the button are caught automatically.
         val hideGetApp =
                 """
             (function () {
-                if (window.__bdsGetAppHidden) return;
-                function attempt() {
+                if (window.__bdsGetAppObserver) return;
+                function hideButton() {
                     var spans = document.querySelectorAll('span');
                     for (var i = 0; i < spans.length; i++) {
                         var span = spans[i];
@@ -355,20 +356,14 @@ class MainActivity : ComponentActivity() {
                         while (el && el.tagName !== 'BUTTON') { el = el.parentElement; }
                         if (el && el.parentElement) {
                             el.parentElement.style.display = 'none';
-                            window.__bdsGetAppHidden = true;
                             console.log('[BDS] Hidden Get App container');
-                            return true;
                         }
                     }
-                    return false;
                 }
-                if (attempt()) return;
-                var timeout;
-                var observer = new MutationObserver(function () {
-                    if (attempt()) { observer.disconnect(); clearTimeout(timeout); }
-                });
+                hideButton();
+                var observer = new MutationObserver(hideButton);
                 observer.observe(document.body, { subtree: true, childList: true });
-                timeout = setTimeout(function () { observer.disconnect(); }, 10000);
+                window.__bdsGetAppObserver = observer;
             })();
         """.trimIndent()
 

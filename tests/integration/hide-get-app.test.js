@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { hideGetAppButton } from "../../src/android/hide-get-app.js";
 
 function makeGetAppButton() {
@@ -20,12 +20,13 @@ function makeGetAppButton() {
 describe("hideGetAppButton", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
-    delete window.__bdsGetAppHidden;
-    vi.useFakeTimers();
+    delete window.__bdsGetAppObserver;
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    // Disconnect live observer so it doesn't bleed between tests.
+    window.__bdsGetAppObserver?.disconnect();
+    delete window.__bdsGetAppObserver;
   });
 
   // ── immediate detection ────────────────────────────────────────────────
@@ -36,10 +37,10 @@ describe("hideGetAppButton", () => {
     expect(container.style.display).toBe("none");
   });
 
-  it("sets __bdsGetAppHidden flag on window", () => {
+  it("sets __bdsGetAppObserver on window", () => {
     makeGetAppButton();
     hideGetAppButton();
-    expect(window.__bdsGetAppHidden).toBe(true);
+    expect(window.__bdsGetAppObserver).toBeTruthy();
   });
 
   it("ignores spans whose text does not match 'Get App'", () => {
@@ -70,14 +71,18 @@ describe("hideGetAppButton", () => {
 
   // ── idempotency ────────────────────────────────────────────────────────
 
-  it("skips hiding when __bdsGetAppHidden flag is already set", () => {
-    window.__bdsGetAppHidden = true;
+  it("skips setup when __bdsGetAppObserver already set", () => {
+    const sentinel = { disconnect: vi.fn() };
+    window.__bdsGetAppObserver = sentinel;
     const { container } = makeGetAppButton();
     hideGetAppButton();
+    // Container should not be hidden — the early-return fired.
     expect(container.style.display).not.toBe("none");
+    // Sentinel must be untouched.
+    expect(window.__bdsGetAppObserver).toBe(sentinel);
   });
 
-  // ── MutationObserver fallback ──────────────────────────────────────────
+  // ── MutationObserver: deferred detection ──────────────────────────────
 
   it("hides container added to DOM after initial call", async () => {
     hideGetAppButton();
@@ -85,20 +90,30 @@ describe("hideGetAppButton", () => {
     await vi.waitFor(() => expect(container.style.display).toBe("none"));
   });
 
-  it("sets __bdsGetAppHidden flag after deferred detection", async () => {
+  it("observer is set immediately (not deferred)", () => {
     hideGetAppButton();
-    makeGetAppButton();
-    await vi.waitFor(() => expect(window.__bdsGetAppHidden).toBe(true));
+    expect(window.__bdsGetAppObserver).toBeTruthy();
   });
 
-  it("stops watching after 10-second safety timeout", async () => {
-    hideGetAppButton();
-    vi.advanceTimersByTime(10_000);
-    // Element added after observer disconnects — must NOT be hidden.
+  // ── SPA persistence: observer stays alive after first hide ────────────
+
+  it("re-hides button when removed and re-inserted (SPA nav)", async () => {
     const { container } = makeGetAppButton();
-    // Flush any pending microtasks — observer is disconnected so nothing fires.
-    await Promise.resolve();
-    expect(container.style.display).not.toBe("none");
+    hideGetAppButton();
+    expect(container.style.display).toBe("none");
+
+    // Simulate SPA transition: remove old node, add fresh one.
+    container.remove();
+    const { container: container2 } = makeGetAppButton();
+    await vi.waitFor(() => expect(container2.style.display).toBe("none"));
+  });
+
+  it("hides all matching instances if multiple exist simultaneously", () => {
+    const { container: c1 } = makeGetAppButton();
+    const { container: c2 } = makeGetAppButton();
+    hideGetAppButton();
+    expect(c1.style.display).toBe("none");
+    expect(c2.style.display).toBe("none");
   });
 
   // ── text-content resilience ────────────────────────────────────────────

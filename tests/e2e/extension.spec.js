@@ -255,8 +255,8 @@ test("hides the Get App promotional button when the Android hide script runs", a
 
   // Simulate MainActivity.injectBdsScripts() evaluating the hide-get-app snippet.
   await page.evaluate(() => {
-    if (window.__bdsGetAppHidden) return;
-    function attempt() {
+    if (window.__bdsGetAppObserver) return;
+    function hideButton() {
       const spans = document.querySelectorAll("span");
       for (const span of spans) {
         if (span.textContent.trim() !== "Get App") continue;
@@ -266,16 +266,59 @@ test("hides the Get App promotional button when the Android hide script runs", a
         }
         if (el && el.parentElement) {
           el.parentElement.style.display = "none";
-          window.__bdsGetAppHidden = true;
-          return true;
         }
       }
-      return false;
     }
-    attempt();
+    hideButton();
+    const observer = new MutationObserver(hideButton);
+    observer.observe(document.body, { subtree: true, childList: true });
+    window.__bdsGetAppObserver = observer;
   });
 
   await expect(container).not.toBeVisible();
+});
+
+test("re-hides Get App button after SPA re-render (observer stays alive)", async ({ page }) => {
+  // Install the hide script.
+  await page.evaluate(() => {
+    if (window.__bdsGetAppObserver) return;
+    function hideButton() {
+      const spans = document.querySelectorAll("span");
+      for (const span of spans) {
+        if (span.textContent.trim() !== "Get App") continue;
+        let el = span.parentElement;
+        while (el && el.tagName !== "BUTTON") {
+          el = el.parentElement;
+        }
+        if (el && el.parentElement) {
+          el.parentElement.style.display = "none";
+        }
+      }
+    }
+    hideButton();
+    const observer = new MutationObserver(hideButton);
+    observer.observe(document.body, { subtree: true, childList: true });
+    window.__bdsGetAppObserver = observer;
+  });
+
+  // Simulate SPA transition: remove original node and inject a fresh "Get App" button.
+  await page.evaluate(() => {
+    const old = document.querySelector('[data-testid="get-app-container"]');
+    if (old) old.remove();
+
+    const container = document.createElement("div");
+    container.dataset.testid = "get-app-container-spa";
+    const button = document.createElement("button");
+    button.type = "button";
+    const label = document.createElement("span");
+    label.textContent = "Get App";
+    button.appendChild(label);
+    container.appendChild(button);
+    document.body.prepend(container);
+  });
+
+  // Observer must auto-hide the re-inserted button.
+  await expect(page.locator('[data-testid="get-app-container-spa"]')).not.toBeVisible();
 });
 
 test("creates the PDF export iframe from the sidebar menu", async ({ page }) => {
