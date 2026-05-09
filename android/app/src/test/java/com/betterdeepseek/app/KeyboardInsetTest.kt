@@ -37,7 +37,7 @@ class KeyboardInsetTest {
     }
 
     @Test
-    fun `view is pushed up by keyboard height`() {
+    fun `keyboard expands bottom padding without translating the view`() {
         val keyboardHeight = 840
         val insets = WindowInsetsCompat.Builder()
             .setInsets(WindowInsetsCompat.Type.systemBars(), Insets.of(16, 48, 16, 48))
@@ -46,11 +46,12 @@ class KeyboardInsetTest {
 
         ViewCompat.dispatchApplyWindowInsets(rootLayout, insets)
 
-        assertEquals(-keyboardHeight.toFloat(), rootLayout.translationY, 0f)
+        assertEquals(0f, rootLayout.translationY, 0f)
+        assertEquals(keyboardHeight, rootLayout.paddingBottom)
     }
 
     @Test
-    fun `transition from no keyboard to keyboard updates translation`() {
+    fun `transition from no keyboard to keyboard updates bottom padding`() {
         val noKeyboard = WindowInsetsCompat.Builder()
             .setInsets(WindowInsetsCompat.Type.systemBars(), Insets.of(16, 48, 16, 48))
             .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, 0))
@@ -58,6 +59,7 @@ class KeyboardInsetTest {
 
         ViewCompat.dispatchApplyWindowInsets(rootLayout, noKeyboard)
         assertEquals(0f, rootLayout.translationY, 0f)
+        assertEquals(48, rootLayout.paddingBottom)
 
         val withKeyboard = WindowInsetsCompat.Builder()
             .setInsets(WindowInsetsCompat.Type.systemBars(), Insets.of(16, 48, 16, 48))
@@ -65,7 +67,20 @@ class KeyboardInsetTest {
             .build()
 
         ViewCompat.dispatchApplyWindowInsets(rootLayout, withKeyboard)
-        assertEquals(-840f, rootLayout.translationY, 0f)
+        assertEquals(0f, rootLayout.translationY, 0f)
+        assertEquals(840, rootLayout.paddingBottom)
+    }
+
+    @Test
+    fun `system bar padding is kept when ime inset is smaller`() {
+        val insets = WindowInsetsCompat.Builder()
+            .setInsets(WindowInsetsCompat.Type.systemBars(), Insets.of(24, 56, 24, 56))
+            .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, 20))
+            .build()
+
+        ViewCompat.dispatchApplyWindowInsets(rootLayout, insets)
+
+        assertEquals(56, rootLayout.paddingBottom)
     }
 
     @Test
