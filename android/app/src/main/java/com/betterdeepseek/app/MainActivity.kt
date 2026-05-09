@@ -35,10 +35,12 @@ import okhttp3.Request
 internal fun applyRootWindowInsets(view: View, windowInsets: WindowInsetsCompat): WindowInsetsCompat {
     val systemBars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
     val imeInsets = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
+    val bottomInset = maxOf(systemBars.bottom, imeInsets.bottom)
 
-    view.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-    // Edge-to-edge WebViews do not resize reliably for IME insets, so shift the wrapper instead.
-    view.translationY = -imeInsets.bottom.toFloat()
+    // Resize the WebView host from the bottom so the top of the viewport stays anchored like a
+    // normal adjustResize layout, while still preserving the persistent system-bar insets.
+    view.setPadding(systemBars.left, systemBars.top, systemBars.right, bottomInset)
+    view.translationY = 0f
     return WindowInsetsCompat.CONSUMED
 }
 
@@ -122,7 +124,7 @@ class MainActivity : ComponentActivity() {
                     setBackgroundColor(if (isPageDark) PAGE_BG_DARK else PAGE_BG_LIGHT)
                 }
 
-        // FrameLayout wrapper receives system-bar padding and IME translation.
+        // FrameLayout wrapper receives system-bar padding and expands its bottom inset for IME.
         // WebView.setPadding() does not shift the viewport reliably, so the wrapper is the
         // inset target. Its background fills the padding band behind the system bars.
         val rootLayout = FrameLayout(this).apply {
