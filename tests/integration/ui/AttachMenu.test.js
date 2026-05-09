@@ -107,6 +107,22 @@ describe("AttachMenu integration", () => {
     cleanup();
   });
 
+  it("keeps multiple enabled for the web Upload File flow", async () => {
+    const nativeInput = setupNativeInput();
+    nativeInput.click = vi.fn(() => {
+      expect(nativeInput.multiple).toBe(true);
+    });
+    const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+
+    target.querySelector(".bds-plus-btn").click();
+    await flushUi();
+    document.querySelector(".bds-attach-item").click();
+
+    expect(nativeInput.click).toHaveBeenCalledOnce();
+    expect(nativeInput.multiple).toBe(true);
+    cleanup();
+  });
+
   it("fetches a github repo and injects the resulting file", async () => {
     const nativeInput = setupNativeInput();
     const file = new File(["repo"], "repo.txt", { type: "text/plain" });

@@ -9,6 +9,7 @@
   } from "../files/github-commits.js";
   import { fetchAndConvertWebPage } from "../files/web-reader.js";
   import { projectFilesToFile } from "../files/project-file-builder.js";
+  import { openNativeFilePicker } from "../files/native-file-input.js";
   import {
     getFilesForProject,
     setActiveProject,
@@ -281,7 +282,10 @@
   function handleUploadFile() {
     closeMenu();
     if (nativeInput) {
-      nativeInput.click();
+      // Native picker behavior is selected via a file-flow strategy. Android's
+      // "Upload File" path prefers the single-file strategy so WebView asks the
+      // platform chooser for one file even though DeepSeek's DOM input is `multiple`.
+      openNativeFilePicker(nativeInput, { preferSingle: isAndroidTarget });
     }
   }
 

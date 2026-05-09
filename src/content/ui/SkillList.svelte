@@ -3,6 +3,7 @@
   import { pushConfigToPage } from "../bridge.js";
   import { STORAGE_KEYS } from "../../lib/constants.js";
   import { makeId } from "../../lib/utils/helpers.js";
+  import { openNativeFilePicker } from "../files/native-file-input.js";
 
   let skills = $state([...appState.skills]);
   let fileInput = $state(null);
@@ -28,7 +29,7 @@
   }
 
   function triggerImport() {
-    if (fileInput) fileInput.click();
+    openNativeFilePicker(fileInput, { preferSingle: true });
   }
 
   async function handleImportSkills(event) {

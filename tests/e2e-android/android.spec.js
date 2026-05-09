@@ -79,6 +79,103 @@ test("hides the voice prompt mic button on Android", async ({ page }) => {
   await expect(page.locator(".bds-mic-btn")).toHaveCount(0);
 });
 
+test("Upload File requests single-file mode on Android", async ({ page }) => {
+  await page.evaluate(() => {
+    const input = document.querySelector("#native-file-input");
+    window.__mockDeepSeek.uploadFileClickMultiple = null;
+    input.click = () => {
+      window.__mockDeepSeek.uploadFileClickMultiple = input.multiple;
+    };
+  });
+
+  await page.locator(".bds-plus-btn").click({ force: true });
+  await page
+    .locator(".bds-attach-dropdown .bds-attach-item")
+    .filter({ hasText: "Upload File" })
+    .click({ force: true });
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.uploadFileClickMultiple))
+    .toBe(false);
+  await expect
+    .poll(() => page.evaluate(() => document.querySelector("#native-file-input").multiple))
+    .toBe(true);
+});
+
+test("drawer import and upload inputs stay single-file on Android", async ({ page }) => {
+  await openDrawer(page);
+  await page.evaluate(() => {
+    const modes = {};
+    window.__mockDeepSeek.drawerFilePickerModes = modes;
+
+    const names = ["skillImport", "characterImport", "memoryImport"];
+    const jsonInputs = Array.from(
+      document.querySelectorAll('#bds-drawer input[type="file"][accept=".json"]'),
+    );
+    jsonInputs.forEach((input, index) => {
+      input.addEventListener("click", (event) => {
+        modes[names[index]] = input.multiple;
+        event.preventDefault();
+      }, { once: true });
+    });
+
+    for (const [key, selector] of [
+      ["skillUpload", "#bds-skill-upload"],
+      ["characterUpload", "#bds-char-upload"],
+    ]) {
+      const input = document.querySelector(selector);
+      input.addEventListener("click", (event) => {
+        modes[key] = input.multiple;
+        event.preventDefault();
+      }, { once: true });
+    }
+  });
+
+  const importButtons = page.locator("#bds-drawer button").filter({ hasText: "Import" });
+  await importButtons.nth(0).click({ force: true });
+  await importButtons.nth(1).click({ force: true });
+  await importButtons.nth(2).click({ force: true });
+  await page.locator("#bds-skill-upload").dispatchEvent("click");
+  await page.locator("#bds-char-upload").dispatchEvent("click");
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.drawerFilePickerModes))
+    .toEqual({
+      skillImport: false,
+      characterImport: false,
+      memoryImport: false,
+      skillUpload: false,
+      characterUpload: false,
+    });
+});
+
+test("project Upload File requests single-file mode on Android", async ({ page }) => {
+  await openDrawer(page);
+  await page.locator("#bds-drawer button").filter({ hasText: "Manage" }).click({ force: true });
+  await page.locator("#bds-drawer button").filter({ hasText: "New Project" }).click({ force: true });
+  await page.locator('#bds-drawer input[placeholder="Project name (required)"]').fill("Regression Project");
+  await page.locator("#bds-drawer button").filter({ hasText: "Create" }).click({ force: true });
+  await page.locator("#bds-drawer .bds-skill-item").filter({ hasText: "Regression Project" }).click({ force: true });
+
+  await page.evaluate(() => {
+    const input = document.querySelector('#bds-drawer input[type="file"][multiple]');
+    window.__mockDeepSeek.projectUploadClickMultiple = null;
+    input.addEventListener("click", (event) => {
+      window.__mockDeepSeek.projectUploadClickMultiple = input.multiple;
+      event.preventDefault();
+    }, { once: true });
+  });
+
+  await page.locator("#bds-drawer button").filter({ hasText: "Upload File" }).click({ force: true });
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.projectUploadClickMultiple))
+    .toBe(false);
+  await expect
+    .poll(() => page.evaluate(() => document.querySelector('#bds-drawer input[type="file"][multiple]').multiple))
+    .toBe(true);
+});
+
 test("imports a GitHub repository and commit history through the Android bridge", async ({ page }) => {
   await page.evaluate((zipBase64) => {
     window.__bdsBridgeRoute = {
