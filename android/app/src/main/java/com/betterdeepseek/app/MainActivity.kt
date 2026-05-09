@@ -20,6 +20,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.FrameLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -79,6 +80,9 @@ class MainActivity : ComponentActivity() {
                         .addPathHandler("/", WebViewAssetLoader.AssetsPathHandler(this))
                         .build()
 
+        val isSystemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+
         webView =
                 WebView(this).apply {
                     layoutParams =
@@ -101,17 +105,29 @@ class MainActivity : ComponentActivity() {
                     webViewClient = bdsWebViewClient()
                     webChromeClient = bdsWebChromeClient()
                     isVerticalScrollBarEnabled = true
-                    setBackgroundColor(0x00000000)
+                    // Match page background so the inset-padding area behind the status/nav bar
+                    // shows the correct colour instead of the window theme default.
+                    setBackgroundColor(if (isSystemDark) PAGE_BG_DARK else PAGE_BG_LIGHT)
                 }
 
-        ViewCompat.setOnApplyWindowInsetsListener(webView) { view, windowInsets ->
+        // FrameLayout wrapper receives system-bar insets and applies them as padding.
+        // WebView.setPadding() does not shift the WebView viewport reliably, so the wrapper
+        // is the inset target. Its background fills the padding band behind the system bars.
+        val rootLayout = FrameLayout(this).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+            setBackgroundColor(if (isSystemDark) PAGE_BG_DARK else PAGE_BG_LIGHT)
+            addView(webView)
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(rootLayout) { view, windowInsets ->
             val bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
             view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             WindowInsetsCompat.CONSUMED
         }
 
-        val isSystemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
-            Configuration.UI_MODE_NIGHT_YES
         WindowInsetsControllerCompat(window, window.decorView).apply {
             isAppearanceLightStatusBars = !isSystemDark
             isAppearanceLightNavigationBars = !isSystemDark
@@ -119,6 +135,9 @@ class MainActivity : ComponentActivity() {
 
         bridge.onThemeChanged = { isDark ->
             runOnUiThread {
+                val bg = if (isDark) PAGE_BG_DARK else PAGE_BG_LIGHT
+                rootLayout.setBackgroundColor(bg)
+                webView.setBackgroundColor(bg)
                 WindowInsetsControllerCompat(window, window.decorView).apply {
                     isAppearanceLightStatusBars = !isDark
                     isAppearanceLightNavigationBars = !isDark
@@ -126,7 +145,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        setContentView(webView)
+        setContentView(rootLayout)
         webView.loadUrl(getString(R.string.bds_target_url))
 
         onBackPressedDispatcher.addCallback(
@@ -429,6 +448,12 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val BRIDGE_NAME = "AndroidBridge"
         private const val TAG = "BdsMainActivity"
+
+        // Default WebView background colours used in the inset-padding area behind transparent
+        // system bars. Approximates DeepSeek's own page backgrounds so the status/nav bar region
+        // blends seamlessly before (and if) the page reports its live theme via reportTheme().
+        private val PAGE_BG_DARK = Color.rgb(0x17, 0x17, 0x1A)
+        private val PAGE_BG_LIGHT = Color.WHITE
 
         /**
          * Fully synthetic Chrome-mobile UA string. Servers that block embedded WebViews (notably

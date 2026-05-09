@@ -2,6 +2,7 @@ package com.betterdeepseek.app
 
 import android.graphics.Color
 import android.view.WindowManager
+import android.widget.FrameLayout
 import androidx.core.view.ViewCompat
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -66,6 +67,23 @@ class EdgeToEdgeTest {
                 "setDecorFitsSystemWindows(false) must be applied for edge-to-edge",
                 ViewCompat.getFitsSystemWindows(activity.window.decorView),
             )
+        }
+    }
+
+    @Test
+    fun rootLayout_hasPaddingMatchingSystemBars() {
+        activityRule.scenario.onActivity { activity ->
+            val rootLayout = activity.window.decorView
+                .findViewById<FrameLayout>(android.R.id.content)
+                .getChildAt(0) as? FrameLayout
+            checkNotNull(rootLayout) { "Root FrameLayout not found as first child of content" }
+
+            val insets = ViewCompat.getRootWindowInsets(rootLayout)
+            checkNotNull(insets) { "Window insets not yet available" }
+
+            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            assertEquals("Padding top must equal status bar inset", bars.top, rootLayout.paddingTop)
+            assertEquals("Padding bottom must equal nav bar inset", bars.bottom, rootLayout.paddingBottom)
         }
     }
 }
