@@ -55,6 +55,18 @@ class WebViewBridge(
                             .callTimeout(120, TimeUnit.SECONDS)
                             .build()
 
+    /** Set by MainActivity to react to page theme changes without leaking the Activity window. */
+    @Volatile var onThemeChanged: ((isDark: Boolean) -> Unit)? = null
+
+    /**
+     * Called by the injected theme-detection script whenever the page's light/dark state changes.
+     * Routes to [onThemeChanged] so MainActivity can update status/navigation bar icon appearance.
+     */
+    @JavascriptInterface
+    fun reportTheme(isDark: Boolean) {
+        onThemeChanged?.invoke(isDark)
+    }
+
     @JavascriptInterface
     fun getStorage(key: String?): String? {
         if (key.isNullOrEmpty()) return null

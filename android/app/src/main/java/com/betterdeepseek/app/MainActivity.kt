@@ -2,6 +2,8 @@ package com.betterdeepseek.app
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.res.Configuration
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -18,7 +20,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.webkit.WebViewAssetLoader
 import java.io.ByteArrayInputStream
 import java.util.concurrent.TimeUnit
@@ -61,7 +66,9 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, true)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
 
         bridge = WebViewBridge(applicationContext)
         cookieManager = CookieManager.getInstance()
@@ -97,6 +104,28 @@ class MainActivity : ComponentActivity() {
                     setBackgroundColor(0x00000000)
                 }
 
+        ViewCompat.setOnApplyWindowInsetsListener(webView) { view, windowInsets ->
+            val bars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
+
+        val isSystemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+            Configuration.UI_MODE_NIGHT_YES
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !isSystemDark
+            isAppearanceLightNavigationBars = !isSystemDark
+        }
+
+        bridge.onThemeChanged = { isDark ->
+            runOnUiThread {
+                WindowInsetsControllerCompat(window, window.decorView).apply {
+                    isAppearanceLightStatusBars = !isDark
+                    isAppearanceLightNavigationBars = !isDark
+                }
+            }
+        }
+
         setContentView(webView)
         webView.loadUrl(getString(R.string.bds_target_url))
 
@@ -115,6 +144,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        bridge.onThemeChanged = null
         webView.removeJavascriptInterface(BRIDGE_NAME)
         super.onDestroy()
     }
@@ -339,9 +369,26 @@ class MainActivity : ComponentActivity() {
             })();
         """.trimIndent()
 
+        val themeDetect =
+                """
+            (function () {
+                if (typeof AndroidBridge === 'undefined' || !AndroidBridge.reportTheme) return;
+                function bdsReportTheme() {
+                    var isDark = document.documentElement.classList.contains('dark') ||
+                        window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    AndroidBridge.reportTheme(isDark);
+                }
+                bdsReportTheme();
+                new MutationObserver(function () { bdsReportTheme(); })
+                    .observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', bdsReportTheme);
+            })();
+        """.trimIndent()
+
         view.evaluateJavascript(injected, null)
         view.evaluateJavascript(bootstrap, null)
         view.evaluateJavascript(content, null)
+        view.evaluateJavascript(themeDetect, null)
     }
 
     private fun readAsset(path: String): String? =

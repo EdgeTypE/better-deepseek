@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:tools="http://schemas.android.com/tools">
+<resources>
     <style name="Theme.BetterDeepSeek" parent="Theme.Material3.DayNight" />
 
+    <!-- Status/navigation bar colors and light-bar appearance are set programmatically in
+         MainActivity so they react to the page's live dark/light theme. -->
     <style name="Theme.BetterDeepSeek.NoActionBar" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 </resources>
