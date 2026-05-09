@@ -48,17 +48,16 @@ class MainActivity : ComponentActivity() {
     private lateinit var cookieManager: CookieManager
 
     private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
-    private val multipleFileLauncher: ActivityResultLauncher<Array<String>> =
-            registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+    private val fileChooserLauncher: ActivityResultLauncher<Intent> =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
                 val callback = pendingFileChooser
                 pendingFileChooser = null
-                callback?.onReceiveValue(uris.toTypedArray())
-            }
-    private val singleFileLauncher: ActivityResultLauncher<Array<String>> =
-            registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-                val callback = pendingFileChooser
-                pendingFileChooser = null
-                callback?.onReceiveValue(uri?.let { arrayOf(it) } ?: emptyArray())
+                callback?.onReceiveValue(
+                        WebChromeClient.FileChooserParams.parseResult(
+                                result.resultCode,
+                                result.data
+                        )
+                )
             }
 
     private val proxyClient: OkHttpClient by lazy {
@@ -230,19 +229,14 @@ class MainActivity : ComponentActivity() {
                 ): Boolean {
                     pendingFileChooser?.onReceiveValue(null)
                     pendingFileChooser = filePathCallback
-                    val mimeTypes =
-                            fileChooserParams
-                                    ?.acceptTypes
-                                    ?.filter { it.isNotBlank() }
-                                    ?.toTypedArray()
-                                    ?.takeIf { it.isNotEmpty() }
-                                    ?: arrayOf("*/*")
                     return try {
-                        if (fileChooserParams?.mode == FileChooserParams.MODE_OPEN_MULTIPLE) {
-                            multipleFileLauncher.launch(mimeTypes)
-                        } else {
-                            singleFileLauncher.launch(mimeTypes)
-                        }
+                        fileChooserLauncher.launch(
+                                fileChooserParams?.createIntent()
+                                        ?: Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                                            addCategory(Intent.CATEGORY_OPENABLE)
+                                            type = "*/*"
+                                        }
+                        )
                         true
                     } catch (t: Throwable) {
                         pendingFileChooser = null

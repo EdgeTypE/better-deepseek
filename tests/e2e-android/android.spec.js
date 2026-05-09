@@ -79,6 +79,29 @@ test("hides the voice prompt mic button on Android", async ({ page }) => {
   await expect(page.locator(".bds-mic-btn")).toHaveCount(0);
 });
 
+test("Upload File requests single-file mode on Android", async ({ page }) => {
+  await page.evaluate(() => {
+    const input = document.querySelector("#native-file-input");
+    window.__mockDeepSeek.uploadFileClickMultiple = null;
+    input.click = () => {
+      window.__mockDeepSeek.uploadFileClickMultiple = input.multiple;
+    };
+  });
+
+  await page.locator(".bds-plus-btn").click({ force: true });
+  await page
+    .locator(".bds-attach-dropdown .bds-attach-item")
+    .filter({ hasText: "Upload File" })
+    .click({ force: true });
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.uploadFileClickMultiple))
+    .toBe(false);
+  await expect
+    .poll(() => page.evaluate(() => document.querySelector("#native-file-input").multiple))
+    .toBe(true);
+});
+
 test("imports a GitHub repository and commit history through the Android bridge", async ({ page }) => {
   await page.evaluate((zipBase64) => {
     window.__bdsBridgeRoute = {

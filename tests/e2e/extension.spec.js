@@ -111,6 +111,30 @@ test("imports a GitHub repository through the attach menu flow", async ({ page }
     .toEqual(["Hello-World_github.txt"]);
 });
 
+test("Upload File keeps multiple mode in the web flow", async ({ page }) => {
+  await page.evaluate(() => {
+    const input = document.querySelector("#native-file-input");
+    window.__mockDeepSeek.uploadFileClickMultiple = null;
+    input.addEventListener("click", (event) => {
+      window.__mockDeepSeek.uploadFileClickMultiple = input.multiple;
+      event.preventDefault();
+    }, { once: true });
+  });
+
+  await page.locator(".bds-plus-btn").click();
+  await page
+    .locator(".bds-attach-dropdown .bds-attach-item")
+    .filter({ hasText: "Upload File" })
+    .click();
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.uploadFileClickMultiple))
+    .toBe(true);
+  await expect
+    .poll(() => page.evaluate(() => document.querySelector("#native-file-input").multiple))
+    .toBe(true);
+});
+
 test("imports GitHub commit history as a second attachment when enabled", async ({ page }) => {
   await page.locator(".bds-plus-btn").click();
   await page.locator(".bds-attach-dropdown .bds-attach-item").filter({ hasText: "GitHub Repo" }).click();
