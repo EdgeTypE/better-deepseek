@@ -51,22 +51,47 @@ export function mountUi() {
  * follows the panel's left edge in real time during open/close animations.
  * @param {HTMLElement} root
  */
+/**
+ * Compute the right offset for the BDS root element.
+ * Returns null on mobile so CSS media query handles positioning.
+ * @param {number} innerWidth
+ * @param {number} mobileBreakpoint
+ * @param {DOMRect|null} panelRect bounding rect of the file-preview panel, or null
+ * @param {number} defaultRight
+ * @param {number} gap
+ * @returns {number|null}
+ */
+export function computePreviewRight(innerWidth, mobileBreakpoint, panelRect, defaultRight, gap) {
+  if (innerWidth < mobileBreakpoint) return null;
+  if (!panelRect) return defaultRight;
+  return Math.max(innerWidth - panelRect.left + gap, defaultRight);
+}
+
 function initPreviewAvoidance(root) {
   const PANEL_SELECTOR = "._519be07";
   const DEFAULT_RIGHT = 16;
   const GAP = 8;
+  const MOBILE_BREAKPOINT = 768;
 
   let lastRight = DEFAULT_RIGHT;
 
   function tick() {
     const panel = document.querySelector(PANEL_SELECTOR);
-    const targetRight = panel
-      ? Math.max(window.innerWidth - panel.getBoundingClientRect().left + GAP, DEFAULT_RIGHT)
-      : DEFAULT_RIGHT;
+    const right = computePreviewRight(
+      window.innerWidth,
+      MOBILE_BREAKPOINT,
+      panel ? panel.getBoundingClientRect() : null,
+      DEFAULT_RIGHT,
+      GAP,
+    );
 
-    if (targetRight !== lastRight) {
-      root.style.right = targetRight === DEFAULT_RIGHT ? "" : `${targetRight}px`;
-      lastRight = targetRight;
+    if (right === null) {
+      // Mobile: clear any inline override so CSS media query handles positioning.
+      if (root.style.right !== "") root.style.right = "";
+      lastRight = DEFAULT_RIGHT;
+    } else if (right !== lastRight) {
+      root.style.right = right === DEFAULT_RIGHT ? "" : `${right}px`;
+      lastRight = right;
     }
 
     requestAnimationFrame(tick);
