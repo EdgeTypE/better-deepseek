@@ -14,9 +14,12 @@
 import { STORAGE_KEYS } from "../lib/constants.js";
 
 export function startThemeWatcher() {
+  // DeepSeek sets the theme class on <body> (e.g. "en_US dark"), not on <html>.
+  // matchMedia is retained as a fallback for the "System" setting where no explicit
+  // body class may be present, and for OS-level theme changes.
   function detect() {
     return (
-      document.documentElement.classList.contains("dark") ||
+      document.body.classList.contains("dark") ||
       window.matchMedia("(prefers-color-scheme: dark)").matches
     );
   }
@@ -37,10 +40,18 @@ export function startThemeWatcher() {
 
   run();
 
+  // Primary observer: watch <body> class for DeepSeek's live theme toggles.
+  new MutationObserver(run).observe(document.body, {
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+
+  // Fallback observer: <html> attributes (data-theme or class) for other potential signals.
   new MutationObserver(run).observe(document.documentElement, {
     attributes: true,
     attributeFilter: ["class", "data-theme"],
   });
 
+  // OS-level theme changes (covers DeepSeek's "System" setting).
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", run);
 }
