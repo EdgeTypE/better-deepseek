@@ -1520,62 +1520,69 @@ textarea.bds-input,
    Mobile Layout (viewport < 768px)
    ══════════════════════════════════ */
 @media (max-width: 767px) {
-  /* Root: full-width, bottom-anchored, items stack upward */
+  /* Root: full-width, top-anchored, items stack downward */
   #bds-root {
     right: 0;
     left: 0;
-    top: auto;
-    bottom: 0;
+    top: 8px;
+    bottom: auto;
     width: 100%;
     align-items: center;
-    flex-direction: column-reverse;
+    flex-direction: column;
     /* Lower than portal overlays (.bds-attach-dropdown: 999999,
        .bds-github-overlay: 9999999) so they paint above on mobile. */
     z-index: 999990;
   }
 
-  /* Toggle: compact 44x44 circle (meets 44pt touch target) */
+  /* Toggle: small semi-transparent circle — unintrusive at top-center */
   #bds-toggle {
-    width: 44px;
-    height: 44px;
+    width: 22px;
+    height: 22px;
     padding: 0;
     border-radius: 50%;
-    font-size: 14px;
+    font-size: 9px;
     font-weight: 700;
     letter-spacing: 0;
-    margin-bottom: 8px;
+    margin-bottom: 0;
+    opacity: 0.4;
+    transition: opacity 0.2s ease;
+  }
+
+  #bds-toggle:hover,
+  #bds-toggle:active {
+    opacity: 1;
   }
 
   .bds-toggle-full { display: none; }
   .bds-toggle-short { display: inline; }
 
-  /* Drawer: full-width bottom sheet, slides up */
+  /* Drawer: full-width top sheet, slides down */
   #bds-drawer {
     width: 100%;
     max-width: 100%;
     margin: 0;
-    border-radius: 16px 16px 0 0;
-    border-bottom: none;
+    border-radius: 0 0 16px 16px;
+    border-top: none;
     border-left: none;
     border-right: none;
     max-height: 80dvh;
   }
 
   #bds-drawer.bds-open {
-    animation: bds-slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: bds-slide-down 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  @keyframes bds-slide-up {
-    from { transform: translateY(40px); opacity: 0; }
+  @keyframes bds-slide-down {
+    from { transform: translateY(-40px); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
   }
 
-  /* Toast: bottom-center above the toggle button */
+  /* Toast: bottom-center, clear of input bar */
   #bds-toast-stack {
     right: auto;
     left: 50%;
     transform: translateX(-50%);
-    bottom: 80px;
+    bottom: 24px;
     width: calc(100% - 32px);
     max-width: 400px;
   }
