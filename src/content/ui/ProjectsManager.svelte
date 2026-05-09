@@ -10,6 +10,7 @@
   } from "../project-manager.js";
   import { pushConfigToPage } from "../bridge.js";
   import { pickFolderSelection } from "../../lib/utils/folder-picker.js";
+  import { openNativeFilePicker } from "../files/native-file-input.js";
 
   let { onback } = $props();
 
@@ -116,7 +117,7 @@
   }
 
   function triggerFileUpload() {
-    fileInput?.click();
+    openNativeFilePicker(fileInput);
   }
 
   async function handleFileUpload(event) {

@@ -135,6 +135,80 @@ test("Upload File keeps multiple mode in the web flow", async ({ page }) => {
     .toBe(true);
 });
 
+test("drawer import and upload inputs stay single-file in the web flow", async ({ page }) => {
+  await openDrawer(page);
+  await page.evaluate(() => {
+    const modes = {};
+    window.__mockDeepSeek.drawerFilePickerModes = modes;
+
+    const names = ["skillImport", "characterImport", "memoryImport"];
+    const jsonInputs = Array.from(
+      document.querySelectorAll('#bds-drawer input[type="file"][accept=".json"]'),
+    );
+    jsonInputs.forEach((input, index) => {
+      input.addEventListener("click", (event) => {
+        modes[names[index]] = input.multiple;
+        event.preventDefault();
+      }, { once: true });
+    });
+
+    for (const [key, selector] of [
+      ["skillUpload", "#bds-skill-upload"],
+      ["characterUpload", "#bds-char-upload"],
+    ]) {
+      const input = document.querySelector(selector);
+      input.addEventListener("click", (event) => {
+        modes[key] = input.multiple;
+        event.preventDefault();
+      }, { once: true });
+    }
+  });
+
+  const importButtons = page.locator("#bds-drawer button").filter({ hasText: "Import" });
+  await importButtons.nth(0).click();
+  await importButtons.nth(1).click();
+  await importButtons.nth(2).click();
+  await page.locator("#bds-skill-upload").dispatchEvent("click");
+  await page.locator("#bds-char-upload").dispatchEvent("click");
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.drawerFilePickerModes))
+    .toEqual({
+      skillImport: false,
+      characterImport: false,
+      memoryImport: false,
+      skillUpload: false,
+      characterUpload: false,
+    });
+});
+
+test("project Upload File keeps multiple mode in the web flow", async ({ page }) => {
+  await openDrawer(page);
+  await page.locator("#bds-drawer button").filter({ hasText: "Manage" }).click();
+  await page.locator("#bds-drawer button").filter({ hasText: "New Project" }).click();
+  await page.locator('#bds-drawer input[placeholder="Project name (required)"]').fill("Regression Project");
+  await page.locator("#bds-drawer button").filter({ hasText: "Create" }).click();
+  await page.locator("#bds-drawer .bds-skill-item").filter({ hasText: "Regression Project" }).click();
+
+  await page.evaluate(() => {
+    const input = document.querySelector('#bds-drawer input[type="file"][multiple]');
+    window.__mockDeepSeek.projectUploadClickMultiple = null;
+    input.addEventListener("click", (event) => {
+      window.__mockDeepSeek.projectUploadClickMultiple = input.multiple;
+      event.preventDefault();
+    }, { once: true });
+  });
+
+  await page.locator("#bds-drawer button").filter({ hasText: "Upload File" }).click();
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.projectUploadClickMultiple))
+    .toBe(true);
+  await expect
+    .poll(() => page.evaluate(() => document.querySelector('#bds-drawer input[type="file"][multiple]').multiple))
+    .toBe(true);
+});
+
 test("imports GitHub commit history as a second attachment when enabled", async ({ page }) => {
   await page.locator(".bds-plus-btn").click();
   await page.locator(".bds-attach-dropdown .bds-attach-item").filter({ hasText: "GitHub Repo" }).click();

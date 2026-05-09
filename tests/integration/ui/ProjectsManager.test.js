@@ -137,4 +137,22 @@ describe("ProjectsManager integration", () => {
     expect(bridgeMocks.pushConfigToPage).toHaveBeenCalled();
     cleanup();
   });
+
+  it("keeps multiple enabled for the project Upload File flow", async () => {
+    const { target, cleanup } = renderSvelte(ProjectsManager, { onback: vi.fn() });
+    target.querySelector(".bds-skill-item").click();
+    await flushUi();
+
+    const fileInput = target.querySelector('input[type="file"][multiple]');
+    fileInput.click = vi.fn(() => {
+      expect(fileInput.multiple).toBe(true);
+    });
+
+    getButtonByText(target, "Upload File").click();
+    await flushUi();
+
+    expect(fileInput.click).toHaveBeenCalledOnce();
+    expect(fileInput.multiple).toBe(true);
+    cleanup();
+  });
 });

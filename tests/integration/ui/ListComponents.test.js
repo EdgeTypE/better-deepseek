@@ -6,7 +6,12 @@ const bridgeMocks = vi.hoisted(() => ({
   pushConfigToPage: vi.fn(),
 }));
 
+const nativeFileInputMocks = vi.hoisted(() => ({
+  openNativeFilePicker: vi.fn(),
+}));
+
 vi.mock("../../../src/content/bridge.js", () => bridgeMocks);
+vi.mock("../../../src/content/files/native-file-input.js", () => nativeFileInputMocks);
 
 import CharacterList from "../../../src/content/ui/CharacterList.svelte";
 import MemoryList from "../../../src/content/ui/MemoryList.svelte";
@@ -37,6 +42,7 @@ describe("memory, character, and skill components", () => {
       ui: { showToast: vi.fn() },
     });
     bridgeMocks.pushConfigToPage.mockReset();
+    nativeFileInputMocks.openNativeFilePicker.mockReset();
     document.body.innerHTML = "";
   });
 
@@ -76,6 +82,22 @@ describe("memory, character, and skill components", () => {
     cleanup();
   });
 
+  it("MemoryList import button keeps a single-file input", async () => {
+    const { target, cleanup } = renderSvelte(MemoryList);
+    await flushUi();
+    const fileInput = target.querySelector('input[type="file"]');
+
+    getButtonByText(target, "Import").click();
+    await flushUi();
+
+    expect(nativeFileInputMocks.openNativeFilePicker).toHaveBeenCalledWith(
+      fileInput,
+      { preferSingle: true },
+    );
+    expect(fileInput.multiple).toBe(false);
+    cleanup();
+  });
+
   it("CharacterList edits and uploads characters", async () => {
     state.characters = [
       { id: "c1", name: "Mage", usage: "rp", content: "wise", active: true },
@@ -106,6 +128,25 @@ describe("memory, character, and skill components", () => {
     await triggerFileInput(uploadInput, file);
 
     expect(state.characters.some((item) => item.name === "rogue")).toBe(true);
+    cleanup();
+  });
+
+  it("CharacterList keeps import and persona uploads single-file", async () => {
+    const { target, cleanup } = renderSvelte(CharacterList);
+    await flushUi();
+    const importInput = target.querySelector('input[type="file"][accept=".json"]');
+
+    getButtonByText(target, "Import").click();
+    await flushUi();
+
+    expect(nativeFileInputMocks.openNativeFilePicker).toHaveBeenCalledWith(
+      importInput,
+      { preferSingle: true },
+    );
+    expect(importInput.multiple).toBe(false);
+
+    const uploadInput = target.querySelector("#bds-char-upload");
+    expect(uploadInput.multiple).toBe(false);
     cleanup();
   });
 
@@ -140,6 +181,25 @@ describe("memory, character, and skill components", () => {
 
     expect(state.skills.some((item) => item.name === "planner")).toBe(true);
     expect(bridgeMocks.pushConfigToPage).toHaveBeenCalled();
+    cleanup();
+  });
+
+  it("SkillList keeps import and skill uploads single-file", async () => {
+    const { target, cleanup } = renderSvelte(SkillList);
+    await flushUi();
+    const importInput = target.querySelector('input[type="file"][accept=".json"]');
+
+    getButtonByText(target, "Import").click();
+    await flushUi();
+
+    expect(nativeFileInputMocks.openNativeFilePicker).toHaveBeenCalledWith(
+      importInput,
+      { preferSingle: true },
+    );
+    expect(importInput.multiple).toBe(false);
+
+    const uploadInput = target.querySelector("#bds-skill-upload");
+    expect(uploadInput.multiple).toBe(false);
     cleanup();
   });
 });

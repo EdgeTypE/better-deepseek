@@ -2,6 +2,7 @@
   import appState from "../state.js";
   import { STORAGE_KEYS } from "../../lib/constants.js";
   import { normalizeMemories } from "../storage.js";
+  import { openNativeFilePicker } from "../files/native-file-input.js";
 
   let entries = $state(
     Object.entries(appState.memories).sort((a, b) => a[0].localeCompare(b[0]))
@@ -27,7 +28,7 @@
   }
 
   function triggerImport() {
-    if (fileInput) fileInput.click();
+    openNativeFilePicker(fileInput, { preferSingle: true });
   }
 
   async function handleImport(event) {
