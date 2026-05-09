@@ -117,7 +117,7 @@
   }
 
   function triggerFileUpload() {
-    openNativeFilePicker(fileInput);
+    openNativeFilePicker(fileInput, { preferSingle: isAndroidTarget });
   }
 
   async function handleFileUpload(event) {

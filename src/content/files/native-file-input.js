@@ -9,6 +9,11 @@
  * - Android single-file strategy: temporarily clear `multiple` so WebView
  *   requests a single-file chooser instead of the OEM multi-document flow.
  *
+ * Operational rule:
+ * - On Android, all user-facing "Upload File" actions should prefer the
+ *   single-file strategy, even if the backing DOM input is marked `multiple`.
+ *   Multi-file upload remains available on non-Android targets.
+ *
  * The caller only expresses intent (`preferSingle`); this module chooses the
  * appropriate native-picker strategy and keeps the platform workaround local.
  */

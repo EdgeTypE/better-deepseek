@@ -149,7 +149,7 @@ test("drawer import and upload inputs stay single-file on Android", async ({ pag
     });
 });
 
-test("project Upload File keeps multiple mode on Android", async ({ page }) => {
+test("project Upload File requests single-file mode on Android", async ({ page }) => {
   await openDrawer(page);
   await page.locator("#bds-drawer button").filter({ hasText: "Manage" }).click({ force: true });
   await page.locator("#bds-drawer button").filter({ hasText: "New Project" }).click({ force: true });
@@ -170,7 +170,7 @@ test("project Upload File keeps multiple mode on Android", async ({ page }) => {
 
   await expect
     .poll(() => page.evaluate(() => window.__mockDeepSeek.projectUploadClickMultiple))
-    .toBe(true);
+    .toBe(false);
   await expect
     .poll(() => page.evaluate(() => document.querySelector('#bds-drawer input[type="file"][multiple]').multiple))
     .toBe(true);
