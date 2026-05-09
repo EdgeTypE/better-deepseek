@@ -393,7 +393,7 @@ class WebViewBridge(
         while (commits.length() < count) {
             val remaining = count - commits.length()
             val perPage = minOf(GITHUB_COMMITS_PAGE_SIZE, remaining)
-            var fetchedThisPage = perPage
+            var fetchedThisPage: Int
             val requestBuilder =
                     Request.Builder()
                             .url(buildGithubCommitsUrl(owner, repo, branch, perPage, page))

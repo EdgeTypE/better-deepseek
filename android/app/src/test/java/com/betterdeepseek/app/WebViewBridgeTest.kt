@@ -180,7 +180,7 @@ class WebViewBridgeTest {
         bridge.reportTheme(true)
 
         // Persistence is handled by theme.js via chrome.storage — bridge must not double-write.
-        verify(prefsEditor, never()).putBoolean(any(), anyBoolean())
+        verify(prefsEditor, never()).putBoolean(any(), any<Boolean>())
         assertEquals(true, reported)
     }
 
