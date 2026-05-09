@@ -438,7 +438,7 @@ class MainActivity : ComponentActivity() {
         // Default WebView background colours used in the inset-padding area behind transparent
         // system bars. Approximates DeepSeek's own page backgrounds so the status/nav bar region
         // blends seamlessly before (and if) the page reports its live theme via reportTheme().
-        private val PAGE_BG_DARK = Color.rgb(0x17, 0x17, 0x1A)
+        private val PAGE_BG_DARK = Color.rgb(0x15, 0x15, 0x17)
         private val PAGE_BG_LIGHT = Color.WHITE
 
         /**
