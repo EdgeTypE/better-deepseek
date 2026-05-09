@@ -59,8 +59,20 @@ class WebViewBridge(
     @Volatile var onThemeChanged: ((isDark: Boolean) -> Unit)? = null
 
     /**
-     * Called by the injected theme-detection script whenever the page's light/dark state changes.
-     * Routes to [onThemeChanged] so MainActivity can update status/navigation bar icon appearance.
+     * Returns the last DeepSeek page theme written by the extension's theme.js via
+     * chrome.storage.local (which the Android polyfill routes through [setStorage] as
+     * JSON.stringify(boolean) → stored as the string "true" or "false"). Falls back to [default]
+     * on first-ever launch before any value has been persisted.
+     */
+    fun getLastKnownIsDark(default: Boolean = false): Boolean {
+        val raw = prefs.getString(KEY_LAST_PAGE_DARK, null) ?: return default
+        return raw == "true"
+    }
+
+    /**
+     * Called by theme.js (via AndroidBridge.reportTheme) when the page's light/dark state changes.
+     * Persistence is handled cross-platform by chrome.storage.local.set in theme.js; this method
+     * exists solely so MainActivity can update status/navigation bar icon colours immediately.
      */
     @JavascriptInterface
     fun reportTheme(isDark: Boolean) {
@@ -551,5 +563,7 @@ class WebViewBridge(
         private const val DEFAULT_GITHUB_API_BASE_URL = "https://api.github.com"
         private const val DEFAULT_GITHUB_COMMIT_COUNT = 100
         private const val GITHUB_COMMITS_PAGE_SIZE = 100
+        // Double-underscore prefix marks this as internal bridge state, not user chrome.storage data.
+        internal const val KEY_LAST_PAGE_DARK = "__bds_page_is_dark"
     }
 }

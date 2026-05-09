@@ -82,6 +82,9 @@ class MainActivity : ComponentActivity() {
 
         val isSystemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
             Configuration.UI_MODE_NIGHT_YES
+        // DeepSeek's persisted theme drives colours; system dark mode is only the first-launch
+        // fallback (before any reportTheme call has been persisted to prefs).
+        val isPageDark = bridge.getLastKnownIsDark(default = isSystemDark)
 
         webView =
                 WebView(this).apply {
@@ -105,9 +108,7 @@ class MainActivity : ComponentActivity() {
                     webViewClient = bdsWebViewClient()
                     webChromeClient = bdsWebChromeClient()
                     isVerticalScrollBarEnabled = true
-                    // Match page background so the inset-padding area behind the status/nav bar
-                    // shows the correct colour instead of the window theme default.
-                    setBackgroundColor(if (isSystemDark) PAGE_BG_DARK else PAGE_BG_LIGHT)
+                    setBackgroundColor(if (isPageDark) PAGE_BG_DARK else PAGE_BG_LIGHT)
                 }
 
         // FrameLayout wrapper receives system-bar insets and applies them as padding.
@@ -118,7 +119,7 @@ class MainActivity : ComponentActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
             )
-            setBackgroundColor(if (isSystemDark) PAGE_BG_DARK else PAGE_BG_LIGHT)
+            setBackgroundColor(if (isPageDark) PAGE_BG_DARK else PAGE_BG_LIGHT)
             addView(webView)
         }
 
@@ -129,8 +130,8 @@ class MainActivity : ComponentActivity() {
         }
 
         WindowInsetsControllerCompat(window, window.decorView).apply {
-            isAppearanceLightStatusBars = !isSystemDark
-            isAppearanceLightNavigationBars = !isSystemDark
+            isAppearanceLightStatusBars = !isPageDark
+            isAppearanceLightNavigationBars = !isPageDark
         }
 
         bridge.onThemeChanged = { isDark ->
@@ -388,26 +389,11 @@ class MainActivity : ComponentActivity() {
             })();
         """.trimIndent()
 
-        val themeDetect =
-                """
-            (function () {
-                if (typeof AndroidBridge === 'undefined' || !AndroidBridge.reportTheme) return;
-                function bdsReportTheme() {
-                    var isDark = document.documentElement.classList.contains('dark') ||
-                        window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    AndroidBridge.reportTheme(isDark);
-                }
-                bdsReportTheme();
-                new MutationObserver(function () { bdsReportTheme(); })
-                    .observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
-                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', bdsReportTheme);
-            })();
-        """.trimIndent()
-
         view.evaluateJavascript(injected, null)
         view.evaluateJavascript(bootstrap, null)
+        // content.js calls startThemeWatcher() which persists pageIsDark via chrome.storage and
+        // fires AndroidBridge.reportTheme() for the live native bar-icon colour update.
         view.evaluateJavascript(content, null)
-        view.evaluateJavascript(themeDetect, null)
     }
 
     private fun readAsset(path: String): String? =
