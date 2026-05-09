@@ -389,11 +389,84 @@ class MainActivity : ComponentActivity() {
             })();
         """.trimIndent()
 
+        // Hides the "Get App" promotional button shown on mobile viewports.
+        // Detection is text-based so it survives DeepSeek's dynamic class renames.
+        // The observer stays alive for the lifetime of the page so SPA navigations that
+        // re-insert the button are caught automatically.
+        val hideGetApp =
+                """
+            (function () {
+                if (window.__bdsGetAppObserver) return;
+                function hideButton() {
+                    var spans = document.querySelectorAll('span');
+                    for (var i = 0; i < spans.length; i++) {
+                        var span = spans[i];
+                        if (span.textContent.trim() !== 'Get App') continue;
+                        var el = span.parentElement;
+                        while (el && el.tagName !== 'BUTTON') { el = el.parentElement; }
+                        if (el && el.parentElement) {
+                            el.parentElement.style.display = 'none';
+                            console.log('[BDS] Hidden Get App container');
+                        }
+                    }
+                }
+                hideButton();
+                var observer = new MutationObserver(hideButton);
+                observer.observe(document.body, { subtree: true, childList: true });
+                window.__bdsGetAppObserver = observer;
+            })();
+        """.trimIndent()
+
+        // Hides the "Download mobile App" (or equivalent) item from the settings drawer
+        // (.ds-floating-position-wrapper). Detection is text-based (/download.*app|get.*app/i)
+        // so it survives class-name renames. The observer stays alive for the page lifetime.
+        // NodeFilter.SHOW_TEXT = 4.
+        // Hides the "Download mobile App" item from DeepSeek's settings dropdown.
+        // Uses the same .ds-dropdown-menu / .ds-dropdown-menu-option__label structure
+        // as SidebarMenuInjector. Update TARGET if DeepSeek renames the item (e.g. i18n).
+        val hideDrawerItem =
+                """
+            (function () {
+                if (window.__bdsDrawerItemObserver) return;
+                var TARGET = 'Download mobile App';
+                function hideItem(menu) {
+                    var options = menu.querySelectorAll('.ds-dropdown-menu-option');
+                    for (var i = 0; i < options.length; i++) {
+                        var label = options[i].querySelector('.ds-dropdown-menu-option__label');
+                        if (label && label.textContent.trim().includes(TARGET)) {
+                            options[i].style.display = 'none';
+                            console.log('[BDS] Hidden drawer app item');
+                        }
+                    }
+                }
+                document.querySelectorAll('.ds-dropdown-menu').forEach(hideItem);
+                var observer = new MutationObserver(function (mutations) {
+                    for (var m = 0; m < mutations.length; m++) {
+                        var added = mutations[m].addedNodes;
+                        for (var n = 0; n < added.length; n++) {
+                            var node = added[n];
+                            if (node.nodeType !== 1) continue;
+                            if (node.classList.contains('ds-dropdown-menu')) {
+                                hideItem(node);
+                            } else {
+                                var menu = node.querySelector && node.querySelector('.ds-dropdown-menu');
+                                if (menu) hideItem(menu);
+                            }
+                        }
+                    }
+                });
+                observer.observe(document.body, { childList: true, subtree: true });
+                window.__bdsDrawerItemObserver = observer;
+            })();
+        """.trimIndent()
+
         view.evaluateJavascript(injected, null)
         view.evaluateJavascript(bootstrap, null)
         // content.js calls startThemeWatcher() which persists pageIsDark via chrome.storage and
         // fires AndroidBridge.reportTheme() for the live native bar-icon colour update.
         view.evaluateJavascript(content, null)
+        view.evaluateJavascript(hideGetApp, null)
+        view.evaluateJavascript(hideDrawerItem, null)
     }
 
     private fun readAsset(path: String): String? =

@@ -249,6 +249,137 @@ test("exports a chat as markdown from the sidebar menu", async ({ page }) => {
   expect(artifact.suggestedFilename()).toMatch(/\.md$/);
 });
 
+test("hides the Get App promotional button when the Android hide script runs", async ({ page }) => {
+  const container = page.locator('[data-testid="get-app-container"]');
+  await expect(container).toBeVisible();
+
+  // Simulate MainActivity.injectBdsScripts() evaluating the hide-get-app snippet.
+  await page.evaluate(() => {
+    if (window.__bdsGetAppObserver) return;
+    function hideButton() {
+      const spans = document.querySelectorAll("span");
+      for (const span of spans) {
+        if (span.textContent.trim() !== "Get App") continue;
+        let el = span.parentElement;
+        while (el && el.tagName !== "BUTTON") {
+          el = el.parentElement;
+        }
+        if (el && el.parentElement) {
+          el.parentElement.style.display = "none";
+        }
+      }
+    }
+    hideButton();
+    const observer = new MutationObserver(hideButton);
+    observer.observe(document.body, { subtree: true, childList: true });
+    window.__bdsGetAppObserver = observer;
+  });
+
+  await expect(container).not.toBeVisible();
+});
+
+test("re-hides Get App button after SPA re-render (observer stays alive)", async ({ page }) => {
+  // Install the hide script.
+  await page.evaluate(() => {
+    if (window.__bdsGetAppObserver) return;
+    function hideButton() {
+      const spans = document.querySelectorAll("span");
+      for (const span of spans) {
+        if (span.textContent.trim() !== "Get App") continue;
+        let el = span.parentElement;
+        while (el && el.tagName !== "BUTTON") {
+          el = el.parentElement;
+        }
+        if (el && el.parentElement) {
+          el.parentElement.style.display = "none";
+        }
+      }
+    }
+    hideButton();
+    const observer = new MutationObserver(hideButton);
+    observer.observe(document.body, { subtree: true, childList: true });
+    window.__bdsGetAppObserver = observer;
+  });
+
+  // Simulate SPA transition: remove original node and inject a fresh "Get App" button.
+  await page.evaluate(() => {
+    const old = document.querySelector('[data-testid="get-app-container"]');
+    if (old) old.remove();
+
+    const container = document.createElement("div");
+    container.dataset.testid = "get-app-container-spa";
+    const button = document.createElement("button");
+    button.type = "button";
+    const label = document.createElement("span");
+    label.textContent = "Get App";
+    button.appendChild(label);
+    container.appendChild(button);
+    document.body.prepend(container);
+  });
+
+  // Observer must auto-hide the re-inserted button.
+  await expect(page.locator('[data-testid="get-app-container-spa"]')).not.toBeVisible();
+});
+
+function installDrawerHideScript(page) {
+  return page.evaluate(() => {
+    if (window.__bdsDrawerItemObserver) return;
+    const TARGET = "Download mobile App";
+    function hideItem(menu) {
+      const options = menu.querySelectorAll(".ds-dropdown-menu-option");
+      for (const opt of options) {
+        const label = opt.querySelector(".ds-dropdown-menu-option__label");
+        if (label?.textContent.trim().includes(TARGET)) {
+          opt.style.display = "none";
+        }
+      }
+    }
+    document.querySelectorAll(".ds-dropdown-menu").forEach(hideItem);
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType !== 1) continue;
+          if (node.classList.contains("ds-dropdown-menu")) {
+            hideItem(node);
+          } else {
+            const menu = node.querySelector?.(".ds-dropdown-menu");
+            if (menu) hideItem(menu);
+          }
+        }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.__bdsDrawerItemObserver = observer;
+  });
+}
+
+test("hides Download mobile App item in settings drawer when Android hide script runs", async ({ page }) => {
+  await installDrawerHideScript(page);
+
+  // Open the settings drawer (fixture builds a real .ds-dropdown-menu on click).
+  await page.locator('[data-testid="settings-trigger"]').click();
+  await expect(page.locator('[data-testid="settings-drawer"]')).toBeVisible();
+
+  // Download item must be hidden; other items must remain visible.
+  await expect(page.locator('[data-testid="drawer-item-download"]')).not.toBeVisible();
+  await expect(page.locator('[data-testid="drawer-item-settings"]')).toBeVisible();
+  await expect(page.locator('[data-testid="drawer-item-logout"]')).toBeVisible();
+});
+
+test("re-hides drawer download item when settings menu is reopened (SPA nav)", async ({ page }) => {
+  await installDrawerHideScript(page);
+
+  // Open → verify hidden.
+  await page.locator('[data-testid="settings-trigger"]').click();
+  await expect(page.locator('[data-testid="drawer-item-download"]')).not.toBeVisible();
+
+  // Close by clicking elsewhere, then reopen — fixture creates a fresh .ds-dropdown-menu.
+  await page.locator("h1").click();
+  await page.locator('[data-testid="settings-trigger"]').click();
+  await expect(page.locator('[data-testid="drawer-item-download"]')).not.toBeVisible();
+  await expect(page.locator('[data-testid="drawer-item-settings"]')).toBeVisible();
+});
+
 test("creates the PDF export iframe from the sidebar menu", async ({ page }) => {
   await page.goto("https://chat.deepseek.com/chat/s/mock-chat-1");
   await page.waitForSelector("#bds-toggle");
