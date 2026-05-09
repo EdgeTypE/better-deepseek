@@ -48,11 +48,17 @@ class MainActivity : ComponentActivity() {
     private lateinit var cookieManager: CookieManager
 
     private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
-    private val fileChooserLauncher: ActivityResultLauncher<Array<String>> =
+    private val multipleFileLauncher: ActivityResultLauncher<Array<String>> =
             registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
                 val callback = pendingFileChooser
                 pendingFileChooser = null
                 callback?.onReceiveValue(uris.toTypedArray())
+            }
+    private val singleFileLauncher: ActivityResultLauncher<Array<String>> =
+            registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                val callback = pendingFileChooser
+                pendingFileChooser = null
+                callback?.onReceiveValue(uri?.let { arrayOf(it) } ?: emptyArray())
             }
 
     private val proxyClient: OkHttpClient by lazy {
@@ -232,7 +238,11 @@ class MainActivity : ComponentActivity() {
                                     ?.takeIf { it.isNotEmpty() }
                                     ?: arrayOf("*/*")
                     return try {
-                        fileChooserLauncher.launch(mimeTypes)
+                        if (fileChooserParams?.mode == FileChooserParams.MODE_OPEN_MULTIPLE) {
+                            multipleFileLauncher.launch(mimeTypes)
+                        } else {
+                            singleFileLauncher.launch(mimeTypes)
+                        }
                         true
                     } catch (t: Throwable) {
                         pendingFileChooser = null
