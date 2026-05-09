@@ -361,4 +361,97 @@ class WebViewBridgeTest {
         assertEquals(401, response.getInt("status"))
         assertTrue(response.getBoolean("authRejected"))
     }
+
+    // ── pickFiles ───────────────────────────────────────────────────────
+
+    @Test
+    fun `pickFiles invokes onPickFiles with files mode and sanitized requestId`() {
+        var capturedMode: String? = null
+        var capturedId: String? = null
+        bridge.onPickFiles = { mode, id -> capturedMode = mode; capturedId = id }
+
+        bridge.pickFiles("files", "abc-123")
+
+        assertEquals("files", capturedMode)
+        assertEquals("abc-123", capturedId)
+    }
+
+    @Test
+    fun `pickFiles normalizes unknown mode to files`() {
+        var capturedMode: String? = null
+        bridge.onPickFiles = { mode, _ -> capturedMode = mode }
+
+        bridge.pickFiles("banana", "abc-123")
+
+        assertEquals("files", capturedMode)
+    }
+
+    @Test
+    fun `pickFiles passes folder mode unchanged`() {
+        var capturedMode: String? = null
+        bridge.onPickFiles = { mode, _ -> capturedMode = mode }
+
+        bridge.pickFiles("folder", "abc-123")
+
+        assertEquals("folder", capturedMode)
+    }
+
+    @Test
+    fun `pickFiles strips injection characters from requestId`() {
+        var capturedId: String? = null
+        bridge.onPickFiles = { _, id -> capturedId = id }
+
+        bridge.pickFiles("files", "ab!@#cd--12")
+
+        assertEquals("abcd--12", capturedId)
+    }
+
+    @Test
+    fun `pickFiles truncates requestId to 64 characters`() {
+        val longId = "a".repeat(80)
+        var capturedId: String? = null
+        bridge.onPickFiles = { _, id -> capturedId = id }
+
+        bridge.pickFiles("files", longId)
+
+        assertEquals(64, capturedId?.length)
+    }
+
+    @Test
+    fun `pickFiles returns immediately for null requestId without invoking handler`() {
+        var called = false
+        bridge.onPickFiles = { _, _ -> called = true }
+
+        bridge.pickFiles("files", null)
+
+        assertFalse(called)
+    }
+
+    @Test
+    fun `pickFiles returns immediately for empty requestId without invoking handler`() {
+        var called = false
+        bridge.onPickFiles = { _, _ -> called = true }
+
+        bridge.pickFiles("files", "")
+
+        assertFalse(called)
+    }
+
+    @Test
+    fun `pickFiles returns immediately when requestId contains only invalid characters`() {
+        var called = false
+        bridge.onPickFiles = { _, _ -> called = true }
+
+        bridge.pickFiles("files", "!@#\$%^")
+
+        assertFalse(called)
+    }
+
+    @Test
+    fun `pickFiles does not throw when onPickFiles is null`() {
+        // Old APK: handler not wired. Bridge must not crash; it delivers a
+        // "cancelled" result asynchronously via mainHandler — covered by E2E.
+        bridge.onPickFiles = null
+        bridge.pickFiles("files", "abc-123")
+    }
 }
