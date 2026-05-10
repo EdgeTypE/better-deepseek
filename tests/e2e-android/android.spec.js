@@ -151,10 +151,40 @@ test("drawer import and upload inputs stay single-file on Android", async ({ pag
 
 test("project Upload File requests single-file mode on Android", async ({ page }) => {
   await openDrawer(page);
-  await page.locator("#bds-drawer button").filter({ hasText: "Manage" }).click({ force: true });
-  await page.locator("#bds-drawer button").filter({ hasText: "New Project" }).click({ force: true });
-  await page.locator('#bds-drawer input[placeholder="Project name (required)"]').fill("Regression Project");
-  await page.locator("#bds-drawer button").filter({ hasText: "Create" }).click({ force: true });
+
+  // Seed a project directly in chrome.storage rather than going through the
+  // multi-step "New Project" UI flow.  The polyfill's set() fires onChanged
+  // synchronously, so appState.projects is updated before the evaluate()
+  // Promise resolves — no additional wait is needed.
+  await page.evaluate(() =>
+    chrome.storage.local.set({
+      bds_projects: [
+        {
+          id: "regression-prj",
+          name: "Regression Project",
+          description: "",
+          customInstructions: "",
+          createdAt: Date.now(),
+        },
+      ],
+      bds_project_files: { "regression-prj": [] },
+    }),
+  );
+
+  // Click "Manage" via direct JS rather than Playwright's coordinate-based
+  // click.  The drawer is overflow-y: auto and "Manage" sits near the bottom
+  // edge on mobile viewports; coordinate-based force-clicks can land on the
+  // wrong element when the scroll hasn't settled on slow CI runners.
+  await page.evaluate(() => {
+    const btn = Array.from(document.querySelectorAll("#bds-drawer button")).find(
+      (b) => b.textContent.trim() === "Manage",
+    );
+    btn?.scrollIntoView({ block: "nearest", behavior: "instant" });
+    btn?.click();
+  });
+
+  // Wait for ProjectsManager to mount and show the seeded project before clicking.
+  await page.locator("#bds-drawer .bds-skill-item").filter({ hasText: "Regression Project" }).waitFor();
   await page.locator("#bds-drawer .bds-skill-item").filter({ hasText: "Regression Project" }).click({ force: true });
 
   await page.evaluate(() => {
