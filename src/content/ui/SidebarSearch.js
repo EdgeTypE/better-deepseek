@@ -84,6 +84,7 @@ export function injectSearchInput() {
 
   renderTagChips();
   watchSidebarVisibility(container);
+  setupSidebarObserver(container);
 }
 
 /**
@@ -216,8 +217,34 @@ export function renderTagChips() {
       <span class="bds-tag-chip-label">${tag}</span>
       <span class="bds-tag-chip-count">${tagCounts[tag]}</span>
     `;
-    chip.addEventListener('click', () => toggleTagFilter(tag));
+    chip.addEventListener('mousedown', (e) => {
+      e.preventDefault(); // Prevent input blur
+      toggleTagFilter(tag);
+      if (searchInput) searchInput.focus();
+    });
     tagChipsContainer.appendChild(chip);
+  });
+}
+
+let sidebarObserver = null;
+
+function setupSidebarObserver(container) {
+  if (sidebarObserver) sidebarObserver.disconnect();
+
+  // Find the list container - usually the parent of the chat items
+  // We'll watch the whole sidebar area for now
+  const sidebarNav = document.querySelector('div.flex-1.overflow-y-auto') || container.parentElement;
+  if (!sidebarNav) return;
+
+  sidebarObserver = new MutationObserver(() => {
+    // Re-apply filtering when sidebar content changes (e.g. DeepSeek re-renders)
+    const query = searchInput ? searchInput.value : "";
+    performFiltering(query);
+  });
+
+  sidebarObserver.observe(sidebarNav, {
+    childList: true,
+    subtree: true
   });
 }
 
@@ -249,7 +276,7 @@ function performFiltering(query) {
     const titleEl = item.querySelector('.c08e6e93');
     const fullTitle = titleEl?.getAttribute("data-bds-full-title") || "";
     const visibleTitle = titleEl ? titleEl.textContent.toLowerCase() : '';
-    const searchableTitle = fullTitle.toLowerCase() || visibleTitle;
+    const searchableTitle = (fullTitle || visibleTitle).toLowerCase();
     
     const sessionId = extractSessionId(item.href);
     const sessionTags = sessionId ? (state.chatTags[sessionId] || []) : [];
@@ -268,7 +295,7 @@ function performFiltering(query) {
     }
 
     if (!matches) {
-      item.style.display = 'none';
+      item.style.setProperty('display', 'none', 'important');
       return;
     }
 
@@ -284,7 +311,11 @@ function performFiltering(query) {
       }
     }
 
-    item.style.display = matches ? '' : 'none';
+    if (matches) {
+      item.style.removeProperty('display');
+    } else {
+      item.style.setProperty('display', 'none', 'important');
+    }
   });
 
   // Filter history group headers
@@ -293,10 +324,10 @@ function performFiltering(query) {
     const items = group.querySelectorAll('a._546d736');
     const hasVisibleItems = Array.from(items).some(item => item.style.display !== 'none');
     
-    if (hasVisibleItems || !query) {
-      group.style.display = '';
+    if (hasVisibleItems || !query && activeTags.size === 0) {
+      group.style.removeProperty('display');
     } else {
-      group.style.display = 'none';
+      group.style.setProperty('display', 'none', 'important');
     }
   });
 }
