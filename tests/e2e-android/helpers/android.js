@@ -75,26 +75,6 @@ function buildAndroidBridgeBootstrap() {
         downloadBlob(base64, mimeType, fileName) {
           downloads.push({ base64, mimeType, fileName });
         },
-        pickFiles(mode, requestId) {
-          // Per-test override: set window.__bdsNativeFilePicker = (mode) => result.
-          // Default: simulate cancellation after a short delay.
-          const handler = window.__bdsNativeFilePicker;
-          setTimeout(function () {
-            let detail;
-            if (typeof handler === "function") {
-              try {
-                detail = handler(mode);
-              } catch (err) {
-                detail = { error: String(err), files: [] };
-              }
-            } else {
-              detail = { files: [], cancelled: true };
-            }
-            window.dispatchEvent(
-              new CustomEvent("__bds_native_files_picked_" + requestId, { detail: detail }),
-            );
-          }, 10);
-        },
       };
     })();
   `;
