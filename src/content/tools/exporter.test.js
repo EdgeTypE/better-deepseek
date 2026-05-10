@@ -108,22 +108,25 @@ describe("exporter helpers", () => {
   it("exports to image using html2canvas", async () => {
     const html2canvas = (await import("html2canvas")).default;
     const { exportToImage } = await import("./exporter.js");
-    
-    // Mock canvas implementation
+
+    const mockBlob = new Blob(["fake"], { type: "image/png" });
     const mockCanvas = {
-      toDataURL: vi.fn().mockReturnValue("data:image/png;base64,fake"),
+      toBlob: vi.fn((cb) => cb(mockBlob)),
     };
     html2canvas.mockResolvedValue(mockCanvas);
 
-    // Mock link click
+    // triggerBlobDownload uses URL.createObjectURL + anchor click on non-Android
+    URL.createObjectURL = vi.fn(() => "blob:fake-png");
+    URL.revokeObjectURL = vi.fn();
     const linkClickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
     const messages = [{ role: "user", content: "hello", bdsCards: [] }];
     await exportToImage(messages, "Test Title", true, "test-file");
 
     expect(html2canvas).toHaveBeenCalled();
+    expect(mockCanvas.toBlob).toHaveBeenCalled();
     expect(linkClickSpy).toHaveBeenCalled();
-    
+
     linkClickSpy.mockRestore();
   });
 });

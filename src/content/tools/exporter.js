@@ -5,7 +5,7 @@
 
 import { collectMessageNodes, detectMessageRole } from "../scanner.js";
 import { extractMessageMarkdown, extractMessageRawText } from "../dom/message-text.js";
-import { triggerTextDownload } from "../../lib/utils/download.js";
+import { triggerTextDownload, triggerBlobDownload } from "../../lib/utils/download.js";
 import { simpleHash } from "../../lib/utils/hash.js";
 import html2canvas from "html2canvas";
 
@@ -623,10 +623,9 @@ export async function exportToImage(messages, title, dark, fileName) {
       allowTaint: true
     });
 
-    const link = document.createElement("a");
-    link.download = `${fileName}.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+    if (!blob) throw new Error("canvas.toBlob returned null");
+    triggerBlobDownload(blob, `${fileName}.png`);
   } catch (err) {
     console.error("[BDS] Image export failed:", err);
     alert("Failed to generate image. Please try selecting fewer messages.");
