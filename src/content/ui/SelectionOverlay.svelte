@@ -6,6 +6,10 @@
   let selectionMode = $state(appState.selectionMode);
   let selectedCount = $state(0);
 
+  // Bridge presence is fixed at page load — not reactive.
+  const isAndroid = typeof window !== "undefined" &&
+    typeof window.AndroidBridge?.downloadBlob === "function";
+
   $effect(() => {
     const handleUrlChange = () => {
       // Exit selection mode on navigation
@@ -18,7 +22,7 @@
 
     window.addEventListener("bds:urlChanged", handleUrlChange);
     window.addEventListener("bds:selectionChanged", handleSelectionChange);
-    
+
     // Check initial state periodically because appState is not reactive
     const timer = setInterval(() => {
       if (selectionMode !== appState.selectionMode) {
@@ -46,9 +50,9 @@
     appState.selectionMode = false;
     appState.selectedMessageIds.clear();
     selectionMode = false;
-    selectedCount = 0; // Reset count
+    selectedCount = 0;
     document.body.classList.remove("bds-selection-mode-active");
-    
+
     // Uncheck all checkboxes
     document.querySelectorAll(".bds-selection-checkbox").forEach(cb => {
       if (cb instanceof HTMLInputElement) cb.checked = false;
@@ -60,7 +64,7 @@
   function selectAll() {
     const checkboxes = document.querySelectorAll(".bds-selection-checkbox");
     const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-    
+
     checkboxes.forEach(cb => {
       cb.checked = !allChecked;
       const id = cb.getAttribute("data-bds-message-id");
@@ -70,7 +74,7 @@
         appState.selectedMessageIds.delete(id);
       }
     });
-    
+
     selectedCount = appState.selectedMessageIds.size;
     window.dispatchEvent(new CustomEvent("bds:selectionChanged"));
   }
@@ -80,7 +84,7 @@
       alert("Please select the messages you want to export first.");
       return;
     }
-    
+
     await exportSession(format, Array.from(appState.selectedMessageIds));
     cancelSelection();
   }
@@ -89,25 +93,29 @@
 {#if selectionMode}
   <div class="bds-selection-overlay">
     <div class="bds-selection-bar">
-      <div class="bds-selection-info">
-        <span class="bds-selection-count">{selectedCount}</span>
-        <span class="bds-selection-label">messages selected</span>
-      </div>
-      
-      <div class="bds-selection-center">
+
+      <!-- Layer 1: count + select-all -->
+      <div class="bds-row bds-row-info">
+        <div class="bds-selection-info">
+          <span class="bds-selection-count">{selectedCount}</span>
+          <span class="bds-selection-label">selected</span>
+        </div>
         <button class="bds-btn-ghost" onclick={selectAll}>
           {document.querySelectorAll(".bds-selection-checkbox").length === selectedCount ? "Deselect All" : "Select All"}
         </button>
       </div>
 
-      <div class="bds-selection-actions">
+      <!-- Layer 2: format buttons -->
+      <div class="bds-row bds-row-formats">
         <div class="bds-export-group">
           <button class="bds-export-btn" onclick={() => handleExport('markdown')} title="Markdown (.md)">
             MD
           </button>
-          <button class="bds-export-btn" onclick={() => handleExport('pdf')} title="PDF Document">
-            PDF
-          </button>
+          {#if !isAndroid}
+            <button class="bds-export-btn" onclick={() => handleExport('pdf')} title="PDF Document">
+              PDF
+            </button>
+          {/if}
           <button class="bds-export-btn" onclick={() => handleExport('html')} title="Interactive HTML">
             HTML
           </button>
@@ -115,11 +123,13 @@
             IMG
           </button>
         </div>
+      </div>
 
-        <div class="bds-divider-v"></div>
-
+      <!-- Layer 3: cancel (last, avoids accidental press) -->
+      <div class="bds-row bds-row-cancel">
         <button class="bds-btn-cancel" onclick={cancelSelection}>Cancel</button>
       </div>
+
     </div>
   </div>
 {/if}
@@ -133,7 +143,7 @@
     z-index: 10000;
     display: flex;
     justify-content: center;
-    padding: 20px;
+    padding: 16px;
     pointer-events: none;
     animation: slideUp 0.3s ease-out;
   }
@@ -143,20 +153,70 @@
     to { transform: translateY(0); }
   }
 
+  /* Mobile-first: vertical card layout */
   .bds-selection-bar {
     background: #111111;
-    border: 1px solid #333333;
-    border-radius: 100px; /* Pill shape */
-    padding: 8px 12px 8px 24px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 12px 16px;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 32px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
     pointer-events: auto;
     color: white;
-    min-width: 600px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    width: 100%;
+    max-width: 420px;
+  }
+
+  .bds-row {
+    display: flex;
+    align-items: center;
+  }
+
+  .bds-row-info {
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .bds-row-formats {
+    justify-content: center;
+  }
+
+  .bds-row-cancel {
+    justify-content: center;
+  }
+
+  /* Desktop: restore horizontal pill layout */
+  @media (min-width: 620px) {
+    .bds-selection-overlay {
+      padding: 20px;
+    }
+
+    .bds-selection-bar {
+      flex-direction: row;
+      align-items: center;
+      width: auto;
+      max-width: none;
+      border-radius: 100px;
+      padding: 8px 12px 8px 24px;
+      gap: 24px;
+    }
+
+    .bds-row-formats {
+      justify-content: flex-start;
+    }
+
+    .bds-row-cancel {
+      justify-content: flex-start;
+    }
+
+    .bds-btn-cancel {
+      border: none !important;
+      width: auto !important;
+      padding: 6px 12px !important;
+      border-radius: 20px !important;
+    }
   }
 
   .bds-selection-info {
@@ -179,18 +239,6 @@
   .bds-selection-label {
     font-size: 13px;
     color: #999;
-  }
-
-  .bds-selection-center {
-    flex-grow: 1;
-    display: flex;
-    justify-content: center;
-  }
-
-  .bds-selection-actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
   }
 
   .bds-export-group {
@@ -229,6 +277,7 @@
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
+    white-space: nowrap;
   }
 
   .bds-btn-ghost:hover {
@@ -237,25 +286,23 @@
     color: white;
   }
 
+  /* Mobile: full-width bordered cancel button (easy to see, hard to accidentally hit) */
   .bds-btn-cancel {
     background: transparent;
-    border: none;
+    border: 1px solid rgba(255, 95, 86, 0.3);
     color: #ff5f56;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-    padding: 6px 12px;
-    border-radius: 20px;
-    transition: background 0.2s;
+    padding: 8px 0;
+    border-radius: 10px;
+    transition: background 0.2s, border-color 0.2s;
+    width: 100%;
+    text-align: center;
   }
 
   .bds-btn-cancel:hover {
     background: rgba(255, 95, 86, 0.1);
-  }
-
-  .bds-divider-v {
-    width: 1px;
-    height: 20px;
-    background: #333;
+    border-color: rgba(255, 95, 86, 0.5);
   }
 </style>
