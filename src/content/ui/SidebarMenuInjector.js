@@ -24,9 +24,23 @@ export function initSidebarMenuInjector() {
   // The three-dot menu button is a descendant of the <a> element, so this
   // fires reliably without depending on auto-generated class names.
   function captureLinkFromClick(e) {
-    const link = e.target.closest('a[href*="/chat/s/"]');
+    // Fast path: button is inside the chat link element (some DOM layouts)
+    let link = e.target.closest('a[href*="/chat/s/"]');
     if (link) {
       lastClickedChatUrl = link.href;
+      return;
+    }
+    // Fallback: button is a sibling of the chat link rather than a descendant.
+    // Walk up until we find the nearest container that holds a chat link.
+    // Stops at the first match to avoid capturing the wrong session.
+    let el = e.target.parentElement;
+    while (el && el !== document.body) {
+      link = el.querySelector('a[href*="/chat/s/"]');
+      if (link) {
+        lastClickedChatUrl = link.href;
+        return;
+      }
+      el = el.parentElement;
     }
   }
 

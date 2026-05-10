@@ -85,6 +85,30 @@ describe("SidebarMenuInjector", () => {
       );
     });
 
+    it("captures URL when mousedown fires on sibling button (button outside <a>, real Chrome/Firefox layout)", async () => {
+      const container = document.createElement("div");
+      const link = document.createElement("a");
+      link.href = "https://chat.deepseek.com/chat/s/sibling";
+      link.textContent = "Chat Title";
+      const btn = document.createElement("button");
+      btn.textContent = "...";
+      container.appendChild(link);
+      container.appendChild(btn);
+      document.body.appendChild(container);
+
+      btn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+
+      const menu = buildDropdownMenu();
+      await vi.waitFor(() => expect(menu.querySelector(".bds-tags-option")).not.toBeNull());
+
+      menu.querySelector(".bds-tags-option").click();
+      await vi.waitFor(() =>
+        expect(tagEditorMocks.openTagEditor).toHaveBeenCalledWith(
+          "https://chat.deepseek.com/chat/s/sibling"
+        )
+      );
+    });
+
     it("does not capture URL from mousedown outside any chat link", async () => {
       const outside = document.createElement("div");
       document.body.appendChild(outside);
