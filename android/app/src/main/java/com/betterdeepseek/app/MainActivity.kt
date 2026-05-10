@@ -73,37 +73,6 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-    // Correlation key for in-flight native file/folder pick requests.
-    @Volatile private var pendingPickFilesRequestId: String? = null
-
-    private val multiFileLauncher: ActivityResultLauncher<Array<String>> =
-            registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-                val requestId = pendingPickFilesRequestId ?: return@registerForActivityResult
-                pendingPickFilesRequestId = null
-                if (uris.isNullOrEmpty()) {
-                    bridge.deliverPickError(requestId, "cancelled")
-                    return@registerForActivityResult
-                }
-                Thread {
-                    val files = uris.mapNotNull { uri -> bridge.readPickedContentUri(uri) }
-                    bridge.deliverPickedFiles(requestId, files, null)
-                }.start()
-            }
-
-    private val folderPickerLauncher: ActivityResultLauncher<Uri?> =
-            registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { treeUri ->
-                val requestId = pendingPickFilesRequestId ?: return@registerForActivityResult
-                pendingPickFilesRequestId = null
-                if (treeUri == null) {
-                    bridge.deliverPickError(requestId, "cancelled")
-                    return@registerForActivityResult
-                }
-                Thread {
-                    val (files, folderName) = bridge.readPickedFolderTree(treeUri)
-                    bridge.deliverPickedFiles(requestId, files, folderName)
-                }.start()
-            }
-
     private val proxyClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
                 .connectTimeout(20, TimeUnit.SECONDS)
@@ -122,18 +91,6 @@ class MainActivity : ComponentActivity() {
 
         bridge = WebViewBridge(applicationContext)
         cookieManager = CookieManager.getInstance()
-
-        // Wire native file/folder picker callbacks. pickFiles() is invoked on the JS thread;
-        // the launcher must be called on the UI thread, so we use runOnUiThread.
-        bridge.onPickFiles = { mode, requestId ->
-            pendingPickFilesRequestId = requestId
-            runOnUiThread {
-                when (mode) {
-                    "folder" -> folderPickerLauncher.launch(null)
-                    else -> multiFileLauncher.launch(arrayOf("*/*"))
-                }
-            }
-        }
 
         assetLoader =
                 WebViewAssetLoader.Builder()
@@ -168,9 +125,6 @@ class MainActivity : ComponentActivity() {
                     addJavascriptInterface(bridge, BRIDGE_NAME)
                     webViewClient = bdsWebViewClient()
                     webChromeClient = bdsWebChromeClient()
-                    // evaluateJavascript must be called on the main thread; bridge.deliverPickResult
-                    // already posts to mainHandler before invoking this lambda.
-                    bridge.evaluateJs = { script -> evaluateJavascript(script, null) }
                     isVerticalScrollBarEnabled = true
                     setBackgroundColor(if (isPageDark) PAGE_BG_DARK else PAGE_BG_LIGHT)
                 }
@@ -225,8 +179,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         bridge.onThemeChanged = null
-        bridge.evaluateJs = null
-        bridge.onPickFiles = null
         webView.removeJavascriptInterface(BRIDGE_NAME)
         super.onDestroy()
     }

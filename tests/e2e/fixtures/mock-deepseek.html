@@ -382,9 +382,13 @@
             button.addEventListener("click", (event) => {
               event.preventDefault();
               event.stopPropagation();
-              const chatItem = button.closest("a._546d736");
-              if (!chatItem) return;
-              buildMenu(chatItem.href);
+              // Support both layouts: button inside <a> (old) and button as sibling (new)
+              let chatLink = button.closest("a._546d736");
+              if (!chatLink && button.parentElement) {
+                chatLink = button.parentElement.querySelector("a._546d736");
+              }
+              if (!chatLink) return;
+              buildMenu(chatLink.href);
             });
           });
         }
@@ -491,14 +495,18 @@
 
         <div class="mock-history-list">
           <div class="_3098d02">
-            <a class="_546d736" data-session-id="mock-chat-1" href="/chat/s/mock-chat-1">
-              <span class="c08e6e93">Alpha Session</span>
+            <div class="mock-chat-item">
+              <a class="_546d736" data-session-id="mock-chat-1" href="/chat/s/mock-chat-1">
+                <span class="c08e6e93">Alpha Session</span>
+              </a>
               <div class="_2090548" role="button" tabindex="0" aria-label="Open menu">...</div>
-            </a>
-            <a class="_546d736" data-session-id="mock-chat-2" href="/chat/s/mock-chat-2">
-              <span class="c08e6e93">Beta Session</span>
+            </div>
+            <div class="mock-chat-item">
+              <a class="_546d736" data-session-id="mock-chat-2" href="/chat/s/mock-chat-2">
+                <span class="c08e6e93">Beta Session</span>
+              </a>
               <div class="_2090548" role="button" tabindex="0" aria-label="Open menu">...</div>
-            </a>
+            </div>
           </div>
         </div>
       </aside>

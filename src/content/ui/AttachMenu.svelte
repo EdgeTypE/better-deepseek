@@ -11,11 +11,6 @@
   import { projectFilesToFile } from "../files/project-file-builder.js";
   import { openNativeFilePicker } from "../files/native-file-input.js";
   import {
-    isNativeFilePickerAvailable,
-    nativePickFiles,
-    buildFolderFileFromNative,
-  } from "../../platform/android-file-picker.js";
-  import {
     getFilesForProject,
     setActiveProject,
     clearActiveProject,
@@ -73,9 +68,12 @@
   const BDS_TARGET = process.env.BDS_TARGET || "chrome";
   const isAndroidTarget = BDS_TARGET === "android";
 
-  // Folder upload: web uses showDirectoryPicker; Android uses the native bridge when available.
-  // Voice input is hidden on Android because SpeechRecognition is not wired up in the WebView.
-  const supportsFolderUpload = !isAndroidTarget || isNativeFilePickerAvailable();
+  // Folder upload uses window.showDirectoryPicker — unavailable in Android
+  // WebView. Voice input is hidden on Android because SpeechRecognition isn't
+  // wired up in WebView; the on-screen keyboard mic is always reachable.
+  // On non-Android targets we keep the buttons visible and let the existing
+  // runtime fallbacks (toast on missing API) handle older Chromium variants.
+  const supportsFolderUpload = !isAndroidTarget;
   const supportsVoiceInput = !isAndroidTarget;
 
   function hasGithubToken() {
@@ -281,24 +279,8 @@
     }
   }
 
-  async function handleUploadFile() {
+  function handleUploadFile() {
     closeMenu();
-    // On Android with native bridge: launch multi-file picker, then inject results.
-    if (isAndroidTarget && isNativeFilePickerAvailable()) {
-      try {
-        const result = await nativePickFiles("files");
-        if (!result.cancelled && result.files && result.files.length > 0) {
-          for (const f of result.files) {
-            const blob = new Blob([f.content], { type: "text/plain" });
-            injectFile(new File([blob], f.name, { type: "text/plain" }));
-          }
-        }
-      } catch (err) {
-        if (appState.ui) appState.ui.showToast(err?.message || "File pick failed.");
-      }
-      return;
-    }
-    // Fallback: use the DOM file input (web or old Android app without pickFiles).
     if (nativeInput) {
       // Native picker behavior is selected via a file-flow strategy. Android's
       // "Upload File" path prefers the single-file strategy so WebView asks the
@@ -310,22 +292,11 @@
   async function handleUploadFolder() {
     closeMenu();
 
-    // On Android with native bridge: launch folder picker, build workspace file.
-    if (isAndroidTarget) {
-      if (isNativeFilePickerAvailable()) {
-        try {
-          const result = await nativePickFiles("folder");
-          if (!result.cancelled && result.files && result.files.length > 0) {
-            const fakeFile = buildFolderFileFromNative(result.files, result.folderName);
-            if (fakeFile) injectFile(fakeFile);
-          }
-        } catch (err) {
-          if (appState.ui) appState.ui.showToast(err?.message || "Folder pick failed.");
-        }
-      } else {
-        if (appState.ui) {
-          appState.ui.showToast("Folder upload requires a newer version of the app.");
-        }
+    if (!supportsFolderUpload) {
+      if (appState.ui) {
+        appState.ui.showToast(
+          "Folder upload is not supported on Android yet.",
+        );
       }
       return;
     }

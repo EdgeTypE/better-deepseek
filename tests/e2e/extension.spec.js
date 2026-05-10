@@ -315,10 +315,10 @@ test("exports a chat as markdown from the sidebar menu", async ({ page }) => {
   await addAssistantMessage(page, "Exports are generated from the visible session transcript.");
 
   // Hover and open chat menu
-  const chatItem = page.locator('a._546d736[data-session-id="mock-chat-1"]');
+  const chatItem = page.locator('.mock-chat-item:has(a[data-session-id="mock-chat-1"])');
   await chatItem.hover();
-  
-  // Click the three-dots/menu button (using exact class from mock)
+
+  // Click the three-dots/menu button (sibling of the chat link, not a descendant)
   const menuBtn = chatItem.locator('div._2090548');
   await menuBtn.click({ force: true });
 
@@ -486,7 +486,7 @@ test("creates the PDF export iframe from the sidebar menu", async ({ page }) => 
   await addAssistantMessage(page, "This transcript should render into the PDF export iframe.");
 
   // Hover and open chat menu
-  const chatItem = page.locator('a._546d736[data-session-id="mock-chat-1"]');
+  const chatItem = page.locator('.mock-chat-item:has(a[data-session-id="mock-chat-1"])');
   await chatItem.hover();
   const menuBtn = chatItem.locator('div._2090548');
   await menuBtn.click({ force: true });
@@ -500,7 +500,7 @@ test("creates the PDF export iframe from the sidebar menu", async ({ page }) => 
 
   // Wait for selection overlay
   await expect(page.locator(".bds-selection-bar")).toBeVisible();
-  
+
   // Wait for checkboxes
   await page.waitForSelector(".bds-selection-checkbox", { timeout: 5000 });
 

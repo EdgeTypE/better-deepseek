@@ -20,26 +20,39 @@ const TAG_ICON = `
 </svg>`;
 
 export function initSidebarMenuInjector() {
-  // Capture the chat URL when the menu button is clicked
-  const captureUrl = (e) => {
-    const btn = e.target.closest("div._2090548") || e.target.closest('button[aria-label*="menu" i]');
-    if (btn) {
-      const chatItem = btn.closest("a._546d736") || btn.closest('a[href*="/chat/s/"]');
-      if (chatItem) {
-        lastClickedChatUrl = chatItem.href;
-      }
+  // Capture the chat URL from any click inside a sidebar chat link.
+  // The three-dot menu button is a descendant of the <a> element, so this
+  // fires reliably without depending on auto-generated class names.
+  function captureLinkFromClick(e) {
+    // Fast path: button is inside the chat link element (some DOM layouts)
+    let link = e.target.closest('a[href*="/chat/s/"]');
+    if (link) {
+      lastClickedChatUrl = link.href;
+      return;
     }
-  };
-
-  document.addEventListener("mousedown", captureUrl, true);
-  document.addEventListener("click", captureUrl, true);
+    // Fallback: button is a sibling of the chat link rather than a descendant.
+    // Walk up until we find the nearest container that holds a chat link.
+    // Stops at the first match to avoid capturing the wrong session.
+    let el = e.target.parentElement;
+    while (el && el !== document.body) {
+      link = el.querySelector('a[href*="/chat/s/"]');
+      if (link) {
+        lastClickedChatUrl = link.href;
+        return;
+      }
+      el = el.parentElement;
+    }
+  }
 
   // Secondary backup for menu injection on any click
-  document.addEventListener("click", () => {
+  function handleBackupScan() {
     setTimeout(() => {
       document.querySelectorAll(".ds-dropdown-menu").forEach(injectOptions);
     }, 100);
-  }, true);
+  }
+
+  document.addEventListener("mousedown", captureLinkFromClick, true);
+  document.addEventListener("click", handleBackupScan, true);
 
   const observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
@@ -60,11 +73,20 @@ export function initSidebarMenuInjector() {
 
   // Initial check for pending exports
   checkPendingExport();
+
+  return function cleanup() {
+    document.removeEventListener("mousedown", captureLinkFromClick, true);
+    document.removeEventListener("click", handleBackupScan, true);
+    observer.disconnect();
+  };
 }
 
 async function handleExportAction(format) {
   const targetUrl = lastClickedChatUrl;
-  if (!targetUrl) return;
+  if (!targetUrl) {
+    console.warn("[BDS] handleExportAction: no chat URL captured — three-dot button may be outside chat link");
+    return;
+  }
 
   // For selection mode
   if (format === "selection") {
@@ -98,14 +120,16 @@ function injectOptions(menu) {
 
   // Tags option
   const tagsOption = createMenuOption("Tags (BDS)", TAG_ICON, "bds-tags-option", () => {
-    if (lastClickedChatUrl) {
-      // Dismiss the dropdown by clicking the body — lets React close it naturally
-      // (force-removing DOM nodes crashes React's reconciliation)
-      document.body.click();
-      // Open the tag editor after a small delay to let React clean up
-      const url = lastClickedChatUrl;
-      setTimeout(() => openTagEditor(url), 50);
+    if (!lastClickedChatUrl) {
+      console.warn("[BDS] Tags action: no chat URL captured — three-dot button may be outside chat link");
+      return;
     }
+    // Dismiss the dropdown by clicking the body — lets React close it naturally
+    // (force-removing DOM nodes crashes React's reconciliation)
+    document.body.click();
+    // Open the tag editor after a small delay to let React clean up
+    const url = lastClickedChatUrl;
+    setTimeout(() => openTagEditor(url), 50);
   });
 
   const exportOption = createMenuOption("Export Chat (BDS)", SELECTION_ICON, "bds-export-option", () => {

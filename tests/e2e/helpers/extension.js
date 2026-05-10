@@ -143,7 +143,14 @@ export const test = base.extend({
     try {
       await use(context);
     } finally {
-      await context.close();
+      try {
+        await context.close();
+      } catch {
+        // On Windows, a race in libuv's async-handle cleanup can cause the
+        // browser process to exit before context.close() resolves, surfacing
+        // "Target page, context or browser has been closed". This is a
+        // Playwright/Chromium Windows-only issue unrelated to test correctness.
+      }
       fs.rmSync(userDataDir, { recursive: true, force: true });
     }
   },
