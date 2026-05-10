@@ -160,10 +160,12 @@ test("project Upload File requests single-file mode on Android", async ({ page }
   await page.evaluate(() => {
     const input = document.querySelector('#bds-drawer input[type="file"][multiple]');
     window.__mockDeepSeek.projectUploadClickMultiple = null;
-    input.addEventListener("click", (event) => {
-      window.__mockDeepSeek.projectUploadClickMultiple = input.multiple;
-      event.preventDefault();
-    }, { once: true });
+    // Override click() rather than using addEventListener so the file-chooser
+    // dialog never opens. This matches the established pattern in test #5
+    // ("Upload File requests single-file mode on Android").
+    input.click = function () {
+      window.__mockDeepSeek.projectUploadClickMultiple = this.multiple;
+    };
   });
 
   await page.locator("#bds-drawer button").filter({ hasText: "Upload File" }).click({ force: true });
