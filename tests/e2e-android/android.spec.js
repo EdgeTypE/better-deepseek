@@ -215,13 +215,10 @@ test("project Upload File on Android uses native pickFiles bridge", async ({ pag
     });
     // Track whether the DOM file input was clicked directly (it should NOT be on Android).
     const input = document.querySelector('#bds-drawer input[type="file"][multiple]');
-    window.__mockDeepSeek.projectUploadClickMultiple = null;
-    // Override click() rather than using addEventListener so the file-chooser
-    // dialog never opens. This matches the established pattern in test #5
-    // ("Upload File requests single-file mode on Android").
-    input.click = function () {
-      window.__mockDeepSeek.projectUploadClickMultiple = this.multiple;
-    };
+    window.__mockDeepSeek.projectInputClickedDirectly = false;
+    input.addEventListener("click", () => {
+      window.__mockDeepSeek.projectInputClickedDirectly = true;
+    }, { once: true });
   });
 
   await page.locator("#bds-drawer button").filter({ hasText: "Upload File" }).click({ force: true });
