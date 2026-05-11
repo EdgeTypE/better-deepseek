@@ -93,7 +93,7 @@ jobs:
         run: |
           APK_PATH=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
           if [ -n "$APK_PATH" ]; then
-            apksigner verify --verbose "$APK_PATH"
+            $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose "$APK_PATH"
           else
             echo "No release APK found to verify."
             exit 1
