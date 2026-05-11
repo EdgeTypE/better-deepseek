@@ -6,7 +6,7 @@
  * They guard the parity contract between Chrome and Android so a future shim
  * regression is caught without needing a device farm.
  */
-import { test, expect } from "./helpers/android.js";
+import { test, expect, reinjectAndroidContentBundle } from "./helpers/android.js";
 import { strToU8, zipSync } from "fflate";
 
 const githubZipBase64 = Buffer.from(
@@ -249,6 +249,24 @@ test("renders standalone create_file download cards", async ({ page }) => {
     '<BDS:create_file fileName="notes.txt">android body</BDS:create_file>',
   );
   await expect(page.locator(".bds-download-card")).toContainText("notes.txt");
+});
+
+test("does not duplicate tagged reply overlays after repeated Android content injection", async ({ page }) => {
+  await reinjectAndroidContentBundle(page);
+  await reinjectAndroidContentBundle(page);
+
+  await addAssistantMessage(
+    page,
+    [
+      "Android dedupe lead.",
+      '<BDS:VISUALIZER><div class="v-card"><h2 class="v-title">Android Dedupe</h2></div></BDS:VISUALIZER>',
+    ].join("\n"),
+  );
+
+  await expect(page.locator(".bds-message-overlay")).toHaveCount(1);
+  await expect(page.locator(".bds-sanitized-text")).toHaveCount(1);
+  await expect(page.locator(".bds-sanitized-text")).toContainText("Android dedupe lead");
+  await expect(page.locator(".bds-visualizer-card")).toHaveCount(1);
 });
 
 test("does NOT inject duplicate Run buttons on re-scan", async ({ page }) => {

@@ -65,6 +65,49 @@ test("renders visualizer and HTML tool cards from tagged assistant messages", as
   await expect(page.locator(".bds-tool-card h4")).toContainText("HTML");
 });
 
+test("does not duplicate tagged reply overlays after rescans and updates", async ({ page }) => {
+  await addAssistantMessage(
+    page,
+    [
+      "Initial dedupe lead.",
+      '<BDS:VISUALIZER><div class="v-card"><h2 class="v-title">Dedupe Chart</h2></div></BDS:VISUALIZER>',
+    ].join("\n"),
+  );
+
+  await expect(page.locator(".bds-message-overlay")).toHaveCount(1);
+  await expect(page.locator(".bds-sanitized-text")).toHaveCount(1);
+  await expect(page.locator(".bds-visualizer-card")).toHaveCount(1);
+
+  await page.evaluate(() => {
+    for (let i = 0; i < 5; i += 1) {
+      const marker = document.createElement("span");
+      marker.className = "bds-test-rescan-marker";
+      marker.textContent = String(i);
+      document.body.appendChild(marker);
+    }
+  });
+  await page.waitForTimeout(500);
+
+  await updateLastAssistantMessage(
+    page,
+    [
+      "Updated dedupe lead.",
+      '<BDS:VISUALIZER><div class="v-card"><h2 class="v-title">Dedupe Chart</h2></div></BDS:VISUALIZER>',
+    ].join("\n"),
+  );
+  await page.evaluate(() => {
+    const marker = document.createElement("span");
+    marker.className = "bds-test-rescan-marker";
+    marker.textContent = "after-update";
+    document.body.appendChild(marker);
+  });
+
+  await expect(page.locator(".bds-sanitized-text")).toContainText("Updated dedupe lead");
+  await expect(page.locator(".bds-message-overlay")).toHaveCount(1);
+  await expect(page.locator(".bds-sanitized-text")).toHaveCount(1);
+  await expect(page.locator(".bds-visualizer-card")).toHaveCount(1);
+});
+
 test("renders PPTX, Excel, and Docx cards for office-generation tags", async ({ page }) => {
   await addAssistantMessage(
     page,

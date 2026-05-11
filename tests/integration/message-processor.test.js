@@ -131,6 +131,41 @@ describe("message processor integration", () => {
     expect(node.querySelector(".ds-markdown").classList.contains("bds-hidden-message")).toBe(true);
   });
 
+  it("updates an existing tool overlay without mounting a duplicate", () => {
+    const node = createMessageNode(
+      "Intro\n<BDS:VISUALIZER><div>viz</div></BDS:VISUALIZER>",
+    );
+
+    processMessageNode(node);
+    node.dataset.rawText = "Updated intro\n<BDS:VISUALIZER><div>viz</div></BDS:VISUALIZER>";
+    processMessageNode(node);
+
+    expect(mocks.mount).toHaveBeenCalledOnce();
+    expect(mocks.mount.mock.calls[0][1].props.text).toBe("Updated intro");
+    expect(document.querySelectorAll(".mock-overlay")).toHaveLength(1);
+  });
+
+  it("removes stale DOM overlays before mounting a replacement", () => {
+    const node = createMessageNode(
+      "Intro\n<BDS:VISUALIZER><div>viz</div></BDS:VISUALIZER>",
+    );
+    const wrapper = document.createElement("div");
+    wrapper.className = "bds-host-wrapper";
+    const host = document.createElement("div");
+    host.className = "bds-overlay-host";
+    const staleOverlay = document.createElement("div");
+    staleOverlay.className = "bds-message-overlay";
+    staleOverlay.textContent = "stale duplicate";
+    host.appendChild(staleOverlay);
+    wrapper.appendChild(host);
+    node.insertAdjacentElement("afterend", wrapper);
+
+    processMessageNode(node);
+
+    expect(document.querySelector(".bds-message-overlay")).toBeNull();
+    expect(document.querySelectorAll(".mock-overlay")).toHaveLength(1);
+  });
+
   it("collects standalone files outside long work", () => {
     const node = createMessageNode(
       '<BDS:create_file fileName="README.md">```markdown\n# Demo\n```</BDS:create_file>',

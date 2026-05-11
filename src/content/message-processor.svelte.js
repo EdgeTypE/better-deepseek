@@ -304,6 +304,7 @@ export function processMessageNode(node) {
         existing.props.loadingIndex = loadingIndex;
       } else {
         const host = getOrCreateHost(node, "bds-overlay-host");
+        removeStaleMessageOverlays(host);
         
         // Create reactive props object
         const props = $state({
@@ -340,6 +341,12 @@ export function processMessageNode(node) {
         overlayHost.replaceChildren();
       }
     }
+  }
+}
+
+function removeStaleMessageOverlays(host) {
+  for (const overlay of host.querySelectorAll(".bds-message-overlay")) {
+    overlay.remove();
   }
 }
 

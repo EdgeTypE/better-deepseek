@@ -29,9 +29,14 @@ import { initPricing } from "../lib/pricing.js";
 import { startStatusMonitor } from "./status-monitor.js";
 import { startThemeWatcher } from "./theme.js";
 
-init().catch((error) => {
-  console.error("[BetterDeepSeek] Init error:", error);
-});
+const CONTENT_BOOTSTRAP_KEY = "__bdsContentBootstrapped";
+
+if (!window[CONTENT_BOOTSTRAP_KEY]) {
+  window[CONTENT_BOOTSTRAP_KEY] = true;
+  init().catch((error) => {
+    console.error("[BetterDeepSeek] Init error:", error);
+  });
+}
 
 async function init() {
   await waitForBody();
