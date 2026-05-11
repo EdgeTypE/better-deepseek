@@ -25,7 +25,16 @@ android {
         debug {
             isMinifyEnabled = false
         }
+        signingConfigs {
+            create("release") {
+                storeFile = rootProject.file("ci-release.jks")
+                storePassword = System.getenv("BDS_KEYSTORE_PASSWORD") ?: ""
+                keyAlias = System.getenv("BDS_KEY_ALIAS") ?: ""
+                keyPassword = System.getenv("BDS_KEY_PASSWORD") ?: ""
+            }
+        }
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

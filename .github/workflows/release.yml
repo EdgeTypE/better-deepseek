@@ -71,9 +71,33 @@ jobs:
         working-directory: android
         run: chmod +x ./gradlew
 
+      - name: Decode Keystore
+        env:
+          BDS_KEYSTORE: ${{ secrets.BDS_KEYSTORE }}
+        run: |
+          if [ -n "$BDS_KEYSTORE" ]; then
+            echo "$BDS_KEYSTORE" | base64 --decode > android/ci-release.jks
+          else
+            echo "Warning: BDS_KEYSTORE secret is missing. Release build might fail or be unsigned."
+          fi
+
       - name: Build Android APK
         working-directory: android
-        run: ./gradlew --no-daemon assembleDebug
+        run: ./gradlew --no-daemon assembleRelease
+        env:
+          BDS_KEYSTORE_PASSWORD: ${{ secrets.BDS_KEYSTORE_PASSWORD }}
+          BDS_KEY_ALIAS: ${{ secrets.BDS_KEY_ALIAS }}
+          BDS_KEY_PASSWORD: ${{ secrets.BDS_KEY_PASSWORD }}
+
+      - name: Verify APK Signature
+        run: |
+          APK_PATH=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          if [ -n "$APK_PATH" ]; then
+            apksigner verify --verbose "$APK_PATH"
+          else
+            echo "No release APK found to verify."
+            exit 1
+          fi
 
       - name: Compute version and prepare artifact names
         id: prep
@@ -81,17 +105,17 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
+          APK_SRC=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             mv better-deepseek-chrome.zip   better-deepseek-chrome-latest.zip
             mv better-deepseek-firefox.zip  better-deepseek-firefox-latest.zip
-            mv android/app/build/outputs/apk/debug/app-debug.apk \
-               better-deepseek-android-latest-debug.apk
+            cp "$APK_SRC" better-deepseek-android-latest-signed.apk
             echo "is_tag=false" >> "$GITHUB_OUTPUT"
           else
             mv better-deepseek-chrome.zip   "better-deepseek-chrome-v${VERSION}.zip"
             mv better-deepseek-firefox.zip  "better-deepseek-firefox-v${VERSION}.zip"
-            mv android/app/build/outputs/apk/debug/app-debug.apk \
-               "better-deepseek-android-v${VERSION}-debug.apk"
+            cp "$APK_SRC" "better-deepseek-android-v${VERSION}-signed.apk"
             echo "is_tag=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -104,11 +128,11 @@ jobs:
           body: |
             This release contains the latest automated build from the `main` branch.
 
-            Android is distributed as an unofficial debug-signed APK through GitHub Releases only. Until permanent signing is added, Android upgrades may require uninstalling the previous APK before reinstalling.
+            The Android APK is now **digitally signed**. You can install it directly without Play Protect warnings (though you may still need to allow "Unknown Sources" in your browser).
           files: |
             better-deepseek-chrome-latest.zip
             better-deepseek-firefox-latest.zip
-            better-deepseek-android-latest-debug.apk
+            better-deepseek-android-latest-signed.apk
           prerelease: true
           make_latest: true
         env:
@@ -119,13 +143,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body: |
-            This release includes browser extension bundles plus an unofficial debug-signed Android APK.
-
-            Android builds are distributed through GitHub Releases only. Until permanent signing is added, Android upgrades may require uninstalling the previous APK before reinstalling.
+            This release includes browser extension bundles and a **signed** Android APK.
           files: |
             better-deepseek-chrome-v${{ steps.prep.outputs.version }}.zip
             better-deepseek-firefox-v${{ steps.prep.outputs.version }}.zip
-            better-deepseek-android-v${{ steps.prep.outputs.version }}-debug.apk
+            better-deepseek-android-v${{ steps.prep.outputs.version }}-signed.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
