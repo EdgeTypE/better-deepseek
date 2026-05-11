@@ -53,6 +53,8 @@
         <DocxCard content={block.content} />
       {:else if block.name === 'auto:code_runner'}
         <AutoCodeRunnerCard language={block.attrs.language || block.attrs.lang} content={block.content} />
+      {:else if block.name === 'auto_code_result'}
+        <AutoCodeResultCard language={block.attrs.language} status={block.attrs.status} output={block.content} />
       {:else if block.name === 'ask_question'}
         <div class="bds-question-info-card">
           <div class="bds-question-icon">

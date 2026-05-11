@@ -64,6 +64,35 @@ export function processMessageNode(node) {
   if (role === "user") {
     const rawUserText = rawText;
     stripBdsTagsFromUserMessage(node);
+
+    // --- CODE RUNNER RESULT CARD (USER) ---
+    if (rawUserText.includes("[BDS:AUTO] Code Runner Result")) {
+      const match = rawUserText.match(/\[BDS:AUTO\] Code Runner Result \(([^)]+)\)\s+Status: ([^\n]+)\s+Output:\s+(?:```text\n|```)?([\s\S]*?)(?:\n```)?\s*(?:<\/BetterDeepSeek>|$)/i);
+      if (match) {
+        stateData.hasControlTags = true;
+        const language = match[1];
+        const status = match[2];
+        const output = match[3];
+
+        const existing = messageOverlays.get(node);
+        const newBlocks = [{
+          name: "auto_code_result",
+          attrs: { language, status },
+          content: output
+        }];
+
+        if (existing) {
+          existing.props.blocks = newBlocks;
+        } else {
+          const host = getOrCreateHost(node, "bds-overlay-host");
+          const props = $state({ text: "", blocks: newBlocks, loading: false });
+          const component = mount(MessageOverlay, { target: host, props });
+          messageOverlays.set(node, { component, props });
+        }
+        syncVisibilityState(node, false, stateData, true);
+      }
+    }
+
     if (state.settings.tokenPriceDisplay && !stateData.priceInjected) {
       const modelName = detectModelInline(null);
       
