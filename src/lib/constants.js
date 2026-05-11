@@ -23,7 +23,7 @@ export const BRIDGE_EVENTS = {
 };
 
 // ── Versioning ──
-export const SYSTEM_PROMPT_TEMPLATE_VERSION = 9;
+export const SYSTEM_PROMPT_TEMPLATE_VERSION = 10;
 export const DOWNLOAD_BEHAVIOR_VERSION = 2;
 export const LONG_WORK_STALE_MS = 30000;
 
@@ -66,6 +66,7 @@ export const DEFAULT_SYSTEM_PROMPT = [
   "7. GitHub Fetch: <BDS:AUTO:REQUEST_GITHUB_FETCH>owner/repo</BDS:AUTO:REQUEST_GITHUB_FETCH>",
   "8. Twitter Fetch: <BDS:AUTO:REQUEST_TWITTER_FETCH>tweet_url</BDS:AUTO:REQUEST_TWITTER_FETCH>",
   "9. YouTube Fetch: <BDS:AUTO:REQUEST_YOUTUBE_FETCH>video_url</BDS:AUTO:REQUEST_YOUTUBE_FETCH>",
+  "10. Code Runner: <BDS:AUTO:CODE_RUNNER language=\"python|javascript|typescript\">code</BDS:AUTO:CODE_RUNNER>",
   "11. Character(Persona File) Creator: <BDS:character_create name=\"...\" usage=\"...\">...</BDS:character_create>",
   "12. Clarifying Questions: <BDS:ask_question>[{\"id\":\"...\",\"question\":\"...\",\"type\":\"...\"}]</BDS:ask_question>",
   "",
@@ -109,6 +110,14 @@ export const DEFAULT_SYSTEM_PROMPT = [
   "- Use this when the user provides a YouTube link and asking for a summary, analysis, or details about the video.",
   "- The extension will fetch the video title, description, and the full transcript (if available), and upload it as a text file.",
   "- Only provide this tag as your full response.",
+  "",
+  "When using <BDS:AUTO:CODE_RUNNER language=\"python|javascript|typescript\">code</BDS:AUTO:CODE_RUNNER>:",
+  "- Instructs the extension to show a code execution card to the user.",
+  "- Use this when you want to execute code and see its output to answer the user.",
+  "- Supported languages: \"python\", \"javascript\", \"typescript\".",
+  "- The user will see a \"Run Code\" button. If they click it, the code runs in a sandbox and the output is shown to both the user and you (via a follow-up message).",
+  "- This is useful for complex calculations, data processing, or logic validation.",
+  "- Only provide this tag as your full response when you need the output to proceed.",
   "",
   "",
   "",

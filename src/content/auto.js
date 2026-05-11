@@ -104,6 +104,31 @@ export async function handleAutoYouTubeFetch(url) {
 }
 
 /**
+ * Handles automatic reporting of code runner results back to the AI.
+ */
+export async function handleAutoCodeRunnerResult(language, status, output) {
+  const statusLabels = {
+    success: "SUCCESS",
+    error: "ERROR",
+    rejected: "REJECTED"
+  };
+
+  const autoMessage = [
+    `<BetterDeepSeek>`,
+    `[BDS:AUTO] Code Runner Result (${language.toUpperCase()})`,
+    `Status: ${statusLabels[status] || status.toUpperCase()}`,
+    `Output:`,
+    "```text",
+    output.map(o => (typeof o === 'string' ? o : o.text)).join("\n") || "(No output)",
+    "```",
+    `</BetterDeepSeek>`
+  ].join("\n");
+
+  console.log(`[BDS:AUTO] Sending code runner result (${status})...`);
+  injectPureTextAndSend(autoMessage);
+}
+
+/**
  * Handles automatic error reporting when a tool fails in the sandbox.
  * Constructs a correction prompt and sends it to the chat.
  * @param {string} toolName - Name of the tool (e.g., 'PPTX', 'Excel', 'Word')

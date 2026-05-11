@@ -17,7 +17,7 @@ import { parseMemoryWrite } from "./memory-parser.js";
 import { sanitizeVisibleText } from "./text-sanitizer.js";
 
 // Tool renderers that have visual cards
-const RENDERABLE_TOOLS = new Set(["html", "latex", "visualizer", "pptx", "excel", "docx", "ask_question", "character_create"]);
+const RENDERABLE_TOOLS = new Set(["html", "latex", "visualizer", "pptx", "excel", "docx", "ask_question", "character_create", "auto:code_runner"]);
 
 /**
  * Parse a raw message text for all BDS tags.
@@ -29,13 +29,13 @@ export function parseBdsMessage(rawText, isSettled = false) {
   // This prevents infinite "Working..." animations and lost tool output.
   if (isSettled) {
     const unclosedTags = [];
-    const allTags = Array.from(text.matchAll(/<\/?BDS:([A-Za-z0-9_]+)[^>]*>/gi));
+    const allTags = Array.from(text.matchAll(/<\/?BDS:([A-Za-z0-9_:]+)[^>]*>/gi));
     for (const match of allTags) {
       const isClose = match[0].startsWith('</');
       const tName = match[1].toLowerCase();
       
       // AUTO tags are background requests lacking standard rendering lifecycle
-      if (tName.startsWith("auto")) continue;
+      if (tName.startsWith("auto") && tName !== "auto:code_runner") continue;
 
       if (!isClose) {
         unclosedTags.push(match[1]);
@@ -76,8 +76,8 @@ export function parseBdsMessage(rawText, isSettled = false) {
   }
 
   // We have BDS tags, but do we have tags that should HIDE the original message?
-  // AUTO tags should NOT hide the message.
-  const hasHidingTags = /(<BDS:(?!AUTO)[a-zA-Z0-9_]+|<BetterDeepSeek>|Bds create file>)/i.test(text);
+  // AUTO tags should NOT hide the message, EXCEPT for AUTO:CODE_RUNNER which has a UI card.
+  const hasHidingTags = /(<BDS:(?!AUTO:(?!CODE_RUNNER))[a-zA-Z0-9_:]+|<BetterDeepSeek>|Bds create file>)/i.test(text);
   result.containsControlTags = hasHidingTags;
   result.longWorkOpen = /<BDS:LONG_WORK>/i.test(text);
   result.longWorkClose = /<\/BDS:LONG_WORK>/i.test(text);
@@ -100,7 +100,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
   }
 
   const pairTagRegex =
-    /<BDS:([A-Za-z0-9_]+)([^>]*)>([\s\S]*?)<\/BDS:\1>/gi;
+    /<BDS:([A-Za-z0-9_:]+)([^>]*)>([\s\S]*?)<\/BDS:\1>/gi;
   match = null;
   while ((match = pairTagRegex.exec(text)) !== null) {
     const name = String(match[1] || "").toLowerCase();
@@ -212,8 +212,8 @@ export function parseBdsMessage(rawText, isSettled = false) {
 
   // UNIVERSAL INTERFACE LOCK: Detect if ANY BDS tag is currently open (not closed)
   // This handles streaming for all tools (Visualizer, LongWork, etc.)
-  const allBdsTags = Array.from(text.matchAll(/<BDS:([A-Za-z0-9_]+)[^>]*>/gi));
-  const allBdsCloseTags = Array.from(text.matchAll(/<\/BDS:([A-Za-z0-9_]+)>/gi));
+  const allBdsTags = Array.from(text.matchAll(/<BDS:([A-Za-z0-9_:]+)[^>]*>/gi));
+  const allBdsCloseTags = Array.from(text.matchAll(/<\/BDS:([A-Za-z0-9_:]+)>/gi));
 
   // Determine if there's an open tag that hasn't been closed yet
   // We check if the last open tag has a corresponding close tag after it
@@ -228,7 +228,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
     
     // EXCEPTION: AUTO tags are background instructions/requests, 
     // they should never trigger the UI's "Working..." overlay.
-    if (tagName.startsWith("auto")) continue;
+    if (tagName.startsWith("auto") && tagName !== "auto:code_runner") continue;
 
     // Check if this specific tag name has a close tag appearing after this open tag
     const hasClose = allBdsCloseTags.some(ct => 

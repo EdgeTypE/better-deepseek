@@ -5,6 +5,7 @@
   import PptxCard from "./PptxCard.svelte";
   import ExcelCard from "./ExcelCard.svelte";
   import DocxCard from "./DocxCard.svelte";
+  import AutoCodeRunnerCard from "./AutoCodeRunnerCard.svelte";
   import LoadingIndicator from "./LoadingIndicator.svelte";
 
 
@@ -50,6 +51,8 @@
         <ExcelCard content={block.content} />
       {:else if block.name === 'docx'}
         <DocxCard content={block.content} />
+      {:else if block.name === 'auto:code_runner'}
+        <AutoCodeRunnerCard language={block.attrs.language || block.attrs.lang} content={block.content} />
       {:else if block.name === 'ask_question'}
         <div class="bds-question-info-card">
           <div class="bds-question-icon">

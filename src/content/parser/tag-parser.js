@@ -38,7 +38,8 @@ export function normalizeTaggedCodeContent(content, tagName) {
     name === "docx" ||
     name === "pptx" ||
     name === "excel" ||
-    name === "character_create"
+    name === "character_create" ||
+    name === "auto:code_runner"
   ) {
     output = unwrapMarkdownCodeFence(output);
   }
@@ -48,7 +49,8 @@ export function normalizeTaggedCodeContent(content, tagName) {
     name === "html" ||
     name === "docx" ||
     name === "pptx" ||
-    name === "excel"
+    name === "excel" ||
+    name === "auto:code_runner"
   ) {
     output = stripLeadingChatter(output);
   }
