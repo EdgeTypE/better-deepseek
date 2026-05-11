@@ -29,7 +29,7 @@
       </div>
       <div class="bds-result-details">
         <h4>{statusLabel}</h4>
-        <p>{langLabel} code was processed.</p>
+        <p>{langLabel} code execution {status === "SUCCESS" ? "completed successfully" : (status === "REJECTED" ? "was rejected" : "failed")}.</p>
       </div>
     </div>
     

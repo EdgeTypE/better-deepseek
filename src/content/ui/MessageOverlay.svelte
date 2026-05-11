@@ -6,6 +6,7 @@
   import ExcelCard from "./ExcelCard.svelte";
   import DocxCard from "./DocxCard.svelte";
   import AutoCodeRunnerCard from "./AutoCodeRunnerCard.svelte";
+  import AutoCodeResultCard from "./AutoCodeResultCard.svelte";
   import LoadingIndicator from "./LoadingIndicator.svelte";
 
 

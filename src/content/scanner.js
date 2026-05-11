@@ -152,7 +152,11 @@ function scanPage() {
 
     const nodes = collectMessageNodes();
     for (const node of nodes) {
-      processMessageNode(node);
+      try {
+        processMessageNode(node);
+      } catch (err) {
+        console.error("[BDS] Error processing message node:", err, node);
+      }
     }
 
     linkifyLogo();
