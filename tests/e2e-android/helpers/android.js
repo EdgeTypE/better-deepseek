@@ -27,6 +27,12 @@ function ensureBuildExists() {
   }
 }
 
+export async function reinjectAndroidContentBundle(page) {
+  ensureBuildExists();
+  const contentJs = fs.readFileSync(contentJsPath, "utf8");
+  await page.evaluate(contentJs);
+}
+
 /**
  * Init script (runs in every page before any frame script). Installs an
  * in-memory mock of window.AndroidBridge that mirrors the @JavascriptInterface
