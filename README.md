@@ -100,7 +100,7 @@ The easiest way to install Better DeepSeek is through the official stores:
 - **[Firefox Add-ons](https://addons.mozilla.org/en/firefox/addon/better-deepseek/)**
 
 ### Latest Development Build
-If you want to try the very latest features before they reach the store, you can download the **[Latest Automated Build](https://github.com/EdgeTypE/better-deepseek/releases/tag/latest)**. Download the ZIP, unzip it, and load it via "Load unpacked" in Chrome.
+If you want to try the very latest features before they reach the store, you can download the **[Latest Automated Build](https://github.com/EdgeTypE/better-deepseek/releases/tag/latest)**. Download the ZIP for browsers, or the **signed APK** for Android. Load the browser extension via "Load unpacked" in Chrome.
 
 ### Manual Installation (Developer Mode)
 If you prefer to build from source or contribute to development:
