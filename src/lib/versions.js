@@ -1,5 +1,27 @@
 export const VERSION_HISTORY = [
   {
+    version: "0.1.6",
+    date: "2026-05-12",
+    title: "Android & Organization",
+    features: [
+      {
+        type: "platform",
+        title: "Android Version",
+        description: "Better DeepSeek is now available on <a href='https://github.com/EdgeTypE/better-deepseek/releases' target='_blank' style='color: #4d6bfe; text-decoration: underline;'>Android</a>."
+      },
+      {
+        type: "organization",
+        title: "Chat Filtering & Tags",
+        description: "Organize your sessions by adding tags. Filter and group chats easily from the sidebar menu."
+      },
+      {
+        type: "export",
+        title: "Export UI Rework",
+        description: "Newly designed export interface for Markdown, PDF, HTML, and Images. Export full sessions or specific parts."
+      }
+    ]
+  },
+  {
     version: "0.1.5",
     date: "2026-05-06",
     title: "Refinement & Visibility",

@@ -2,6 +2,7 @@
 
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/aabiopennjmopfippagcalmkdjlepdhh?style=for-the-badge&color=blue&logo=google-chrome&logoColor=white)](https://chromewebstore.google.com/detail/better-deepseek/aabiopennjmopfippagcalmkdjlepdhh)
 [![Firefox Add-ons](https://img.shields.io/amo/v/better-deepseek?style=for-the-badge&color=orange&logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/en/firefox/addon/better-deepseek/)
+[![Android Build](https://img.shields.io/github/package-json/v/EdgeTypE/better-deepseek?label=Android%20Build&style=for-the-badge&color=3DDC84&logo=android&logoColor=white)](https://github.com/EdgeTypE/better-deepseek/releases/tag/latest)
 [![Latest Build](https://img.shields.io/github/package-json/v/EdgeTypE/better-deepseek?label=Latest%20Build&style=for-the-badge&color=orange)](https://github.com/EdgeTypE/better-deepseek/releases/tag/latest)
 [![License](https://img.shields.io/github/license/EdgeTypE/better-deepseek?style=for-the-badge&color=green)](LICENSE)
 [![GitHub Stars](https://img.shields.io/github/stars/EdgeTypE/better-deepseek?style=for-the-badge&color=gold)](https://github.com/EdgeTypE/better-deepseek/stargazers)
@@ -339,6 +340,15 @@ system image recommended).
 Better DeepSeek does not collect, transmit, or sell any personal data. All settings, memories, skills, and characters are stored locally on your device. If you configure a GitHub personal access token for private repository support, it is stored locally and only sent to GitHub when you explicitly fetch a repository. See the full [Privacy Policy](extension/PRIVACY.md) for details.
 
 ## Changelog
+
+### v0.1.6 (2026-05-12)
+- **New Platform**: Better DeepSeek is now available on Android. (Thanks to [@WhiteLicorice](https://github.com/WhiteLicorice)).
+- **New Feature**: Chat Filtering & Grouping. Organize your conversations with tags and filter them from the sidebar.
+- **New Feature**: Reworked Export UI. Export full sessions or specific messages as Markdown, PDF, HTML, or Images.
+- **New Tool**: `BDS:AUTO:CODE_RUNNER`. DeepSeek can now request code execution and see results directly.
+- **New Feature**: Server Status Checker. Real-time monitoring of DeepSeek's server status with user notifications.
+- **New UI**: Renderable card for character creation.
+- **UX Improvement**: Various UI refinements and performance optimizations.
 
 ### v0.1.5 (2026-05-06)
 - **New Feature**: Advanced system prompt injection control. Choose between "Always", "First Message", or "Every X" messages with customizable intervals.

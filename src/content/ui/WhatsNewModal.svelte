@@ -92,7 +92,7 @@
                 </div>
                 <div class="bds-feature-info">
                   <h3>{feature.title}</h3>
-                  <p>{feature.description}</p>
+                  <p>{@html feature.description}</p>
                 </div>
               </div>
             {/each}
