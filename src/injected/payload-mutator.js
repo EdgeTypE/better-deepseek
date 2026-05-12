@@ -2,8 +2,10 @@
  * All payload mutation logic for intercepted API requests.
  *
  * This is the CORE of the injection system — it injects the system prompt,
- * skills, and memory context into DeepSeek's API payload.
+ * skills, memory context, and office document library references into DeepSeek's API payload.
  */
+
+import { buildOfficeSkillsBlock } from "../lib/office-skills/index.js";
 
 /**
  * @param {object} payload - The parsed JSON request body
@@ -303,6 +305,11 @@ export function buildHiddenPrefix(
   const memoryBlock = buildMemoryCallsBlock(userPrompt, state);
   if (memoryBlock) {
     blocks.push(memoryBlock);
+  }
+
+  const officeBlock = buildOfficeSkillsBlock(userPrompt);
+  if (officeBlock) {
+    blocks.push(officeBlock);
   }
 
   const activeChar = state.config.activeCharacter;

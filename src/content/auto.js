@@ -8,6 +8,15 @@ import { fetchGitHubRepo } from "./files/github-reader.js";
 import { fetchTwitterTweet } from "./files/twitter-reader.js";
 import { fetchYouTubeData } from "./files/youtube-reader.js";
 import appState from "./state.js";
+import { XLSX_SKILL } from "../lib/office-skills/xlsx.js";
+import { PPTX_SKILL } from "../lib/office-skills/pptx.js";
+import { DOCX_SKILL } from "../lib/office-skills/docx.js";
+
+const TOOL_TO_SKILL = {
+  PPTX: { tag: "pptx", skill: PPTX_SKILL },
+  Excel: { tag: "excel", skill: XLSX_SKILL },
+  Word: { tag: "docx", skill: DOCX_SKILL },
+};
 
 // Keep track of already processing/processed URLs globally so we don't spam
 const processedWebFetches = new Set();
@@ -136,6 +145,10 @@ export async function handleAutoCodeRunnerResult(language, status, output) {
  * @param {string} originalCode - The code that caused the error
  */
 export async function handleAutoErrorReport(toolName, error, originalCode) {
+  const entry = TOOL_TO_SKILL[toolName];
+  const tagName = entry ? entry.tag : toolName.toLowerCase();
+  const skillRef = entry ? entry.skill : "";
+
   const autoMessage = [
     `<BetterDeepSeek>`,
     `[BDS:AUTO] ERROR during ${toolName} generation.`,
@@ -144,7 +157,9 @@ export async function handleAutoErrorReport(toolName, error, originalCode) {
     "```javascript",
     originalCode.trim(),
     "```",
-    `Please analyze the error, fix the code, and provide the corrected version within the appropriate <BDS:${toolName.toLowerCase()}> tag.`,
+    skillRef ? `\nLibrary API Reference (use this to fix the code):\n${skillRef}\n` : "",
+    `Please analyze the error above, study the Library API Reference, then fix the code and provide the corrected version within the appropriate <BDS:${tagName}> tag.`,
+    `Pay close attention to: correct API method names, proper arguments, and the required save/output call at the end.`,
     `</BetterDeepSeek>`
   ].join("\n");
 
