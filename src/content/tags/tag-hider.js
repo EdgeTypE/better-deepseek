@@ -7,7 +7,12 @@
  */
 
 import state from "../state.js";
-import { extractBaseTitle } from "./tag-manager.js";
+import {
+  extractBaseTitle,
+  discoverTags,
+  extractSessionId,
+  getCurrentSessionId,
+} from "./tag-manager.js";
 
 // Tag suffix pattern: one or more <word> at end of string
 const TAG_SUFFIX_REGEX = /(\s+<[^<>]+>)+\s*$/;
@@ -21,6 +26,15 @@ export function hideTagsInSidebar() {
 
   for (const el of titleElements) {
     const fullText = el.textContent || "";
+
+    // Discovery: if title has tags, ensure they are in our state
+    const link = el.closest('a[href*="/chat/s/"]');
+    if (link) {
+      const sessionId = extractSessionId(link.href);
+      if (sessionId) {
+        discoverTags(sessionId, fullText);
+      }
+    }
 
     // Skip if no tags in the text
     if (!TAG_SUFFIX_REGEX.test(fullText)) {
@@ -53,6 +67,13 @@ export function hideTagsInHeader() {
   if (!headerTitle) return;
 
   const text = headerTitle.textContent || "";
+
+  // Discovery for header title
+  const sessionId = getCurrentSessionId();
+  if (sessionId) {
+    discoverTags(sessionId, text);
+  }
+
   if (!TAG_SUFFIX_REGEX.test(text)) return;
 
   headerTitle.setAttribute("data-bds-full-title", text);

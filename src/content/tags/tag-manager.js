@@ -260,3 +260,37 @@ async function persistTags() {
     [STORAGE_KEYS.chatTags]: state.chatTags,
   });
 }
+// ── Discovery ──
+
+/**
+ * Extract tags from a title string and update local state if they are missing.
+ * This is used to "discover" tags that were added on other devices or before
+ * the extension's local storage was populated.
+ *
+ * It does NOT call syncTitleWithTags to avoid redundant API calls.
+ */
+export async function discoverTags(sessionId, fullTitle) {
+  if (!sessionId || !fullTitle) return;
+
+  const tagsFromTitle = extractTagsFromTitle(fullTitle);
+  if (tagsFromTitle.length === 0) return;
+
+  const currentTags = getTags(sessionId);
+
+  // Check if they are already the same to avoid redundant storage writes
+  if (
+    currentTags.length === tagsFromTitle.length &&
+    currentTags.every((t, i) => t === tagsFromTitle[i])
+  ) {
+    return;
+  }
+
+  // They differ, update state locally
+  state.chatTags[sessionId] = tagsFromTitle;
+
+  // Persist to storage
+  await persistTags();
+
+  // If search is active, we might need to refresh the tag chips
+  // (SidebarSearch will usually pick this up via storage listener anyway)
+}

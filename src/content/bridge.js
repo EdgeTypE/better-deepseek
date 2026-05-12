@@ -7,6 +7,7 @@ import { BRIDGE_EVENTS } from "../lib/constants.js";
 import { findLatestAssistantMessageNode, collectMessageNodes } from "./scanner.js";
 import { finalizeLongWork } from "./files/long-work.js";
 import { getActiveProject, getActiveFiles } from "./project-manager.js";
+import { discoverTags } from "./tags/tag-manager.js";
 
 /**
  * Set up listeners for bridge events from the injected script.
@@ -94,6 +95,9 @@ function handleSessionData(data) {
 
   const currentIds = new Set(state.chatSessions.map(s => s.id));
   for (const session of sessions) {
+    if (session.id && session.title) {
+      discoverTags(session.id, session.title);
+    }
     if (!currentIds.has(session.id)) {
       state.chatSessions.push({
         id: session.id,
