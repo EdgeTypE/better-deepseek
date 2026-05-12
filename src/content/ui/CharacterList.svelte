@@ -6,7 +6,7 @@
   import { openNativeFilePicker } from "../files/native-file-input.js";
 
   let characters = $state([...appState.characters]);
-  let fileInput = $state(null);
+  let uploadInput = $state(null);
 
   // Editing state
   let editingId = $state(null);
@@ -30,38 +30,17 @@
   }
 
   function triggerImport() {
-    openNativeFilePicker(fileInput, { preferSingle: true });
-  }
-
-  async function handleImport(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const raw = JSON.parse(text);
-      const { normalizeCharacters } = await import("../storage.js");
-      const normalized = normalizeCharacters(raw);
-
-      await chrome.storage.local.set({
-        [STORAGE_KEYS.characters]: normalized,
-      });
-
-      if (appState.ui) {
-        appState.ui.showToast("Characters imported.");
-      }
-    } catch (err) {
-      console.error("Import failed:", err);
-      if (appState.ui) {
-        appState.ui.showToast("Import failed: Invalid JSON.");
-      }
-    }
-    event.target.value = "";
+    openNativeFilePicker(uploadInput, { preferSingle: true });
   }
 
   async function handleUpload(event) {
     const file = event.target.files && event.target.files[0];
     if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".md")) {
+      if (appState.ui) appState.ui.showToast("Only .md files are supported for persona uploads.");
+      event.target.value = "";
+      return;
+    }
 
     const content = await file.text();
     const name = file.name.replace(/\.md$/i, "") || `char-${appState.characters.length + 1}`;
@@ -177,13 +156,6 @@
       <button type="button" class="bds-btn-outlined" onclick={triggerImport}>
         Import
       </button>
-      <input 
-        type="file" 
-        accept=".json" 
-        style="display: none;" 
-        bind:this={fileInput} 
-        onchange={handleImport}
-      />
     </div>
   </div>
 </div>
@@ -192,7 +164,8 @@
 <input
   id="bds-char-upload"
   type="file"
-  accept=".md,text/markdown"
+  accept=".md"
+  bind:this={uploadInput}
   onchange={handleUpload}
 />
 

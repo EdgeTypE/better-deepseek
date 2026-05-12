@@ -35,4 +35,19 @@ describe("openNativeFilePicker", () => {
     expect(input.click).toHaveBeenCalledOnce();
     expect(input.multiple).toBe(true);
   });
+
+  it("preserves extension-only accept filters while preferring single-file mode", () => {
+    const input = createNativeInput();
+    input.accept = ".json";
+    input.click = vi.fn(() => {
+      expect(input.multiple).toBe(false);
+      expect(input.accept).toBe(".json");
+    });
+
+    openNativeFilePicker(input, { preferSingle: true });
+
+    expect(input.click).toHaveBeenCalledOnce();
+    expect(input.multiple).toBe(true);
+    expect(input.accept).toBe(".json");
+  });
 });
