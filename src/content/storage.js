@@ -26,6 +26,8 @@ export async function loadStateFromStorage() {
     STORAGE_KEYS.projectFiles,
     STORAGE_KEYS.whatsNewPending,
     STORAGE_KEYS.chatTags,
+    STORAGE_KEYS.remoteAnnouncement,
+    STORAGE_KEYS.dismissedAnnouncements,
   ]);
 
   const storedSettings = values[STORAGE_KEYS.settings] || {};
@@ -67,6 +69,8 @@ export async function loadStateFromStorage() {
   state.projectFiles = normalizeProjectFiles(values[STORAGE_KEYS.projectFiles]);
   state.whatsNewPending = !!values[STORAGE_KEYS.whatsNewPending];
   state.chatTags = normalizeChatTags(values[STORAGE_KEYS.chatTags]);
+  state.remoteAnnouncements = Array.isArray(values[STORAGE_KEYS.remoteAnnouncement]) ? values[STORAGE_KEYS.remoteAnnouncement] : [];
+  state.dismissedAnnouncements = Array.isArray(values[STORAGE_KEYS.dismissedAnnouncements]) ? values[STORAGE_KEYS.dismissedAnnouncements] : [];
 }
 
 function shouldUpgradeSystemPrompt(storedSettings) {
@@ -320,6 +324,15 @@ export function bindStorageChangeListener() {
           m.renderTagChips();
         }
       });
+    }
+    
+    if (changes[STORAGE_KEYS.remoteAnnouncement]) {
+      state.remoteAnnouncements = Array.isArray(changes[STORAGE_KEYS.remoteAnnouncement].newValue) ? changes[STORAGE_KEYS.remoteAnnouncement].newValue : [];
+      window.dispatchEvent(new CustomEvent("bds:remote-announcement-updated", { detail: state.remoteAnnouncements }));
+    }
+
+    if (changes[STORAGE_KEYS.dismissedAnnouncements]) {
+      state.dismissedAnnouncements = changes[STORAGE_KEYS.dismissedAnnouncements].newValue || [];
     }
 
     pushConfigToPage();

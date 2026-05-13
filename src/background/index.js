@@ -363,3 +363,27 @@ chrome.runtime.onInstalled.addListener((details) => {
     chrome.storage.local.set({ bds_whats_new_pending: true });
   }
 });
+
+// Remote status announcement system
+const REMOTE_STATUS_URL = "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/extension/status.json";
+
+async function fetchRemoteStatus() {
+  try {
+    const response = await fetch(`${REMOTE_STATUS_URL}?t=${Date.now()}`, {
+      cache: "no-store"
+    });
+    if (!response.ok) return;
+    
+    let data = await response.json();
+    if (data) {
+      // Ensure data is always an array for the new multi-announcement system
+      const announcements = Array.isArray(data) ? data : [data];
+      await chrome.storage.local.set({ bds_remote_announcement: announcements });
+    }
+  } catch (err) {
+    console.error("Failed to fetch remote status:", err);
+  }
+}
+
+// Run once on startup
+fetchRemoteStatus();

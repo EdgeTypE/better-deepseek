@@ -8,6 +8,8 @@ export const STORAGE_KEYS = {
   projectFiles: "bds_project_files",
   whatsNewPending: "bds_whats_new_pending",
   chatTags: "bds_chat_tags",
+  remoteAnnouncement: "bds_remote_announcement",
+  dismissedAnnouncements: "bds_dismissed_announcements",
   // Last observed DeepSeek page theme. Written on all platforms so desktop modals and Android
   // native bars can both read it without relying on OS-level dark-mode assumptions.
   pageIsDark: "bds_page_is_dark",

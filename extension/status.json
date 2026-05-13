@@ -4,11 +4,5 @@
     "show": true,
     "message": "Due to issues with DeepSeek or intentional behavior, file uploading is currently unavailable in Expert mode.",
     "type": "warning"
-  },
-  {
-    "id": "new-beta-feature-v1",
-    "show": true,
-    "message": "Better DeepSeek introduces a new beta feature: [feature description]. This feature is currently in beta and may be subject to change.",
-    "type": "error"
   }
 ]

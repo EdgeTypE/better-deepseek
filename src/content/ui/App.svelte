@@ -5,6 +5,7 @@
   import WhatsNewModal from "./WhatsNewModal.svelte";
   import SelectionOverlay from "./SelectionOverlay.svelte";
   import StatusBanner from "./StatusBanner.svelte";
+  import AnnouncementBanner from "./AnnouncementBanner.svelte";
   import appState from "../state.js";
 
   let drawerOpen = $state(false);
@@ -82,3 +83,4 @@
 
 <SelectionOverlay />
 <StatusBanner />
+<AnnouncementBanner />

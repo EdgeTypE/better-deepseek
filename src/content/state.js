@@ -72,6 +72,8 @@ const state = {
     description: 'All Systems Operational',
     lastChecked: 0
   },
+  remoteAnnouncements: [],
+  dismissedAnnouncements: [],
 };
 
 /**
