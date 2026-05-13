@@ -11,12 +11,17 @@
   import { pushConfigToPage } from "../bridge.js";
   import { pickFolderSelection } from "../../lib/utils/folder-picker.js";
   import { openNativeFilePicker } from "../files/native-file-input.js";
+  import {
+    isNativeFilePickerAvailable,
+    nativePickFiles,
+  } from "../../platform/android-file-picker.js";
 
   let { onback } = $props();
 
   const BDS_TARGET = process.env.BDS_TARGET || "chrome";
   const isAndroidTarget = BDS_TARGET === "android";
-  const supportsFolderUpload = !isAndroidTarget;
+  // Android native bridge re-enables folder upload when pickFiles exists.
+  const supportsFolderUpload = !isAndroidTarget || isNativeFilePickerAvailable();
 
   // view: "list" | "detail"
   let view = $state("list");
@@ -116,7 +121,31 @@
     goBack();
   }
 
-  function triggerFileUpload() {
+  async function triggerFileUpload() {
+    if (isAndroidTarget && isNativeFilePickerAvailable()) {
+      try {
+        const result = await nativePickFiles("files");
+        if (result.cancelled || !result.files || result.files.length === 0) {
+          return;
+        }
+        if (!fileInput) return;
+        const dataTransfer = new DataTransfer();
+        for (const file of result.files) {
+          const blob = new Blob([file.content], { type: "text/plain" });
+          dataTransfer.items.add(
+            new File([blob], file.name, { type: "text/plain" }),
+          );
+        }
+        fileInput.files = dataTransfer.files;
+        fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+      } catch (err) {
+        if (appState.ui) {
+          appState.ui.showToast(err?.message || "File pick failed.");
+        }
+      }
+      return;
+    }
+
     openNativeFilePicker(fileInput, { preferSingle: isAndroidTarget });
   }
 
@@ -180,11 +209,51 @@
   }
 
   async function handleFolderUpload() {
-    if (!supportsFolderUpload) {
-      if (appState.ui) {
-        appState.ui.showToast(
-          "Folder upload is not supported on Android yet.",
-        );
+    if (isAndroidTarget) {
+      if (isNativeFilePickerAvailable()) {
+        uploading = true;
+        fileError = "";
+        try {
+          const result = await nativePickFiles("folder");
+          if (!result.cancelled && result.files && result.files.length > 0) {
+            const MAX_SIZE = 500 * 1024;
+            const filesToAdd = [];
+            let skippedCount = 0;
+
+            for (const file of result.files) {
+              if (new TextEncoder().encode(file.content).length > MAX_SIZE) {
+                skippedCount++;
+                continue;
+              }
+              if (!file.content.trim()) {
+                skippedCount++;
+                continue;
+              }
+              filesToAdd.push({ name: file.name, content: file.content });
+            }
+
+            if (filesToAdd.length > 0) {
+              try {
+                await addProjectFilesBatch(selectedProject.id, filesToAdd);
+              } catch (err) {
+                fileError = `Storage error: ${err?.message || String(err)}`;
+              }
+            }
+
+            if (skippedCount > 0) {
+              fileError =
+                `${filesToAdd.length} file${filesToAdd.length !== 1 ? "s" : ""} uploaded, ` +
+                `${skippedCount} skipped (too large or empty).`;
+            }
+          }
+        } catch (err) {
+          fileError = err?.message || "Folder pick failed.";
+        } finally {
+          uploading = false;
+          projectFiles = getFilesForProject(selectedProject.id);
+        }
+      } else if (appState.ui) {
+        appState.ui.showToast("Folder upload requires a newer version of the app.");
       }
       return;
     }

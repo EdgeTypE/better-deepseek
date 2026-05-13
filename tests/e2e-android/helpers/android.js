@@ -81,6 +81,26 @@ function buildAndroidBridgeBootstrap() {
         downloadBlob(base64, mimeType, fileName) {
           downloads.push({ base64, mimeType, fileName });
         },
+        pickFiles(mode, requestId) {
+          const handler = window.__bdsNativeFilePicker;
+          setTimeout(function () {
+            let detail;
+            if (typeof handler === "function") {
+              try {
+                detail = handler(mode);
+              } catch (err) {
+                detail = { error: String(err), files: [] };
+              }
+            } else {
+              detail = { error: "cancelled", files: [] };
+            }
+            window.dispatchEvent(
+              new CustomEvent("__bds_native_files_picked_" + requestId, {
+                detail,
+              }),
+            );
+          }, 10);
+        },
       };
     })();
   `;

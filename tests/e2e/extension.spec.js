@@ -178,28 +178,29 @@ test("Upload File keeps multiple mode in the web flow", async ({ page }) => {
     .toBe(true);
 });
 
-test("drawer import and upload inputs stay single-file in the web flow", async ({ page }) => {
+test("drawer import inputs stay single-file in the web flow", async ({ page }) => {
   await openDrawer(page);
   await page.evaluate(() => {
     const modes = {};
+    const accepts = {};
     window.__mockDeepSeek.drawerFilePickerModes = modes;
+    window.__mockDeepSeek.drawerFilePickerAccepts = accepts;
 
-    const names = ["skillImport", "characterImport", "memoryImport"];
-    const jsonInputs = Array.from(
-      document.querySelectorAll('#bds-drawer input[type="file"][accept=".json"]'),
-    );
-    jsonInputs.forEach((input, index) => {
-      input.addEventListener("click", (event) => {
-        modes[names[index]] = input.multiple;
-        event.preventDefault();
-      }, { once: true });
-    });
+    const jsonInputs = document.querySelectorAll('#bds-drawer input[type="file"][accept=".json"]');
+    accepts.jsonInputCount = jsonInputs.length;
+    const memoryImportInput = jsonInputs[0];
+    accepts.memoryImport = memoryImportInput.accept;
+    memoryImportInput.addEventListener("click", (event) => {
+      modes.memoryImport = memoryImportInput.multiple;
+      event.preventDefault();
+    }, { once: true });
 
     for (const [key, selector] of [
-      ["skillUpload", "#bds-skill-upload"],
-      ["characterUpload", "#bds-char-upload"],
+      ["skillImport", "#bds-skill-upload"],
+      ["characterImport", "#bds-char-upload"],
     ]) {
       const input = document.querySelector(selector);
+      accepts[key] = input.accept;
       input.addEventListener("click", (event) => {
         modes[key] = input.multiple;
         event.preventDefault();
@@ -211,8 +212,6 @@ test("drawer import and upload inputs stay single-file in the web flow", async (
   await importButtons.nth(0).click();
   await importButtons.nth(1).click();
   await importButtons.nth(2).click();
-  await page.locator("#bds-skill-upload").dispatchEvent("click");
-  await page.locator("#bds-char-upload").dispatchEvent("click");
 
   await expect
     .poll(() => page.evaluate(() => window.__mockDeepSeek.drawerFilePickerModes))
@@ -220,8 +219,14 @@ test("drawer import and upload inputs stay single-file in the web flow", async (
       skillImport: false,
       characterImport: false,
       memoryImport: false,
-      skillUpload: false,
-      characterUpload: false,
+    });
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.drawerFilePickerAccepts))
+    .toEqual({
+      jsonInputCount: 1,
+      skillImport: ".md",
+      characterImport: ".md",
+      memoryImport: ".json",
     });
 });
 

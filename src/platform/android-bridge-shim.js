@@ -18,6 +18,9 @@
  *   getAssetUrl(relativePath: String): String
  *   downloadBlob(base64, mimeType, fileName): void
  *   reportTheme(isDark: Boolean): void  // live bar-icon colour update; persistence via setStorage
+ *   pickFiles(mode: String, requestId: String): void
+ *     // mode: "files" | "folder"; result delivered as
+ *     // CustomEvent("__bds_native_files_picked_" + requestId)
  */
 
 function getBridge() {

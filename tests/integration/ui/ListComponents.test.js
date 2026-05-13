@@ -131,22 +131,86 @@ describe("memory, character, and skill components", () => {
     cleanup();
   });
 
+  it("CharacterList accepts lowercase .md persona uploads", async () => {
+    const { target, cleanup } = renderSvelte(CharacterList);
+    const uploadInput = target.querySelector("#bds-char-upload");
+    const file = {
+      name: "test.md",
+      text: vi.fn(async () => "persona body"),
+    };
+
+    await triggerFileInput(uploadInput, file);
+
+    expect(state.characters).toMatchObject([
+      {
+        name: "test",
+        usage: "uploaded",
+        content: "persona body",
+        active: true,
+      },
+    ]);
+    expect(state.ui.showToast).not.toHaveBeenCalledWith(
+      "Only .md files are supported for persona uploads.",
+    );
+    cleanup();
+  });
+
+  it("CharacterList rejects non-.md persona uploads", async () => {
+    state.characters = [
+      { id: "c1", name: "Mage", usage: "rp", content: "wise", active: true },
+    ];
+    const initialCharacters = structuredClone(state.characters);
+    const { target, cleanup } = renderSvelte(CharacterList);
+    const uploadInput = target.querySelector("#bds-char-upload");
+    const file = {
+      name: "notes.txt",
+      text: vi.fn(async () => "persona body"),
+    };
+
+    await triggerFileInput(uploadInput, file);
+
+    expect(file.text).not.toHaveBeenCalled();
+    expect(state.characters).toEqual(initialCharacters);
+    expect(state.ui.showToast).toHaveBeenCalledWith(
+      "Only .md files are supported for persona uploads.",
+    );
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    expect(bridgeMocks.pushConfigToPage).not.toHaveBeenCalled();
+    cleanup();
+  });
+
+  it("CharacterList accepts uppercase .MD persona uploads", async () => {
+    const { target, cleanup } = renderSvelte(CharacterList);
+    const uploadInput = target.querySelector("#bds-char-upload");
+    const file = {
+      name: "TEST.MD",
+      text: vi.fn(async () => "persona body"),
+    };
+
+    await triggerFileInput(uploadInput, file);
+
+    expect(state.characters.some((item) => item.name === "TEST")).toBe(true);
+    expect(state.ui.showToast).not.toHaveBeenCalledWith(
+      "Only .md files are supported for persona uploads.",
+    );
+    cleanup();
+  });
+
   it("CharacterList keeps import and persona uploads single-file", async () => {
     const { target, cleanup } = renderSvelte(CharacterList);
     await flushUi();
-    const importInput = target.querySelector('input[type="file"][accept=".json"]');
+    const uploadInput = target.querySelector("#bds-char-upload");
 
     getButtonByText(target, "Import").click();
     await flushUi();
 
     expect(nativeFileInputMocks.openNativeFilePicker).toHaveBeenCalledWith(
-      importInput,
+      uploadInput,
       { preferSingle: true },
     );
-    expect(importInput.multiple).toBe(false);
-
-    const uploadInput = target.querySelector("#bds-char-upload");
     expect(uploadInput.multiple).toBe(false);
+    expect(uploadInput.accept).toBe(".md");
+    expect(target.querySelector('input[type="file"][accept=".json"]')).toBeNull();
     cleanup();
   });
 
@@ -184,22 +248,85 @@ describe("memory, character, and skill components", () => {
     cleanup();
   });
 
+  it("SkillList accepts lowercase .md skill uploads", async () => {
+    const { target, cleanup } = renderSvelte(SkillList);
+    const uploadInput = target.querySelector("#bds-skill-upload");
+    const file = {
+      name: "test.md",
+      text: vi.fn(async () => "skill body"),
+    };
+
+    await triggerFileInput(uploadInput, file);
+
+    expect(state.skills).toMatchObject([
+      {
+        name: "test",
+        content: "skill body",
+        active: true,
+      },
+    ]);
+    expect(state.ui.showToast).not.toHaveBeenCalledWith(
+      "Only .md files are supported for skills.",
+    );
+    cleanup();
+  });
+
+  it("SkillList rejects non-.md skill uploads", async () => {
+    state.skills = [
+      { id: "s1", name: "Debugger", content: "Inspect logs", active: true },
+    ];
+    const initialSkills = structuredClone(state.skills);
+    const { target, cleanup } = renderSvelte(SkillList);
+    const uploadInput = target.querySelector("#bds-skill-upload");
+    const file = {
+      name: "notes.txt",
+      text: vi.fn(async () => "skill body"),
+    };
+
+    await triggerFileInput(uploadInput, file);
+
+    expect(file.text).not.toHaveBeenCalled();
+    expect(state.skills).toEqual(initialSkills);
+    expect(state.ui.showToast).toHaveBeenCalledWith(
+      "Only .md files are supported for skills.",
+    );
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    expect(bridgeMocks.pushConfigToPage).not.toHaveBeenCalled();
+    cleanup();
+  });
+
+  it("SkillList accepts uppercase .MD skill uploads", async () => {
+    const { target, cleanup } = renderSvelte(SkillList);
+    const uploadInput = target.querySelector("#bds-skill-upload");
+    const file = {
+      name: "TEST.MD",
+      text: vi.fn(async () => "skill body"),
+    };
+
+    await triggerFileInput(uploadInput, file);
+
+    expect(state.skills.some((item) => item.name === "TEST")).toBe(true);
+    expect(state.ui.showToast).not.toHaveBeenCalledWith(
+      "Only .md files are supported for skills.",
+    );
+    cleanup();
+  });
+
   it("SkillList keeps import and skill uploads single-file", async () => {
     const { target, cleanup } = renderSvelte(SkillList);
     await flushUi();
-    const importInput = target.querySelector('input[type="file"][accept=".json"]');
+    const uploadInput = target.querySelector("#bds-skill-upload");
 
     getButtonByText(target, "Import").click();
     await flushUi();
 
     expect(nativeFileInputMocks.openNativeFilePicker).toHaveBeenCalledWith(
-      importInput,
+      uploadInput,
       { preferSingle: true },
     );
-    expect(importInput.multiple).toBe(false);
-
-    const uploadInput = target.querySelector("#bds-skill-upload");
     expect(uploadInput.multiple).toBe(false);
+    expect(uploadInput.accept).toBe(".md");
+    expect(target.querySelector('input[type="file"][accept=".json"]')).toBeNull();
     cleanup();
   });
 });

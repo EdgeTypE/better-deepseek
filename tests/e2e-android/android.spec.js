@@ -33,22 +33,20 @@ test("loads the bundle and surfaces the BDS toggle inside the WebView simulator"
   await expect(page.locator("#bds-toggle")).toBeVisible();
 });
 
-test("hides the folder upload menu item on Android", async ({ page }) => {
+test("shows the folder upload menu item on Android when native picker is available", async ({ page }) => {
   await page.locator(".bds-plus-btn").click({ force: true });
   await expect(page.locator(".bds-attach-dropdown")).toBeVisible();
   await expect(
     page.locator(".bds-attach-dropdown .bds-attach-item").filter({ hasText: "Upload Folder" }),
-  ).toHaveCount(0);
+  ).toBeVisible();
   await expect(
     page.locator(".bds-attach-dropdown .bds-attach-item").filter({ hasText: "GitHub Repo" }),
   ).toBeVisible();
 });
 
-test("Upload Folder button is hidden in Projects panel on Android", async ({ page }) => {
-  // Verify via Evaluate that the built content.js carries the Android
-  // target check and calls handleFolderUpload()'s toast path.
-  // The ProjectsManager.svelte mounts inside the drawer; we assert
-  // the Build-time define baked "android" into the module.
+test("loads Android project panel code path", async ({ page }) => {
+  // Verify via Evaluate that the Android content bundle is active before
+  // project picker tests interact with drawer-managed UI.
   const builtForAndroid = await page.evaluate(() => {
     // The AttachMenu and ProjectsManager both gate on BDS_TARGET.
     // The Vite define inlines the string, so in dist-android/content.js
@@ -61,11 +59,8 @@ test("Upload Folder button is hidden in Projects panel on Android", async ({ pag
   });
   expect(builtForAndroid).toBe(true);
 
-  // A direct check: since BDS_TARGET is "android" in this build, the
-  // `supportsFolderUpload` flag in ProjectsManager.svelte is false,
-  // so no "+ Upload Folder" button is ever rendered. We confirm that
-  // the `handleFolderUpload` function's guard is reachable by checking
-  // that the module pattern matches the expected built output.
+  // Smoke check that the Android bundle is mounted before the project-specific
+  // folder picker tests below exercise the visible Upload Folder button.
   const folderUploadCalls = await page.evaluate(() => {
     // The AttachMenu's handleUploadFolder logs via toast when called
     // on Android. The toast module is window-accessible. We assert
@@ -75,16 +70,56 @@ test("Upload Folder button is hidden in Projects panel on Android", async ({ pag
   expect(folderUploadCalls).toBe(true);
 });
 
+test("Upload Folder button is visible in Projects panel on Android", async ({ page }) => {
+  await openDrawer(page);
+  await page.evaluate(() =>
+    chrome.storage.local.set({
+      bds_projects: [
+        {
+          id: "folder-prj",
+          name: "Folder Project",
+          description: "",
+          customInstructions: "",
+          createdAt: Date.now(),
+        },
+      ],
+      bds_project_files: [],
+    }),
+  );
+
+  await page.evaluate(() => {
+    const btn = Array.from(document.querySelectorAll("#bds-drawer button")).find(
+      (button) => button.textContent.trim() === "Manage",
+    );
+    btn?.scrollIntoView({ block: "nearest", behavior: "instant" });
+    btn?.click();
+  });
+  await page
+    .locator("#bds-drawer .bds-skill-item")
+    .filter({ hasText: "Folder Project" })
+    .click({ force: true });
+
+  await expect(
+    page.locator("#bds-drawer button").filter({ hasText: "Upload Folder" }),
+  ).toBeVisible();
+});
+
 test("hides the voice prompt mic button on Android", async ({ page }) => {
   await expect(page.locator(".bds-mic-btn")).toHaveCount(0);
 });
 
-test("Upload File requests single-file mode on Android", async ({ page }) => {
+test("Upload File on Android uses native picker bridge and injects markdown", async ({ page }) => {
   await page.evaluate(() => {
     const input = document.querySelector("#native-file-input");
-    window.__mockDeepSeek.uploadFileClickMultiple = null;
+    window.__mockDeepSeek.uploadInputClickedDirectly = false;
     input.click = () => {
-      window.__mockDeepSeek.uploadFileClickMultiple = input.multiple;
+      window.__mockDeepSeek.uploadInputClickedDirectly = true;
+    };
+    window.__bdsNativeFilePicker = (mode) => {
+      window.__mockDeepSeek.nativeUploadFileMode = mode;
+      return {
+        files: [{ name: "android-notes.md", content: "# Android notes" }],
+      };
     };
   });
 
@@ -95,35 +130,65 @@ test("Upload File requests single-file mode on Android", async ({ page }) => {
     .click({ force: true });
 
   await expect
-    .poll(() => page.evaluate(() => window.__mockDeepSeek.uploadFileClickMultiple))
-    .toBe(false);
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.getAttachedFiles()))
+    .toContain("android-notes.md");
   await expect
-    .poll(() => page.evaluate(() => document.querySelector("#native-file-input").multiple))
-    .toBe(true);
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.nativeUploadFileMode))
+    .toBe("files");
+  expect(await page.evaluate(() => window.__mockDeepSeek.uploadInputClickedDirectly)).toBe(false);
 });
 
-test("drawer import and upload inputs stay single-file on Android", async ({ page }) => {
+test("Upload Folder on Android uses native picker bridge and injects workspace", async ({ page }) => {
+  await page.evaluate(() => {
+    window.__bdsNativeFilePicker = (mode) => {
+      window.__mockDeepSeek.nativeUploadFolderMode = mode;
+      return {
+        files: [
+          { name: "src/index.js", content: 'console.log("hello");' },
+          { name: "README.md", content: "# Project" },
+        ],
+        folderName: "android-project",
+      };
+    };
+  });
+
+  await page.locator(".bds-plus-btn").click({ force: true });
+  await page
+    .locator(".bds-attach-dropdown .bds-attach-item")
+    .filter({ hasText: "Upload Folder" })
+    .click({ force: true });
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.getAttachedFiles()))
+    .toContain("android-project_workspace.txt");
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.nativeUploadFolderMode))
+    .toBe("folder");
+});
+
+test("drawer import inputs stay single-file on Android", async ({ page }) => {
   await openDrawer(page);
   await page.evaluate(() => {
     const modes = {};
+    const accepts = {};
     window.__mockDeepSeek.drawerFilePickerModes = modes;
+    window.__mockDeepSeek.drawerFilePickerAccepts = accepts;
 
-    const names = ["skillImport", "characterImport", "memoryImport"];
-    const jsonInputs = Array.from(
-      document.querySelectorAll('#bds-drawer input[type="file"][accept=".json"]'),
-    );
-    jsonInputs.forEach((input, index) => {
-      input.addEventListener("click", (event) => {
-        modes[names[index]] = input.multiple;
-        event.preventDefault();
-      }, { once: true });
-    });
+    const jsonInputs = document.querySelectorAll('#bds-drawer input[type="file"][accept=".json"]');
+    accepts.jsonInputCount = jsonInputs.length;
+    const memoryImportInput = jsonInputs[0];
+    accepts.memoryImport = memoryImportInput.accept;
+    memoryImportInput.addEventListener("click", (event) => {
+      modes.memoryImport = memoryImportInput.multiple;
+      event.preventDefault();
+    }, { once: true });
 
     for (const [key, selector] of [
-      ["skillUpload", "#bds-skill-upload"],
-      ["characterUpload", "#bds-char-upload"],
+      ["skillImport", "#bds-skill-upload"],
+      ["characterImport", "#bds-char-upload"],
     ]) {
       const input = document.querySelector(selector);
+      accepts[key] = input.accept;
       input.addEventListener("click", (event) => {
         modes[key] = input.multiple;
         event.preventDefault();
@@ -135,8 +200,6 @@ test("drawer import and upload inputs stay single-file on Android", async ({ pag
   await importButtons.nth(0).click({ force: true });
   await importButtons.nth(1).click({ force: true });
   await importButtons.nth(2).click({ force: true });
-  await page.locator("#bds-skill-upload").dispatchEvent("click");
-  await page.locator("#bds-char-upload").dispatchEvent("click");
 
   await expect
     .poll(() => page.evaluate(() => window.__mockDeepSeek.drawerFilePickerModes))
@@ -144,12 +207,18 @@ test("drawer import and upload inputs stay single-file on Android", async ({ pag
       skillImport: false,
       characterImport: false,
       memoryImport: false,
-      skillUpload: false,
-      characterUpload: false,
+    });
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.drawerFilePickerAccepts))
+    .toEqual({
+      jsonInputCount: 1,
+      skillImport: ".md",
+      characterImport: ".md",
+      memoryImport: ".json",
     });
 });
 
-test("project Upload File requests single-file mode on Android", async ({ page }) => {
+test("project Upload File on Android uses native picker bridge and stores markdown", async ({ page }) => {
   await openDrawer(page);
 
   // Seed a project directly in chrome.storage rather than going through the
@@ -167,7 +236,7 @@ test("project Upload File requests single-file mode on Android", async ({ page }
           createdAt: Date.now(),
         },
       ],
-      bds_project_files: { "regression-prj": [] },
+      bds_project_files: [],
     }),
   );
 
@@ -189,23 +258,78 @@ test("project Upload File requests single-file mode on Android", async ({ page }
 
   await page.evaluate(() => {
     const input = document.querySelector('#bds-drawer input[type="file"][multiple]');
-    window.__mockDeepSeek.projectUploadClickMultiple = null;
-    // Override click() rather than using addEventListener so the file-chooser
-    // dialog never opens. This matches the established pattern in test #5
-    // ("Upload File requests single-file mode on Android").
+    window.__mockDeepSeek.projectInputClickedDirectly = false;
     input.click = function () {
-      window.__mockDeepSeek.projectUploadClickMultiple = this.multiple;
+      window.__mockDeepSeek.projectInputClickedDirectly = true;
+    };
+    window.__bdsNativeFilePicker = (mode) => {
+      window.__mockDeepSeek.projectNativePickerMode = mode;
+      return {
+        files: [{ name: "project-notes.md", content: "# Project notes" }],
+      };
     };
   });
 
   await page.locator("#bds-drawer button").filter({ hasText: "Upload File" }).click({ force: true });
 
   await expect
-    .poll(() => page.evaluate(() => window.__mockDeepSeek.projectUploadClickMultiple))
-    .toBe(false);
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.projectNativePickerMode))
+    .toBe("files");
   await expect
-    .poll(() => page.evaluate(() => document.querySelector('#bds-drawer input[type="file"][multiple]').multiple))
-    .toBe(true);
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.projectInputClickedDirectly))
+    .toBe(false);
+  await expect(page.locator("#bds-drawer").filter({ hasText: "project-notes.md" })).toBeVisible();
+});
+
+test("project Upload Folder on Android uses native picker bridge", async ({ page }) => {
+  await openDrawer(page);
+  await page.evaluate(() =>
+    chrome.storage.local.set({
+      bds_projects: [
+        {
+          id: "folder-upload-prj",
+          name: "Folder Upload Project",
+          description: "",
+          customInstructions: "",
+          createdAt: Date.now(),
+        },
+      ],
+      bds_project_files: [],
+    }),
+  );
+
+  await page.evaluate(() => {
+    const btn = Array.from(document.querySelectorAll("#bds-drawer button")).find(
+      (button) => button.textContent.trim() === "Manage",
+    );
+    btn?.scrollIntoView({ block: "nearest", behavior: "instant" });
+    btn?.click();
+  });
+  await page
+    .locator("#bds-drawer .bds-skill-item")
+    .filter({ hasText: "Folder Upload Project" })
+    .click({ force: true });
+
+  await page.evaluate(() => {
+    window.__bdsNativeFilePicker = (mode) => {
+      window.__mockDeepSeek.projectNativeFolderMode = mode;
+      return {
+        files: [
+          { name: "README.md", content: "# Folder readme" },
+          { name: "src/app.js", content: "console.log('folder');" },
+        ],
+        folderName: "folder-upload",
+      };
+    };
+  });
+
+  await page.locator("#bds-drawer button").filter({ hasText: "Upload Folder" }).click({ force: true });
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.projectNativeFolderMode))
+    .toBe("folder");
+  await expect(page.locator("#bds-drawer").filter({ hasText: "README.md" })).toBeVisible();
+  await expect(page.locator("#bds-drawer").filter({ hasText: "src/app.js" })).toBeVisible();
 });
 
 test("imports a GitHub repository and commit history through the Android bridge", async ({ page }) => {

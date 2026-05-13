@@ -10,11 +10,13 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import android.util.Base64
 import android.util.Log
 import android.webkit.JavascriptInterface
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import androidx.documentfile.provider.DocumentFile
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
@@ -24,6 +26,9 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+
+/** Text file entry returned by the native Android picker to JavaScript. */
+internal data class PickedFile(val name: String, val content: String)
 
 /**
  * @JavascriptInterface object exposed to the WebView as `window.AndroidBridge`.
@@ -59,6 +64,18 @@ class WebViewBridge(
     @Volatile var onThemeChanged: ((isDark: Boolean) -> Unit)? = null
 
     /**
+     * Set by MainActivity to evaluate JS in the WebView. Results from native picker launchers
+     * are delivered through CustomEvent instances in the page.
+     */
+    @Volatile var evaluateJs: ((script: String) -> Unit)? = null
+
+    /**
+     * Set by MainActivity to launch the native file or folder picker.
+     * Mode is "files" or "folder"; requestId is the JS correlation key.
+     */
+    @Volatile var onPickFiles: ((mode: String, requestId: String) -> Unit)? = null
+
+    /**
      * Returns the last DeepSeek page theme written by the extension's theme.js via
      * chrome.storage.local (which the Android polyfill routes through [setStorage] as
      * JSON.stringify(boolean) → stored as the string "true" or "false"). Falls back to [default]
@@ -78,6 +95,161 @@ class WebViewBridge(
     fun reportTheme(isDark: Boolean) {
         onThemeChanged?.invoke(isDark)
     }
+
+    /**
+     * Called by JS to open the native Android file or folder picker.
+     *
+     * The result is delivered asynchronously as a page CustomEvent named
+     * "__bds_native_files_picked_<requestId>".
+     */
+    @JavascriptInterface
+    fun pickFiles(mode: String?, requestId: String?) {
+        val safeId =
+                requestId
+                        ?.filter { it.isLetterOrDigit() || it == '-' }
+                        ?.take(64)
+                        ?: return
+        if (safeId.isEmpty()) return
+
+        val safeMode = if (mode == "folder") "folder" else "files"
+        val handler = onPickFiles
+        if (handler == null) {
+            deliverPickError(safeId, "cancelled")
+            return
+        }
+        handler.invoke(safeMode, safeId)
+    }
+
+    internal fun deliverPickedFiles(
+            requestId: String,
+            files: List<PickedFile>,
+            folderName: String?
+    ) {
+        val filesJson = JSONArray()
+        for (file in files) {
+            filesJson.put(
+                    JSONObject().apply {
+                        put("name", file.name)
+                        put("content", file.content)
+                    }
+            )
+        }
+        val payload =
+                JSONObject().apply {
+                    put("files", filesJson)
+                    if (folderName != null) put("folderName", folderName)
+                }
+        deliverPickResult(requestId, payload)
+    }
+
+    internal fun deliverPickError(requestId: String, error: String) {
+        val payload =
+                JSONObject().apply {
+                    put("error", error)
+                    put("files", JSONArray())
+                }
+        deliverPickResult(requestId, payload)
+    }
+
+    private fun deliverPickResult(requestId: String, payload: JSONObject) {
+        val safeId = requestId.filter { it.isLetterOrDigit() || it == '-' }.take(64)
+        if (safeId.isEmpty()) return
+        val payloadLiteral = JSONObject.quote(payload.toString())
+        val script =
+                "(function(){try{var d=JSON.parse($payloadLiteral);" +
+                        "window.dispatchEvent(new CustomEvent('__bds_native_files_picked_$safeId'," +
+                        "{detail:d}));}catch(e){}})();"
+        mainHandler.post { evaluateJs?.invoke(script) }
+    }
+
+    internal fun readPickedContentUri(uri: Uri): PickedFile? {
+        return try {
+            val name = getDisplayName(uri) ?: return null
+            if (!isTextFileExtension(name)) return null
+
+            val length = getContentLength(uri)
+            if (length > MAX_PICKED_FILE_SIZE) return null
+
+            val content =
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        stream.bufferedReader(Charsets.UTF_8).readText()
+                    } ?: return null
+            if (content.any { it.code == 0 }) return null
+            if (content.toByteArray(Charsets.UTF_8).size > MAX_PICKED_FILE_SIZE) return null
+            PickedFile(name, content)
+        } catch (t: Throwable) {
+            Log.w(TAG, "readPickedContentUri failed for $uri", t)
+            null
+        }
+    }
+
+    internal fun readPickedFolderTree(treeUri: Uri): Pair<List<PickedFile>, String> {
+        val docTree = DocumentFile.fromTreeUri(context, treeUri)
+                ?: return Pair(emptyList(), "folder")
+        val folderName = docTree.name ?: "folder"
+        val files = mutableListOf<PickedFile>()
+        traverseDocumentTree(docTree, "", files, 0)
+        return Pair(files, folderName)
+    }
+
+    private fun traverseDocumentTree(
+            dir: DocumentFile,
+            pathPrefix: String,
+            out: MutableList<PickedFile>,
+            depth: Int
+    ) {
+        if (depth > MAX_FOLDER_DEPTH) return
+        for (child in dir.listFiles()) {
+            val name = child.name ?: continue
+            val relPath = if (pathPrefix.isEmpty()) name else "$pathPrefix/$name"
+            if (isSkippedPath(relPath)) continue
+            if (child.isDirectory) {
+                traverseDocumentTree(child, relPath, out, depth + 1)
+            } else if (child.isFile) {
+                val picked = readDocumentFile(child, relPath) ?: continue
+                out.add(picked)
+            }
+        }
+    }
+
+    private fun readDocumentFile(file: DocumentFile, relPath: String): PickedFile? {
+        val name = file.name ?: return null
+        if (!isTextFileExtension(name)) return null
+        if (file.length() > MAX_PICKED_FILE_SIZE) return null
+        return try {
+            val content =
+                    context.contentResolver.openInputStream(file.uri)?.use { stream ->
+                        stream.bufferedReader(Charsets.UTF_8).readText()
+                    } ?: return null
+            if (content.any { it.code == 0 }) return null
+            if (content.toByteArray(Charsets.UTF_8).size > MAX_PICKED_FILE_SIZE) return null
+            PickedFile(relPath, content)
+        } catch (t: Throwable) {
+            Log.w(TAG, "readDocumentFile failed for $relPath", t)
+            null
+        }
+    }
+
+    private fun getDisplayName(uri: Uri): String? =
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (!cursor.moveToFirst() || index < 0) null else cursor.getString(index)
+            }
+
+    private fun getContentLength(uri: Uri): Long =
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val index = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (!cursor.moveToFirst() || index < 0 || cursor.isNull(index)) -1L
+                else cursor.getLong(index)
+            } ?: -1L
+
+    private fun isTextFileExtension(filename: String): Boolean {
+        val ext = filename.substringAfterLast('.', "").lowercase()
+        return ext.isNotEmpty() && ext in TEXT_EXTENSIONS
+    }
+
+    private fun isSkippedPath(relPath: String): Boolean =
+            relPath.split("/").any { it in SKIP_DIRS }
 
     @JavascriptInterface
     fun getStorage(key: String?): String? {
@@ -567,5 +739,27 @@ class WebViewBridge(
         // polyfill routes chrome.storage.local.set({ bds_page_is_dark: ... }) through setStorage,
         // so getLastKnownIsDark() and the polyfill share the same SharedPreferences key.
         internal const val KEY_LAST_PAGE_DARK = "bds_page_is_dark"
+
+        /** Max bytes per native-picked text file. */
+        internal const val MAX_PICKED_FILE_SIZE = 2L * 1024 * 1024
+
+        private const val MAX_FOLDER_DEPTH = 15
+
+        private val TEXT_EXTENSIONS =
+                setOf(
+                        "js", "ts", "jsx", "tsx", "svelte", "vue", "html", "css", "scss",
+                        "json", "md", "txt", "py", "c", "cpp", "h", "hpp", "java", "go",
+                        "rs", "rb", "php", "sh", "yml", "yaml", "toml", "ini", "csv", "sql",
+                        "xml", "env", "cs", "csproj", "sln", "fs", "fsproj", "razor",
+                        "swift", "kt", "dart"
+                )
+
+        private val SKIP_DIRS =
+                setOf(
+                        "node_modules", ".git", ".github", ".svn", "dist", "build",
+                        "__pycache__", ".gradle", ".idea", ".vscode", ".vs", "vendor",
+                        ".next", ".cache", "bin", "obj", "out", "target", "dist-chrome",
+                        "dist-firefox"
+                )
     }
 }
