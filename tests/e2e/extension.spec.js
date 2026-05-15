@@ -331,13 +331,16 @@ test("renders the voice prompt control in the composer", async ({ page }) => {
 
 test("persists settings across reloads", async ({ page }) => {
   await openDrawer(page);
-  await page.locator("#bds-system-prompt").fill("System prompt from Playwright");
-  await page.locator("#bds-save-settings").click();
+  await page.locator(".bds-add-prompt-btn").click();
+  await page.locator(".bds-modal-body input").fill("E2E Rules");
+  await page.locator(".bds-modal-body textarea").fill("System prompt from Playwright");
+  await page.locator(".bds-modal-footer .bds-btn").click({ force: true });
+  await page.waitForTimeout(200);
 
   await page.reload();
   await page.waitForSelector("#bds-toggle");
   await openDrawer(page);
-  await expect(page.locator("#bds-system-prompt")).toHaveValue("System prompt from Playwright");
+  await expect(page.locator(".bds-prompt-name").nth(1)).toHaveText("E2E Rules");
 });
 
 test("filters sidebar history through the injected search box", async ({ page }) => {

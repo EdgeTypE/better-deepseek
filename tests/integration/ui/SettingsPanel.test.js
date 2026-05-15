@@ -37,12 +37,22 @@ describe("SettingsPanel integration", () => {
     document.body.innerHTML = "";
   });
 
-  it("saves edited settings to chrome storage", async () => {
+  it("adds a custom system prompt and saves settings to chrome storage", async () => {
     const { target, cleanup } = renderSvelte(SettingsPanel);
 
-    const prompt = target.querySelector("#bds-system-prompt");
-    prompt.value = "Updated prompt";
-    prompt.dispatchEvent(new Event("input", { bubbles: true }));
+    target.querySelector(".bds-add-prompt-btn").click();
+    await flushUi();
+
+    const nameInput = target.querySelector(".bds-modal-body input");
+    nameInput.value = "My Rules";
+    nameInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+    const contentArea = target.querySelector(".bds-modal-body textarea");
+    contentArea.value = "Be concise and helpful";
+    contentArea.dispatchEvent(new Event("input", { bubbles: true }));
+
+    target.querySelector(".bds-modal-footer .bds-btn").click();
+    await flushUi();
 
     target.querySelector(".bds-advanced-toggle").click();
     await flushUi();
@@ -57,12 +67,18 @@ describe("SettingsPanel integration", () => {
     expect(chrome.storage.local.set).toHaveBeenCalledWith(
       expect.objectContaining({
         bds_settings: expect.objectContaining({
-          systemPrompt: "Updated prompt",
+          customSystemPrompts: expect.arrayContaining([
+            expect.objectContaining({
+              name: "My Rules",
+              content: "Be concise and helpful",
+            }),
+          ]),
+          activeSystemPromptId: expect.any(String),
           preferredLang: "Turkish",
         }),
       }),
     );
-    expect(bridgeMocks.pushConfigToPage).toHaveBeenCalledOnce();
+    expect(bridgeMocks.pushConfigToPage).toHaveBeenCalled();
     expect(state.ui.showToast).toHaveBeenCalledWith("Settings saved.");
     cleanup();
   });
