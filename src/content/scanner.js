@@ -8,6 +8,7 @@ import { processMessageNode } from "./message-processor.svelte.js";
 import { enhanceCodeBlockDownloads } from "./files/code-blocks.js";
 import { mount } from "svelte";
 import AttachMenu from "./ui/AttachMenu.svelte";
+import CompactModeToggle from "./ui/CompactModeToggle.svelte";
 import { injectSearchInput } from "./ui/SidebarSearch.js";
 import { checkPendingExport } from "./tools/pending-export.js";
 import { hideTagsInSidebar, hideTagsInHeader } from "./tags/tag-hider.js";
@@ -201,6 +202,10 @@ function scanInputArea() {
       nativeInput: fileInput
     }
   });
+
+  const toggleMountPoint = document.createElement("div");
+  wrapper.insertBefore(toggleMountPoint, fileInput);
+  mount(CompactModeToggle, { target: toggleMountPoint });
 
   wrapper.setAttribute("data-bds-attach-menu-mounted", "true");
 }

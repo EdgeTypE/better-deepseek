@@ -1593,3 +1593,35 @@ textarea.bds-input,
 
 
 
+/* ══════════════════════════════════
+   Expanded Prompt Box
+   ══════════════════════════════════ */
+.bds-prompt-expanded {
+  height: 70vh !important;
+  max-height: 800px !important;
+  transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.bds-prompt-expanded .ds-textarea {
+  flex: 1 !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.bds-prompt-expanded textarea {
+  flex: 1 !important;
+  height: 100% !important;
+  max-height: none !important;
+}
+
+/* Ensure the bottom bar stays at the bottom */
+.bds-prompt-expanded ._6f68655, 
+.bds-prompt-expanded ._24fad49,
+.bds-prompt-expanded [style*="position: absolute; bottom"] {
+  position: relative !important;
+  bottom: auto !important;
+  margin-top: auto !important;
+}
