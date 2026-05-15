@@ -6,7 +6,7 @@
   let textarea = $state(null);
   let container = $state(null);
 
-  const THRESHOLD_CHARS = 100;
+  const THRESHOLD_CHARS = 250;
   const THRESHOLD_LINES = 3;
 
   function findTextarea() {
@@ -19,10 +19,7 @@
     if (!textarea) return;
     const text = textarea.value;
     const lines = text.split("\n").length;
-    isVisible = text.length > THRESHOLD_CHARS || lines > THRESHOLD_LINES;
-    
-    // If it's expanded but content becomes short, keep it expanded? 
-    // Usually, users want to minimize it manually.
+    isVisible = isExpanded || text.length > THRESHOLD_CHARS || lines > THRESHOLD_LINES;
   }
 
   function toggle() {
@@ -34,6 +31,7 @@
         container.classList.remove("bds-prompt-expanded");
       }
     }
+    checkContent();
   }
 
   onMount(() => {
@@ -71,7 +69,7 @@
 
 {#if isVisible}
   <button 
-    class="bds-compact-toggle {isExpanded ? 'expanded' : ''}" 
+    class="bds-expand-toggle {isExpanded ? 'expanded' : ''}" 
     onclick={toggle}
     aria-label={isExpanded ? "Collapse" : "Expand"}
     title={isExpanded ? "Collapse Prompt Box" : "Expand Prompt Box"}
@@ -95,7 +93,7 @@
 {/if}
 
 <style>
-  .bds-compact-toggle {
+  .bds-expand-toggle {
     position: absolute;
     top: 16px;
     right: 16px;
@@ -124,7 +122,7 @@
     }
   }
 
-  .bds-compact-toggle:hover {
+  .bds-expand-toggle:hover {
     background: var(--bds-bg-hover);
     color: var(--bds-text-primary);
     border-color: var(--bds-accent);
@@ -132,17 +130,17 @@
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
   }
 
-  .bds-compact-toggle.expanded {
+  .bds-expand-toggle.expanded {
     color: #fff;
     background: var(--bds-accent);
     border-color: var(--bds-accent);
   }
 
-  .bds-compact-toggle svg {
+  .bds-expand-toggle svg {
     transition: transform 0.3s ease;
   }
 
-  .bds-compact-toggle:active {
+  .bds-expand-toggle:active {
     transform: scale(0.95);
   }
 </style>
