@@ -9,7 +9,15 @@
   } from "../../lib/constants.js";
   import { getActiveProject, updateProject } from "../project-manager.js";
 
-  let systemPrompt = $state(appState.settings.systemPrompt || "");
+  let customSystemPrompts = $state(appState.settings.customSystemPrompts || []);
+  let activeSystemPromptId = $state(appState.settings.activeSystemPromptId || "default");
+  
+  let showPromptEditor = $state(false);
+  let editingPrompt = $state(null);
+  let promptEditorName = $state("");
+  let promptEditorContent = $state("");
+  let promptEditorIsNew = $state(false);
+
   let autoFiles = $state(Boolean(appState.settings.autoDownloadFiles));
   let autoZip = $state(Boolean(appState.settings.autoDownloadLongWorkZip));
   let voiceMode = $state(Boolean(appState.settings.voiceMode));
@@ -20,7 +28,7 @@
   let autoSubmitVoice = $state(Boolean(appState.settings.autoSubmitVoice));
   let preferredLang = $state(appState.settings.preferredLang || "");
   let githubToken = $state(appState.settings.githubToken || "");
-  let showGithubToken = $state(!String(appState.settings.githubToken || "").trim());
+  let showGithubToken = $state(shouldShowGithubTokenByDefault(appState.settings.githubToken));
   let disableSystemPrompt = $state(
     Boolean(appState.settings.disableSystemPrompt),
   );
@@ -50,7 +58,8 @@
   }
 
   export function refresh() {
-    systemPrompt = appState.settings.systemPrompt || "";
+    customSystemPrompts = appState.settings.customSystemPrompts || [];
+    activeSystemPromptId = appState.settings.activeSystemPromptId || "default";
     autoFiles = Boolean(appState.settings.autoDownloadFiles);
     autoZip = Boolean(appState.settings.autoDownloadLongWorkZip);
     voiceMode = Boolean(appState.settings.voiceMode);
@@ -92,7 +101,17 @@
   }
 
   async function save() {
-    appState.settings.systemPrompt = systemPrompt.trim();
+    // Ensure we are saving a plain array, not a Svelte proxy
+    let snapshots = [];
+    try {
+      // @ts-ignore
+      snapshots = $state.snapshot(customSystemPrompts);
+    } catch (e) {
+      snapshots = JSON.parse(JSON.stringify(customSystemPrompts));
+    }
+
+    appState.settings.customSystemPrompts = snapshots;
+    appState.settings.activeSystemPromptId = activeSystemPromptId;
     appState.settings.systemPromptTemplateVersion =
       SYSTEM_PROMPT_TEMPLATE_VERSION;
     appState.settings.downloadBehaviorVersion = DOWNLOAD_BEHAVIOR_VERSION;
@@ -129,8 +148,61 @@
     }
   }
 
-  function resetSystemPrompt() {
-    systemPrompt = DEFAULT_SYSTEM_PROMPT;
+  function openPromptEditor(prompt = null) {
+    if (prompt) {
+      editingPrompt = prompt;
+      promptEditorName = prompt.name;
+      promptEditorContent = prompt.content;
+      promptEditorIsNew = false;
+    } else {
+      editingPrompt = null;
+      promptEditorName = "";
+      promptEditorContent = "";
+      promptEditorIsNew = true;
+    }
+    showPromptEditor = true;
+  }
+
+  function closePromptEditor() {
+    showPromptEditor = false;
+    editingPrompt = null;
+  }
+
+  function savePrompt() {
+    if (!promptEditorName.trim() || !promptEditorContent.trim()) {
+      if (appState.ui) appState.ui.showToast("Name and content are required.");
+      return;
+    }
+
+    if (promptEditorIsNew) {
+      const newPrompt = {
+        id: "sp_" + Math.random().toString(36).substring(2, 9),
+        name: promptEditorName.trim(),
+        content: promptEditorContent.trim()
+      };
+      customSystemPrompts = [...customSystemPrompts, newPrompt];
+    } else if (editingPrompt) {
+      customSystemPrompts = customSystemPrompts.map(p => 
+        p.id === editingPrompt.id 
+          ? { ...p, name: promptEditorName.trim(), content: promptEditorContent.trim() }
+          : p
+      );
+    }
+    
+    closePromptEditor();
+    save(); // Persist immediately
+  }
+
+  function deletePrompt(id) {
+    if (activeSystemPromptId === id) {
+      activeSystemPromptId = "default";
+    }
+    customSystemPrompts = customSystemPrompts.filter(p => p.id !== id);
+    save(); // Persist immediately
+  }
+
+  function baseOnDefault() {
+    promptEditorContent = appState.settings.systemPrompt || DEFAULT_SYSTEM_PROMPT;
   }
 
   function getGithubTokenDisplayValue() {
@@ -178,14 +250,86 @@
   General Settings
 </div>
 
-<div class="bds-label-row">
-  <label class="bds-label" for="bds-system-prompt">Hidden System Prompt</label>
-  <button class="bds-reset-btn" type="button" onclick={resetSystemPrompt}
-    >Reset</button
-  >
+<div class="bds-section-title">
+  <label class="bds-label">System Prompts</label>
 </div>
-<textarea id="bds-system-prompt" spellcheck="false" bind:value={systemPrompt}
-></textarea>
+
+<div class="bds-list">
+  <div class="bds-skill-item" class:active={activeSystemPromptId === "default"}>
+    <label onclick={() => { activeSystemPromptId = "default"; save(); }} role="button" tabindex="0">
+      <input type="radio" checked={activeSystemPromptId === "default"} readonly />
+      <div class="bds-prompt-info">
+        <span class="bds-prompt-name">Default (Hidden)</span>
+        <span class="bds-prompt-status">Read-only core instructions</span>
+      </div>
+    </label>
+    <div class="bds-prompt-actions">
+      <button class="bds-btn-outlined" style="font-size: 11px; padding: 4px 8px;" title="View" onclick={() => openPromptEditor({ id: 'default', name: 'Default (Hidden)', content: appState.settings.systemPrompt || DEFAULT_SYSTEM_PROMPT, readonly: true })}>
+        View
+      </button>
+    </div>
+  </div>
+
+  {#each customSystemPrompts as prompt (prompt.id)}
+    <div class="bds-skill-item" class:active={activeSystemPromptId === prompt.id}>
+      <label onclick={() => { activeSystemPromptId = prompt.id; save(); }} role="button" tabindex="0">
+        <input type="radio" checked={activeSystemPromptId === prompt.id} readonly />
+        <div class="bds-prompt-info">
+          <span class="bds-prompt-name">{prompt.name}</span>
+          <span class="bds-prompt-status">Custom saved prompt</span>
+        </div>
+      </label>
+      <div class="bds-prompt-actions">
+        <button class="bds-btn-outlined" style="font-size: 11px; padding: 4px 8px;" title="Edit" onclick={() => openPromptEditor(prompt)}>
+          Edit
+        </button>
+        <button class="bds-btn-danger" title="Delete" onclick={() => deletePrompt(prompt.id)}>
+          Delete
+        </button>
+      </div>
+    </div>
+  {/each}
+
+  <button class="bds-add-prompt-btn" type="button" onclick={() => openPromptEditor()}>
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="margin-right: 4px;"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    Add New System Prompt
+  </button>
+</div>
+
+{#if showPromptEditor}
+  <div class="bds-modal-overlay">
+    <div class="bds-modal">
+      <div class="bds-modal-header">
+        <div class="ds-modal-content__title">{promptEditorIsNew ? 'Add New Prompt' : (editingPrompt?.readonly ? 'View Prompt' : 'Edit Prompt')}</div>
+        <button class="bds-modal-close" onclick={closePromptEditor}>×</button>
+      </div>
+      
+      <div class="bds-modal-body">
+        <div class="bds-field">
+          <label class="bds-label">Name</label>
+          <input type="text" class="bds-input" bind:value={promptEditorName} placeholder="e.g. My Custom Rules" readonly={editingPrompt?.readonly} />
+        </div>
+        
+        <div class="bds-field">
+          <div class="bds-label-row">
+            <label class="bds-label">Content</label>
+            {#if !editingPrompt?.readonly}
+              <button class="bds-reset-btn" type="button" onclick={baseOnDefault}>Base on Default</button>
+            {/if}
+          </div>
+          <textarea class="bds-input" style="min-height: 240px;" bind:value={promptEditorContent} placeholder="System instructions here..." readonly={editingPrompt?.readonly}></textarea>
+        </div>
+      </div>
+
+      <div class="bds-modal-footer">
+        <button class="bds-btn-outlined" onclick={closePromptEditor}>Cancel</button>
+        {#if !editingPrompt?.readonly}
+          <button class="bds-btn" onclick={savePrompt}>Save Prompt</button>
+        {/if}
+      </div>
+    </div>
+  </div>
+{/if}
 
 {#if activeProject}
   <div class="bds-label-row" style="margin-top: 12px;">
@@ -504,6 +648,122 @@
   .bds-token-help code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 0.95em;
+  }
+
+  .bds-prompt-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+
+  .bds-prompt-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--bds-text-primary);
+  }
+
+  .bds-prompt-status {
+    font-size: 11px;
+    color: var(--bds-text-tertiary);
+  }
+
+  .bds-prompt-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .bds-add-prompt-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    background: transparent;
+    border: 1px dashed var(--bds-border);
+    border-radius: 10px;
+    color: var(--bds-text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--bds-transition);
+    margin-top: 4px;
+  }
+
+  .bds-add-prompt-btn:hover {
+    border-color: var(--bds-accent);
+    color: var(--bds-accent);
+    background: var(--bds-accent-glow);
+  }
+
+  /* Modal Overrides for DeepSeek Aesthetics */
+  .bds-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2147483647;
+    padding: 20px;
+  }
+
+  .bds-modal {
+    background: var(--bds-bg-panel);
+    border: 1px solid var(--bds-border);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 540px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--bds-shadow);
+  }
+
+  .bds-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--bds-border);
+  }
+
+  .bds-modal-close {
+    background: transparent;
+    border: none;
+    color: var(--bds-text-tertiary);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+  }
+
+  .bds-modal-close:hover {
+    color: var(--bds-text-primary);
+  }
+
+  .bds-modal-body {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+  }
+
+  .bds-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .bds-modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--bds-border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
   }
 
   @media (max-width: 560px) {

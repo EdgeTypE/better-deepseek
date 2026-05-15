@@ -121,8 +121,18 @@ function handleSessionData(data) {
  */
 export function pushConfigToPage() {
   const activeProject = getActiveProject();
+  let activeSystemPrompt = state.settings.systemPrompt || "";
+  if (state.settings.activeSystemPromptId && 
+      state.settings.activeSystemPromptId !== "default" && 
+      Array.isArray(state.settings.customSystemPrompts)) {
+    const custom = state.settings.customSystemPrompts.find(p => p.id === state.settings.activeSystemPromptId);
+    if (custom) {
+      activeSystemPrompt = custom.content;
+    }
+  }
+
   const detail = {
-    systemPrompt: String(state.settings.systemPrompt || ""),
+    systemPrompt: String(activeSystemPrompt),
     skills: state.skills
       .filter((skill) => skill.active)
       .map((skill) => ({ name: skill.name, content: skill.content })),

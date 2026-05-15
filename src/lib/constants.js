@@ -25,7 +25,7 @@ export const BRIDGE_EVENTS = {
 };
 
 // ── Versioning ──
-export const SYSTEM_PROMPT_TEMPLATE_VERSION = 10;
+export const SYSTEM_PROMPT_TEMPLATE_VERSION = 11;
 export const DOWNLOAD_BEHAVIOR_VERSION = 2;
 export const LONG_WORK_STALE_MS = 30000;
 
@@ -514,6 +514,9 @@ export const PRICING_URLS = {
 export const DEFAULT_SETTINGS = {
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   systemPromptTemplateVersion: SYSTEM_PROMPT_TEMPLATE_VERSION,
+  customSystemPrompts: [], // Array of { id, name, content }
+  activeSystemPromptId: "default",
+  systemPromptBackupDone: false,
   downloadBehaviorVersion: DOWNLOAD_BEHAVIOR_VERSION,
   autoDownloadFiles: false,
   autoDownloadLongWorkZip: false,

@@ -36,10 +36,38 @@ export async function loadStateFromStorage() {
     ...DEFAULT_SETTINGS,
     ...storedSettings,
   };
+  state.settings.customSystemPrompts = normalizeCustomSystemPrompts(state.settings.customSystemPrompts);
+
   setHtmlToMarkdownMaxDepth(state.settings.htmlToMarkdownMaxDepth);
   setMaxChatSessions(state.settings.maxChatSessions);
 
-  if (shouldUpgradeSystemPrompt(storedSettings)) {
+  if (!state.settings.systemPromptBackupDone) {
+    const isOldDefault = shouldUpgradeSystemPrompt(storedSettings);
+    const hasCustomPrompt = storedSettings.systemPrompt && 
+                           storedSettings.systemPrompt.trim() !== "" && 
+                           storedSettings.systemPrompt.trim() !== DEFAULT_SYSTEM_PROMPT.trim();
+
+    if (!isOldDefault && hasCustomPrompt) {
+      const backupId = makeId();
+      state.settings.customSystemPrompts = [
+        {
+          id: backupId,
+          name: "Legacy Custom Prompt",
+          content: storedSettings.systemPrompt.trim()
+        },
+        ...state.settings.customSystemPrompts
+      ];
+      state.settings.activeSystemPromptId = backupId;
+    }
+    
+    state.settings.systemPromptBackupDone = true;
+    state.settings.systemPrompt = DEFAULT_SYSTEM_PROMPT;
+    state.settings.systemPromptTemplateVersion = SYSTEM_PROMPT_TEMPLATE_VERSION;
+
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.settings]: state.settings,
+    });
+  } else if (Number(storedSettings.systemPromptTemplateVersion || 0) < SYSTEM_PROMPT_TEMPLATE_VERSION) {
     state.settings.systemPrompt = DEFAULT_SYSTEM_PROMPT;
     state.settings.systemPromptTemplateVersion = SYSTEM_PROMPT_TEMPLATE_VERSION;
     await chrome.storage.local.set({
@@ -138,6 +166,20 @@ export function normalizeSkills(raw) {
       name: String(item && item.name ? item.name : "Skill"),
       content: String(item && item.content ? item.content : ""),
       active: item && typeof item.active === "boolean" ? item.active : true,
+    }))
+    .filter((item) => item.content.trim().length > 0);
+}
+
+export function normalizeCustomSystemPrompts(raw) {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw
+    .map((item) => ({
+      id: String(item && item.id ? item.id : makeId()),
+      name: String(item && item.name ? item.name : "Saved Prompt"),
+      content: String(item && item.content ? item.content : ""),
     }))
     .filter((item) => item.content.trim().length > 0);
 }
@@ -266,6 +308,7 @@ export function bindStorageChangeListener() {
         ...DEFAULT_SETTINGS,
         ...(changes[STORAGE_KEYS.settings].newValue || {}),
       };
+      state.settings.customSystemPrompts = normalizeCustomSystemPrompts(state.settings.customSystemPrompts);
       setHtmlToMarkdownMaxDepth(state.settings.htmlToMarkdownMaxDepth);
       setMaxChatSessions(state.settings.maxChatSessions);
       if (state.ui) {
