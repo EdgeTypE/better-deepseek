@@ -9,6 +9,7 @@ import { enhanceCodeBlockDownloads } from "./files/code-blocks.js";
 import { mount } from "svelte";
 import AttachMenu from "./ui/AttachMenu.svelte";
 import ExpandToggle from "./ui/ExpandToggle.svelte";
+import RagPreview from "./ui/RagPreview.svelte";
 import { injectSearchInput } from "./ui/SidebarSearch.js";
 import { checkPendingExport } from "./tools/pending-export.js";
 import { hideTagsInSidebar, hideTagsInHeader } from "./tags/tag-hider.js";
@@ -206,6 +207,10 @@ function scanInputArea() {
   const toggleMountPoint = document.createElement("div");
   wrapper.insertBefore(toggleMountPoint, fileInput);
   mount(ExpandToggle, { target: toggleMountPoint });
+
+  const ragMountPoint = document.createElement("div");
+  wrapper.insertBefore(ragMountPoint, fileInput);
+  mount(RagPreview, { target: ragMountPoint });
 
   wrapper.setAttribute("data-bds-attach-menu-mounted", "true");
 }
