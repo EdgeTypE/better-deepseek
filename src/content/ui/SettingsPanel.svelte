@@ -417,7 +417,7 @@
       </div>
     {/if}
 
-    <div class="bds-toggle-row">
+    <div class="bds-toggle-row" style="flex-wrap: wrap;">
       <span class="bds-toggle-label">Process .gitignore during upload</span>
       <label class="bds-switch">
         <input
@@ -428,9 +428,6 @@
         <span class="bds-switch-track"></span>
       </label>
     </div>
-    <p style="font-size: 10px; opacity: 0.5; margin: -4px 0 8px; padding-left: 0;">
-      When uploading a folder, reads <code>.gitignore</code> files and skips matching files.
-    </p>
 
     <div class="bds-toggle-row">
       <span class="bds-toggle-label">Auto download create_file outputs</span>
