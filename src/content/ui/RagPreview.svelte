@@ -4,6 +4,7 @@
   import { searchActiveProjectRAG } from "../../lib/rag-engine.js";
   import { getActiveProject, getFilesForProject, getActiveFiles } from "../project-manager.js";
   import appState from "../state.js";
+  import { t } from "../../lib/i18n.svelte.js";
 
   let allChunks = $state([]);
   let panelExpanded = $state(false);
@@ -165,7 +166,7 @@
     >
       <span class="bds-rag-header-main">
         <span class="bds-rag-icon">&#x1F50D;</span>
-        <span class="bds-rag-title">RAG matched files</span>
+        <span class="bds-rag-title">{t('ragPreview.title')}</span>
         <span class="bds-rag-count">{totalUniqueFiles}</span>
       </span>
       <span class="bds-rag-chevron">{panelExpanded ? "▲" : "▼"}</span>
@@ -192,7 +193,7 @@
                 {#each group.chunks as chunk, i}
                   <div class="bds-rag-chunk">
                     <div class="bds-rag-chunk-label">
-                      Lines {chunk.startLine}&ndash;{chunk.endLine}
+                      {t('ragPreview.lines', { start: chunk.startLine, end: chunk.endLine })}
                     </div>
                     <pre class="bds-rag-chunk-code"><code>{chunk.content}</code></pre>
                   </div>
@@ -202,7 +203,7 @@
           </div>
         {/each}
         {#if totalUniqueFiles > MAX_FILES}
-          <div class="bds-rag-more">+{totalUniqueFiles - MAX_FILES} more files</div>
+          <div class="bds-rag-more">{t('ragPreview.moreFiles', { count: totalUniqueFiles - MAX_FILES })}</div>
         {/if}
       </div>
     {/if}

@@ -1,4 +1,5 @@
 <script>
+  import { t } from "../../lib/i18n.svelte.js";
   import { onMount } from "svelte";
 
   let isExpanded = $state(false);
@@ -71,8 +72,8 @@
   <button 
     class="bds-expand-toggle {isExpanded ? 'expanded' : ''}" 
     onclick={toggle}
-    aria-label={isExpanded ? "Collapse" : "Expand"}
-    title={isExpanded ? "Collapse Prompt Box" : "Expand Prompt Box"}
+    aria-label={isExpanded ? t('expandToggle.collapse') : t('expandToggle.expand')}
+    title={isExpanded ? t('expandToggle.collapseTitle') : t('expandToggle.expandTitle')}
   >
     {#if isExpanded}
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

@@ -1,5 +1,6 @@
 <script>
   import appState from "../state.js";
+  import { t } from "../../lib/i18n.svelte.js";
   import {
     createProject,
     updateProject,
@@ -114,7 +115,7 @@
   async function handleCreate() {
     createError = "";
     if (!createName.trim()) {
-      createError = "Name is required.";
+      createError = t('projectsManager.nameIsRequired');
       return;
     }
     await createProject(createName.trim(), createDescription.trim());
@@ -155,7 +156,7 @@
         fileInput.dispatchEvent(new Event("change", { bubbles: true }));
       } catch (err) {
         if (appState.ui) {
-          appState.ui.showToast(err?.message || "File pick failed.");
+          appState.ui.showToast(err?.message || t('projectsManager.filePickFailed'));
         }
       }
       return;
@@ -183,7 +184,7 @@
       for (const file of files) {
         if (file.size > MAX_SIZE) {
           errors.push(
-            `"${file.name}" is too large (${(file.size / 1024).toFixed(1)} KB)`,
+            t('projectsManager.fileTooLarge', { name: file.name, size: (file.size / 1024).toFixed(1) }),
           );
           continue;
         }
@@ -192,12 +193,12 @@
         try {
           content = await file.text();
         } catch {
-          errors.push(`Could not read "${file.name}"`);
+          errors.push(t('projectsManager.fileUnreadable', { name: file.name }));
           continue;
         }
 
         if (!content.trim()) {
-          errors.push(`"${file.name}" is empty`);
+          errors.push(t('projectsManager.fileEmpty', { name: file.name }));
           continue;
         }
 
@@ -208,7 +209,7 @@
         try {
           await addProjectFilesBatch(selectedProject.id, filesToAdd);
         } catch (err) {
-          errors.push(`Storage error: ${err?.message || String(err)}`);
+          errors.push(t('projectsManager.storageError', { msg: err?.message || String(err) }));
         }
       }
 
@@ -251,24 +252,22 @@
               try {
                 await addProjectFilesBatch(selectedProject.id, filesToAdd);
               } catch (err) {
-                fileError = `Storage error: ${err?.message || String(err)}`;
+                fileError = t('projectsManager.storageError', { msg: err?.message || String(err) });
               }
             }
 
             if (skippedCount > 0) {
-              fileError =
-                `${filesToAdd.length} file${filesToAdd.length !== 1 ? "s" : ""} uploaded, ` +
-                `${skippedCount} skipped (too large or empty).`;
+              fileError = t('projectsManager.filesUploadedShort', { count: filesToAdd.length, skipped: skippedCount });
             }
           }
         } catch (err) {
-          fileError = err?.message || "Folder pick failed.";
+          fileError = err?.message || t('projectsManager.folderPickFailed');
         } finally {
           uploading = false;
           projectFiles = getFilesForProject(selectedProject.id);
         }
       } else if (appState.ui) {
-        appState.ui.showToast("Folder upload requires a newer version of the app.");
+        appState.ui.showToast(t('projectsManager.folderRequiresNewer'));
       }
       return;
     }
@@ -284,7 +283,7 @@
     } catch (err) {
       uploading = false;
       if (err?.name !== "AbortError") {
-        fileError = `Folder upload failed: ${err?.message || String(err)}`;
+        fileError = t('projectsManager.folderUploadFailed', { msg: err?.message || String(err) });
       }
       return;
     }
@@ -340,12 +339,12 @@
         try {
           await addProjectFilesBatch(selectedProject.id, filesToAdd);
         } catch (err) {
-          fileError = `Storage error: ${err?.message || String(err)}`;
+          fileError = t('projectsManager.storageError', { msg: err?.message || String(err) });
         }
       }
 
       if (skippedCount > 0) {
-        fileError = `${filesToAdd.length} file${filesToAdd.length !== 1 ? "s" : ""} uploaded, ${skippedCount} skipped (too large, unreadable, or not text).`;
+        fileError = t('projectsManager.filesUploaded', { count: filesToAdd.length, skipped: skippedCount });
       }
     } finally {
       uploading = false;
@@ -379,7 +378,7 @@
       linkedDirInfo = await getLinkedDirectoryInfo(selectedProject.id);
     } catch (err) {
       if (err?.name !== "AbortError") {
-        linkDirError = err?.message || "Failed to link directory.";
+        linkDirError = err?.message || t('projectsManager.linkFailed');
       }
     } finally {
       linkingDir = false;
@@ -400,7 +399,7 @@
       await refreshDirectoryCache(selectedProject.id);
       linkedDirInfo = await getLinkedDirectoryInfo(selectedProject.id);
     } catch (err) {
-      linkDirError = err?.message || "Failed to refresh directory.";
+      linkDirError = err?.message || t('projectsManager.refreshFailed');
     }
   }
 
@@ -454,10 +453,10 @@
     class="bds-back-btn"
     onclick={view === "detail" ? goBack : onback}
   >
-    ← {view === "detail" ? "Projects" : "Back"}
+    ← {view === "detail" ? t('projectsManager.title') : t('projectsManager.back')}
   </button>
   <div class="bds-section-title" style="margin: 0; padding: 0; border: none;">
-    {view === "detail" ? selectedProject?.name || "Project" : "Manage Projects"}
+    {view === "detail" ? selectedProject?.name || "Project" : t('projectsManager.manage')}
   </div>
 </div>
 
@@ -470,20 +469,20 @@
         style="width: 100%;"
         onclick={() => (showCreateForm = true)}
       >
-        + New Project
+        {t('projectsManager.newProject')}
       </button>
     {:else}
       <div class="bds-inline-editor">
         <input
           class="bds-input"
           bind:value={createName}
-          placeholder="Project name (required)"
+          placeholder={t('projectsManager.nameRequired')}
           onkeydown={(e) => e.key === "Enter" && handleCreate()}
         />
         <textarea
           class="bds-input bds-desc-input"
           bind:value={createDescription}
-          placeholder="Description (optional)"
+          placeholder={t('projectsManager.descriptionOptional')}
         ></textarea>
         {#if createError}
           <p class="bds-field-error">{createError}</p>
@@ -497,10 +496,10 @@
               createError = "";
             }}
           >
-            Cancel
+            {t('projectsManager.cancel')}
           </button>
           <button type="button" class="bds-btn" onclick={handleCreate}
-            >Create</button
+            >{t('projectsManager.create')}</button
           >
         </div>
       </div>
@@ -509,7 +508,7 @@
 
   <div class="bds-list">
     {#if projects.length === 0}
-      <p class="bds-empty">No projects yet.</p>
+      <p class="bds-empty">{t('projectsManager.empty')}</p>
     {:else}
       {#each projects as project (project.id)}
         <div
@@ -554,7 +553,7 @@
 {:else if view === "detail" && selectedProject}
   <!-- Name + Description -->
   <div class="bds-field-group">
-    <label class="bds-label" for="pm-name">Name</label>
+    <label class="bds-label" for="pm-name">{t('projectsManager.nameLabel')}</label>
     <input
       id="pm-name"
       class="bds-input"
@@ -564,42 +563,42 @@
   </div>
 
   <div class="bds-field-group">
-    <label class="bds-label" for="pm-desc">Description</label>
+    <label class="bds-label" for="pm-desc">{t('projectsManager.descriptionLabel')}</label>
     <textarea
       id="pm-desc"
       class="bds-input"
       bind:value={editDescription}
-      placeholder="Optional"
+      placeholder={t('projectsManager.optional')}
       oninput={scheduleSave}
     ></textarea>
   </div>
 
   <div class="bds-field-group">
-    <label class="bds-label" for="pm-instructions">Custom Instructions</label>
+    <label class="bds-label" for="pm-instructions">{t('projectsManager.customInstructions')}</label>
     <textarea
       id="pm-instructions"
       class="bds-input"
       bind:value={editInstructions}
-      placeholder="Instructions appended to the global system prompt when this project is active…"
+      placeholder={t('projectsManager.instructionsPlaceholder')}
       oninput={scheduleSave}
     ></textarea>
-    <p style="font-size: 10px; opacity: 0.5; margin: 2px 0 0;">Auto-saved</p>
+    <p style="font-size: 10px; opacity: 0.5; margin: 2px 0 0;">{t('projectsManager.autoSaved')}</p>
   </div>
 
   <hr style="margin: 12px 0;" />
 
   <!-- Files section -->
   <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-    <div class="bds-subsection-title" style="margin: 0;">Files</div>
+    <div class="bds-subsection-title" style="margin: 0;">{t('projectsManager.files')}</div>
     {#if projectFiles.length > 0}
       <button
         type="button"
         class="bds-btn-outlined"
         style="font-size: 10px; padding: 2px 7px;"
         onclick={exportAll}
-        title="Download all files as a single concatenated text file"
+        title={t('projectsManager.downloadAll')}
       >
-        Export All
+        {t('projectsManager.exportAll')}
       </button>
     {/if}
   </div>
@@ -610,7 +609,7 @@
 
   <div class="bds-list" style="margin-bottom: 8px;">
     {#if projectFiles.length === 0}
-      <p class="bds-empty" style="font-size: 11px;">No files added yet.</p>
+      <p class="bds-empty" style="font-size: 11px;">{t('projectsManager.noFiles')}</p>
     {:else}
       {#each projectFiles as file (file.id)}
           <div class="bds-skill-item">
@@ -630,18 +629,18 @@
                 class="bds-btn-outlined"
                 style="font-size: 11px; padding: 3px 8px;"
                 onclick={() => exportFile(file)}
-                title="Download {file.name}"
+                title={t('projectsManager.downloadFile', { name: file.name })}
               >
-                Export
+                {t('projectsManager.export')}
               </button>
               <button
                 type="button"
                 class="bds-btn-danger"
                 style="font-size: 11px; padding: 3px 8px;"
                 onclick={() => handleDeleteFile(file)}
-                title="Remove {file.name} from this project"
+                title={t('projectsManager.removeFile', { name: file.name })}
               >
-                Delete
+                {t('projectsManager.delete')}
               </button>
             </div>
           </div>
@@ -655,7 +654,7 @@
     style="width: 100%;"
     onclick={triggerFileUpload}
   >
-    + Upload File
+    {t('projectsManager.uploadFile')}
   </button>
   {#if supportsFolderUpload}
     <button
@@ -664,7 +663,7 @@
       style="width: 100%; margin-top: 6px;"
       onclick={handleFolderUpload}
     >
-      + Upload Folder
+      {t('projectsManager.uploadFolder')}
     </button>
   {/if}
 
@@ -677,13 +676,13 @@
     onchange={handleFileUpload}
   />
   <p style="font-size: 10px; opacity: 0.45; margin: 4px 0 0;">
-    Plain text files only. Max 500 KB per file.
+    {t('projectsManager.fileHint')}
   </p>
 
   <!-- Local Directory Linking -->
   {#if supportsLocalDirectoryLinking()}
     <hr style="margin: 12px 0;" />
-    <div class="bds-subsection-title" style="margin-bottom: 6px;">Local Directory</div>
+    <div class="bds-subsection-title" style="margin-bottom: 6px;">{t('projectsManager.localDirectory')}</div>
 
     {#if linkDirError}
       <p class="bds-field-error">{linkDirError}</p>
@@ -695,7 +694,7 @@
         <span class="bds-linked-dir-meta">
           {linkedDirInfo.fileCount} file{linkedDirInfo.fileCount !== 1 ? "s" : ""}
           {#if !linkedDirInfo.hasPermission}
-            <span class="bds-linked-dir-warning">(permission lost — re-link)</span>
+            <span class="bds-linked-dir-warning">{t('projectsManager.permissionLost')}</span>
           {/if}
         </span>
       </div>
@@ -706,7 +705,7 @@
           style="font-size: 10px; padding: 2px 7px;"
           onclick={handleRefreshDirectory}
         >
-          Refresh
+          {t('projectsManager.refresh')}
         </button>
         <button
           type="button"
@@ -714,7 +713,7 @@
           style="font-size: 10px; padding: 2px 7px;"
           onclick={handleUnlinkDirectory}
         >
-          Unlink
+          {t('projectsManager.unlink')}
         </button>
       </div>
     {:else}
@@ -725,10 +724,10 @@
         onclick={handleLinkDirectory}
         disabled={linkingDir}
       >
-        {linkingDir ? "Selecting directory…" : "+ Link Local Directory"}
+        {linkingDir ? t('projectsManager.selectingDir') : t('projectsManager.linkDirectory')}
       </button>
       <p style="font-size: 10px; opacity: 0.45; margin: 4px 0 0;">
-        Files are read live from your filesystem (not copied). Chromium-based browsers only.
+        {t('projectsManager.dirHint')}
       </p>
     {/if}
   {/if}
@@ -739,20 +738,18 @@
   {#if showDeleteConfirm}
     <div class="bds-confirm-box bds-confirm-danger">
       <p class="bds-confirm-text">
-        Delete "{selectedProject.name}"? This will also remove its
-        {projectFiles.length}
-        {projectFiles.length === 1 ? "file" : "files"}.
+        {@html t('projectsManager.deleteConfirm', { name: selectedProject.name, count: projectFiles.length })}
       </p>
       <div class="bds-editor-actions">
         <button
           type="button"
           class="bds-btn-outlined"
-          onclick={() => (showDeleteConfirm = false)}>Cancel</button
+          onclick={() => (showDeleteConfirm = false)}>{t('projectsManager.cancel')}</button
         >
         <button
           type="button"
           class="bds-btn-danger"
-          onclick={confirmDeleteProject}>Delete Project</button
+          onclick={confirmDeleteProject}>{t('projectsManager.deleteProject')}</button
         >
       </div>
     </div>
@@ -763,7 +760,7 @@
       style="width: 100%;"
       onclick={promptDeleteProject}
     >
-      Delete Project
+      {t('projectsManager.deleteProject')}
     </button>
   {/if}
 {/if}

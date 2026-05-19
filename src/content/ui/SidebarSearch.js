@@ -6,6 +6,7 @@
 
 import state from "../state.js";
 import { extractSessionId } from "../tags/tag-manager.js";
+import { i18n } from "../../lib/i18n.svelte.js";
 
 let searchInput = null;
 let tagChipsContainer = null;
@@ -54,7 +55,7 @@ export function injectSearchInput() {
       <input 
         type="text" 
         id="bds-sidebar-search-input" 
-        placeholder="Search history... (#tag)" 
+        placeholder="${i18n.t('sidebarSearch.placeholder')}" 
         autocomplete="off"
       />
     </div>

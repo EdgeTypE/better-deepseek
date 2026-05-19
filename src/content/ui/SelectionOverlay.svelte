@@ -2,6 +2,7 @@
   import appState from "../state.js";
   import { exportSession, collectMessages } from "../tools/exporter.js";
   import { scheduleScan } from "../scanner.js";
+  import { t } from "../../lib/i18n.svelte.js";
 
   let selectionMode = $state(appState.selectionMode);
   let selectedCount = $state(0);
@@ -81,7 +82,7 @@
 
   async function handleExport(format) {
     if (selectedCount === 0) {
-      alert("Please select the messages you want to export first.");
+      alert(t('selectionOverlay.exportHint'));
       return;
     }
 
@@ -98,28 +99,28 @@
       <div class="bds-row bds-row-info">
         <div class="bds-selection-info">
           <span class="bds-selection-count">{selectedCount}</span>
-          <span class="bds-selection-label">selected</span>
+          <span class="bds-selection-label">{t('selectionOverlay.selected')}</span>
         </div>
         <button class="bds-btn-ghost" onclick={selectAll}>
-          {document.querySelectorAll(".bds-selection-checkbox").length === selectedCount ? "Deselect All" : "Select All"}
+          {document.querySelectorAll(".bds-selection-checkbox").length === selectedCount ? t('selectionOverlay.deselectAll') : t('selectionOverlay.selectAll')}
         </button>
       </div>
 
       <!-- Layer 2: format buttons -->
       <div class="bds-row bds-row-formats">
         <div class="bds-export-group">
-          <button class="bds-export-btn" onclick={() => handleExport('markdown')} title="Markdown (.md)">
+          <button class="bds-export-btn" onclick={() => handleExport('markdown')} title={t('selectionOverlay.markdown')}>
             MD
           </button>
           {#if !isAndroid}
-            <button class="bds-export-btn" onclick={() => handleExport('pdf')} title="PDF Document">
+            <button class="bds-export-btn" onclick={() => handleExport('pdf')} title={t('selectionOverlay.pdf')}>
               PDF
             </button>
           {/if}
-          <button class="bds-export-btn" onclick={() => handleExport('html')} title="Interactive HTML">
+          <button class="bds-export-btn" onclick={() => handleExport('html')} title={t('selectionOverlay.html')}>
             HTML
           </button>
-          <button class="bds-export-btn" onclick={() => handleExport('image')} title="Long Screenshot">
+          <button class="bds-export-btn" onclick={() => handleExport('image')} title={t('selectionOverlay.image')}>
             IMG
           </button>
         </div>
@@ -127,7 +128,7 @@
 
       <!-- Layer 3: cancel (last, avoids accidental press) -->
       <div class="bds-row bds-row-cancel">
-        <button class="bds-btn-cancel" onclick={cancelSelection}>Cancel</button>
+        <button class="bds-btn-cancel" onclick={cancelSelection}>{t('selectionOverlay.cancel')}</button>
       </div>
 
     </div>

@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { t } from "../../lib/i18n.svelte.js";
   import { triggerTextDownload } from "../../lib/utils/download.js";
   import { buildHeadlessRunnerDocument } from "../../lib/utils/html-utils.js";
 
@@ -49,11 +50,11 @@
 
   function getStatusText() {
     switch (status) {
-      case "LOADING_PYODIDE": return "Loading Pyodide Runtime...";
-      case "RUNNING": return "Running...";
-      case "FINISHED": return "Finished.";
-      case "ERROR": return "Execution Error.";
-      default: return isPython ? "Python 3.x (WASM)" : (isTypeScript ? "TypeScript (Babel)" : "JavaScript (V8)");
+      case "LOADING_PYODIDE": return t('codeRunner.loadingPyodide');
+      case "RUNNING": return t('codeRunner.running');
+      case "FINISHED": return t('codeRunner.finished');
+      case "ERROR": return t('codeRunner.executionError');
+      default: return isPython ? t('codeRunner.pythonStatus') : (isTypeScript ? t('codeRunner.tsStatus') : t('codeRunner.jsStatus'));
     }
   }
 </script>
@@ -74,7 +75,7 @@
         {/if}
       </div>
       <div class="bds-title-group">
-        <h4>{isPython ? 'Python' : (isTypeScript ? 'TypeScript' : 'JavaScript')} Runner</h4>
+        <h4>{isPython ? t('codeRunner.pythonRunner') : (isTypeScript ? t('codeRunner.tsRunner') : t('codeRunner.jsRunner'))}</h4>
         <span class="bds-status-text">{getStatusText()}</span>
       </div>
     </div>
@@ -82,7 +83,7 @@
     <div class="bds-runner-actions">
       <button type="button" class="bds-btn-small" onclick={handleDownload}>
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-        Download
+        {t('codeRunner.download')}
       </button>
     </div>
   </header>
@@ -93,7 +94,7 @@
         class="bds-code-editor" 
         bind:value={code} 
         spellcheck="false"
-        placeholder="Enter your code here..."
+        placeholder={t('codeRunner.placeholder')}
       ></textarea>
       
       <button 
@@ -103,9 +104,9 @@
         disabled={status === 'RUNNING' || status === 'LOADING_PYODIDE'}
       >
         {#if status === 'RUNNING'}
-          <span class="bds-spinner"></span> Running...
+          <span class="bds-spinner"></span> {t('codeRunner.running')}
         {:else}
-          ▶ Run {isPython ? 'Python' : (isTypeScript ? 'TS' : 'JS')}
+          ▶ {isPython ? t('codeRunner.runPython') : (isTypeScript ? t('codeRunner.runTs') : t('codeRunner.runJs'))}
         {/if}
       </button>
     </div>
@@ -113,8 +114,8 @@
     {#if output.length > 0 || status === 'ERROR' || status === 'FINISHED'}
       <div class="bds-output-area">
         <div class="bds-output-header">
-          <span>Console Output</span>
-          <button class="bds-clear-btn" onclick={() => output = []}>Clear</button>
+          <span>{t('codeRunner.consoleOutput')}</span>
+          <button class="bds-clear-btn" onclick={() => output = []}>{t('codeRunner.clear')}</button>
         </div>
         <div class="bds-output-logs">
           {#each output as log}
@@ -123,7 +124,7 @@
             </div>
           {/each}
           {#if output.length === 0 && status === 'FINISHED'}
-            <div class="bds-log-line dim"><i>(Execution finished with no output)</i></div>
+            <div class="bds-log-line dim"><i>{t('codeRunner.noOutput')}</i></div>
           {/if}
         </div>
       </div>

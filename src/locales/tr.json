@@ -323,6 +323,9 @@
       "showCode": "Kodu Göster ▾",
       "consoleOutput": "Konsol Çıktısı"
     },
+    "toolCard": {
+      "pythonRunner": "Python Çalıştırıcı"
+    },
     "downloadCard": {
       "download": "İndir"
     },
@@ -508,7 +511,138 @@
       "brandingNote": "Better DeepSeek açık kaynaklı bir topluluk projesidir.",
       "seeAllChanges": "v{{version}} sürümündeki tüm değişiklikleri GitHub'da gör",
       "seeDetailed": "Detaylı sürüm notlarını GitHub'da gör",
-      "features": {}
+      "features": {
+        "v0_1_6": {
+          "title": "Android ve Organizasyon",
+          "features": {
+            "feat_0": {
+              "title": "Android Sürümü",
+              "description": "Better DeepSeek artık <a href='https://github.com/EdgeTypE/better-deepseek/releases' target='_blank' style='color: #4d6bfe; text-decoration: underline;'>Android</a> cihazlarda kullanılabilir."
+            },
+            "feat_1": {
+              "title": "Sohbet Filtreleme ve Etiketler",
+              "description": "Sohbet oturumlarınıza etiketler ekleyerek düzenleyin Menüden sohbetleri kolayca filtreleyin ve gruplayın."
+            },
+            "feat_2": {
+              "title": "Yenilenen Dışa Aktarma Arayüzü",
+              "description": "Markdown, PDF, HTML ve Görsel olarak dışa aktarma işlemleri için yeni arayüz tasarımı. Sohbetin tamamını veya belirli kısımlarını dışa aktarabilirsiniz."
+            }
+          }
+        },
+        "v0_1_5": {
+          "title": "Geliştirmeler ve Görünürlük",
+          "features": {
+            "feat_0": {
+              "title": "Yenilikler Penceresi",
+              "description": "Şu an tam olarak bu pencereye bakıyorsunuz! Artık en son değişiklikleri doğrudan buradan sizinle paylaşacağız."
+            },
+            "feat_1": {
+              "title": "Gelişmiş Enjeksiyon Kontrolü",
+              "description": "Sistem yönergelerinin ne sıklıkla gönderileceğini seçin: 'Her zaman', 'Sadece ilk mesajda' veya özelleştirilebilir aralıklarla 'Her X mesajda bir'."
+            },
+            "feat_2": {
+              "title": "Özel Depo (Private Repo) Desteği",
+              "description": "GitHub Kişisel Erişim Tokenlarınızı (PAT) kullanarak özel depolarınızı güvenli bir şekilde içe aktarın."
+            },
+            "feat_3": {
+              "title": "Token ve Fiyat Tahmini",
+              "description": "API eşdeğeri kullanımlar için gerçek zamanlı token kullanım tahmini ve bağlam penceresi gösterimi."
+            },
+            "feat_4": {
+              "title": "Belleği Devre Dışı Bırak",
+              "description": "Eklentinin sohbet bağlamını kaydetmesini önlemek için Ayarlar menüsüne yeni bir seçenek eklendi."
+            },
+            "feat_5": {
+              "title": "Kararlılık İyileştirmeleri",
+              "description": "Mesaj işleme sorunları giderildi ve genel kullanıcı arayüzü durumu iyileştirildi."
+            }
+          }
+        },
+        "v0_1_4": {
+          "title": "Projeler ve Gelişmiş Ayarlar",
+          "features": {
+            "feat_0": {
+              "title": "Projeler Menüsü",
+              "description": "Sohbet oturumları ve dosyalar için daha iyi bir organizasyonel kontrol sağlar."
+            },
+            "feat_1": {
+              "title": "Geçmiş Arama",
+              "description": "Sohbet geçmişi kenar çubuğuna arama özelliği eklendi."
+            },
+            "feat_2": {
+              "title": "Gelişmiş Ayarlar",
+              "description": "Daha az yer kaplaması ve odaklanmayı kolaylaştırması için akordeon düzeninde yeniden tasarlanan ayarlar menüsü."
+            },
+            "feat_3": {
+              "title": "Sistem Yönergesini Kapat",
+              "description": "İhtiyaç duyulmadığında Gizli Sistem Yönergesini tamamen kapatabilme seçeneği."
+            },
+            "feat_4": {
+              "title": "Dili Zorla",
+              "description": "Girdi dilinden bağımsız olarak DeepSeek'in her zaman tercih ettiğiniz dilde yanıt vermesini sağlayın."
+            }
+          }
+        },
+        "v0_1_3": {
+          "title": "Soru Sorma ve Dışa Aktarmalar",
+          "features": {
+            "feat_0": {
+              "title": "Soru Sorma Aracı",
+              "description": "DeepSeek, bağlam veya talimatlar konusunda kararsız kaldığında artık sizden açıklama talep edebilir."
+            },
+            "feat_1": {
+              "title": "Markdown ve PDF Dışa Aktarma",
+              "description": "Tüm sohbet oturumlarınızı Markdown ve PDF dosyalarına aktarabilirsiniz."
+            },
+            "feat_2": {
+              "title": "Yönerge Sıfırlama",
+              "description": "Sistem yönergesini kolayca varsayılan durumuna sıfırlayın."
+            },
+            "feat_3": {
+              "title": "Gezinme Düzeltmeleri",
+              "description": "Logoya veya 'Yeni Sohbet' butonuna tıklandığında sayfanın tamamen yeniden yüklenmesi sorunu giderildi."
+            }
+          }
+        },
+        "v0_1_2": {
+          "title": "Çapraz Tarayıcı ve Kod Çalıştırıcılar",
+          "features": {
+            "feat_0": {
+              "title": "Firefox Desteği",
+              "description": "Firefox tarayıcısı için deneysel destek eklendi."
+            },
+            "feat_1": {
+              "title": "Geliştirilmiş Kod Çalıştırıcılar",
+              "description": "Python çalıştırıcısı güncellendi, yeni JS ve TS çalıştırma ortamları eklendi."
+            },
+            "feat_2": {
+              "title": "GitHub Otomatik Çekme",
+              "description": "BDS:AUTO komutu ile GitHub depolarını doğrudan sohbete enjekte edin."
+            }
+          }
+        },
+        "v0_1_1": {
+          "title": "Ses Desteği ve Kararlılık",
+          "features": {
+            "feat_0": {
+              "title": "Tam Ses Desteği",
+              "description": "Konuşmadan Metne (Speech-to-Text) ve Metinden Konuşmaya (Text-to-Speech) entegrasyonu."
+            },
+            "feat_1": {
+              "title": "Ses Yapılandırması",
+              "description": "Ayarlar menüsünde ses ve tanıma dilleri yapılandırma seçenekleri."
+            },
+            "feat_2": {
+              "title": "Geliştirilmiş Gezinme",
+              "description": "Logo ve 'Yeni Sohbet' alanları gerçek &lt;a&gt; etiketlerine dönüştürülerek 'Yeni sekmede aç' desteği eklendi."
+            },
+            "feat_3": {
+              "title": "Akış Kararlılığı",
+              "description": "Tıkanan veri akışlarının daha iyi yönetilmesi ve otomatik etiket kapatma."
+            }
+          }
+        }
+      }
     },
     "language": {
       "en": "English",

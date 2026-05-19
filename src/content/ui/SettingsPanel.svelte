@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from "svelte";
   import appState from "../state.js";
   import { pushConfigToPage } from "../bridge.js";
   import {
@@ -53,6 +54,8 @@
   let locale = $state(appState.settings.locale || "en");
   let syncLocale = $state(Boolean(appState.settings.syncLocale));
   let advancedOpen = $state(false);
+  let lastCheckedDate = $state("");
+  let updatingLanguages = $state(false);
 
   let activeProject = $state(getActiveProject());
   let projectInstructions = $state(activeProject?.customInstructions || "");
@@ -91,6 +94,51 @@
     processGitignoreOnUpload = Boolean(appState.settings.processGitignoreOnUpload);
     locale = appState.settings.locale || "en";
     syncLocale = Boolean(appState.settings.syncLocale);
+    chrome.storage.local.get("bds_locale_update_last_checked", (data) => {
+      lastCheckedDate = data.bds_locale_update_last_checked || "";
+    });
+  }
+
+  onMount(() => {
+    chrome.storage.local.get("bds_locale_update_last_checked", (data) => {
+      lastCheckedDate = data.bds_locale_update_last_checked || "";
+    });
+  });
+
+  async function checkLanguageUpdates() {
+    if (updatingLanguages) return;
+    updatingLanguages = true;
+
+    chrome.runtime.sendMessage({ type: "BDS_UPDATE_LANGUAGES" }, (response) => {
+      updatingLanguages = false;
+      if (response && response.success) {
+        chrome.storage.local.get("bds_locale_update_last_checked", (data) => {
+          lastCheckedDate = data.bds_locale_update_last_checked || new Date().toLocaleDateString();
+        });
+        if (appState.ui) {
+          appState.ui.showToast(t("settings.updatedSuccess"));
+        }
+      } else {
+        if (appState.ui) {
+          appState.ui.showToast(t("settings.updateFailed"));
+        }
+      }
+    });
+  }
+
+  async function resetLanguageFactory() {
+    chrome.runtime.sendMessage({ type: "BDS_RESET_LANGUAGES" }, (response) => {
+      if (response && response.success) {
+        lastCheckedDate = "";
+        if (appState.ui) {
+          appState.ui.showToast(t("settings.resetSuccess"));
+        }
+      } else {
+        if (appState.ui) {
+          appState.ui.showToast(t("settings.updateFailed"));
+        }
+      }
+    });
   }
 
   export function refreshProject() {
@@ -366,27 +414,6 @@
   <p style="font-size: 10px; opacity: 0.5; margin: 2px 0 12px;">{t('settings.autoSaved')}</p>
 {/if}
 
-<div class="bds-section-title" style="margin-top: 16px;">{t('settings.languageSettings')}</div>
-<div class="bds-list" style="margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--bds-border); border-radius: 12px; background: rgba(255, 255, 255, 0.02);">
-  <div class="bds-toggle-row" style="margin: 0; padding: 0; border: none;">
-    <span class="bds-toggle-label">{t('settings.syncLocale')}</span>
-    <label class="bds-switch">
-      <input type="checkbox" bind:checked={syncLocale} />
-      <span class="bds-switch-track"></span>
-    </label>
-  </div>
-
-  {#if !syncLocale}
-    <div class="bds-toggle-row" style="margin: 0; padding: 10px 0 0; border-top: 1px solid rgba(255, 255, 255, 0.05); justify-content: space-between; align-items: center;">
-      <span class="bds-toggle-label">{t('settings.selectLanguage')}</span>
-      <select class="bds-select" bind:value={locale} style="width: 140px;">
-        <option value="en">{t('language.en')}</option>
-        <option value="tr">{t('language.tr')}</option>
-      </select>
-    </div>
-  {/if}
-</div>
-
 <button
   type="button"
   class="bds-advanced-toggle"
@@ -415,6 +442,56 @@
 
 <div class="bds-advanced-content" class:open={advancedOpen}>
   <div class="bds-advanced-inner">
+    <!-- Language Settings -->
+    <div style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 12px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; width: 100%;">
+      <span class="bds-toggle-label" style="font-weight: 600; opacity: 0.9;">{t('settings.languageSettings')}</span>
+      
+      <div class="bds-toggle-row" style="padding: 0; border: none; margin: 0;">
+        <span class="bds-toggle-label">{t('settings.syncLocale')}</span>
+        <label class="bds-switch">
+          <input type="checkbox" bind:checked={syncLocale} />
+          <span class="bds-switch-track"></span>
+        </label>
+      </div>
+
+      {#if !syncLocale}
+        <div class="bds-toggle-row" style="padding: 0; border: none; margin: 0; justify-content: space-between; align-items: center;">
+          <span class="bds-toggle-label">{t('settings.selectLanguage')}</span>
+          <select class="bds-select" bind:value={locale} style="width: 140px;">
+            <option value="en">{t('language.en')}</option>
+            <option value="tr">{t('language.tr')}</option>
+          </select>
+        </div>
+      {/if}
+
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
+        <div style="display: flex; gap: 8px; justify-content: space-between; align-items: center; width: 100%;">
+          <button 
+            type="button" 
+            class="bds-btn-outlined" 
+            style="flex: 1; font-size: 11px; padding: 6px 12px;" 
+            onclick={checkLanguageUpdates} 
+            disabled={updatingLanguages}
+          >
+            {updatingLanguages ? t('common.working') : t('settings.checkUpdates')}
+          </button>
+          <button 
+            type="button" 
+            class="bds-btn-outlined" 
+            style="flex: 1; font-size: 11px; padding: 6px 12px; border-color: rgba(239, 68, 68, 0.3); color: rgba(239, 68, 68, 0.8);" 
+            onclick={resetLanguageFactory}
+          >
+            {t('settings.resetFactory')}
+          </button>
+        </div>
+        {#if lastCheckedDate}
+          <span style="font-size: 10px; opacity: 0.5; text-align: center; display: block; margin-top: 4px;">
+            {t('settings.lastChecked').replace('{{date}}', lastCheckedDate)}
+          </span>
+        {/if}
+      </div>
+    </div>
+
     <div class="bds-toggle-row">
       <span class="bds-toggle-label">{t('settings.projectAutoContext')}</span>
       <label class="bds-switch">

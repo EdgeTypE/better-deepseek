@@ -4,6 +4,7 @@
   import { STORAGE_KEYS } from "../../lib/constants.js";
   import { makeId } from "../../lib/utils/helpers.js";
   import { openNativeFilePicker } from "../files/native-file-input.js";
+  import { t } from "../../lib/i18n.svelte.js";
 
   let characters = $state([...appState.characters]);
   let uploadInput = $state(null);
@@ -37,7 +38,7 @@
     const file = event.target.files && event.target.files[0];
     if (!file) return;
     if (!file.name.toLowerCase().endsWith(".md")) {
-      if (appState.ui) appState.ui.showToast("Only .md files are supported for persona uploads.");
+      if (appState.ui) appState.ui.showToast(t('characterList.onlyMd'));
       event.target.value = "";
       return;
     }
@@ -63,7 +64,7 @@
     pushConfigToPage();
 
     if (appState.ui) {
-      appState.ui.showToast(`Character loaded: ${name}`);
+      appState.ui.showToast(t('characterList.loaded', { name }));
     }
 
     event.target.value = "";
@@ -101,7 +102,7 @@
     pushConfigToPage();
 
     if (appState.ui) {
-      appState.ui.showToast("Character removed.");
+      appState.ui.showToast(t('characterList.removed'));
     }
   }
 
@@ -130,7 +131,7 @@
       pushConfigToPage();
       
       if (appState.ui) {
-        appState.ui.showToast("Character saved.");
+        appState.ui.showToast(t('characterList.saved'));
       }
     }
     editingId = null;
@@ -146,21 +147,21 @@
           <path d="M8 9C5.33 9 0 10.34 0 13V16H16V13C16 10.34 10.67 9 8 9Z" fill="currentColor"></path>
         </svg>
       </span>
-      RP Characters
+      {t('characterList.title')}
     </div>
 
     <div style="display: flex; gap: 6px;">
       <button type="button" class="bds-btn-outlined" onclick={exportCharacters}>
-        Export
+        {t('characterList.export')}
       </button>
       <button type="button" class="bds-btn-outlined" onclick={triggerImport}>
-        Import
+        {t('characterList.import')}
       </button>
     </div>
   </div>
 </div>
 
-<label class="bds-label" for="bds-char-upload">Upload Persona (.md)</label>
+<label class="bds-label" for="bds-char-upload">{t('characterList.uploadLabel')}</label>
 <input
   id="bds-char-upload"
   type="file"
@@ -178,12 +179,12 @@
         checked={characters.every(c => !c.active)}
         onchange={deactivateAll}
       />
-      <span>None (Assistant)</span>
+      <span>{t('characterList.defaultOption')}</span>
     </label>
   </div>
 
   {#if characters.length === 0}
-    <p class="bds-empty">No personas saved.</p>
+    <p class="bds-empty">{t('characterList.empty')}</p>
   {:else}
     {#each characters as char (char.id)}
       {#if editingId === char.id}
@@ -191,21 +192,21 @@
           <input 
             class="bds-input" 
             bind:value={editingName} 
-            placeholder="Character Name"
+            placeholder={t('characterList.namePlaceholder')}
           />
           <input 
             class="bds-input" 
             bind:value={editingUsage} 
-            placeholder="Usage (e.g. fun, philosophy)"
+            placeholder={t('characterList.usagePlaceholder')}
           />
           <textarea 
             class="bds-input" 
             bind:value={editingContent} 
-            placeholder="Character instructions/background..."
+            placeholder={t('characterList.contentPlaceholder')}
           ></textarea>
           <div class="bds-editor-actions">
-            <button type="button" class="bds-btn-outlined" onclick={cancelEdit}>Cancel</button>
-            <button type="button" class="bds-btn" onclick={saveEdit}>Save</button>
+            <button type="button" class="bds-btn-outlined" onclick={cancelEdit}>{t('characterList.cancel')}</button>
+            <button type="button" class="bds-btn" onclick={saveEdit}>{t('characterList.save')}</button>
           </div>
         </div>
       {:else}
@@ -228,10 +229,10 @@
           </label>
           <div style="display: flex; gap: 6px;">
             <button type="button" class="bds-btn-outlined" style="font-size: 11px; padding: 4px 8px;" onclick={() => startEdit(char)}>
-              Edit
+              {t('characterList.edit')}
             </button>
             <button type="button" class="bds-btn-danger" onclick={() => deleteCharacter(char.id)}>
-              Delete
+              {t('characterList.delete')}
             </button>
           </div>
         </div>

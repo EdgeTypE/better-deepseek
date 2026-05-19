@@ -1,5 +1,6 @@
 <script>
   let { onmanage } = $props();
+  import { t } from "../../lib/i18n.svelte.js";
 </script>
 
 <div class="bds-section-title">
@@ -12,7 +13,7 @@
           <path d="M3 12a1 1 0 0 0 0 2h10a1 1 0 0 0 0-2H3Z" fill="currentColor"/>
         </svg>
       </span>
-      Projects
+      {t('projectsCard.title')}
     </div>
     <button
       type="button"
@@ -20,10 +21,10 @@
       style="font-size: 11px; padding: 3px 8px;"
       onclick={onmanage}
     >
-      Manage
+      {t('projectsCard.manage')}
     </button>
   </div>
 </div>
 <p style="font-size: 11px; opacity: 0.45; margin: 0 0 4px; padding: 0 2px;">
-  Project &amp; file selection available below the chat input.
+  {t('projectsCard.description')}
 </p>

@@ -4,6 +4,8 @@
   import { STORAGE_KEYS } from "../../lib/constants.js";
   import appState from "../state.js";
 
+  import { t } from "../../lib/i18n.svelte.js";
+
   let { onDismiss } = $props();
   let modalRef = $state(null);
   let view = $state("latest"); // "latest" veya "history"
@@ -46,6 +48,24 @@
   function getIcon(type) {
     return ICON_MAP[type] || ICON_MAP.feature;
   }
+
+  function getVersionTitle(ver) {
+    const key = `whatsnew.features.v${ver.version.replace(/\./g, "_")}.title`;
+    const trans = t(key);
+    return trans !== key ? trans : ver.title;
+  }
+
+  function getFeatureTitle(ver, feat, index) {
+    const key = `whatsnew.features.v${ver.version.replace(/\./g, "_")}.features.feat_${index}.title`;
+    const trans = t(key);
+    return trans !== key ? trans : feat.title;
+  }
+
+  function getFeatureDescription(ver, feat, index) {
+    const key = `whatsnew.features.v${ver.version.replace(/\./g, "_")}.features.feat_${index}.description`;
+    const trans = t(key);
+    return trans !== key ? trans : feat.description;
+  }
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -65,9 +85,9 @@
           <button class="bds-back-btn" onclick={() => view = "latest"} aria-label="Back">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
           </button>
-          <span class="bds-modal-title">Version History</span>
+          <span class="bds-modal-title">{t('whatsnew.versionHistory')}</span>
         {:else}
-          <span class="bds-modal-title">What's New</span>
+          <span class="bds-modal-title">{t('whatsnew.title')}</span>
           <button class="bds-version-tag bds-version-tag--clickable" onclick={() => view = "history"}>
             v{LATEST_VERSION.version}
             <svg class="bds-chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -82,24 +102,24 @@
     <div class="bds-modal-body">
       {#if view === "latest"}
         <div class="bds-view-latest">
-          <h2 class="bds-main-title">{LATEST_VERSION.title}</h2>
+          <h2 class="bds-main-title">{getVersionTitle(LATEST_VERSION)}</h2>
           
           <div class="bds-feature-list">
-            {#each LATEST_VERSION.features as feature}
+            {#each LATEST_VERSION.features as feature, index}
               <div class="bds-feature-row">
                 <div class="bds-feature-icon-wrapper">
                   {@html getIcon(feature.type)}
                 </div>
                 <div class="bds-feature-info">
-                  <h3>{feature.title}</h3>
-                  <p>{@html feature.description}</p>
+                  <h3>{getFeatureTitle(LATEST_VERSION, feature, index)}</h3>
+                  <p>{@html getFeatureDescription(LATEST_VERSION, feature, index)}</p>
                 </div>
               </div>
             {/each}
           </div>
           
           <a href="https://github.com/EdgeTypE/better-deepseek#changelog" target="_blank" class="bds-and-more-link">
-            See all changes in v{LATEST_VERSION.version} on GitHub
+            {t('whatsnew.seeAllChanges').replace('{{version}}', LATEST_VERSION.version)}
           </a>
         </div>
       {:else}
@@ -110,14 +130,14 @@
                 <span class="bds-history-version">v{ver.version}</span>
                 <span class="bds-history-date">{ver.date}</span>
               </div>
-              <h3 class="bds-history-title">{ver.title}</h3>
+              <h3 class="bds-history-title">{getVersionTitle(ver)}</h3>
               <ul class="bds-history-features">
-                {#each ver.features as feature}
+                {#each ver.features as feature, index}
                   <li>
                     <div class="bds-history-feature-icon">
                       {@html getIcon(feature.type)}
                     </div>
-                    {feature.title}
+                    {getFeatureTitle(ver, feature, index)}
                   </li>
                 {/each}
               </ul>
@@ -125,7 +145,7 @@
           {/each}
 
           <a href="https://github.com/EdgeTypE/better-deepseek#changelog" target="_blank" class="bds-see-more-link">
-            See detailed release notes on GitHub
+            {t('whatsnew.seeDetailed')}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
           </a>
         </div>
@@ -133,14 +153,14 @@
     </div>
 
     <div class="bds-modal-footer">
-      <button class="bds-primary-btn" onclick={dismiss}>Got it, thanks!</button>
+      <button class="bds-primary-btn" onclick={dismiss}>{t('whatsnew.dismiss')}</button>
       
       <div class="bds-footer-links">
-        <a href="https://github.com/EdgeTypE/better-deepseek/issues/new" target="_blank" class="bds-link">Report Bug</a>
+        <a href="https://github.com/EdgeTypE/better-deepseek/issues/new" target="_blank" class="bds-link">{t('whatsnew.reportBug')}</a>
         <span class="bds-link-sep">•</span>
-        <a href="https://github.com/EdgeTypE/better-deepseek/issues/new" target="_blank" class="bds-link">Request Feature</a>
+        <a href="https://github.com/EdgeTypE/better-deepseek/issues/new" target="_blank" class="bds-link">{t('whatsnew.requestFeature')}</a>
       </div>
-      <div class="bds-branding-note">Better DeepSeek is an open-source community project.</div>
+      <div class="bds-branding-note">{t('whatsnew.brandingNote')}</div>
     </div>
   </div>
 </div>

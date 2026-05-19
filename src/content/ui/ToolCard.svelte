@@ -1,8 +1,10 @@
 <script>
+  import { t } from "../../lib/i18n.svelte.js";
+
   /** @type {{name: string, content: string}} */
   let { name, content } = $props();
 
-  let headerTitle = $derived(name === 'run_python_embed' ? 'Python Runner' : name.toUpperCase());
+  let headerTitle = $derived(name === 'run_python_embed' ? t('toolCard.pythonRunner') : name.toUpperCase());
 </script>
 
 <div class="bds-tool-card">

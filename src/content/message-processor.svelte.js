@@ -24,6 +24,7 @@ import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, hand
 
 import { mount, unmount } from "svelte";
 import MessageOverlay from "./ui/MessageOverlay.svelte";
+import { i18n } from "../lib/i18n.svelte.js";
 
 const messageOverlays = new Map();
 const nodeStates = new WeakMap();
@@ -637,7 +638,7 @@ function injectPriceUser(node, tokens, cost) {
   if (!target) return;
   const el = document.createElement("span");
   el.className = "bds-message-price bds-price-user";
-  el.innerHTML = `<span class="bds-price-label">API: ~${priceText}</span><span class="bds-token-count">${fmtTok(tokens)} tok</span>`;
+  el.innerHTML = `<span class="bds-price-label">${i18n.t('messageProcessor.userPrice', { price: priceText })}</span><span class="bds-token-count">${i18n.t('messageProcessor.tokenCount', { count: fmtTok(tokens) })}</span>`;
   target.appendChild(el);
 }
 
@@ -651,7 +652,7 @@ function injectPriceAssistant(node, tokens, cost) {
   if (modelBadge) {
     const el = document.createElement("span");
     el.className = "bds-message-price bds-price-assistant-inline";
-    el.innerHTML = `<span class="bds-price-label">~${priceText}</span>`;
+    el.innerHTML = `<span class="bds-price-label">${i18n.t('messageProcessor.userPrice', { price: priceText })}</span>`;
     modelBadge.appendChild(el);
     return;
   }
@@ -663,7 +664,7 @@ function injectPriceAssistant(node, tokens, cost) {
       if (bar.querySelector(".ds-icon-button") || bar.querySelector("[role='button']")) {
         const el = document.createElement("span");
         el.className = "bds-message-price bds-price-assistant";
-        el.innerHTML = `<span class="bds-price-label">API: ~${priceText}</span><span class="bds-token-count">${fmtTok(tokens)} tok</span>`;
+        el.innerHTML = `<span class="bds-price-label">${i18n.t('messageProcessor.userPrice', { price: priceText })}</span><span class="bds-token-count">${i18n.t('messageProcessor.tokenCount', { count: fmtTok(tokens) })}</span>`;
         bar.appendChild(el);
         return;
       }
@@ -672,7 +673,7 @@ function injectPriceAssistant(node, tokens, cost) {
   }
   const el = document.createElement("span");
   el.className = "bds-message-price bds-price-assistant";
-  el.innerHTML = `<span class="bds-price-label">API: ~${priceText}</span><span class="bds-token-count">${fmtTok(tokens)} tok</span>`;
+  el.innerHTML = `<span class="bds-price-label">${i18n.t('messageProcessor.userPrice', { price: priceText })}</span><span class="bds-token-count">${i18n.t('messageProcessor.tokenCount', { count: fmtTok(tokens) })}</span>`;
   target.appendChild(el);
 }
 
@@ -681,7 +682,7 @@ function fmtTok(n) {
 }
 
 function formatCostDisplay(cost) {
-  if (cost <= 0 || cost < 1e-6) return "<$0.0001";
+  if (cost <= 0 || cost < 1e-6) return i18n.t('messageProcessor.minCost');
   if (cost < 1e-3) return "$" + cost.toFixed(6);
   if (cost < 0.01) return "$" + cost.toFixed(4);
   return "$" + cost.toFixed(3);
@@ -741,12 +742,12 @@ function refreshSessionTotalDisplayInline() {
   const circ = 2 * Math.PI * radius;
   const offset = circ * (1 - usagePercent);
   const ringClass = usagePercent > 0.9 ? "danger" : usagePercent > 0.7 ? "warning" : "";
-  const usageText = `${fmtTok(allTok)} / ${fmtTok(contextLimit)} (${(usagePercent * 100).toFixed(1)}%)`;
+  const usageText = i18n.t('messageProcessor.contextTemplate', { used: fmtTok(allTok), total: fmtTok(contextLimit), percent: (usagePercent * 100).toFixed(1) });
 
   el.innerHTML = `
-    <span class="bds-price-badge">~${totalFmt}</span>
-    <span class="bds-token-badge">${fmtTok(allTok)}</span>
-    <div class="bds-context-ring-container" data-tooltip="Context: ${usageText}">
+    <span class="bds-price-badge">${i18n.t('messageProcessor.userPrice', { price: totalFmt })}</span>
+    <span class="bds-token-badge">${i18n.t('messageProcessor.tokenCount', { count: fmtTok(allTok) })}</span>
+    <div class="bds-context-ring-container" data-tooltip="${i18n.t('messageProcessor.contextTooltip', { text: usageText })}">
       <svg class="bds-context-ring ${ringClass}" width="18" height="18" viewBox="0 0 18 18">
         <circle class="bg" cx="9" cy="9" r="${radius}" />
         <circle class="progress" cx="9" cy="9" r="${radius}" 

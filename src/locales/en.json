@@ -327,6 +327,9 @@
       "showCode": "Show Code ▾",
       "consoleOutput": "Console Output"
     },
+    "toolCard": {
+      "pythonRunner": "Python Runner"
+    },
     "downloadCard": {
       "download": "Download"
     },
@@ -512,7 +515,138 @@
       "brandingNote": "Better DeepSeek is an open-source community project.",
       "seeAllChanges": "See all changes in v{{version}} on GitHub",
       "seeDetailed": "See detailed release notes on GitHub",
-      "features": {}
+      "features": {
+        "v0_1_6": {
+          "title": "Android & Organization",
+          "features": {
+            "feat_0": {
+              "title": "Android Version",
+              "description": "Better DeepSeek is now available on <a href='https://github.com/EdgeTypE/better-deepseek/releases' target='_blank' style='color: #4d6bfe; text-decoration: underline;'>Android</a>."
+            },
+            "feat_1": {
+              "title": "Chat Filtering & Tags",
+              "description": "Organize your sessions by adding tags. Filter and group chats easily from the sidebar menu."
+            },
+            "feat_2": {
+              "title": "Export UI Rework",
+              "description": "Newly designed export interface for Markdown, PDF, HTML, and Images. Export full sessions or specific parts."
+            }
+          }
+        },
+        "v0_1_5": {
+          "title": "Refinement & Visibility",
+          "features": {
+            "feat_0": {
+              "title": "What's New Popup",
+              "description": "You're looking at it! We'll now keep you updated on the latest changes right here."
+            },
+            "feat_1": {
+              "title": "Advanced Injection Control",
+              "description": "Choose between 'Always', 'First Message', or 'Every X' messages with customizable intervals for system prompts."
+            },
+            "feat_2": {
+              "title": "Private Repo Support",
+              "description": "Import private repositories via GitHub Personal Access Tokens securely."
+            },
+            "feat_3": {
+              "title": "Token & Price Estimation",
+              "description": "Real-time token usage estimation and context window display for API-equivalent usage."
+            },
+            "feat_4": {
+              "title": "Disable Memory",
+              "description": "New toggle in Settings to prevent the extension from persisting conversation context."
+            },
+            "feat_5": {
+              "title": "Stability Improvements",
+              "description": "Resolved issues with message handling and refined the overall UI state."
+            }
+          }
+        },
+        "v0_1_4": {
+          "title": "Projects & Advanced Settings",
+          "features": {
+            "feat_0": {
+              "title": "Projects Menu",
+              "description": "Better organizational control for sessions and files."
+            },
+            "feat_1": {
+              "title": "History Search",
+              "description": "Added search functionality to the session history sidebar."
+            },
+            "feat_2": {
+              "title": "Advanced Settings",
+              "description": "Reworked settings menu with an accordion layout to save space and improve focus."
+            },
+            "feat_3": {
+              "title": "Disable System Prompt",
+              "description": "New option to disable the Hidden System Prompt entirely when not needed."
+            },
+            "feat_4": {
+              "title": "Force Language",
+              "description": "Ensure DeepSeek always responds in your preferred language, regardless of input."
+            }
+          }
+        },
+        "v0_1_3": {
+          "title": "Ask Questions & Exports",
+          "features": {
+            "feat_0": {
+              "title": "Ask Questions Tool",
+              "description": "DeepSeek can now ask for clarification when unsure about context or instructions."
+            },
+            "feat_1": {
+              "title": "Markdown & PDF Export",
+              "description": "Export your full chat sessions to Markdown and PDF files."
+            },
+            "feat_2": {
+              "title": "Prompt Reset",
+              "description": "Easily reset the system prompt to its default state."
+            },
+            "feat_3": {
+              "title": "Navigation Fixes",
+              "description": "Resolved full page reloading issues when clicking the logo or 'New Chat'."
+            }
+          }
+        },
+        "v0_1_2": {
+          "title": "Cross-Browser & Code Runners",
+          "features": {
+            "feat_0": {
+              "title": "Firefox Support",
+              "description": "Added experimental support for the Firefox browser."
+            },
+            "feat_1": {
+              "title": "Enhanced Code Runners",
+              "description": "Updated Python runner and added new JS and TS execution environments."
+            },
+            "feat_2": {
+              "title": "GitHub Auto-Fetch",
+              "description": "Inject GitHub repositories directly into the chat via the BDS:AUTO command."
+            }
+          }
+        },
+        "v0_1_1": {
+          "title": "Voice Support & Reliability",
+          "features": {
+            "feat_0": {
+              "title": "Full Voice Support",
+              "description": "Complete Speech-to-Text and Text-to-Speech integration."
+            },
+            "feat_1": {
+              "title": "Voice Configuration",
+              "description": "Configurable voice and recognition languages available in Settings."
+            },
+            "feat_2": {
+              "title": "Improved Navigation",
+              "description": "Logo and 'New Chat' are now real &lt;a&gt; tags, supporting 'Open in new tab'."
+            },
+            "feat_3": {
+              "title": "Streaming Reliability",
+              "description": "Better handling of stalled streams and automatic closing of tags."
+            }
+          }
+        }
+      }
     },
     "language": {
       "en": "English",

@@ -1,4 +1,5 @@
 <script>
+  import { t } from "../../lib/i18n.svelte.js";
   import { triggerBlobDownload } from "../../lib/utils/download.js";
 
   /** @type {{ title: string, description: string, fileName: string, blob: Blob }} */
@@ -25,7 +26,7 @@
   </div>
 
   <button type="button" class="bds-btn" onclick={handleDownload}>
-    Download
+    {t('downloadCard.download')}
   </button>
 </article>
 

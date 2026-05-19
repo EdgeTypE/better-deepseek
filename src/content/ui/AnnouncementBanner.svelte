@@ -1,4 +1,5 @@
 <script>
+  import { t } from "../../lib/i18n.svelte.js";
   import appState from "../state.js";
   import { STORAGE_KEYS } from "../../lib/constants.js";
 
@@ -68,7 +69,7 @@
       class="bds-announcement-close" 
       type="button"
       onclick={(e) => dismiss(ann, e)}
-      aria-label="Dismiss"
+      aria-label={t('announcementBanner.dismiss')}
     >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>

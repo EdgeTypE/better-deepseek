@@ -1,13 +1,14 @@
 <script>
+  import { t } from "../../lib/i18n.svelte.js";
   let { index = 1 } = $props();
   let svgPath = $derived(chrome.runtime.getURL(`static/loading/${index}.svg`));
 </script>
 
 <div class="bds-loading-indicator">
   <div class="bds-loading-icon">
-    <img src={svgPath} alt="Working..." />
+    <img src={svgPath} alt={t('loadingIndicator.working')} />
   </div>
-  <p class="bds-loading-text">Working...</p>
+  <p class="bds-loading-text">{t('loadingIndicator.working')}</p>
 </div>
 
 <style>

@@ -1,6 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import appState from "../state.js";
+  import { t } from "../../lib/i18n.svelte.js";
 
   let questions = $state([]);
   let answers = $state({});
@@ -198,7 +199,7 @@
   }
 
   function submitAnswers() {
-    let responseText = "Here are the answers to your clarifying questions:\n\n";
+    let responseText = t('questionPanel.answersHeader');
     
     questions.forEach((q, index) => {
       const key = q.id || `q_${index}`;
@@ -236,7 +237,7 @@
   function injectTextIntoDeepSeek(text) {
     const textarea = findTextarea();
     if (!textarea) {
-      if (appState.ui) appState.ui.showToast("Could not find DeepSeek input field.");
+      if (appState.ui) appState.ui.showToast(t('questionPanel.noInputField'));
       return;
     }
 
@@ -303,13 +304,13 @@
             <button class="bds-nav-btn" onclick={prevQuestion} disabled={currentQuestionIndex === 0}>
               &lt;
             </button>
-            <span>{currentQuestionIndex + 1} of {questions.length}</span>
+            <span>{t('questionPanel.of', { current: currentQuestionIndex + 1, total: questions.length })}</span>
             <button class="bds-nav-btn" onclick={nextQuestion} disabled={currentQuestionIndex === questions.length - 1}>
               &gt;
             </button>
           </div>
         {/if}
-        <button class="bds-close-btn" onclick={dismiss} title="Dismiss">&times;</button>
+        <button class="bds-close-btn" onclick={dismiss} title={t('questionPanel.dismiss')}>&times;</button>
       </div>
     </div>
 
@@ -356,7 +357,7 @@
                 type="text" 
                 use:focusOnMount
                 class="bds-custom-text-input" 
-                placeholder="Something else..." 
+                placeholder={t('questionPanel.somethingElse')} 
                 bind:value={customAnswers[key]}
                 oninput={() => answers[key] = "Other"}
                 onmousedown={(e) => e.stopPropagation()}
@@ -420,7 +421,7 @@
                 type="text" 
                 use:focusOnMount
                 class="bds-custom-text-input" 
-                placeholder="Something else..." 
+                placeholder={t('questionPanel.somethingElse')} 
                 bind:value={customAnswers[key]}
                 onmousedown={(e) => e.stopPropagation()}
                 onclick={(e) => e.stopPropagation()}
@@ -443,7 +444,7 @@
             type="text" 
             use:focusOnMount
             class="bds-text-input" 
-            placeholder="Type your answer here..." 
+            placeholder={t('questionPanel.typeAnswer')} 
             bind:value={customAnswers[key]} 
             onmousedown={(e) => e.stopPropagation()}
             onclick={(e) => e.stopPropagation()}
@@ -463,18 +464,18 @@
 
     <div class="bds-question-footer">
       <div class="bds-keyboard-hints">
-        <span>↑↓ to navigate</span>
-        <span>Enter to select</span>
-        <span>Esc to close</span>
+        <span>{t('questionPanel.keyboardNav')}</span>
+        <span>{t('questionPanel.keyboardSelect')}</span>
+        <span>{t('questionPanel.keyboardClose')}</span>
       </div>
       <div class="bds-footer-actions">
         {#if currentQuestionIndex === questions.length - 1}
           <button class="bds-action-btn bds-submit-btn" onclick={submitAnswers}>
-            {hasAnswer(q, key) ? 'Send Answers' : 'Skip'}
+            {hasAnswer(q, key) ? t('questionPanel.sendAnswers') : t('questionPanel.skip')}
           </button>
         {:else}
           <button class="bds-action-btn bds-next-btn" onclick={nextOrSubmit}>
-            {hasAnswer(q, key) ? 'Next' : 'Skip'}
+            {hasAnswer(q, key) ? t('questionPanel.next') : t('questionPanel.skip')}
           </button>
         {/if}
       </div>

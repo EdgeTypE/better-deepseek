@@ -3,6 +3,7 @@
   import { STORAGE_KEYS } from "../../lib/constants.js";
   import { normalizeMemories } from "../storage.js";
   import { openNativeFilePicker } from "../files/native-file-input.js";
+  import { t } from "../../lib/i18n.svelte.js";
 
   let entries = $state(
     Object.entries(appState.memories).sort((a, b) => a[0].localeCompare(b[0]))
@@ -48,12 +49,12 @@
         });
 
         if (appState.ui) {
-          appState.ui.showToast("Memories imported successfully.");
+          appState.ui.showToast(t('memoryList.importSuccess'));
         }
       } catch (err) {
         console.error("Import failed:", err);
         if (appState.ui) {
-          appState.ui.showToast("Import failed: JSON format error.");
+          appState.ui.showToast(t('memoryList.importFailed'));
         }
       }
       event.target.value = "";
@@ -67,7 +68,7 @@
       [STORAGE_KEYS.memories]: { ...appState.memories },
     });
     if (appState.ui) {
-      appState.ui.showToast(`Deleted memory: ${key}`);
+      appState.ui.showToast(t('memoryList.deleted', { key }));
     }
   }
 </script>
@@ -81,15 +82,17 @@
           <path d="M8.00002 10.3316C11.7343 10.3316 14.1864 11.8997 15.0387 14.4445L14.4292 14.6483L13.8197 14.8531C13.1955 12.9893 11.3673 11.6182 8.00002 11.6182C4.63277 11.6182 2.80455 12.9893 2.18031 14.8531L1.5708 14.6483L0.961304 14.4445C1.81368 11.8997 4.26579 10.3316 8.00002 10.3316Z" fill="currentColor"></path>
         </svg>
       </span>
-      Stored Memory
+      {t('memoryList.title')}
     </div>
     
     <div style="display: flex; gap: 6px;">
       <button type="button" class="bds-btn-outlined" onclick={exportMemories}>
-        Export
+        {t('memoryList.export')}
+        
       </button>
       <button type="button" class="bds-btn-outlined" onclick={triggerImport}>
-        Import
+        {t('memoryList.import')}
+        
       </button>
       <input 
         type="file" 
@@ -104,7 +107,7 @@
 
 <div id="bds-memory-list" class="bds-list">
   {#if entries.length === 0}
-    <p class="bds-empty">No memory entries yet.</p>
+    <p class="bds-empty">{t('memoryList.empty')}</p>
   {:else}
     {#each entries as [key, item] (key)}
       <div class="bds-memory-item">
@@ -115,7 +118,7 @@
             <em>{item.importance}</em>
           </div>
           <button type="button" class="bds-btn-danger" onclick={() => deleteMemory(key)}>
-            Delete
+            {t('memoryList.delete')}
           </button>
         </div>
       </div>

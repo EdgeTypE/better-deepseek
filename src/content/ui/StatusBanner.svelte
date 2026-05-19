@@ -1,5 +1,6 @@
 <script>
   import appState from "../state.js";
+  import { t } from "../../lib/i18n.svelte.js";
 
   let status = $state(appState.serverStatus);
 
@@ -22,10 +23,10 @@
   </div>
   <div class="ds-status-content">
     <div class="ds-status-title">
-      DeepSeek {status.indicator} issue detected | {status.description}
+      {t('statusBanner.title', { indicator: status.indicator, description: status.description })}
     </div>
     <div class="ds-status-message">
-      The problem is not on your end, it's on DeepSeek's side. Servers may be experiencing issues due to high load or maintenance.
+      {t('statusBanner.message')}
     </div>
   </div>
 </div>

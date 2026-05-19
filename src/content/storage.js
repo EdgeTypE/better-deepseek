@@ -29,7 +29,13 @@ export async function loadStateFromStorage() {
     STORAGE_KEYS.chatTags,
     STORAGE_KEYS.remoteAnnouncement,
     STORAGE_KEYS.dismissedAnnouncements,
+    "bds_locale_update_en",
+    "bds_locale_update_tr",
   ]);
+
+  if (values.bds_locale_update_en || values.bds_locale_update_tr) {
+    i18n.loadUpdatedLocales(values.bds_locale_update_en, values.bds_locale_update_tr);
+  }
 
   const storedSettings = values[STORAGE_KEYS.settings] || {};
 
@@ -382,6 +388,12 @@ export function bindStorageChangeListener() {
 
     if (changes[STORAGE_KEYS.dismissedAnnouncements]) {
       state.dismissedAnnouncements = changes[STORAGE_KEYS.dismissedAnnouncements].newValue || [];
+    }
+
+    if (changes.bds_locale_update_en || changes.bds_locale_update_tr) {
+      const updatedEn = changes.bds_locale_update_en ? changes.bds_locale_update_en.newValue : null;
+      const updatedTr = changes.bds_locale_update_tr ? changes.bds_locale_update_tr.newValue : null;
+      i18n.loadUpdatedLocales(updatedEn, updatedTr);
     }
 
     pushConfigToPage();

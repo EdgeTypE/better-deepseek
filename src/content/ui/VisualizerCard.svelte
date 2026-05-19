@@ -1,4 +1,5 @@
 <script>
+  import { t } from "../../lib/i18n.svelte.js";
   import { buildVisualizerDocument } from "../../lib/utils/html-utils.js";
 
   /** @type {{content: string}} */
@@ -9,14 +10,14 @@
 
 <div class="bds-visualizer-card">
   <header class="bds-visualizer-header">
-    <h4>Visualizer</h4>
-    <p>Interactive Simulation</p>
+    <h4>{t('visualizerCard.title')}</h4>
+    <p>{t('visualizerCard.subtitle')}</p>
   </header>
   
   <div class="bds-visualizer-body">
     <iframe
       class="bds-visualizer-frame"
-      title="Visualizer"
+      title={t('visualizerCard.title')}
       sandbox="allow-scripts allow-forms"
       srcdoc={iframeSrcDoc}
     ></iframe>

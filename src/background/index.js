@@ -82,6 +82,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "BDS_UPDATE_LANGUAGES") {
+    handleLanguageUpdate()
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
+  if (message.type === "BDS_RESET_LANGUAGES") {
+    handleLanguageReset()
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
   return false;
 });
 
@@ -387,3 +401,52 @@ async function fetchRemoteStatus() {
 
 // Run once on startup
 fetchRemoteStatus();
+
+// Dynamic Language updates from GitHub
+async function handleLanguageUpdate() {
+  try {
+    const enUrl = "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/src/locales/en.json";
+    const trUrl = "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/src/locales/tr.json";
+
+    const [enRes, trRes] = await Promise.all([
+      fetch(`${enUrl}?t=${Date.now()}`, { cache: "no-store" }),
+      fetch(`${trUrl}?t=${Date.now()}`, { cache: "no-store" })
+    ]);
+
+    if (!enRes.ok || !trRes.ok) {
+      return { success: false, error: `Failed to fetch: EN=${enRes.status}, TR=${trRes.status}` };
+    }
+
+    const enData = await enRes.json();
+    const trData = await trRes.json();
+
+    if (!enData || !trData || !enData.messages || !trData.messages) {
+      return { success: false, error: "Invalid dynamic language file format" };
+    }
+
+    await chrome.storage.local.set({
+      bds_locale_update_en: enData,
+      bds_locale_update_tr: trData,
+      bds_locale_update_last_checked: new Date().toLocaleDateString()
+    });
+
+    return { success: true };
+  } catch (err) {
+    console.error("Failed to execute dynamic language update:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+async function handleLanguageReset() {
+  try {
+    await chrome.storage.local.remove([
+      "bds_locale_update_en",
+      "bds_locale_update_tr",
+      "bds_locale_update_last_checked"
+    ]);
+    return { success: true };
+  } catch (err) {
+    console.error("Failed to reset language files:", err);
+    return { success: false, error: err.message };
+  }
+}

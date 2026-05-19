@@ -1,6 +1,7 @@
 import { exportSession } from "../tools/exporter.js";
 import { setPendingExport, checkPendingExport } from "../tools/pending-export.js";
 import { openTagEditor } from "../tags/tag-editor.js";
+import { i18n } from "../../lib/i18n.svelte.js";
 
 // Keep track of which chat item's menu was opened
 let lastClickedChatUrl = null;
@@ -119,7 +120,7 @@ function injectOptions(menu) {
   const insertBefore = deleteOption || null;
 
   // Tags option
-  const tagsOption = createMenuOption("Tags (BDS)", TAG_ICON, "bds-tags-option", () => {
+  const tagsOption = createMenuOption(i18n.t('sidebarMenu.tags'), TAG_ICON, "bds-tags-option", () => {
     if (!lastClickedChatUrl) {
       console.warn("[BDS] Tags action: no chat URL captured — three-dot button may be outside chat link");
       return;
@@ -132,7 +133,7 @@ function injectOptions(menu) {
     setTimeout(() => openTagEditor(url), 50);
   });
 
-  const exportOption = createMenuOption("Export Chat (BDS)", SELECTION_ICON, "bds-export-option", () => {
+  const exportOption = createMenuOption(i18n.t('sidebarMenu.exportChat'), SELECTION_ICON, "bds-export-option", () => {
     handleExportAction("selection");
   });
 

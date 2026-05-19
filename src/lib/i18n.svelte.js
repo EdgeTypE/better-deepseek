@@ -11,7 +11,7 @@ class I18nManager {
   messages = $derived(locales[this.locale] || locales["en"]);
 
   /**
-   * Initializes the locale from chrome.storage.local or falls back to system preferences.
+   * Initializes the locale from chrome.storage.local, cookies, or falls back to system preferences.
    * @param {string} [savedLocale] Custom saved locale code
    */
   init(savedLocale) {
@@ -19,12 +19,45 @@ class I18nManager {
       this.locale = savedLocale;
       return;
     }
-    // Auto-detect browser/system language
-    const browserLang = (typeof navigator !== "undefined" ? navigator.language : "en").split("-")[0];
-    if (locales[browserLang]) {
-      this.locale = browserLang;
+
+    let detectedLang = null;
+
+    // 1. Try to get DeepSeek web language from NEXT_LOCALE cookie
+    if (typeof document !== "undefined" && document.cookie) {
+      const cookies = document.cookie.split(";");
+      for (const cookie of cookies) {
+        const [name, val] = cookie.trim().split("=");
+        if (name === "NEXT_LOCALE" && val) {
+          detectedLang = val.trim().split("-")[0];
+          break;
+        }
+      }
+    }
+
+    // 2. Try browser/system language if cookie language is not found or not supported
+    if (!detectedLang || !locales[detectedLang]) {
+      detectedLang = (typeof navigator !== "undefined" ? navigator.language : "en").split("-")[0];
+    }
+
+    // 3. Fallback to English if still not supported
+    if (detectedLang && locales[detectedLang]) {
+      this.locale = detectedLang;
     } else {
       this.locale = "en";
+    }
+  }
+
+  /**
+   * Dynamically hot-loads updated locales fetched from remote source
+   * @param {Object} updatedEn Updated English dictionary
+   * @param {Object} updatedTr Updated Turkish dictionary
+   */
+  loadUpdatedLocales(updatedEn, updatedTr) {
+    if (updatedEn && updatedEn.messages) {
+      locales.en = updatedEn;
+    }
+    if (updatedTr && updatedTr.messages) {
+      locales.tr = updatedTr;
     }
   }
 

@@ -8,6 +8,7 @@
   import AutoCodeRunnerCard from "./AutoCodeRunnerCard.svelte";
   import AutoCodeResultCard from "./AutoCodeResultCard.svelte";
   import LoadingIndicator from "./LoadingIndicator.svelte";
+  import { t } from "../../lib/i18n.svelte.js";
 
 
   /** 
@@ -66,8 +67,8 @@
             </svg>
           </div>
           <div class="bds-question-content">
-            <div class="bds-question-title">Clarifying questions asked.</div>
-            <div class="bds-question-subtitle">Please provide your answers in the interaction panel below.</div>
+            <div class="bds-question-title">{t('messageOverlay.questionsAsked')}</div>
+            <div class="bds-question-subtitle">{t('messageOverlay.questionsSubtitle')}</div>
           </div>
         </div>
       {:else if block.name === 'character_create'}
@@ -79,8 +80,8 @@
             </svg>
           </div>
           <div class="bds-question-content">
-            <div class="bds-question-title">Character/Persona created.</div>
-            <div class="bds-question-subtitle">Active character: <strong>{block.attrs.name || 'New Character'}</strong></div>
+            <div class="bds-question-title">{t('messageOverlay.characterCreated')}</div>
+            <div class="bds-question-subtitle">{@html t('messageOverlay.characterActive', { name: block.attrs.name || 'New Character' })}</div>
           </div>
         </div>
       {:else}

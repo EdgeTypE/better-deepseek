@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { t } from "../../lib/i18n.svelte.js";
 
   /** @type {{language: string, status: string, output: string}} */
   let { language, status, output } = $props();
@@ -11,7 +12,7 @@
   let langLabel = $derived(isPython ? "Python" : (isTypeScript ? "TypeScript" : "JavaScript"));
   let langColor = $derived(isPython ? "#10b981" : (isTypeScript ? "#3b82f6" : "#f59e0b"));
 
-  let statusLabel = $derived(status === "SUCCESS" ? "Execution Successful" : (status === "REJECTED" ? "Request Rejected" : "Execution Failed"));
+  let statusLabel = $derived(status === "SUCCESS" ? t('autoCodeResult.success') : (status === "REJECTED" ? t('autoCodeResult.rejected') : t('autoCodeResult.failed')));
   let statusColor = $derived(status === "SUCCESS" ? "#10b981" : (status === "REJECTED" ? "#6b7280" : "#ef4444"));
 
   function toggleOutput() {
@@ -29,14 +30,14 @@
       </div>
       <div class="bds-result-details">
         <h4>{statusLabel}</h4>
-        <p>{langLabel} code execution {status === "SUCCESS" ? "completed successfully" : (status === "REJECTED" ? "was rejected" : "failed")}.</p>
+        <p>{langLabel} code execution {status === "SUCCESS" ? t('autoCodeResult.completed', { lang: langLabel }) : (status === "REJECTED" ? t('autoCodeResult.wasRejected', { lang: langLabel }) : t('autoCodeResult.execFailed', { lang: langLabel }))}.</p>
       </div>
     </div>
     
     <div class="bds-result-actions">
       {#if output && output.trim() && output !== "(No output)"}
         <button type="button" class="bds-btn-text" onclick={toggleOutput}>
-          {showOutput ? 'Hide Output ▴' : 'Show Output ▾'}
+          {showOutput ? t('autoCodeResult.hideOutput') : t('autoCodeResult.showOutput')}
         </button>
       {/if}
     </div>
