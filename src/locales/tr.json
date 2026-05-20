@@ -27,7 +27,7 @@
     "settings": {
       "generalSettings": "Genel Ayarlar",
       "systemPrompts": "Sistem Yönergeleri (Prompt)",
-      "defaultPromptName": "Varsayılan (Gizli)",
+      "defaultPromptName": "Varsayılan",
       "defaultPromptStatus": "Salt okunur çekirdek yönergeler",
       "customPromptStatus": "Kaydedilmiş özel yönerge",
       "view": "Görüntüle",
