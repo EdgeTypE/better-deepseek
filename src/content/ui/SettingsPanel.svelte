@@ -48,6 +48,7 @@
     Number(appState.settings.maxChatSessions) || 500,
   );
   let tokenPriceDisplay = $state(Boolean(appState.settings.tokenPriceDisplay));
+  let collapseLongUserMessages = $state(Boolean(appState.settings.collapseLongUserMessages));
   let projectRagEnabled = $state(Boolean(appState.settings.projectRagEnabled));
   let projectRagLimit = $state(Number(appState.settings.projectRagLimit) || 5);
   let processGitignoreOnUpload = $state(Boolean(appState.settings.processGitignoreOnUpload));
@@ -68,7 +69,7 @@
       systemPromptInjectionFrequency, systemPromptInjectionInterval,
       disableMemory, htmlToMarkdownMaxDepth, maxChatSessions,
       tokenPriceDisplay, projectRagEnabled, projectRagLimit,
-      processGitignoreOnUpload, locale, syncLocale
+      processGitignoreOnUpload, locale, syncLocale, collapseLongUserMessages
     });
   }
 
@@ -135,6 +136,7 @@
       Number(appState.settings.htmlToMarkdownMaxDepth) || 200;
     maxChatSessions = Number(appState.settings.maxChatSessions) || 500;
     tokenPriceDisplay = Boolean(appState.settings.tokenPriceDisplay);
+    collapseLongUserMessages = Boolean(appState.settings.collapseLongUserMessages);
     projectRagEnabled = Boolean(appState.settings.projectRagEnabled);
     projectRagLimit = Number(appState.settings.projectRagLimit) || 5;
     processGitignoreOnUpload = Boolean(appState.settings.processGitignoreOnUpload);
@@ -244,6 +246,7 @@
       Math.floor(Number(maxChatSessions) || 500),
     );
     appState.settings.tokenPriceDisplay = tokenPriceDisplay;
+    appState.settings.collapseLongUserMessages = collapseLongUserMessages;
     appState.settings.projectRagEnabled = projectRagEnabled;
     appState.settings.projectRagLimit = Number(projectRagLimit) || 5;
     appState.settings.processGitignoreOnUpload = processGitignoreOnUpload;
@@ -493,9 +496,9 @@
 <div class="bds-advanced-content" class:open={advancedOpen}>
   <div class="bds-advanced-inner">
     <!-- Language Settings -->
-    <div style="padding: 10px 0 6px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--bds-border);">
+    <!-- <div style="padding: 10px 0 6px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--bds-border);">
       <span style="font-size: 13px; font-weight: 600; color: var(--bds-text-primary);">{t('settings.languageSettings')}</span>
-    </div>
+    </div> -->
     
     <div class="bds-toggle-row">
       <span class="bds-toggle-label">{t('settings.syncLocale')}</span>
@@ -542,6 +545,18 @@
         </span>
       {/if}
     </div>
+
+    <div class="bds-toggle-row">
+      <span class="bds-toggle-label">{t('settings.collapseLongUserMessages')}</span>
+      <label class="bds-switch">
+        <input id="bds-collapse-user-messages" type="checkbox" bind:checked={collapseLongUserMessages} />
+        <span class="bds-switch-track"></span>
+      </label>
+    </div>
+    <!-- <p style="font-size: 10px; opacity: 0.5; margin: -8px 0 8px; padding-left: 0;">
+      {t('settings.collapseLongUserMessagesHint')}
+    </p> -->
+
 
     <div class="bds-toggle-row">
       <span class="bds-toggle-label">{t('settings.projectAutoContext')}</span>
@@ -803,6 +818,8 @@
     <p style="font-size: 10px; opacity: 0.5; margin: -8px 0 8px; padding-left: 0;">
       {t('settings.tokenPriceHint')}
     </p>
+
+
   </div>
 </div>
 

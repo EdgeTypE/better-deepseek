@@ -21,6 +21,7 @@
   --bds-shadow: 0 12px 40px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.05);
   --bds-radius: 14px;
   --bds-transition: 0.18s ease;
+  --bds-bg-chat-user: #f3f3f3;
 }
 
 /* ── Dark Theme Tokens ── */
@@ -39,6 +40,7 @@ html.dark, body.dark, .dark :root {
   --bds-danger: #f87171;
   --bds-danger-border: rgba(248, 113, 113, 0.35);
   --bds-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.25);
+  --bds-bg-chat-user: #2a2b30;
 }
 
 /* ── Hidden Messages ── */
@@ -1625,3 +1627,81 @@ textarea.bds-input,
   bottom: auto !important;
   margin-top: auto !important;
 }
+
+/* ── Collapsible User Messages ── */
+.bds-collapsed-user-message {
+  max-height: 160px;
+  overflow: hidden !important;
+  position: relative;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: block !important;
+}
+
+.bds-collapsed-user-message::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 50px;
+  background: linear-gradient(to top, var(--bds-bg-chat-user, var(--bds-bg-panel, #f3f3f3)), transparent);
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  opacity: 1;
+}
+
+.bds-expanded-user-message::after {
+  content: none !important;
+}
+
+.bds-user-message-expand-toggle {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 10000;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bds-bg-panel);
+  border: 1px solid var(--bds-border);
+  border-radius: 10px;
+  color: var(--bds-text-secondary);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  transform: scale(0.9);
+  animation: bds-toggle-fade-in 0.3s forwards;
+}
+
+@keyframes bds-toggle-fade-in {
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.bds-user-message-expand-toggle:hover {
+  background: var(--bds-bg-hover);
+  color: var(--bds-text-primary);
+  border-color: var(--bds-accent);
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.bds-user-message-expand-toggle.expanded {
+  color: #fff;
+  background: var(--bds-accent);
+  border-color: var(--bds-accent);
+}
+
+.bds-user-message-expand-toggle svg {
+  transition: transform 0.3s ease;
+}
+
+.bds-user-message-expand-toggle:active {
+  transform: scale(0.95);
+}
+

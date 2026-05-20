@@ -358,5 +358,9 @@ export function startUrlWatcher() {
   window.addEventListener("focus", () => {
     scheduleScan();
   });
+
+  window.addEventListener("bds:settingsChanged", () => {
+    scheduleScan();
+  });
 }
 

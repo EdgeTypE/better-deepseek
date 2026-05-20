@@ -77,6 +77,8 @@
       "githubTokenClear": "Clear",
       "tokenPriceEstimation": "Token Price Estimation (Experimental)",
       "tokenPriceHint": "Shows estimated DeepSeek API cost per message and session total. Input/output token prices are used for estimation. Pricing data is fetched dynamically with fallbacks.",
+      "collapseLongUserMessages": "Collapse long user messages",
+      "collapseLongUserMessagesHint": "Automatically hide very long user messages behind a read-more toggle.",
       "save": "Save Settings",
       "ragChunks": "Max RAG Chunks to Inject",
       "ragChunks3": "3 chunks (~600 words)",
@@ -408,7 +410,9 @@
       "expand": "Expand",
       "collapse": "Collapse",
       "expandTitle": "Expand Prompt Box",
-      "collapseTitle": "Collapse Prompt Box"
+      "collapseTitle": "Collapse Prompt Box",
+      "showMore": "Show More",
+      "showLess": "Show Less"
     },
     "messageOverlay": {
       "questionsAsked": "Clarifying questions asked.",

@@ -123,6 +123,7 @@ export function processMessageNode(node) {
       refreshSessionTotalDisplayInline();
       stateData.priceInjected = true;
     }
+    handleUserMessageCollapse(node);
     return;
   }
 
@@ -794,3 +795,118 @@ function injectSelectionCheckbox(node) {
     node.appendChild(container);
   }
 }
+
+function handleUserMessageCollapse(node) {
+  const textContainer = node.querySelector('.fbb737a4') || node.querySelector('.ds-markdown');
+  if (!textContainer) return;
+
+  const stateData = getNodeState(node);
+  const text = textContainer.textContent || "";
+  const lines = text.split("\n").length;
+  
+  const CHAR_THRESHOLD = 600;
+  const LINE_THRESHOLD = 10;
+  const isTooLong = text.length > CHAR_THRESHOLD || lines > LINE_THRESHOLD;
+
+  if (isTooLong && state.settings.collapseLongUserMessages) {
+    if (!stateData.collapseInitialized) {
+      stateData.collapseInitialized = true;
+      stateData.isCollapsed = true;
+      
+      textContainer.classList.add("bds-collapsed-user-message");
+      textContainer.style.maxHeight = "160px";
+      textContainer.style.overflow = "hidden";
+      textContainer.style.position = "relative";
+      
+      const parent = textContainer.parentNode;
+      if (parent) {
+        parent.style.position = "relative";
+      }
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "bds-user-message-expand-toggle";
+      btn.title = i18n.t('expandToggle.expandTitle');
+      
+      if (textContainer.nextSibling) {
+        textContainer.parentNode.insertBefore(btn, textContainer.nextSibling);
+      } else {
+        textContainer.parentNode.appendChild(btn);
+      }
+
+      stateData.expandBtn = btn;
+
+      const toggleCollapse = () => {
+        stateData.isCollapsed = !stateData.isCollapsed;
+        if (stateData.isCollapsed) {
+          textContainer.classList.add("bds-collapsed-user-message");
+          textContainer.classList.remove("bds-expanded-user-message");
+          textContainer.style.maxHeight = "160px";
+          btn.classList.remove("expanded");
+          btn.title = i18n.t('expandToggle.expandTitle');
+          btn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <polyline points="9 21 3 21 3 15"></polyline>
+              <line x1="21" y1="3" x2="14" y2="10"></line>
+              <line x1="3" y1="21" x2="10" y2="14"></line>
+            </svg>
+          `;
+        } else {
+          textContainer.classList.remove("bds-collapsed-user-message");
+          textContainer.classList.add("bds-expanded-user-message");
+          textContainer.style.maxHeight = "none";
+          btn.classList.add("expanded");
+          btn.title = i18n.t('expandToggle.collapseTitle');
+          btn.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="4 14 10 14 10 20"></polyline>
+              <polyline points="20 10 14 10 14 4"></polyline>
+              <line x1="14" y1="10" x2="21" y2="3"></line>
+              <line x1="10" y1="14" x2="3" y2="21"></line>
+            </svg>
+          `;
+        }
+      };
+
+      btn.addEventListener("click", toggleCollapse);
+      btn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <polyline points="9 21 3 21 3 15"></polyline>
+          <line x1="21" y1="3" x2="14" y2="10"></line>
+          <line x1="3" y1="21" x2="10" y2="14"></line>
+        </svg>
+      `;
+    } else {
+      if (stateData.isCollapsed) {
+        textContainer.classList.add("bds-collapsed-user-message");
+        textContainer.classList.remove("bds-expanded-user-message");
+        textContainer.style.maxHeight = "160px";
+      } else {
+        textContainer.classList.remove("bds-collapsed-user-message");
+        textContainer.classList.add("bds-expanded-user-message");
+        textContainer.style.maxHeight = "none";
+      }
+    }
+  } else {
+    cleanupUserMessageCollapse(node, stateData, textContainer);
+  }
+}
+
+function cleanupUserMessageCollapse(node, stateData, textContainer) {
+  if (stateData.collapseInitialized) {
+    textContainer.classList.remove("bds-collapsed-user-message");
+    textContainer.classList.remove("bds-expanded-user-message");
+    textContainer.style.maxHeight = "";
+    textContainer.style.overflow = "";
+    textContainer.style.position = "";
+    if (stateData.expandBtn && stateData.expandBtn.parentNode) {
+      stateData.expandBtn.parentNode.removeChild(stateData.expandBtn);
+    }
+    stateData.collapseInitialized = false;
+    stateData.isCollapsed = false;
+    stateData.expandBtn = null;
+  }
+}
+

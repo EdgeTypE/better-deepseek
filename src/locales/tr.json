@@ -77,6 +77,8 @@
       "githubTokenClear": "Temizle",
       "tokenPriceEstimation": "Token Ücret Tahmini (Deneysel)",
       "tokenPriceHint": "Mesaj başına tahmini DeepSeek API maliyetini ve toplam oturum maliyetini gösterir. Girdi/çıktı token fiyatları kullanılır. Fiyat verileri dinamik olarak çekilir.",
+      "collapseLongUserMessages": "Uzun kullanıcı mesajlarını daralt",
+      "collapseLongUserMessagesHint": "Çok uzun kullanıcı mesajlarını otomatik olarak daraltarak bir buton aracılığıyla tamamının açılmasını sağlar.",
       "save": "Ayarları Kaydet",
       "ragChunks": "Enjekte Edilecek Maks. RAG Parçası",
       "ragChunks3": "3 parça (~600 kelime)",
@@ -404,7 +406,9 @@
       "expand": "Genişlet",
       "collapse": "Daralt",
       "expandTitle": "Yazma Alanını Genişlet",
-      "collapseTitle": "Yazma Alanını Daralt"
+      "collapseTitle": "Yazma Alanını Daralt",
+      "showMore": "Devamını Göster",
+      "showLess": "Daha Az Göster"
     },
     "messageOverlay": {
       "questionsAsked": "Açıklık getirilmesi gereken sorular soruldu.",

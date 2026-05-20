@@ -537,6 +537,7 @@ export const DEFAULT_SETTINGS = {
   locale: "en",
   syncLocale: true,
   processGitignoreOnUpload: true,
+  collapseLongUserMessages: true,
 };
 
 // ── Code language → file extension map ──
