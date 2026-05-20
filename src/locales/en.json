@@ -350,7 +350,9 @@
       "success": "Success!",
       "error": "Error: {{msg}}",
       "generating": "Generating PPTX...",
-      "bridgeError": "Bridge Error"
+      "bridgeError": "Bridge Error",
+      "browserUnsupported": "Your browser is not supported",
+      "browserUnsupportedDesc": "We are working on supporting your browser. If you'd like to help, check out our GitHub page."
     },
     "excelCard": {
       "title": "Excel Spreadsheet",
@@ -363,7 +365,9 @@
       "success": "Success!",
       "error": "Error: {{msg}}",
       "generating": "Generating Excel...",
-      "bridgeError": "Bridge Error"
+      "bridgeError": "Bridge Error",
+      "browserUnsupported": "Your browser is not supported",
+      "browserUnsupportedDesc": "We are working on supporting your browser. If you'd like to help, check out our GitHub page."
     },
     "docxCard": {
       "title": "Word Document",
@@ -376,7 +380,9 @@
       "success": "Success!",
       "error": "Error: {{msg}}",
       "generating": "Generating Word Doc...",
-      "bridgeError": "Bridge Error"
+      "bridgeError": "Bridge Error",
+      "browserUnsupported": "Your browser is not supported",
+      "browserUnsupportedDesc": "We are working on supporting your browser. If you'd like to help, check out our GitHub page."
     },
     "visualizerCard": {
       "title": "Visualizer",

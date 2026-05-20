@@ -346,7 +346,9 @@
       "success": "Başarılı!",
       "error": "Hata: {{msg}}",
       "generating": "PPTX Oluşturuluyor...",
-      "bridgeError": "Bağlantı Hatası"
+      "bridgeError": "Bağlantı Hatası",
+      "browserUnsupported": "Tarayıcınız desteklenmemektedir",
+      "browserUnsupportedDesc": "Tarayıcınızı desteklemek için çalışıyoruz. Eğer yardımcı olmak isterseniz GitHub sayfamıza göz atabilirsiniz."
     },
     "excelCard": {
       "title": "Excel Tablosu",
@@ -359,7 +361,9 @@
       "success": "Başarılı!",
       "error": "Hata: {{msg}}",
       "generating": "Excel Oluşturuluyor...",
-      "bridgeError": "Bağlantı Hatası"
+      "bridgeError": "Bağlantı Hatası",
+      "browserUnsupported": "Tarayıcınız desteklenmemektedir",
+      "browserUnsupportedDesc": "Tarayıcınızı desteklemek için çalışıyoruz. Eğer yardımcı olmak isterseniz GitHub sayfamıza göz atabilirsiniz."
     },
     "docxCard": {
       "title": "Word Dokümanı",
@@ -372,7 +376,9 @@
       "success": "Başarılı!",
       "error": "Hata: {{msg}}",
       "generating": "Word Dokümanı Oluşturuluyor...",
-      "bridgeError": "Bağlantı Hatası"
+      "bridgeError": "Bağlantı Hatası",
+      "browserUnsupported": "Tarayıcınız desteklenmemektedir",
+      "browserUnsupportedDesc": "Tarayıcınızı desteklemek için çalışıyoruz. Eğer yardımcı olmak isterseniz GitHub sayfamıza göz atabilirsiniz."
     },
     "visualizerCard": {
       "title": "Görselleştirici",

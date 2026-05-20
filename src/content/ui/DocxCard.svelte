@@ -1,4 +1,5 @@
 <script>
+  import { t } from "../../lib/i18n.svelte.js";
   import { triggerBlobDownload } from "../../lib/utils/download.js";
   import { handleAutoErrorReport } from "../auto.js";
 
@@ -12,6 +13,7 @@
   let iframe = $state();
 
   const sandboxUrl = chrome.runtime.getURL("sandbox.html");
+  const isFirefox = navigator.userAgent.toLowerCase().includes("firefox");
 
   // Extract filename from code
   let fileName = $derived.by(() => {
@@ -99,6 +101,27 @@
   }
 </script>
 
+{#if isFirefox}
+<article class="bds-docx-card">
+  <div class="bds-unsupported">
+    <div class="bds-unsupported-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+    </div>
+    <div class="bds-unsupported-text">
+      <p class="bds-unsupported-title">{t('docxCard.browserUnsupported')}</p>
+      <p class="bds-unsupported-desc">{t('docxCard.browserUnsupportedDesc')}</p>
+    </div>
+    <a href="https://github.com/EdgeTypE/better-deepseek" target="_blank" rel="noopener" class="bds-unsupported-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+      GitHub
+    </a>
+  </div>
+</article>
+{:else}
 <article class="bds-docx-card">
   <div class="bds-docx-download-wrapper">
     <div class="bds-docx-info">
@@ -146,6 +169,7 @@
     title="BDS Docx Sandbox"
   ></iframe>
 </article>
+{/if}
 
 <style>
   .bds-docx-card {
@@ -264,6 +288,68 @@
     font-family: monospace;
     white-space: pre-wrap;
     color: var(--bds-text-primary);
+  }
+
+  .bds-unsupported {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .bds-unsupported-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 48px;
+    background-color: var(--docx-icon-bg);
+    border: 1px solid var(--bds-border);
+    border-radius: 8px;
+    color: var(--docx-icon-color);
+    flex-shrink: 0;
+  }
+
+  .bds-unsupported-text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .bds-unsupported-title {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--bds-text-primary);
+  }
+
+  .bds-unsupported-desc {
+    margin: 0;
+    font-size: 11px;
+    color: var(--bds-text-tertiary);
+    line-height: 1.4;
+  }
+
+  .bds-unsupported-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--bds-border);
+    border-radius: 8px;
+    background: var(--bds-bg-elevated);
+    color: var(--bds-text-primary);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 14px;
+    text-decoration: none;
+    transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .bds-unsupported-btn:hover {
+    background: var(--bds-bg-hover);
+    border-color: var(--bds-border-hover);
   }
 
   .bds-btn {
