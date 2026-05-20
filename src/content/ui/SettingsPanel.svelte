@@ -520,7 +520,7 @@
     {/if}
 
     <div class="bds-toggle-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
-      <div style="display: flex; gap: 8px; justify-content: space-between; align-items: center; width: 100%;">
+      <div style="display: flex; gap: 8px; width: 100%;">
         <button 
           type="button" 
           class="bds-btn-outlined" 
