@@ -96,7 +96,11 @@
       "updateAvailable": "Language update available!",
       "updatedSuccess": "Language files updated successfully.",
       "resetSuccess": "Language files reset to factory defaults.",
-      "updateFailed": "Failed to check for language updates."
+      "updateFailed": "Failed to check for language updates.",
+      "unsavedTitle": "Unsaved Changes",
+      "unsavedMessage": "You have unsaved settings changes. Are you sure you want to discard them?",
+      "discard": "Discard",
+      "keepEditing": "Keep Editing"
     },
     "skillList": {
       "title": "Skill Set",

@@ -57,6 +57,52 @@
   let lastCheckedDate = $state("");
   let updatingLanguages = $state(false);
 
+  let dirty = $state(false);
+  let showUnsavedModal = $state(false);
+  let unsavedResolve = null;
+
+  function captureFormSnapshot() {
+    return JSON.stringify({
+      autoFiles, autoZip, voiceMode, voiceLanguage, autoSubmitVoice,
+      preferredLang, githubToken, disableSystemPrompt,
+      systemPromptInjectionFrequency, systemPromptInjectionInterval,
+      disableMemory, htmlToMarkdownMaxDepth, maxChatSessions,
+      tokenPriceDisplay, projectRagEnabled, projectRagLimit,
+      processGitignoreOnUpload, locale, syncLocale
+    });
+  }
+
+  let formSnapshot = $state(captureFormSnapshot());
+
+  $effect(() => {
+    const current = captureFormSnapshot();
+    dirty = current !== formSnapshot;
+  });
+
+  export function checkBeforeClose() {
+    if (!dirty) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      unsavedResolve = resolve;
+      showUnsavedModal = true;
+    });
+  }
+
+  function discardAndClose() {
+    showUnsavedModal = false;
+    if (unsavedResolve) {
+      unsavedResolve(true);
+      unsavedResolve = null;
+    }
+  }
+
+  function cancelClose() {
+    showUnsavedModal = false;
+    if (unsavedResolve) {
+      unsavedResolve(false);
+      unsavedResolve = null;
+    }
+  }
+
   let activeProject = $state(getActiveProject());
   let projectInstructions = $state(activeProject?.customInstructions || "");
   let projectSaveTimer = null;
@@ -97,12 +143,14 @@
     chrome.storage.local.get("bds_locale_update_last_checked", (data) => {
       lastCheckedDate = data.bds_locale_update_last_checked || "";
     });
+    formSnapshot = captureFormSnapshot();
   }
 
   onMount(() => {
     chrome.storage.local.get("bds_locale_update_last_checked", (data) => {
       lastCheckedDate = data.bds_locale_update_last_checked || "";
     });
+    formSnapshot = captureFormSnapshot();
   });
 
   async function checkLanguageUpdates() {
@@ -206,6 +254,8 @@
       [STORAGE_KEYS.settings]: appState.settings,
     });
     pushConfigToPage();
+
+    formSnapshot = captureFormSnapshot();
 
     if (appState.ui) {
       appState.ui.showToast(t("settings.settingsSaved"));
@@ -756,6 +806,22 @@
   </div>
 </div>
 
+{#if showUnsavedModal}
+  <div class="bds-modal-overlay">
+    <div class="bds-modal bds-unsaved-modal">
+      <div class="bds-modal-header">
+        <div class="ds-modal-content__title">{t('settings.unsavedTitle')}</div>
+      </div>
+      <div class="bds-modal-body">
+        <p style="margin: 0; font-size: 14px; opacity: 0.85;">{t('settings.unsavedMessage')}</p>
+      </div>
+      <div class="bds-modal-footer">
+        <button class="bds-btn-outlined" onclick={cancelClose}>{t('settings.keepEditing')}</button>
+        <button class="bds-btn-danger" onclick={discardAndClose}>{t('settings.discard')}</button>
+      </div>
+    </div>
+  </div>
+{/if}
 <button id="bds-save-settings" type="button" onclick={save}>
   {t('settings.save')}
 </button>

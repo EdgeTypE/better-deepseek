@@ -43,12 +43,21 @@
   function closeProjectsManager() {
     showProjectsManager = false;
   }
+
+  export async function handleClose() {
+    if (settingsRef && settingsRef.checkBeforeClose) {
+      const ok = await settingsRef.checkBeforeClose();
+      if (ok) onclose();
+    } else {
+      onclose();
+    }
+  }
 </script>
 
 <aside id="bds-drawer" class={open ? "bds-open" : "bds-closed"}>
   <div class="bds-drawer-header">
     <div class="ds-modal-content__title">{t('drawer.title')}</div>
-    <button id="bds-close" type="button" onclick={onclose} aria-label={t('drawer.close')}>
+    <button id="bds-close" type="button" onclick={handleClose} aria-label={t('drawer.close')}>
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M14.1871 13.1265L13.1265 14.1872L1.81275 2.87347L2.87341 1.81281L14.1871 13.1265Z" fill="currentColor"></path>
         <path d="M13.1265 1.81282L14.1871 2.87348L2.8734 14.1872L1.81274 13.1265L13.1265 1.81282Z" fill="currentColor"></path>

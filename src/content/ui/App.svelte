@@ -52,8 +52,16 @@
     whatsNewPending = appState.whatsNewPending;
   }
 
-  function toggleDrawer() {
-    drawerOpen = !drawerOpen;
+  async function toggleDrawer() {
+    if (drawerOpen) {
+      if (drawerRef && drawerRef.handleClose) {
+        await drawerRef.handleClose();
+      } else {
+        drawerOpen = false;
+      }
+    } else {
+      drawerOpen = true;
+    }
   }
 
   function closeDrawer() {

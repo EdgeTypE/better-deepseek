@@ -96,7 +96,11 @@
       "updateAvailable": "Yeni dil güncellemesi mevcut!",
       "updatedSuccess": "Dil dosyaları başarıyla güncellendi.",
       "resetSuccess": "Dil dosyaları varsayılan ayarlara sıfırlandı.",
-      "updateFailed": "Dil güncellemeleri denetlenirken hata oluştu."
+      "updateFailed": "Dil güncellemeleri denetlenirken hata oluştu.",
+      "unsavedTitle": "Kaydedilmemiş Değişiklikler",
+      "unsavedMessage": "Kaydedilmemiş ayar değişiklikleriniz bulunuyor. Değişiklikleri kaybetmek istediğinizden emin misiniz?",
+      "discard": "Değişiklikleri İptal Et",
+      "keepEditing": "Düzenlemeye Devam Et"
     },
     "skillList": {
       "title": "Yetenek Seti",
