@@ -1,0 +1,146 @@
+{
+  "meta": {
+    "version": 1,
+    "minExtensionVersion": "0.1.7",
+    "description": "Remote configuration for Better DeepSeek. Edit this file to control feature flags, DOM selectors, API paths, and other tunables without releasing a new extension version."
+  },
+  "features": {
+    "attachMenu": {
+      "enabled": true,
+      "expertMode": { "show": false, "showGithub": true, "showWeb": true, "showFolder": false },
+      "instantMode": { "show": true, "showGithub": true, "showWeb": true, "showFolder": true },
+      "deepthinkMode": { "show": true, "showGithub": true, "showWeb": true, "showFolder": true }
+    },
+    "fileUpload": {
+      "enabled": true,
+      "expertModeBlocked": true,
+      "dataTransfer": true,
+      "nativeInput": true
+    },
+    "codeBlocks": {
+      "downloadButton": true,
+      "runButtons": { "python": true, "javascript": true, "typescript": true }
+    },
+    "sidebar": {
+      "tagsButton": true,
+      "search": true,
+      "exportButton": true,
+      "tagHider": true
+    },
+    "systemPromptInjection": {
+      "enabled": true,
+      "forceDisableInExpert": false
+    },
+    "voice": { "stt": true, "tts": true },
+    "tokenPriceDisplay": { "enabled": true, "inline": true, "sessionTotal": true },
+    "export": { "markdown": true, "pdf": true, "html": true, "image": true },
+    "longWork": { "enabled": true },
+    "rag": { "enabled": true },
+    "characterRp": { "enabled": true },
+    "autoFetch": { "web": true, "github": true, "twitter": true, "youtube": true },
+    "expandToggle": { "collapseLongMessages": true },
+    "questionPanel": { "enabled": true },
+    "codeRunner": { "enabled": true },
+    "tagManager": { "enabled": true, "sidebarRename": true },
+    "sideBarMenuInjector": { "enabled": true },
+    "selectionMode": { "enabled": true },
+    "whatsNewPopup": { "enabled": true },
+    "statusMonitor": { "enabled": true },
+    "themeWatcher": { "enabled": true }
+  },
+  "selectors": {
+    "message": {
+      "container": "div.ds-message._63c77b1",
+      "containerFallback": "div.ds-message",
+      "userRole": ["d29f3d7d", "_9663006"],
+      "assistantRole": ["_4f9bf79._43c05b5"]
+    },
+    "modelBadge": "._46a12ab",
+    "fileInput": "input[type=\"file\"][multiple]",
+    "chatInput": {
+      "textarea": ["#chat-input", "textarea[placeholder]", "div[contenteditable=\"true\"]"],
+      "wrapper": ["._75e1990", "._6f68655", "._77cefa5", "._24fad49", ".ds-textarea"]
+    },
+    "sidebar": {
+      "chatLink": "a[href*=\"/chat/s/\"]",
+      "titleElement": ".c08e6e93",
+      "panel": ".dc04ec1d",
+      "menuButton": "._2090548",
+      "dateGroup": "div._3098d02"
+    },
+    "header": {
+      "title": "._7436101",
+      "priceTarget": "._2be88ba .f8d1e4c0 ._9fcbeda._7ee190f",
+      "logoContainer": "._262baab",
+      "logoViewBox": "svg[viewBox=\"0 0 143 23\"]",
+      "newChatIconPath": "M8 0.599609"
+    },
+    "dropdownMenu": {
+      "container": ".ds-dropdown-menu",
+      "option": ".ds-dropdown-menu-option",
+      "optionLabel": ".ds-dropdown-menu-option__label"
+    },
+    "priceInsertion": {
+      "userMessage": ["_11d6b3a .ds-flex", "ds-flex._78e0558", "[class*='_78e0558']"],
+      "assistantMessage": ["_0a3d93b", ".ds-flex._0a3d93b"],
+      "headerRow": "._2be88ba .f8d1e4c0 ._9fcbeda._7ee190f"
+    },
+    "sendButton": {
+      "selectors": ["div[role=\"button\"]", "button"],
+      "svgPaths": ["M8.3125", "M8.312", "M13.12 19.98"],
+      "disabledClass": "ds-icon-button--disabled"
+    },
+    "logo": { "svgViewBox": "0 0 143 23", "newChatPath": "M8 0.599609" },
+    "textExtraction": {
+      "thinkContent": ".ds-think-content",
+      "thinkFallback": "[class*=\"think\"]",
+      "noiseClasses": ["_5255ff8", "_60aa7fb", "e4c3fd02", "_74c0879"]
+    },
+    "codeBlock": {
+      "container": ".md-code-block",
+      "banner": ".md-code-block-banner",
+      "atomButton": ".ds-atom-button",
+      "infoText": ".code-info-button-text"
+    },
+    "previewPanel": "._519be07",
+    "renameInput": "input.ds-input__input",
+    "theme": { "darkClass": "dark", "lightClass": "light" }
+  },
+  "api": {
+    "chatCompletionPaths": ["/api/v0/chat/completion", "/api/v0/chat/edit_message"],
+    "sessionFetchPath": "/api/v0/chat_session/fetch_page",
+    "statusUrl": "https://status.deepseek.com/api/v2/status.json",
+    "pricing": {
+      "officialUrl": "https://api-docs.deepseek.com/quick_start/pricing/",
+      "githubUrl": "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/extension/pricing.json"
+    }
+  },
+  "modelMappings": {
+    "deepseek-v4-pro": {
+      "aliases": ["deepseek-reasoner", "expert", "pro", "reasoner"],
+      "displayName": "Expert"
+    },
+    "deepseek-v4-flash": {
+      "aliases": ["deepseek-chat", "instant", "flash", "chat"],
+      "displayName": "Instant"
+    }
+  },
+  "urlPatterns": {
+    "chatSession": "/chat/s/",
+    "base": "https://chat.deepseek.com/"
+  },
+  "android": {
+    "hideGetAppText": "Get App",
+    "hideDrawerAppItemText": "Download mobile App"
+  },
+  "remoteConfig": {
+    "url": "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/extension/remote-config.json",
+    "fetchIntervalMs": 3600000
+  },
+  "embeddedPricing": {
+    "deepseek-v4-flash": { "input": 0.14, "output": 0.28 },
+    "deepseek-v4-pro": { "input": 0.435, "output": 0.87 },
+    "deepseek-chat": { "input": 0.14, "output": 0.28 },
+    "deepseek-reasoner": { "input": 0.435, "output": 0.87 }
+  }
+}
