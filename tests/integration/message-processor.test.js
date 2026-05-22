@@ -264,3 +264,151 @@ describe("message processor integration", () => {
     expect(speak.mock.calls[0][0].text).toBe("Hello there");
   });
 });
+
+describe("bookmark button injection", () => {
+  beforeEach(() => {
+    resetAppState();
+    Object.values(mocks).forEach((mock) => {
+      if (typeof mock?.mockReset === "function") mock.mockReset();
+    });
+    mocks.detectMessageRole.mockImplementation((node) => node.dataset.role || "assistant");
+    mocks.isLatestAssistantMessage.mockImplementation((node) => node.dataset.latest === "1");
+    mocks.isAbsoluteLastMessage.mockImplementation((node) => node.dataset.absoluteLast === "1");
+    mocks.collectMessageNodes.mockImplementation(() => []);
+    mocks.extractMessageRawText.mockImplementation((node) => node.dataset.rawText || "");
+    mocks.mount.mockImplementation((component, { target, props }) => {
+      const marker = document.createElement("div");
+      marker.className = "mock-overlay";
+      marker.textContent = props.text || "";
+      target.appendChild(marker);
+      return { component, props, target };
+    });
+    document.body.innerHTML = "";
+    vi.useFakeTimers();
+    state.ui = { showToast: vi.fn() };
+  });
+
+  function createUserBookmarkNode() {
+    const wrapper = document.createElement("div");
+    wrapper.className = "_4f9bf79 _43c05b5";
+    const msgContainer = document.createElement("div");
+    msgContainer.className = "_11d6b3a";
+    const contentArea = document.createElement("div");
+    contentArea.className = "_425ea0b";
+    const actionBar = document.createElement("div");
+    actionBar.className = "ds-flex _78e0558 _0bbda35";
+    const sibling = document.createElement("div");
+    sibling.className = "db183363 ds-icon-button ds-icon-button--m ds-icon-button--sizing-container";
+    sibling.setAttribute("tabindex", "0");
+    sibling.setAttribute("role", "button");
+    actionBar.appendChild(sibling);
+    contentArea.appendChild(actionBar);
+    msgContainer.appendChild(contentArea);
+    wrapper.appendChild(msgContainer);
+    const node = document.createElement("div");
+    node.className = "ds-message";
+    node.dataset.role = "user";
+    node.dataset.rawText = "Hello";
+    wrapper.appendChild(node);
+    document.body.appendChild(wrapper);
+    return node;
+  }
+
+  function createAssistantBookmarkNode() {
+    const wrapper = document.createElement("div");
+    wrapper.className = "_4f9bf79 _43c05b5";
+    const actionRow = document.createElement("div");
+    actionRow.className = "ds-flex _0a3d93b";
+    const buttonsContainer = document.createElement("div");
+    buttonsContainer.className = "ds-flex _965abe9 _54866f7";
+    const sibling = document.createElement("div");
+    sibling.className = "db183363 ds-icon-button ds-icon-button--m ds-icon-button--sizing-container";
+    sibling.setAttribute("tabindex", "0");
+    sibling.setAttribute("role", "button");
+    buttonsContainer.appendChild(sibling);
+    actionRow.appendChild(buttonsContainer);
+    wrapper.appendChild(actionRow);
+    const node = document.createElement("div");
+    node.className = "ds-message";
+    node.dataset.role = "assistant";
+    node.dataset.rawText = "Hi there";
+    wrapper.appendChild(node);
+    document.body.appendChild(wrapper);
+    return node;
+  }
+
+  it("injects bookmark button into user message action bar", () => {
+    const node = createUserBookmarkNode();
+    processMessageNode(node);
+    const actionBar = node.parentElement.querySelector("._11d6b3a .ds-flex");
+    const btn = actionBar.querySelector(".bds-bookmark-btn");
+    expect(btn).not.toBeNull();
+    expect(btn.getAttribute("role")).toBe("button");
+    expect(btn.querySelector(".ds-icon svg")).not.toBeNull();
+    expect(btn.querySelector(".ds-icon-button__hover-bg")).not.toBeNull();
+    expect(btn.querySelector(".ds-focus-ring")).not.toBeNull();
+  });
+
+  it("injects bookmark button into assistant message action bar", () => {
+    const node = createAssistantBookmarkNode();
+    processMessageNode(node);
+    const wrapper = node.closest("._4f9bf79._43c05b5");
+    const buttonsContainer = wrapper.querySelector("._0a3d93b ._965abe9");
+    const btn = buttonsContainer.querySelector(".bds-bookmark-btn");
+    expect(btn).not.toBeNull();
+  });
+
+  it("does not duplicate bookmark button on re-process", () => {
+    const node = createUserBookmarkNode();
+    processMessageNode(node);
+    processMessageNode(node);
+    const actionBar = node.parentElement.querySelector("._11d6b3a .ds-flex");
+    expect(actionBar.querySelectorAll(".bds-bookmark-btn")).toHaveLength(1);
+  });
+
+  it("clicking bookmark button adds item to state.savedItems", async () => {
+    document.title = "Test Conversation - DeepSeek";
+    const node = createUserBookmarkNode();
+    processMessageNode(node);
+    const actionBar = node.parentElement.querySelector("._11d6b3a .ds-flex");
+    actionBar.querySelector(".bds-bookmark-btn").click();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(state.savedItems).toHaveLength(1);
+    expect(state.savedItems[0].type).toBe("bookmark");
+    expect(state.savedItems[0].messageType).toBe("user");
+    expect(state.savedItems[0].conversationTitle).toBe("Test Conversation");
+  });
+
+  it("clicking active bookmark removes it from state", async () => {
+    document.title = "Conv - DeepSeek";
+    const node = createUserBookmarkNode();
+    processMessageNode(node);
+    const actionBar = node.parentElement.querySelector("._11d6b3a .ds-flex");
+    const btn = actionBar.querySelector(".bds-bookmark-btn");
+    btn.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(state.savedItems).toHaveLength(1);
+    btn.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(state.savedItems).toHaveLength(0);
+  });
+
+  it("toggles bds-bookmark-btn--active class on click", async () => {
+    const node = createUserBookmarkNode();
+    processMessageNode(node);
+    const actionBar = node.parentElement.querySelector("._11d6b3a .ds-flex");
+    const btn = actionBar.querySelector(".bds-bookmark-btn");
+    expect(btn.classList.contains("bds-bookmark-btn--active")).toBe(false);
+    btn.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(btn.classList.contains("bds-bookmark-btn--active")).toBe(true);
+    btn.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(btn.classList.contains("bds-bookmark-btn--active")).toBe(false);
+  });
+});

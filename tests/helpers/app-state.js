@@ -34,6 +34,7 @@ export function resetAppState(overrides = {}) {
   state.ui = null;
   state.heroBarRef = null;
   state.chatSessions = [];
+  state.savedItems = [];
   state.activeQuestions = null;
   state.pricing = {
     modelName: null,

@@ -20,6 +20,7 @@ import {
   normalizeMemories,
   normalizeProjectFiles,
   normalizeProjects,
+  normalizeSavedItems,
   normalizeSkills,
 } from "../../src/content/storage.js";
 import {
@@ -54,6 +55,9 @@ describe("storage integration", () => {
       [STORAGE_KEYS.characters]: [{ id: "2", name: "Mage", content: "wise", active: true }],
       [STORAGE_KEYS.projects]: [{ id: "p1", name: "Proj", description: 1 }],
       [STORAGE_KEYS.projectFiles]: [{ id: "f1", projectId: "p1", name: "README.md", content: "# x" }],
+      [STORAGE_KEYS.savedItems]: [
+        { id: "b1", type: "bookmark", title: "Test", content: "Hello", messageType: "assistant", messageNodeId: "m1", conversationTitle: "Conv1", conversationUrl: "https://example.com/chat/s/c1" },
+      ],
     });
 
     await loadStateFromStorage();
@@ -68,6 +72,10 @@ describe("storage integration", () => {
     expect(state.characters[0].name).toBe("Mage");
     expect(state.projects[0].name).toBe("Proj");
     expect(state.projectFiles[0].projectId).toBe("p1");
+    expect(state.savedItems).toHaveLength(1);
+    expect(state.savedItems[0].id).toBe("b1");
+    expect(state.savedItems[0].type).toBe("bookmark");
+    expect(state.savedItems[0].conversationTitle).toBe("Conv1");
   });
 
   it("upgrades legacy system prompts and download behavior", async () => {
@@ -97,6 +105,7 @@ describe("storage integration", () => {
       refreshMemories: vi.fn(),
       refreshCharacters: vi.fn(),
       refreshProjects: vi.fn(),
+      refreshSavedItems: vi.fn(),
     };
 
     bindStorageChangeListener();
@@ -108,6 +117,7 @@ describe("storage integration", () => {
       [STORAGE_KEYS.characters]: { newValue: [{ name: "Bot", content: "Friendly" }] },
       [STORAGE_KEYS.projects]: { newValue: [{ id: "p1", name: "Proj" }] },
       [STORAGE_KEYS.projectFiles]: { newValue: [{ id: "f1", projectId: "p1", content: "X" }] },
+      [STORAGE_KEYS.savedItems]: { newValue: [{ id: "s1", type: "snippet", title: "S", content: "C" }] },
     });
 
     expect(state.settings.preferredLang).toBe("TR");
@@ -116,12 +126,37 @@ describe("storage integration", () => {
     expect(state.characters).toHaveLength(1);
     expect(state.projects).toHaveLength(1);
     expect(state.projectFiles).toHaveLength(1);
+    expect(state.savedItems).toHaveLength(1);
+    expect(state.savedItems[0].id).toBe("s1");
+    expect(state.savedItems[0].type).toBe("snippet");
     expect(state.ui.refreshSettings).toHaveBeenCalledOnce();
     expect(state.ui.refreshSkills).toHaveBeenCalledOnce();
     expect(state.ui.refreshMemories).toHaveBeenCalledOnce();
     expect(state.ui.refreshCharacters).toHaveBeenCalledOnce();
     expect(state.ui.refreshProjects).toHaveBeenCalledTimes(2);
+    expect(state.ui.refreshSavedItems).toHaveBeenCalledOnce();
     expect(bridgeMocks.pushConfigToPage).toHaveBeenCalledOnce();
+  });
+
+  it("normalizes saved items defensively", () => {
+    const valid = normalizeSavedItems([
+      { id: "b1", type: "bookmark", title: "Msg", content: "Hello", messageType: "assistant", messageNodeId: "m1", conversationTitle: "C1", conversationUrl: "https://ex.com" },
+      { id: "s1", type: "snippet", title: "P", content: "prompt" },
+    ]);
+    expect(valid).toHaveLength(2);
+    expect(valid[0].type).toBe("bookmark");
+    expect(valid[0].messageType).toBe("assistant");
+    expect(valid[1].type).toBe("snippet");
+    expect(valid[1].messageType).toBeNull();
+
+    const withGarbage = normalizeSavedItems([
+      null,
+      { id: "b2" }, // missing content
+      { content: "x" }, // missing id
+      { id: "b3", content: "ok" },
+    ]);
+    expect(withGarbage).toHaveLength(1);
+    expect(withGarbage[0].id).toBe("b3");
   });
 
   it("normalizes corrupt persisted structures defensively", () => {
