@@ -303,7 +303,7 @@ export function buildHiddenPrefix(
     }
   }
 
-  const memoryBlock = buildMemoryCallsBlock(userPrompt, state);
+  const memoryBlock = buildMemoryCallsBlock(userPrompt, state, messages);
   if (memoryBlock) {
     blocks.push(memoryBlock);
   }
@@ -415,12 +415,53 @@ export function getSkillsFingerprint(skills) {
 /**
  * Build the <BDS:memory_calls> block based on importance and keyword matching.
  */
-export function buildMemoryCallsBlock(userPrompt, state) {
+export function findLastAssistantMessage(messages) {
+  if (!Array.isArray(messages)) return null;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const item = messages[i];
+    if (!item || typeof item !== "object") continue;
+    const role = String(item.role || item.author || "").toLowerCase();
+    if (role === "user" || role === "human") continue;
+    if (role === "assistant" || role === "ai" || role === "bot") {
+      return item;
+    }
+  }
+  return null;
+}
+
+export function tokenize(str) {
+  if (!str || typeof str !== "string") return [];
+  return str
+    .split(/[_-]|\s+|(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/)
+    .map(t => t.toLowerCase().replace(/[^a-z0-9]/g, ""))
+    .filter(t => t.length > 0);
+}
+
+export function computeTokenOverlap(uniqueKeyTokens, messageTokens) {
+  if (!uniqueKeyTokens.length || !messageTokens.length) return 0;
+  const uniqueMsgTokens = new Set(messageTokens);
+  let matchCount = 0;
+  for (const token of uniqueKeyTokens) {
+    if (uniqueMsgTokens.has(token)) matchCount++;
+  }
+  return matchCount / uniqueKeyTokens.length;
+}
+
+function isCalledByOverlap(overlap, keyTokenCount) {
+  if (keyTokenCount === 1) return overlap >= 1;
+  return overlap >= 0.5;
+}
+
+export function buildMemoryCallsBlock(userPrompt, state, messages) {
   if (state.config.disableMemory || !state.config.memories.length) {
     return "";
   }
 
-  const lowerPrompt = String(userPrompt || "").toLowerCase();
+  const lastAiMsg = messages ? findLastAssistantMessage(messages) : null;
+  const lastAiText = lastAiMsg ? extractMessageText(lastAiMsg) : "";
+  const matchTarget = [userPrompt, lastAiText].filter(Boolean).join(" ");
+  const matchTokens = tokenize(matchTarget);
+
   const selected = [];
 
   for (const item of state.config.memories) {
@@ -429,7 +470,21 @@ export function buildMemoryCallsBlock(userPrompt, state) {
       continue;
     }
 
-    if (item.key && lowerPrompt.includes(item.key.toLowerCase())) {
+    if (!item.key) continue;
+
+    const keyTokens = tokenize(item.key);
+    if (!keyTokens.length) {
+      if (matchTarget.toLowerCase().includes(item.key.toLowerCase())) {
+        selected.push(item);
+      }
+      continue;
+    }
+
+    const uniqueKeyTokens = [...new Set(keyTokens)];
+    const overlap = computeTokenOverlap(uniqueKeyTokens, matchTokens);
+    if (isCalledByOverlap(overlap, uniqueKeyTokens.length)) {
+      selected.push(item);
+    } else if (matchTarget.toLowerCase().includes(item.key.toLowerCase())) {
       selected.push(item);
     }
   }
