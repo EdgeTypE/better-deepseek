@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "check-locales": "node scripts/check-locales.js",
     "dev": "node build.js --dev",
     "build": "npm run build:chrome && npm run build:firefox",
     "build:chrome": "node build.js --target=chrome",

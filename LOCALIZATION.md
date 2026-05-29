@@ -68,6 +68,18 @@ npm run build
 
 Load the unpacked extension from `dist-chrome`, open the settings drawer, and switch to your language. Every UI string that uses `t()` should now show your translations.
 
+### 5. Check for missing or extra keys
+
+Before submitting, you should run the built-in locale verification script to ensure your translation is fully up-to-date and matches the structure of `en.json`:
+
+```bash
+npm run check-locales
+```
+
+This utility recursively checks all translation files against `en.json` and outputs a colorized report listing any:
+- **Missing Keys**: Keys defined in `en.json` but absent in your file (needs translation).
+- **Extra Keys**: Outdated keys still in your file but already removed from `en.json` (can be safely cleaned up).
+
 ### Submitting your translation
 
 Open a pull request with your new locale file and the updated `src/locales/en.json`. If you're not comfortable with Git or pull requests, that's fine, just attach your translated JSON file to a [new issue](https://github.com/EdgeTypE/better-deepseek/issues/new) and mention which language it's for. I'll take care of the rest.
