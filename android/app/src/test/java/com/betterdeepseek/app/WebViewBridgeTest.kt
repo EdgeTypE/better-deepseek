@@ -19,6 +19,7 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
@@ -190,6 +191,17 @@ class WebViewBridgeTest {
         bridge.onThemeChanged = { isDark -> reported = isDark }
         bridge.reportTheme(false)
         assertEquals(false, reported)
+    }
+
+    @Test
+    fun `getSystemLocale returns current Android locale tag`() {
+        val previous = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale.forLanguageTag("ru-RU"))
+            assertEquals("ru-RU", bridge.getSystemLocale())
+        } finally {
+            Locale.setDefault(previous)
+        }
     }
 
     @Test

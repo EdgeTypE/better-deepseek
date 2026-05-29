@@ -19,6 +19,7 @@ import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -95,6 +96,13 @@ class WebViewBridge(
     @JavascriptInterface
     fun reportTheme(isDark: Boolean) {
         onThemeChanged?.invoke(isDark)
+    }
+
+    /** Returns the Android system locale for JS locale detection inside WebView. */
+    @JavascriptInterface
+    fun getSystemLocale(): String {
+        val tag = Locale.getDefault().toLanguageTag()
+        return if (tag.isNotBlank() && tag != "und") tag else "en-US"
     }
 
     /**

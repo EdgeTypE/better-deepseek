@@ -121,6 +121,7 @@ class MainActivity : ComponentActivity() {
 
         bridge = WebViewBridge(applicationContext)
         cookieManager = CookieManager.getInstance()
+        applySystemLocaleCookie()
 
         bridge.onPickFiles = { mode, requestId ->
             pendingPickFilesRequestId = requestId
@@ -216,6 +217,21 @@ class MainActivity : ComponentActivity() {
                     }
                 }
         )
+    }
+
+    private fun applySystemLocaleCookie() {
+        val localeTag =
+                bridge.getSystemLocale()
+                        .replace('_', '-')
+                        .filter { it.isLetterOrDigit() || it == '-' }
+        if (localeTag.isBlank()) return
+
+        cookieManager.setAcceptCookie(true)
+        cookieManager.setCookie(
+                getString(R.string.bds_target_url),
+                "NEXT_LOCALE=$localeTag; Path=/; SameSite=Lax"
+        )
+        cookieManager.flush()
     }
 
     override fun onDestroy() {

@@ -16,6 +16,7 @@
  *   removeStorage(key: String): void
  *   fetch(payloadJson: String): String   // JSON-encoded { ok, ... }
  *   getAssetUrl(relativePath: String): String
+ *   getSystemLocale(): String
  *   downloadBlob(base64, mimeType, fileName): void
  *   reportTheme(isDark: Boolean): void  // live bar-icon colour update; persistence via setStorage
  *   pickFiles(mode: String, requestId: String): void

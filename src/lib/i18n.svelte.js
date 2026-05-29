@@ -25,6 +25,28 @@ for (const [path, mod] of Object.entries(localeModules)) {
   }
 }
 
+function getSystemLanguageCode() {
+  let rawLocale = null;
+
+  if (
+    typeof window !== "undefined" &&
+    window.AndroidBridge &&
+    typeof window.AndroidBridge.getSystemLocale === "function"
+  ) {
+    try {
+      rawLocale = window.AndroidBridge.getSystemLocale();
+    } catch {
+      rawLocale = null;
+    }
+  }
+
+  if (!rawLocale && typeof navigator !== "undefined") {
+    rawLocale = navigator.language;
+  }
+
+  return String(rawLocale || availableLocaleCodes[0] || "en").replace("_", "-").split("-")[0];
+}
+
 class I18nManager {
   locale = $state(availableLocaleCodes[0] || "en");
 
