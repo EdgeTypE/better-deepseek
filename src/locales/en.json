@@ -750,7 +750,8 @@
     "language": {
       "en": "English",
       "tr": "Türkçe",
-      "ru": "Russian"
+      "ru": "Russian",
+      "zh-cn": "简体中文"
     },
     "apiPlayground": {
       "title": "API Playground",

@@ -747,7 +747,8 @@
     "language": {
       "en": "English",
       "tr": "Türkçe",
-      "ru": "Русский"
+      "ru": "Русский",
+      "zh-cn": "简体中文"
     },
     "apiPlayground": {
       "title": "API Playground",

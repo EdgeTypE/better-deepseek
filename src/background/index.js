@@ -474,7 +474,7 @@ fetchRemoteConfig();
 
 const localeMods = import.meta.glob("../locales/*.json", { eager: true });
 const localeCodes = Object.keys(localeMods)
-  .map(p => p.match(/(\w+)\.json$/)[1])
+  .map(p => p.match(/([^/\\]+)\.json$/)?.[1])
   .filter(Boolean);
 
 async function handleLanguageUpdate() {

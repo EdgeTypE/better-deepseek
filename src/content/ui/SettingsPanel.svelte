@@ -694,7 +694,7 @@
         <option value="fr-FR">Français (FR)</option>
         <option value="es-ES">Español (ES)</option>
         <option value="it-IT">Italiano (IT)</option>
-        <option value="zh-CN">中文 (简体)</option>
+        <option value="zh-CN">简体中文 (CN)</option>
         <option value="ja-JP">日本語 (JP)</option>
       </select>
     </div>

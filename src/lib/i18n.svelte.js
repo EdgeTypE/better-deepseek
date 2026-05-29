@@ -1,10 +1,25 @@
 const localeModules = import.meta.glob("../locales/*.json", { eager: true });
 let locales = $state({});
 const availableLocaleCodes = [];
+
+function getLocaleCode(path) {
+  return path.match(/([^/\\]+)\.json$/)?.[1];
+}
+
+function resolveLocaleCode(lang) {
+  const normalized = String(lang || "").trim().toLowerCase();
+  if (!normalized) return null;
+  if (locales[normalized]) return normalized;
+
+  const base = normalized.split("-")[0];
+  if (locales[base]) return base;
+  return availableLocaleCodes.find(code => code.split("-")[0] === base) || null;
+}
+
 for (const [path, mod] of Object.entries(localeModules)) {
-  const code = path.match(/(\w+)\.json$/)[1];
+  const code = getLocaleCode(path);
   const data = mod.default || mod;
-  if (data && data.messages) {
+  if (code && data && data.messages) {
     locales[code] = data;
     availableLocaleCodes.push(code);
   }
@@ -20,8 +35,9 @@ class I18nManager {
    * @param {string} [savedLocale] Custom saved locale code
    */
   init(savedLocale) {
-    if (savedLocale && locales[savedLocale]) {
-      this.locale = savedLocale;
+    const resolvedSavedLocale = resolveLocaleCode(savedLocale);
+    if (resolvedSavedLocale) {
+      this.locale = resolvedSavedLocale;
       return;
     }
 
@@ -33,21 +49,16 @@ class I18nManager {
       for (const cookie of cookies) {
         const [name, val] = cookie.trim().split("=");
         if (name === "NEXT_LOCALE" && val) {
-          detectedLang = val.trim().split("-")[0];
+          detectedLang = val.trim();
           break;
         }
       }
     }
 
-    if (!detectedLang || !locales[detectedLang]) {
-      detectedLang = (typeof navigator !== "undefined" ? navigator.language : availableLocaleCodes[0] || "en").split("-")[0];
-    }
+    const resolvedDetectedLocale = resolveLocaleCode(detectedLang)
+      || resolveLocaleCode(typeof navigator !== "undefined" ? navigator.language : null);
 
-    if (detectedLang && locales[detectedLang]) {
-      this.locale = detectedLang;
-    } else {
-      this.locale = availableLocaleCodes[0] || "en";
-    }
+    this.locale = resolvedDetectedLocale || availableLocaleCodes[0] || "en";
   }
 
   /**
@@ -72,9 +83,9 @@ class I18nManager {
    */
   resetLocales() {
     for (const [path, mod] of Object.entries(localeModules)) {
-      const code = path.match(/(\w+)\.json$/)[1];
+      const code = getLocaleCode(path);
       const data = mod.default || mod;
-      if (data && data.messages) {
+      if (code && data && data.messages) {
         locales[code] = data;
       }
     }
