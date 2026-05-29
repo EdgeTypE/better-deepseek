@@ -1,0 +1,847 @@
+{
+  "updatedAt": "2026-05-29T00:00:00Z",
+  "messages": {
+    "common": {
+      "save": "保存",
+      "cancel": "取消",
+      "delete": "删除",
+      "edit": "编辑",
+      "close": "关闭",
+      "back": "返回",
+      "export": "导出",
+      "import": "导入",
+      "refresh": "刷新",
+      "download": "下载",
+      "name": "名称",
+      "content": "内容",
+      "description": "描述",
+      "none": "无",
+      "working": "处理中..."
+    },
+    "drawer": {
+      "title": "Better DeepSeek",
+      "close": "关闭",
+      "github": "GitHub",
+      "version": "v{{version}}"
+    },
+    "settings": {
+      "generalSettings": "常规设置",
+      "systemPrompts": "系统提示词",
+      "defaultPromptName": "默认（隐藏）",
+      "defaultPromptStatus": "只读核心指令",
+      "customPromptStatus": "已保存的自定义提示词",
+      "view": "查看",
+      "edit": "编辑",
+      "delete": "删除",
+      "addNewPrompt": "新增系统提示词",
+      "addNewTitle": "新增提示词",
+      "viewTitle": "查看提示词",
+      "editTitle": "编辑提示词",
+      "nameLabel": "名称",
+      "namePlaceholder": "例如：我的自定义规则",
+      "contentLabel": "内容",
+      "contentPlaceholder": "在此处输入系统指令...",
+      "baseOnDefault": "重置为默认核心指令",
+      "cancel": "取消",
+      "savePrompt": "保存提示词",
+      "nameRequired": "名称和内容为必填项。",
+      "settingsSaved": "设置已保存。",
+      "advancedSettings": "高级设置",
+      "projectAutoContext": "项目自动上下文（本地 RAG）",
+      "processGitignore": "上传时遵循 .gitignore 规则",
+      "autoDownloadFiles": "自动下载 create_file 生成的文件",
+      "disableSystemPrompt": "停用系统提示词",
+      "disableMemory": "停用记忆注入",
+      "injectionFrequency": "系统提示词注入频率",
+      "firstMessage": "仅首条消息",
+      "everyMessage": "始终注入（每条消息）",
+      "everyNMessages": "每 N 条消息注入一次",
+      "injectionInterval": "注入间隔（N）",
+      "injectEveryN": "每 {{n}} 条消息注入一次提示词。",
+      "voiceMode": "语音模式（自动朗读回复）",
+      "autoSubmitVoice": "语音输入后自动发送",
+      "speechLanguage": "语音语言",
+      "autoDownloadZip": "自动下载 LONG_WORK 压缩包",
+      "preferredLang": "偏好回复语言",
+      "preferredLangPlaceholder": "例如：中文、英文",
+      "preferredLangHint": "留空则由模型自行决定。",
+      "markdownMaxDepth": "Markdown 遍历最大深度",
+      "markdownMaxDepthHint": "从消息重建 Markdown 时 DOM 递归深度的硬上限。较低的值可避免深层嵌套内容导致栈溢出；较高的值能更完整地保留结构复杂的消息。默认 200。",
+      "chatSessionCap": "聊天会话列表上限",
+      "chatSessionCapHint": "侧边栏中保留的聊天会话数量上限，超出部分按先进先出移除。降低此值可减少长时间运行的标签页的内存占用。默认 500。",
+      "githubToken": "GitHub 个人访问令牌",
+      "githubTokenPlaceholder": "ghp_...",
+      "githubTokenHelp": "请在 GitHub Settings → Tokens 中创建一个具备 repo 权限的 classic token。",
+      "githubTokenShow": "显示",
+      "githubTokenHide": "隐藏",
+      "githubTokenClear": "清空",
+      "tokenPriceEstimation": "Token 费用估算（实验性）",
+      "tokenPriceHint": "显示每条消息和会话的 DeepSeek API 估算费用，基于输入/输出 token 价格计算。价格数据动态拉取，获取失败时使用备用数据。",
+      "collapseLongUserMessages": "折叠过长的用户消息",
+      "collapseLongUserMessagesHint": "自动折叠过长的用户消息，点击“查看更多”展开。",
+      "save": "保存设置",
+      "ragChunks": "RAG 最大注入片段数",
+      "ragChunks3": "3 个片段（约 600 词）",
+      "ragChunks5": "5 个片段（约 1000 词）",
+      "ragChunks8": "8 个片段（约 1600 词）",
+      "ragChunks10": "10 个片段（约 2000 词）",
+      "ragHint": "自动从项目文件中检索相关片段。",
+      "projectInstructions": "项目指令",
+      "projectInstructionsPlaceholder": "此项目启用时追加到全局系统提示词的自定义指令...",
+      "autoSaved": "已自动保存",
+      "languageSettings": "语言设置",
+      "syncLocale": "与浏览器语言保持同步",
+      "selectLanguage": "语言（Language）",
+      "checkUpdates": "检查语言包更新",
+      "resetFactory": "恢复出厂语言包",
+      "lastChecked": "上次检查：{{date}}",
+      "updateAvailable": "检测到语言更新！",
+      "updatedSuccess": "语言文件更新成功。",
+      "resetSuccess": "语言文件已恢复为出厂版本。",
+      "updateFailed": "检查语言更新失败。",
+      "unsavedTitle": "未保存的更改",
+      "unsavedMessage": "你有尚未保存的设置更改，确定要放弃吗？",
+      "discard": "放弃",
+      "keepEditing": "继续编辑"
+    },
+    "skillList": {
+      "title": "技能管理",
+      "export": "导出",
+      "import": "导入",
+      "uploadLabel": "上传技能文件（.md）",
+      "empty": "暂无技能。",
+      "namePlaceholder": "技能名称",
+      "usagePlaceholder": "用途（如 typescript、react）",
+      "contentPlaceholder": "技能人设/指令...",
+      "cancel": "取消",
+      "save": "保存",
+      "edit": "编辑",
+      "delete": "删除",
+      "onlyMd": "技能仅支持 .md 文件。",
+      "loaded": "已加载技能：{{name}}",
+      "removed": "技能已移除。",
+      "saved": "技能已保存。"
+    },
+    "characterList": {
+      "title": "角色扮演",
+      "export": "导出",
+      "import": "导入",
+      "uploadLabel": "上传角色文件（.md）",
+      "defaultOption": "无（默认助手）",
+      "empty": "暂无角色。",
+      "namePlaceholder": "角色名称",
+      "usagePlaceholder": "用途（如娱乐、哲学）",
+      "contentPlaceholder": "角色设定/背景...",
+      "cancel": "取消",
+      "save": "保存",
+      "edit": "编辑",
+      "delete": "删除",
+      "onlyMd": "角色仅支持上传 .md 文件。",
+      "loaded": "已加载角色：{{name}}",
+      "removed": "角色已移除。",
+      "saved": "角色已保存。"
+    },
+    "memoryList": {
+      "title": "已存储记忆",
+      "export": "导出",
+      "import": "导入",
+      "empty": "暂无记忆条目。",
+      "delete": "删除",
+      "edit": "编辑",
+      "editTitle": "编辑记忆",
+      "saved": "已保存记忆：{{key}}",
+      "importSuccess": "记忆导入成功。",
+      "importFailed": "导入失败：JSON 格式错误。",
+      "deleted": "已删除记忆：{{key}}",
+      "more": "+{{count}} 条"
+    },
+    "memoryImport": {
+      "title": "从其他 AI 导入记忆",
+      "step1Title": "1. 复制提示词并粘贴到其他 AI",
+      "copyPrompt": "复制",
+      "copied": "已复制！",
+      "step2Title": "2. 将 AI 的回复粘贴到下方",
+      "placeholder": "在此粘贴 AI 的回复...",
+      "importButton": "导入并启动专家模式会话",
+      "importError": "请先粘贴 AI 的回复。"
+    },
+    "projectsManager": {
+      "back": "返回",
+      "title": "项目",
+      "manage": "管理项目",
+      "newProject": "+ 新建项目",
+      "nameRequired": "项目名称（必填）",
+      "descriptionOptional": "描述（可选）",
+      "cancel": "取消",
+      "create": "创建",
+      "empty": "暂无项目。",
+      "nameLabel": "名称",
+      "descriptionLabel": "描述",
+      "optional": "可选",
+      "customInstructions": "自定义指令",
+      "instructionsPlaceholder": "此项目启用时追加到全局系统提示词的指令...",
+      "autoSaved": "已自动保存",
+      "files": "文件",
+      "exportAll": "全部导出",
+      "noFiles": "尚未添加文件。",
+      "export": "导出",
+      "delete": "删除",
+      "uploadFile": "+ 上传文件",
+      "uploadFolder": "+ 上传文件夹",
+      "fileHint": "仅支持纯文本文件，单个文件最大 500 KB。",
+      "localDirectory": "本地目录",
+      "permissionLost": "（权限已失效 — 请重新关联）",
+      "refresh": "刷新",
+      "unlink": "取消关联",
+      "linkDirectory": "+ 关联本地目录",
+      "selectingDir": "正在选择目录...",
+      "dirHint": "文件从你的文件系统实时读取（不会复制）。仅支持 Chromium 内核浏览器。",
+      "deleteProject": "删除项目",
+      "nameIsRequired": "名称为必填项。",
+      "filePickFailed": "选择文件失败。",
+      "fileTooLarge": "“{{name}}” 过大（{{size}} KB）",
+      "fileUnreadable": "无法读取“{{name}}”",
+      "fileEmpty": "“{{name}}” 为空",
+      "storageError": "存储错误：{{msg}}",
+      "folderPickFailed": "选择文件夹失败。",
+      "folderRequiresNewer": "上传文件夹需要更新版本的应用。",
+      "folderUploadFailed": "上传文件夹失败：{{msg}}",
+      "filesUploaded": "已上传 {{count}} 个文件，跳过 {{skipped}} 个（过大、无法读取或非文本文件）。",
+      "linkFailed": "关联目录失败。",
+      "refreshFailed": "刷新目录失败。",
+      "downloadAll": "将所有文件合并下载为单个文本文件",
+      "downloadFile": "下载 {{name}}",
+      "removeFile": "从项目中移除 {{name}}",
+      "deleteConfirm": "删除“{{name}}”？其中的 {{count}} 个文件也会一并移除。",
+      "filesUploadedShort": "已上传 {{count}} 个文件，跳过 {{skipped}} 个（过大或为空）。"
+    },
+    "projectsCard": {
+      "title": "项目",
+      "manage": "管理",
+      "description": "可在聊天输入框下方选择项目和文件。"
+    },
+    "selectionOverlay": {
+      "selected": "已选中",
+      "deselectAll": "取消全选",
+      "selectAll": "全选",
+      "markdown": "Markdown（.md）",
+      "pdf": "PDF 文档",
+      "html": "交互式 HTML",
+      "image": "长截图",
+      "cancel": "取消",
+      "exportHint": "请先选择要导出的消息。"
+    },
+    "questionPanel": {
+      "of": "{{current}} / {{total}}",
+      "dismiss": "关闭",
+      "somethingElse": "其他...",
+      "typeAnswer": "在此处输入你的回答...",
+      "keyboardNav": "↑↓ 导航",
+      "keyboardSelect": "Enter 选择",
+      "keyboardClose": "Esc 关闭",
+      "sendAnswers": "发送回答",
+      "skip": "跳过",
+      "next": "下一步",
+      "other": "其他",
+      "noOptionSkipped": "*（未选择 / 已跳过）*",
+      "noAnswerSkipped": "*（未填写 / 已跳过）*",
+      "answersHeader": "以下是对澄清问题的回答：\n\n",
+      "noInputField": "找不到 DeepSeek 输入框。"
+    },
+    "statusBanner": {
+      "title": "检测到 DeepSeek {{indicator}} 异常 | {{description}}",
+      "message": "问题不在你这边，是 DeepSeek 服务端的问题。服务器可能因高负载或维护中而暂时不可用。"
+    },
+    "announcementBanner": {
+      "dismiss": "关闭"
+    },
+    "attachMenu": {
+      "buttonTitle": "高级上传",
+      "attachProject": "关联项目",
+      "voicePrompt": "语音输入",
+      "stopRecording": "停止录音",
+      "uploadFile": "上传文件",
+      "uploadFolder": "上传文件夹",
+      "githubRepo": "GitHub 仓库",
+      "githubAuthLabel": "已认证的 GitHub 访问",
+      "fetchWebPage": "抓取网页",
+      "githubImportTitle": "导入 GitHub 仓库",
+      "authenticated": "已认证",
+      "githubPlaceholder": "https://github.com/owner/repo 或 owner/repo",
+      "includeCommits": "包含提交历史",
+      "commitsLabel": "提交数量：",
+      "close": "关闭",
+      "fetch": "抓取",
+      "fetching": "抓取中...",
+      "projectLabel": "项目",
+      "noProject": "无",
+      "projectHint": "所选项目的指令仅应用于首条消息。",
+      "deselectAll": "取消全选",
+      "selectAll": "全选",
+      "file": "文件",
+      "files": "文件",
+      "attach": "关联（{{count}}）",
+      "noFiles": "暂无文件 — 请通过“管理项目”添加",
+      "noProjectSelected": "未选择项目",
+      "webImportTitle": "抓取网页",
+      "webPlaceholder": "https://example.com/article",
+      "noSpeechRecognition": "浏览器不支持语音识别。",
+      "voiceError": "语音错误：{{msg}}",
+      "noInputField": "找不到输入框。",
+      "filePickFailed": "选择文件失败。",
+      "folderPickFailed": "选择文件夹失败。",
+      "folderRequiresNewer": "上传文件夹需要更新版本的应用。",
+      "folderUploadFailed": "上传文件夹失败：{{msg}}",
+      "invalidGithubUrl": "无效的 URL。请使用：https://github.com/owner/repo 或 owner/repo",
+      "commitsFailed": "获取提交历史失败：{{msg}}",
+      "repoFailed": "获取仓库失败：{{msg}}",
+      "invalidWebUrl": "请输入有效的 URL（需包含 http/https）。",
+      "webFetchFailed": "抓取页面内容失败：{{msg}}"
+    },
+    "codeRunner": {
+      "pythonRunner": "Python 运行器",
+      "tsRunner": "TypeScript 运行器",
+      "jsRunner": "JavaScript 运行器",
+      "download": "下载",
+      "placeholder": "在此处输入代码...",
+      "running": "运行中...",
+      "runPython": "▶ 运行 Python",
+      "runTs": "▶ 运行 TS",
+      "runJs": "▶ 运行 JS",
+      "consoleOutput": "控制台输出",
+      "clear": "清空",
+      "noOutput": "（执行完成，无输出）",
+      "loadingPyodide": "正在加载 Pyodide 运行环境...",
+      "finished": "执行完成。",
+      "executionError": "执行出错。",
+      "pythonStatus": "Python 3.x（WASM）",
+      "tsStatus": "TypeScript（Babel）",
+      "jsStatus": "JavaScript（V8）"
+    },
+    "autoCodeResult": {
+      "success": "执行成功",
+      "rejected": "请求已拒绝",
+      "failed": "执行失败",
+      "completed": "{{lang}} 代码执行成功",
+      "wasRejected": "{{lang}} 代码执行已被拒绝",
+      "execFailed": "{{lang}} 代码执行失败",
+      "hideOutput": "隐藏输出 ▴",
+      "showOutput": "显示输出 ▾"
+    },
+    "autoCodeRunner": {
+      "aiWantsToRun": "AI 想要运行 {{lang}} 代码",
+      "safeSandbox": "将在安全的沙盒环境中执行。",
+      "runCode": "▶ 运行代码",
+      "reject": "✕ 拒绝",
+      "running": "运行中...",
+      "finished": "已完成",
+      "runAgain": "再次运行",
+      "error": "错误",
+      "retry": "重试",
+      "rejected": "已拒绝",
+      "actuallyRun": "仍然运行",
+      "hideCode": "隐藏代码 ▴",
+      "showCode": "显示代码 ▾",
+      "consoleOutput": "控制台输出"
+    },
+    "toolCard": {
+      "pythonRunner": "Python 运行器"
+    },
+    "downloadCard": {
+      "download": "下载"
+    },
+    "pptxCard": {
+      "title": "PowerPoint 演示文稿",
+      "download": "下载",
+      "working": "处理中...",
+      "showScript": "显示生成的脚本",
+      "hideScript": "隐藏生成的脚本",
+      "preparing": "正在准备沙盒...",
+      "downloading": "下载中...",
+      "success": "生成成功！",
+      "error": "错误：{{msg}}",
+      "generating": "正在生成 PPTX...",
+      "bridgeError": "桥接错误",
+      "browserUnsupported": "暂不支持你的浏览器",
+      "browserUnsupportedDesc": "我们正在适配更多浏览器。如愿意协助，欢迎访问我们的 GitHub 页面。"
+    },
+    "excelCard": {
+      "title": "Excel 表格",
+      "download": "下载",
+      "working": "处理中...",
+      "showScript": "显示生成的脚本",
+      "hideScript": "隐藏生成的脚本",
+      "preparing": "正在准备沙盒...",
+      "downloading": "下载中...",
+      "success": "生成成功！",
+      "error": "错误：{{msg}}",
+      "generating": "正在生成 Excel...",
+      "bridgeError": "桥接错误",
+      "browserUnsupported": "暂不支持你的浏览器",
+      "browserUnsupportedDesc": "我们正在适配更多浏览器。如愿意协助，欢迎访问我们的 GitHub 页面。"
+    },
+    "docxCard": {
+      "title": "Word 文档",
+      "download": "下载",
+      "working": "处理中...",
+      "showScript": "显示生成的脚本",
+      "hideScript": "隐藏生成的脚本",
+      "preparing": "正在准备沙盒...",
+      "downloading": "下载中...",
+      "success": "生成成功！",
+      "error": "错误：{{msg}}",
+      "generating": "正在生成 Word 文档...",
+      "bridgeError": "桥接错误",
+      "browserUnsupported": "暂不支持你的浏览器",
+      "browserUnsupportedDesc": "我们正在适配更多浏览器。如愿意协助，欢迎访问我们的 GitHub 页面。"
+    },
+    "visualizerCard": {
+      "title": "可视化工具",
+      "subtitle": "交互式模拟"
+    },
+    "htmlPreview": {
+      "title": "HTML 预览",
+      "subtitle": "交互式输出",
+      "downloadHtml": "下载 .html"
+    },
+    "pptxGenerator": {
+      "title": "PowerPoint 生成器",
+      "subtitle": "PptxGenJS 引擎",
+      "heading": "PowerPoint 演示文稿",
+      "download": "下载",
+      "showScript": "显示生成的脚本",
+      "hideScript": "隐藏脚本",
+      "processing": "处理中...",
+      "done": "完成！",
+      "error": "错误"
+    },
+    "loadingIndicator": {
+      "working": "处理中..."
+    },
+    "ragPreview": {
+      "title": "RAG 匹配文件",
+      "moreFiles": "还有 {{count}} 个文件",
+      "lines": "第 {{start}}–{{end}} 行"
+    },
+    "expandToggle": {
+      "expand": "展开",
+      "collapse": "收起",
+      "expandTitle": "展开输入框",
+      "collapseTitle": "收起输入框",
+      "showMore": "查看更多",
+      "showLess": "收起"
+    },
+    "messageOverlay": {
+      "questionsAsked": "已发送澄清问题。",
+      "questionsSubtitle": "请在下方交互面板中填写你的回答。",
+      "characterCreated": "角色已创建。",
+      "characterActive": "当前角色：<strong>{{name}}</strong>",
+      "skillCreated": "技能已创建。",
+      "skillActive": "当前技能：<strong>{{name}}</strong>",
+      "webFetchRequested": "正在抓取网页",
+      "githubFetchRequested": "正在抓取 GitHub 仓库",
+      "memoryStored": "已存储记忆（{{count}} 条）。"
+    },
+    "savedItems": {
+      "title": "已保存项目",
+      "bookmarks": "书签",
+      "snippets": "片段",
+      "newSnippet": "新建片段",
+      "editSnippet": "编辑片段",
+      "search": "搜索已保存的项目...",
+      "emptyBookmarks": "暂无书签。点击任意消息上的书签图标即可保存。",
+      "emptySnippets": "暂无片段。创建片段即可复用常用提示词。",
+      "delete": "删除",
+      "edit": "编辑",
+      "send": "发送到聊天",
+      "removeBookmark": "移除书签",
+      "bookmarkThis": "收藏此消息",
+      "bookmarked": "消息已收藏",
+      "bookmarkRemoved": "书签已移除",
+      "deleted": "已删除",
+      "snippetSent": "片段已发送",
+      "importSuccess": "已导入 {{count}} 个项目",
+      "importFailed": "导入失败：{{msg}}",
+      "namePlaceholder": "片段名称",
+      "contentPlaceholder": "在此处粘贴你的提示词或消息...",
+      "contentRequired": "内容为必填项。",
+      "save": "保存",
+      "cancel": "取消",
+      "titleRequired": "标题为必填项。",
+      "export": "导出",
+      "import": "导入",
+      "openConversation": "打开对话",
+      "dateJustNow": "刚刚",
+      "dateMinAgo": "{{count}} 分钟前",
+      "dateHourAgo": "{{count}} 小时前"
+    },
+    "sidebarMenu": {
+      "tags": "标签（BDS）",
+      "exportChat": "导出聊天（BDS）",
+      "getBdsApp": "获取 BDS 应用",
+      "whatsNew": "更新内容"
+    },
+    "sidebarSearch": {
+      "placeholder": "搜索历史...（#标签）"
+    },
+    "files": {
+      "standalone": {
+        "packageTitle": "生成的文件包",
+        "folderPath": "{{path}}（已保留文件夹结构）",
+        "singleTitle": "生成的文件"
+      },
+      "longWork": {
+        "noFiles": "LONG_WORK 已完成，但未生成任何文件。",
+        "complete": "LONG_WORK 已完成：{{count}} 个文件已打包为 zip。",
+        "projectTitle": "LONG_WORK 项目",
+        "filesPackaged": "已打包 {{count}} 个文件"
+      },
+      "webReader": {
+        "fetching": "正在抓取页面内容...",
+        "processing": "正在处理内容...",
+        "converting": "正在转换为 Markdown...",
+        "creating": "正在创建文件...",
+        "fetchFailed": "抓取页面失败。",
+        "parseFailed": "无法解析此页面的主要内容。",
+        "unknown": "未知"
+      },
+      "githubReader": {
+        "downloading": "正在下载 {{owner}}/{{repo}}（{{branch}}）...",
+        "extracting": "正在解压 ZIP...",
+        "processing": "正在处理文件...",
+        "creating": "正在创建文件...",
+        "invalidUrl": "无效的 GitHub URL。请使用：https://github.com/owner/repo",
+        "tokenRejected": "GitHub 拒绝了你的令牌。请检查是否具备 repo 权限且未过期。",
+        "notFound": "找不到仓库，私有仓库可能需要 GitHub 令牌。可在高级设置中添加。",
+        "downloadFailed": "无法下载 {{owner}}/{{repo}}/{{branch}}。请检查 URL 并确认仓库为公开仓库。",
+        "extractFailed": "解压 ZIP 失败：{{msg}}",
+        "directoryTree": "目录树："
+      },
+      "youtubeReader": {
+        "invalidUrl": "无效的 YouTube URL。",
+        "fallbackTitle": "YouTube 视频",
+        "noTranscript": "[字幕为空。此视频可能没有可用的字幕。]",
+        "transcriptError": "[获取字幕出错：{{msg}}]",
+        "bgScriptError": "[无法从后台脚本获取字幕数据。]"
+      },
+      "twitterReader": {
+        "fetchFailed": "无法从 Twitter OEmbed 获取推文信息。",
+        "noExtract": "无法提取推文文本。"
+      }
+    },
+    "exporter": {
+      "branding": "Better DeepSeek",
+      "archiveReport": "导出报告",
+      "userQuery": "用户提问",
+      "aiResponse": "AI 回复",
+      "pdfFooter": "由 Better DeepSeek 浏览器扩展生成",
+      "imageHeader": "长截图",
+      "imageDate": "截取时间：{{date}}",
+      "userLabel": "用户",
+      "assistantLabel": "助手",
+      "imageFooter": "由 Better DeepSeek 生成",
+      "htmlLogo": "Better DeepSeek 导出",
+      "htmlToggleTheme": "切换主题",
+      "htmlFooter": "由 Better DeepSeek 浏览器扩展导出",
+      "copy": "复制",
+      "copied": "已复制！",
+      "powerpoint": "PowerPoint",
+      "presentation": "演示文稿",
+      "bdsTool": "BDS 工具",
+      "imageFailed": "图片生成失败。请尝试减少选择的消息数量后重试。"
+    },
+    "auto": {
+      "fetchFailed": "抓取 {{url}} 失败：\n\n{{msg}}",
+      "githubFailed": "抓取 GitHub 仓库 {{url}} 失败：\n\n{{msg}}",
+      "tweetFailed": "抓取推文 {{url}} 失败：\n\n{{msg}}",
+      "youtubeFailed": "抓取 YouTube 视频 {{url}} 失败：\n\n{{msg}}",
+      "statusSuccess": "成功",
+      "statusError": "错误",
+      "statusRejected": "已拒绝",
+      "noOutput": "（无输出）",
+      "generationError": "生成 {{toolName}} 时出错。",
+      "errorMessage": "错误信息：{{msg}}",
+      "correctionPrompt": "请分析上方错误，查阅库 API 参考文档，修正代码后在 <BDS:{{tagName}}> 标签内提供修正后的版本。请特别注意：API 方法名是否正确、参数是否正确、末尾是否有必需的保存/输出调用。"
+    },
+    "messageProcessor": {
+      "minCost": "<$0.0001",
+      "contextTemplate": "{{used}} / {{total}}（{{percent}}%）",
+      "contextTooltip": "上下文：{{text}}",
+      "longWorkClosed": "API 响应已结束，LONG_WORK 已关闭。",
+      "userPrice": "API：约 {{price}}",
+      "tokenCount": "{{count}} tok"
+    },
+    "whatsnew": {
+      "title": "更新内容",
+      "versionHistory": "版本历史",
+      "dismiss": "知道了",
+      "reportBug": "报告问题",
+      "requestFeature": "功能建议",
+      "brandingNote": "Better DeepSeek 是一个开源社区项目。",
+      "seeAllChanges": "在 GitHub 上查看 v{{version}} 全部变更",
+      "seeDetailed": "在 GitHub 上查看详细发布说明",
+      "features": {
+        "v0_1_7": {
+          "title": "本地化、自定义提示词与 RAG",
+          "features": {
+            "feat_0": {
+              "title": "本地化系统",
+              "description": "Better DeepSeek 现已支持多语言。欢迎在 <a href='https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md' target='_blank' style='color: #4d6bfe; text-decoration: underline;'>GitHub</a> 上帮助我们改进翻译或添加你的语言。"
+            },
+            "feat_1": {
+              "title": "自定义提示词",
+              "description": "轻松创建、保存并切换多个系统提示词。"
+            },
+            "feat_2": {
+              "title": "项目 RAG 搜索",
+              "description": "新增基础 RAG 系统。可关联项目或选择本地文件夹进行文件检索，后续版本将持续改进。"
+            },
+            "feat_3": {
+              "title": "界面改进",
+              "description": "支持折叠/展开长消息，点击扩展图标可直接打开 DeepSeek 网站，新增服务器状态与公告横幅等。"
+            },
+            "feat_4": {
+              "title": "问题修复与性能优化",
+              "description": "改进 BDS 工具解析器和 Office 工具，修复字体渲染问题，多项稳定性与性能优化。"
+            }
+          }
+        },
+        "v0_1_6": {
+          "title": "Android 与组织管理",
+          "features": {
+            "feat_0": {
+              "title": "Android 版本",
+              "description": "Better DeepSeek 现已支持 <a href='https://github.com/EdgeTypE/better-deepseek/releases' target='_blank' style='color: #4d6bfe; text-decoration: underline;'>Android</a>。"
+            },
+            "feat_1": {
+              "title": "聊天筛选与标签",
+              "description": "通过添加标签整理会话，可在侧边栏菜单中轻松筛选和分组聊天。"
+            },
+            "feat_2": {
+              "title": "导出界面重做",
+              "description": "全新的 Markdown、PDF、HTML 和图片导出界面，支持导出完整会话或指定部分。"
+            }
+          }
+        },
+        "v0_1_5": {
+          "title": "改进与可见性",
+          "features": {
+            "feat_0": {
+              "title": "“更新内容”弹窗",
+              "description": "你现在看到的就是它！之后我们会直接在这里同步最新变更。"
+            },
+            "feat_1": {
+              "title": "高级注入控制",
+              "description": "系统提示词可选择“始终注入”、“仅首条消息”或按自定义间隔“每 X 条消息”注入。"
+            },
+            "feat_2": {
+              "title": "私有仓库支持",
+              "description": "可通过 GitHub 个人访问令牌安全地导入私有仓库。"
+            },
+            "feat_3": {
+              "title": "Token 与价格估算",
+              "description": "实时展示 token 用量估算与上下文窗口，与实际 API 用量对应。"
+            },
+            "feat_4": {
+              "title": "停用记忆",
+              "description": "设置中新增开关，可阻止扩展保存对话上下文。"
+            },
+            "feat_5": {
+              "title": "稳定性优化",
+              "description": "修复消息处理问题，优化整体界面状态。"
+            }
+          }
+        },
+        "v0_1_4": {
+          "title": "项目与高级设置",
+          "features": {
+            "feat_0": {
+              "title": "项目菜单",
+              "description": "更好地组织管理会话和文件。"
+            },
+            "feat_1": {
+              "title": "历史搜索",
+              "description": "会话历史侧边栏新增搜索功能。"
+            },
+            "feat_2": {
+              "title": "高级设置",
+              "description": "设置菜单改为手风琴布局，节省空间、减少干扰。"
+            },
+            "feat_3": {
+              "title": "停用系统提示词",
+              "description": "新增选项，可在不需要时完全停用隐藏系统提示词。"
+            },
+            "feat_4": {
+              "title": "指定回复语言",
+              "description": "无论输入何种语言，都能让 DeepSeek 始终以你偏好的语言回复。"
+            }
+          }
+        },
+        "v0_1_3": {
+          "title": "澄清问题与导出",
+          "features": {
+            "feat_0": {
+              "title": "澄清问题工具",
+              "description": "当 DeepSeek 对上下文或指令不确定时，现在可以向你提出澄清问题。"
+            },
+            "feat_1": {
+              "title": "Markdown 与 PDF 导出",
+              "description": "可将完整聊天会话导出为 Markdown 和 PDF 文件。"
+            },
+            "feat_2": {
+              "title": "提示词重置",
+              "description": "可一键将系统提示词恢复为默认状态。"
+            },
+            "feat_3": {
+              "title": "导航修复",
+              "description": "修复点击 Logo 或“新建聊天”时页面完全重载的问题。"
+            }
+          }
+        },
+        "v0_1_2": {
+          "title": "跨浏览器与代码运行器",
+          "features": {
+            "feat_0": {
+              "title": "Firefox 支持",
+              "description": "新增对 Firefox 浏览器的实验性支持。"
+            },
+            "feat_1": {
+              "title": "增强的代码运行器",
+              "description": "更新 Python 运行器，新增 JS 与 TS 执行环境。"
+            },
+            "feat_2": {
+              "title": "GitHub 自动抓取",
+              "description": "可通过 BDS:AUTO 命令将 GitHub 仓库直接注入聊天。"
+            }
+          }
+        },
+        "v0_1_1": {
+          "title": "语音支持与可靠性",
+          "features": {
+            "feat_0": {
+              "title": "完整语音支持",
+              "description": "全面集成语音转文字（Speech-to-Text）和文字转语音（Text-to-Speech）。"
+            },
+            "feat_1": {
+              "title": "语音配置",
+              "description": "可在设置中配置语音和识别语言。"
+            },
+            "feat_2": {
+              "title": "导航优化",
+              "description": "Logo 和“新建聊天”现在使用真正的 &lt;a&gt; 标签，支持“在新标签页中打开”。"
+            },
+            "feat_3": {
+              "title": "流式响应可靠性",
+              "description": "改进对卡住的流的处理，支持自动闭合标签。"
+            }
+          }
+        }
+      }
+    },
+    "language": {
+      "en": "English",
+      "tr": "Türkçe",
+      "ru": "Русский",
+      "zh-cn": "简体中文"
+    },
+    "apiPlayground": {
+      "title": "API Playground",
+      "builder": "请求构建器",
+      "response": "响应",
+      "history": "历史",
+      "presets": "预设",
+      "endpoint": "Endpoint",
+      "model": "模型",
+      "messages": "消息",
+      "stream": "Stream",
+      "temperature": "Temperature",
+      "maxTokens": "Max Tokens",
+      "topP": "Top P",
+      "frequencyPenalty": "Frequency Penalty",
+      "presencePenalty": "Presence Penalty",
+      "thinking": "Thinking",
+      "disabled": "已停用",
+      "enabled": "已启用",
+      "budgetToken": "Budget Token",
+      "reasoningEffort": "Reasoning Effort",
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "responseFormat": "Response Format",
+      "text": "文本",
+      "jsonObject": "JSON Object",
+      "jsonSchema": "JSON Schema",
+      "schema": "Schema",
+      "tools": "工具",
+      "toolChoice": "Tool Choice",
+      "auto": "自动",
+      "required": "必需",
+      "none": "无",
+      "toolName": "工具名称",
+      "addTool": "添加工具",
+      "addMessage": "添加消息",
+      "role": "角色",
+      "content": "内容",
+      "name": "名称",
+      "prefix": "前缀",
+      "toolCallId": "Tool Call ID",
+      "remove": "移除",
+      "moveUp": "上移",
+      "moveDown": "下移",
+      "beta": "Beta",
+      "prefixCompletion": "Prefix Completion",
+      "store": "Store",
+      "reasoning": "Reasoning",
+      "metadata": "Metadata",
+      "userId": "User ID",
+      "labels": "标签",
+      "logprobs": "Logprobs",
+      "topLogprobs": "Top Logprobs",
+      "copy": "复制",
+      "noResponse": "发送请求后即可查看响应。",
+      "noKey": "无密钥",
+      "messagePlaceholder": "输入消息内容...",
+      "sending": "发送中...",
+      "send": "发送",
+      "reset": "重置",
+      "saveRequest": "保存请求",
+      "saveName": "保存名称",
+      "manageKeys": "管理 API 密钥",
+      "addKey": "添加密钥",
+      "noKeysHint": "尚未保存 API 密钥。添加密钥后即可发送请求。",
+      "useActiveKey": "当前密钥：{{name}}",
+      "noActiveKey": "当前无可用 API 密钥",
+      "searchHistory": "搜索历史...",
+      "allModels": "全部模型",
+      "exportHistory": "导出",
+      "clearHistory": "清空",
+      "noHistory": "暂无历史记录。",
+      "delete": "删除",
+      "historyLimit": "历史记录上限为 500 条。清空前请先导出保存。",
+      "builtinPresets": "内置预设",
+      "savedRequests": "已保存的请求",
+      "viewCurl": "查看 cURL",
+      "copyCode": "复制代码",
+      "clear": "清空",
+      "latency": "延迟",
+      "finishReason": "结束原因",
+      "tokens": "Tokens",
+      "input": "输入",
+      "output": "输出",
+      "cacheHit": "Cache Hit",
+      "cacheMiss": "Cache Miss",
+      "cacheSavings": "缓存节省量",
+      "cost": "费用",
+      "estimatedCost": "估算费用",
+      "responseTime": "响应时间",
+      "rawResponse": "原始响应",
+      "streamChunks": "流式片段",
+      "toolsCalled": "调用的工具",
+      "enterJsonSchema": "输入 JSON schema...",
+      "saveNamePlaceholder": "为请求命名...",
+      "betaFeatureDescription": "Beta 端点功能（请谨慎使用）。",
+      "codeGen": "Code Gen",
+      "promptSuffix": "Prompt Suffix"
+    }
+  }
+}
