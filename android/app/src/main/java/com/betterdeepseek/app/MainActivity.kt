@@ -232,6 +232,18 @@ class MainActivity : ComponentActivity() {
                 "NEXT_LOCALE=$localeTag; Path=/; SameSite=Lax"
         )
         cookieManager.flush()
+    override fun onResume() {
+        super.onResume()
+        if (::cookieManager.isInitialized) {
+            cookieManager.flush()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (::cookieManager.isInitialized) {
+            cookieManager.flush()
+        }
     }
 
     override fun onDestroy() {
@@ -239,6 +251,9 @@ class MainActivity : ComponentActivity() {
         bridge.evaluateJs = null
         bridge.onPickFiles = null
         webView.removeJavascriptInterface(BRIDGE_NAME)
+        if (::cookieManager.isInitialized) {
+            cookieManager.flush()
+        }
         super.onDestroy()
     }
 
