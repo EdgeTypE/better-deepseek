@@ -121,6 +121,7 @@ class MainActivity : ComponentActivity() {
 
         bridge = WebViewBridge(applicationContext)
         cookieManager = CookieManager.getInstance()
+        cookieManager.setAcceptCookie(true)
 
         bridge.onPickFiles = { mode, requestId ->
             pendingPickFilesRequestId = requestId
@@ -218,11 +219,28 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::cookieManager.isInitialized) {
+            cookieManager.flush()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (::cookieManager.isInitialized) {
+            cookieManager.flush()
+        }
+    }
+
     override fun onDestroy() {
         bridge.onThemeChanged = null
         bridge.evaluateJs = null
         bridge.onPickFiles = null
         webView.removeJavascriptInterface(BRIDGE_NAME)
+        if (::cookieManager.isInitialized) {
+            cookieManager.flush()
+        }
         super.onDestroy()
     }
 
