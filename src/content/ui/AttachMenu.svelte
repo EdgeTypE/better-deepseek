@@ -99,18 +99,27 @@
   }
 
   let shouldShowAttach = $state(true);
+  let shouldShowPlus = $state(true);
+  let shouldShowUploadFile = $state(true);
+  let shouldShowUploadFolder = $state(true);
   let shouldShowGithub = $state(true);
   let shouldShowWeb = $state(true);
-  let shouldShowFolder = $state(true);
+  let shouldShowProject = $state(true);
+  let shouldShowVoice = $state(true);
 
   function updateVisibility() {
     try {
       const enabled = getFlag("features.attachMenu.enabled");
       const modelKey = currentModelType === "expert" ? "expertMode" : currentModelType === "instant" ? "instantMode" : "deepthinkMode";
       shouldShowAttach = !!(enabled && getFlag(`features.attachMenu.${modelKey}.show`));
-      shouldShowGithub = shouldShowAttach && !!getFlag(`features.attachMenu.${modelKey}.showGithub`);
-      shouldShowWeb = shouldShowAttach && !!getFlag(`features.attachMenu.${modelKey}.showWeb`);
-      shouldShowFolder = shouldShowAttach && !!getFlag(`features.attachMenu.${modelKey}.showFolder`);
+      const show = shouldShowAttach;
+      shouldShowPlus = show && !!getFlag(`features.attachMenu.${modelKey}.showPlus`);
+      shouldShowUploadFile = show && !!getFlag(`features.attachMenu.${modelKey}.showUploadFile`);
+      shouldShowUploadFolder = show && !!getFlag(`features.attachMenu.${modelKey}.showUploadFolder`);
+      shouldShowGithub = show && !!getFlag(`features.attachMenu.${modelKey}.showGithub`);
+      shouldShowWeb = show && !!getFlag(`features.attachMenu.${modelKey}.showWeb`);
+      shouldShowProject = show && !!getFlag(`features.attachMenu.${modelKey}.showProject`);
+      shouldShowVoice = show && !!getFlag(`features.attachMenu.${modelKey}.showVoice`);
     } catch (e) {
       console.warn("[BDS] Failed to evaluate attach menu visibility:", e);
     }
@@ -666,6 +675,7 @@
 
 {#if shouldShowAttach}
 <div class="bds-attach-wrapper" bind:this={menuRef}>
+  {#if shouldShowPlus}
   <button class="bds-plus-btn" on:click={toggleMenu} title={t('attachMenu.buttonTitle')}>
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -682,7 +692,9 @@
       <line x1="5" y1="12" x2="19" y2="12"></line>
     </svg>
   </button>
+  {/if}
 
+  {#if shouldShowProject}
   <button
     class="bds-project-btn"
     bind:this={projectBtnRef}
@@ -706,8 +718,9 @@
       />
     </svg>
   </button>
+  {/if}
 
-  {#if supportsVoiceInput}
+  {#if shouldShowVoice && supportsVoiceInput}
     <button
       class="bds-mic-btn {isRecording ? 'bds-recording' : ''}"
       on:click={toggleSpeechRecognition}
@@ -744,6 +757,7 @@
       use:portal
       on:click|stopPropagation
     >
+      {#if shouldShowUploadFile}
       <button class="bds-attach-item" on:click={handleUploadFile}>
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -766,7 +780,8 @@
         >
         {t('attachMenu.uploadFile')}
       </button>
-      {#if shouldShowFolder && supportsFolderUpload}
+      {/if}
+      {#if shouldShowUploadFolder && supportsFolderUpload}
         <button class="bds-attach-item" on:click={handleUploadFolder}>
           <svg
             xmlns="http://www.w3.org/2000/svg"

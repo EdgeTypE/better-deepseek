@@ -696,9 +696,9 @@ export const DEFAULT_REMOTE_CONFIG = {
     apiPlayground: { enabled: true },
     attachMenu: {
       enabled: true,
-      expertMode: { show: false, showGithub: true, showWeb: true, showFolder: false },
-      instantMode: { show: true, showGithub: true, showWeb: true, showFolder: true },
-      deepthinkMode: { show: true, showGithub: true, showWeb: true, showFolder: true },
+      expertMode: { show: false, showPlus: true, showUploadFile: false, showUploadFolder: false, showGithub: true, showWeb: true, showProject: true, showVoice: true },
+      instantMode: { show: true, showPlus: true, showUploadFile: true, showUploadFolder: true, showGithub: true, showWeb: true, showProject: true, showVoice: true },
+      deepthinkMode: { show: true, showPlus: true, showUploadFile: true, showUploadFolder: true, showGithub: true, showWeb: true, showProject: true, showVoice: true },
     },
     fileUpload: { enabled: true, expertModeBlocked: true, dataTransfer: true, nativeInput: true },
     codeBlocks: { runButtons: { python: true, javascript: true, typescript: true } },

@@ -183,7 +183,7 @@
       {#if activeTab === "attach"}
         <div class="bds-cdgroup">
           <div class="bds-cdgroup-title">AttachMenu — {currentModel} mode</div>
-          {#each ["enabled", "show", "showGithub", "showWeb", "showFolder"] as flag}
+          {#each ["enabled", "show", "showPlus", "showUploadFile", "showUploadFolder", "showGithub", "showWeb", "showProject", "showVoice"] as flag}
             <div class="bds-cdrow">
               <span class="bds-cdkey">{keyDisplay(flag)}</span>
               <label class="bds-cdtoggle">
@@ -203,7 +203,7 @@
 
         <div class="bds-cdgroup">
           <div class="bds-cdgroup-title">Expert Mode (independent override)</div>
-          {#each ["show", "showGithub", "showWeb", "showFolder"] as flag}
+          {#each ["show", "showPlus", "showUploadFile", "showUploadFolder", "showGithub", "showWeb", "showProject", "showVoice"] as flag}
             <div class="bds-cdrow">
               <span class="bds-cdkey">{keyDisplay(flag)}</span>
               <label class="bds-cdtoggle">
