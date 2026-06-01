@@ -52,6 +52,7 @@
       "autoDownloadFiles": "自动下载 create_file 生成的文件",
       "disableSystemPrompt": "停用系统提示词",
       "disableMemory": "停用记忆注入",
+      "injectSystemDateTime": "在消息中注入系统日期和时间",
       "injectionFrequency": "系统提示词注入频率",
       "firstMessage": "仅首条消息",
       "everyMessage": "始终注入（每条消息）",
@@ -352,6 +353,11 @@
       "showCode": "显示代码 ▾",
       "consoleOutput": "控制台输出"
     },
+    "searchResult": {
+      "searching": "正在 DuckDuckGo 搜索...",
+      "resultsFor": "搜索结果：{{query}}",
+      "resultCount": "找到 {{count}} 条结果"
+    },
     "toolCard": {
       "pythonRunner": "Python 运行器"
     },
@@ -448,6 +454,7 @@
       "skillActive": "当前技能：<strong>{{name}}</strong>",
       "webFetchRequested": "正在抓取网页",
       "githubFetchRequested": "正在抓取 GitHub 仓库",
+      "searchRequested": "正在搜索 DuckDuckGo...",
       "memoryStored": "已存储记忆（{{count}} 条）。"
     },
     "savedItems": {

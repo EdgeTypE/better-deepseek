@@ -683,6 +683,7 @@ export const DEFAULT_SETTINGS = {
   syncLocale: true,
   processGitignoreOnUpload: true,
   collapseLongUserMessages: true,
+  injectSystemDateTime: true,
   customCSS: "",
 };
 

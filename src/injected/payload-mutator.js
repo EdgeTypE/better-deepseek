@@ -541,15 +541,18 @@ export function buildCharacterBlock(state) {
  */
 export function buildUserDataBlock(state) {
   const blocks = [];
-  
-  const now = new Date();
-  blocks.push(`User's System Date & Time: ${now.toLocaleString()}`);
+
+  if (state.config.injectSystemDateTime !== false) {
+    const now = new Date();
+    blocks.push(`User's System Date & Time: ${now.toLocaleString()}`);
+  }
 
   const lang = state.config.preferredLang;
   if (lang && lang.trim()) {
     blocks.push(`Always respond in ${lang.trim()}.`);
   }
 
+  if (blocks.length === 0) return "";
   return `<BetterDeepSeek>\n${blocks.join("\n")}\n</BetterDeepSeek>`;
 }
 

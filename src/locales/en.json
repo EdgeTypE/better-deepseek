@@ -52,6 +52,7 @@
       "autoDownloadFiles": "Auto download create_file outputs",
       "disableSystemPrompt": "Disable Hidden System Prompt",
       "disableMemory": "Disable Stored Memory Injection",
+      "injectSystemDateTime": "Inject system date & time into messages",
       "injectionFrequency": "System Prompt Injection Frequency",
       "firstMessage": "Only on first message",
       "everyMessage": "Always (every message)",

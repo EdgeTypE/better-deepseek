@@ -36,6 +36,7 @@ export function normalizeConfig(config) {
     activeProject,
     projectRagEnabled: Boolean(config.projectRagEnabled),
     projectRagLimit: Number(config.projectRagLimit) || 5,
+    injectSystemDateTime: Boolean(config.injectSystemDateTime),
   };
 }
 

@@ -170,6 +170,7 @@ export async function pushConfigToPage() {
       systemPromptInjectionInterval: Number(state.settings.systemPromptInjectionInterval || 3),
       projectRagEnabled,
       projectRagLimit: Number(state.settings.projectRagLimit || 5),
+      injectSystemDateTime: Boolean(state.settings.injectSystemDateTime),
       activeProject: activeProject
         ? {
           name: activeProject.name,

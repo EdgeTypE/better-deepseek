@@ -55,6 +55,7 @@
   let projectRagEnabled = $state(Boolean(appState.settings.projectRagEnabled));
   let projectRagLimit = $state(Number(appState.settings.projectRagLimit) || 5);
   let processGitignoreOnUpload = $state(Boolean(appState.settings.processGitignoreOnUpload));
+  let injectSystemDateTime = $state(Boolean(appState.settings.injectSystemDateTime));
   let locale = $state(appState.settings.locale || availableLocaleCodes[0] || "en");
   let syncLocale = $state(Boolean(appState.settings.syncLocale));
   let customCSS = $state(appState.settings.customCSS || "");
@@ -73,7 +74,7 @@
       systemPromptInjectionFrequency, systemPromptInjectionInterval,
       disableMemory, htmlToMarkdownMaxDepth, maxChatSessions,
       tokenPriceDisplay, projectRagEnabled, projectRagLimit,
-      processGitignoreOnUpload, locale, syncLocale, collapseLongUserMessages,
+      processGitignoreOnUpload, injectSystemDateTime, locale, syncLocale, collapseLongUserMessages,
       customCSS
     });
   }
@@ -145,6 +146,7 @@
     projectRagEnabled = Boolean(appState.settings.projectRagEnabled);
     projectRagLimit = Number(appState.settings.projectRagLimit) || 5;
     processGitignoreOnUpload = Boolean(appState.settings.processGitignoreOnUpload);
+    injectSystemDateTime = Boolean(appState.settings.injectSystemDateTime);
     locale = appState.settings.locale || availableLocaleCodes[0] || "en";
     syncLocale = Boolean(appState.settings.syncLocale);
     customCSS = appState.settings.customCSS || "";
@@ -263,6 +265,7 @@
     appState.settings.projectRagEnabled = projectRagEnabled;
     appState.settings.projectRagLimit = Number(projectRagLimit) || 5;
     appState.settings.processGitignoreOnUpload = processGitignoreOnUpload;
+    appState.settings.injectSystemDateTime = injectSystemDateTime;
     appState.settings.locale = locale;
     appState.settings.syncLocale = syncLocale;
     appState.settings.customCSS = customCSS;
@@ -644,6 +647,18 @@
           id="bds-disable-memory"
           type="checkbox"
           bind:checked={disableMemory}
+        />
+        <span class="bds-switch-track"></span>
+      </label>
+    </div>
+
+    <div class="bds-toggle-row">
+      <span class="bds-toggle-label">{t('settings.injectSystemDateTime')}</span>
+      <label class="bds-switch">
+        <input
+          id="bds-inject-datetime"
+          type="checkbox"
+          bind:checked={injectSystemDateTime}
         />
         <span class="bds-switch-track"></span>
       </label>
