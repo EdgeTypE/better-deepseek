@@ -212,6 +212,7 @@ function scanInputArea() {
   mount(RagPreview, { target: ragMountPoint });
 
   const deepResearchMountPoint = document.createElement("div");
+  deepResearchMountPoint.className = "bds-deep-research-mount";
   wrapper.insertBefore(deepResearchMountPoint, fileInput);
   mount(DeepResearchToggle, {
     target: deepResearchMountPoint,

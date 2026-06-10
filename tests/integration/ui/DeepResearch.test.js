@@ -166,6 +166,8 @@ describe("Deep Research UI components", () => {
       const btn = target.querySelector('[data-testid="deep-research-toggle"]');
       expect(btn).toBeTruthy();
       expect(btn.textContent).toContain("Research");
+      expect(btn.querySelector("svg")).toBeTruthy();
+      expect(btn.getAttribute("aria-pressed")).toBe("false");
       expect(btn.classList.contains("active")).toBe(false);
       cleanup();
     });
@@ -178,6 +180,7 @@ describe("Deep Research UI components", () => {
 
       const btn = target.querySelector('[data-testid="deep-research-toggle"]');
       expect(btn.textContent).toContain("Research ON");
+      expect(btn.getAttribute("aria-pressed")).toBe("true");
       expect(btn.classList.contains("active")).toBe(true);
       cleanup();
     });
