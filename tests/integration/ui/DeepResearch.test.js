@@ -341,6 +341,7 @@ describe("Deep Research UI components", () => {
       expect(btn.getAttribute("aria-pressed")).toBe("false");
       expect(btn.getAttribute("aria-label")).toBe("Deep Research disabled");
       expect(btn.getAttribute("data-tooltip")).toBe("Deep Research disabled");
+      expect(btn.hasAttribute("aria-describedby")).toBe(false);
       expect(btn.classList.contains("ds-toggle-button")).toBe(true);
       expect(btn.classList.contains("ds-toggle-button--m")).toBe(true);
       expect(btn.classList.contains("ds-toggle-button--selected")).toBe(false);
@@ -358,7 +359,36 @@ describe("Deep Research UI components", () => {
       expect(btn.getAttribute("aria-pressed")).toBe("true");
       expect(btn.getAttribute("aria-label")).toBe("Deep Research enabled");
       expect(btn.getAttribute("data-tooltip")).toBe("Deep Research enabled");
+      expect(btn.hasAttribute("aria-describedby")).toBe(false);
       expect(btn.classList.contains("ds-toggle-button--selected")).toBe(true);
+      cleanup();
+    });
+
+    it("shows a native-looking tooltip on hover", async () => {
+      const { target, cleanup } = renderSvelte(DeepResearchToggle, {
+        enabled: false,
+      });
+      await flushUi();
+
+      const btn = target.querySelector('[data-testid="deep-research-toggle"]');
+      btn.dispatchEvent(new MouseEvent("mouseenter"));
+      await flushUi();
+
+      const tooltipId = btn.getAttribute("aria-describedby");
+      const tooltip = document.getElementById(tooltipId);
+      expect(tooltip).toBeTruthy();
+      expect(tooltip.getAttribute("role")).toBe("tooltip");
+      expect(tooltip.classList.contains("bds-deep-research-tooltip")).toBe(true);
+      expect(tooltip.textContent).toBe("Deep Research disabled");
+
+      btn.click();
+      await flushUi();
+      expect(tooltip.textContent).toBe("Deep Research enabled");
+
+      btn.dispatchEvent(new MouseEvent("mouseleave"));
+      await flushUi();
+      expect(btn.hasAttribute("aria-describedby")).toBe(false);
+      expect(document.querySelector(".bds-deep-research-tooltip")).toBeNull();
       cleanup();
     });
 

@@ -3,45 +3,123 @@
 
   let { enabled = false, onToggle = null } = $props();
   let localEnabled = $state(false);
+  let toggleElement = $state(null);
+  let tooltipElement = null;
+  let tooltipVisible = $state(false);
+  const tooltipId = `bds-deep-research-tooltip-${Math.random().toString(36).slice(2)}`;
+  const tooltipText = $derived(localEnabled ? "Deep Research enabled" : "Deep Research disabled");
 
   $effect(() => {
     localEnabled = Boolean(enabled);
   });
 
+  $effect(() => {
+    if (!tooltipElement) return;
+    syncTooltipText();
+    positionTooltip();
+  });
+
   onMount(() => {
     const handler = (event) => {
-      localEnabled = Boolean(event.detail?.enabled);
+      const nextEnabled = Boolean(event.detail?.enabled);
+      localEnabled = nextEnabled;
+      syncTooltipText(nextEnabled);
     };
     window.addEventListener("bds:deep-research-toggle-state", handler);
-    return () => window.removeEventListener("bds:deep-research-toggle-state", handler);
+    return () => {
+      window.removeEventListener("bds:deep-research-toggle-state", handler);
+      hideTooltip();
+    };
   });
 
   function handleToggle(event) {
     event?.preventDefault?.();
     event?.stopPropagation?.();
-    localEnabled = !localEnabled;
-    if (onToggle) onToggle(localEnabled);
+    const nextEnabled = !localEnabled;
+    localEnabled = nextEnabled;
+    syncTooltipText(nextEnabled);
+    if (onToggle) onToggle(nextEnabled);
   }
 
   function handleKeydown(event) {
     if (event.key !== "Enter" && event.key !== " ") return;
     handleToggle(event);
   }
+
+  function ensureTooltip() {
+    if (tooltipElement && document.body.contains(tooltipElement)) return tooltipElement;
+
+    tooltipElement = document.createElement("div");
+    tooltipElement.id = tooltipId;
+    tooltipElement.className = "bds-deep-research-tooltip";
+    tooltipElement.setAttribute("role", "tooltip");
+    tooltipElement.textContent = tooltipText;
+    document.body.appendChild(tooltipElement);
+    return tooltipElement;
+  }
+
+  function syncTooltipText(enabledState = localEnabled) {
+    if (!tooltipElement) return;
+    tooltipElement.textContent = enabledState ? "Deep Research enabled" : "Deep Research disabled";
+  }
+
+  function positionTooltip() {
+    if (!toggleElement || !tooltipElement) return;
+
+    const toggleRect = toggleElement.getBoundingClientRect();
+    const tooltipRect = tooltipElement.getBoundingClientRect();
+    const gap = 8;
+    const viewportMargin = 8;
+    const tooltipHalfWidth = tooltipRect.width / 2;
+    const minLeft = viewportMargin + tooltipHalfWidth;
+    const maxLeft = window.innerWidth - viewportMargin - tooltipHalfWidth;
+    const preferredLeft = toggleRect.left + toggleRect.width / 2;
+    const left = Math.min(Math.max(preferredLeft, minLeft), maxLeft);
+    const hasRoomAbove = toggleRect.top - tooltipRect.height - gap > viewportMargin;
+
+    tooltipElement.dataset.placement = hasRoomAbove ? "top" : "bottom";
+    tooltipElement.style.left = `${Math.round(left)}px`;
+    tooltipElement.style.top = hasRoomAbove
+      ? `${Math.round(toggleRect.top - gap)}px`
+      : `${Math.round(toggleRect.bottom + gap)}px`;
+  }
+
+  function showTooltip() {
+    tooltipVisible = true;
+    ensureTooltip();
+    positionTooltip();
+    window.addEventListener("scroll", positionTooltip, true);
+    window.addEventListener("resize", positionTooltip);
+  }
+
+  function hideTooltip() {
+    tooltipVisible = false;
+    window.removeEventListener("scroll", positionTooltip, true);
+    window.removeEventListener("resize", positionTooltip);
+    tooltipElement?.remove();
+    tooltipElement = null;
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
+  bind:this={toggleElement}
   tabindex="0"
   aria-pressed={localEnabled}
-  aria-label={localEnabled ? "Deep Research enabled" : "Deep Research disabled"}
-  data-tooltip={localEnabled ? "Deep Research enabled" : "Deep Research disabled"}
+  aria-label={tooltipText}
+  aria-describedby={tooltipVisible ? tooltipId : undefined}
+  data-tooltip={tooltipText}
   class="bds-deep-research-toggle f79352dc ds-toggle-button ds-toggle-button--m"
   class:ds-toggle-button--selected={localEnabled}
   class:bds-deep-research-toggle--selected={localEnabled}
   style="transform: translateZ(0px);"
   onclick={handleToggle}
   onkeydown={handleKeydown}
+  onmouseenter={showTooltip}
+  onmouseleave={hideTooltip}
+  onfocus={showTooltip}
+  onblur={hideTooltip}
   data-testid="deep-research-toggle"
 >
   <div class="ds-toggle-button__icon">
@@ -80,12 +158,9 @@
     user-select: none;
   }
 
-  .bds-deep-research-toggle:hover::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    left: 50%;
-    bottom: calc(100% + 10px);
-    transform: translateX(-50%);
+  :global(.bds-deep-research-tooltip) {
+    position: fixed;
+    transform: translate(-50%, -100%);
     z-index: 100000;
     pointer-events: none;
     white-space: nowrap;
@@ -97,6 +172,10 @@
     font-weight: 500;
     line-height: 1.2;
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  }
+
+  :global(.bds-deep-research-tooltip[data-placement="bottom"]) {
+    transform: translateX(-50%);
   }
 
   .bds-deep-research-toggle:focus,
