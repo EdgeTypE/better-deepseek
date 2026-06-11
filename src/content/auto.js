@@ -286,16 +286,24 @@ export async function handleAutoErrorReport(toolName, error, originalCode) {
   injectPureTextAndSend(autoMessage);
 }
 
-export function injectPureTextAndSend(autoMessage) {
-  setChatInputText(autoMessage);
-  sendCurrentChatInput("Text prompt");
+export function injectPureTextAndSend(autoMessage, logLabel = "Text prompt") {
+  if (!setChatInputText(autoMessage)) {
+    console.error(`[BDS:AUTO] Failed to send ${logLabel}: chat input was not found or could not be updated.`);
+    return false;
+  }
+
+  sendCurrentChatInput(logLabel);
+  return true;
 }
 
 function findChatEditor() {
   return (
     document.querySelector("textarea#chat-input") ||
     document.querySelector(".ds-textarea textarea") ||
+    document.querySelector('[role="textbox"][contenteditable="true"]') ||
+    document.querySelector('.ProseMirror[contenteditable="true"]') ||
     document.querySelector("textarea[placeholder]") ||
+    document.querySelector("input[placeholder]") ||
     document.querySelector('div[contenteditable="true"]')
   );
 }
@@ -325,9 +333,13 @@ export function setChatInputText(text) {
   const value = String(text || "");
   editor.focus();
 
-  if (editor.tagName && editor.tagName.toLowerCase() === "textarea") {
+  const tagName = String(editor.tagName || "").toLowerCase();
+  if (tagName === "textarea" || tagName === "input") {
+    const prototype = tagName === "textarea"
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype;
     const setter = Object.getOwnPropertyDescriptor(
-      HTMLTextAreaElement.prototype,
+      prototype,
       "value",
     )?.set;
     if (setter) {
@@ -360,6 +372,8 @@ export function setChatInputText(text) {
 
     if (!inserted) {
       editor.textContent = value;
+    } else if ((editor.textContent || "").trim() !== value.trim()) {
+      editor.textContent = value;
     }
     dispatchEditorEvents(editor, "insertText", value);
     return true;
@@ -371,12 +385,18 @@ export function setChatInputText(text) {
 function findSendButton() {
   const buttons = Array.from(document.querySelectorAll('div[role="button"], button'));
   return buttons.find((button) => {
+    const label = `${button.title || ""} ${button.ariaLabel || ""} ${button.getAttribute("aria-label") || ""}`
+      .toLowerCase()
+      .trim();
     const isSend =
       button.querySelector('svg path[d*="M8.3125"], .ds-icon-send') ||
       button.querySelector('svg path[d*="M13.12 19.98"]') ||
+      button.querySelector('svg path[d*="M12 19"]') ||
       button.title === "Send message" ||
       button.ariaLabel === "Send Message" ||
-      button.getAttribute("aria-label") === "Send Message";
+      button.getAttribute("aria-label") === "Send Message" ||
+      label.includes("send message") ||
+      label === "send";
     const isBdsControl =
       button.classList.contains("bds-plus-btn") ||
       button.classList.contains("bds-deep-research-toggle") ||
@@ -396,6 +416,7 @@ function isSendButtonDisabled(sendBtn) {
 function sendCurrentChatInput(logLabel = "Auto message") {
   let attempts = 0;
   const maxAttempts = 50;
+  let enterFallbackSent = false;
 
   const attemptSend = () => {
     attempts++;
@@ -406,6 +427,15 @@ function sendCurrentChatInput(logLabel = "Auto message") {
         sendBtn.click();
         console.log(`[BDS:AUTO] ${logLabel} sent successfully after ${attempts} attempts.`);
         return;
+      }
+    }
+
+    if (!enterFallbackSent && attempts === 6) {
+      enterFallbackSent = true;
+      const editor = findChatEditor();
+      if (editor) {
+        editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+        editor.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", bubbles: true }));
       }
     }
 

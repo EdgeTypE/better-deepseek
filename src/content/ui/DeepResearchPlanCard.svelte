@@ -46,12 +46,19 @@
     return () => window.removeEventListener("bds:deep-research-run-state", handler);
   });
 
-  function handleApprove() {
+  function stopNativeClick(event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+  }
+
+  function handleApprove(event) {
+    stopNativeClick(event);
     if (!isInteractive) return;
     if (onApprove) onApprove(runId);
   }
 
-  function handleRequestChanges() {
+  function handleRequestChanges(event) {
+    stopNativeClick(event);
     if (!isInteractive) return;
     if (!showFeedback) {
       showFeedback = true;
@@ -64,7 +71,8 @@
     }
   }
 
-  function handleCancel() {
+  function handleCancel(event) {
+    stopNativeClick(event);
     if (!isInteractive) return;
     if (onCancel) onCancel(runId);
   }
@@ -111,13 +119,13 @@
 
     {#if isInteractive}
       <div class="bds-dr-actions">
-        <button class="bds-dr-btn bds-dr-btn-approve" onclick={handleApprove} data-testid="dr-approve-btn">
+        <button type="button" class="bds-dr-btn bds-dr-btn-approve" onclick={handleApprove} data-testid="dr-approve-btn">
           Approve
         </button>
-        <button class="bds-dr-btn bds-dr-btn-revise" onclick={handleRequestChanges} data-testid="dr-revise-btn">
+        <button type="button" class="bds-dr-btn bds-dr-btn-revise" onclick={handleRequestChanges} data-testid="dr-revise-btn">
           Request Changes
         </button>
-        <button class="bds-dr-btn bds-dr-btn-cancel" onclick={handleCancel} data-testid="dr-cancel-btn">
+        <button type="button" class="bds-dr-btn bds-dr-btn-cancel" onclick={handleCancel} data-testid="dr-cancel-btn">
           Cancel
         </button>
       </div>
@@ -131,7 +139,7 @@
           bind:value={feedbackText}
           data-testid="dr-feedback-input"
         ></textarea>
-        <button class="bds-dr-btn bds-dr-btn-submit" onclick={handleRequestChanges} data-testid="dr-submit-feedback-btn">
+        <button type="button" class="bds-dr-btn bds-dr-btn-submit" onclick={handleRequestChanges} data-testid="dr-submit-feedback-btn">
           Submit Feedback
         </button>
       </div>

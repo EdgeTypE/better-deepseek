@@ -271,10 +271,13 @@ export function buildApprovalMessage(run) {
  */
 export function buildRevisionMessage(run, feedback) {
   const safeFeedback = String(feedback || "").trim() || "No specific feedback was provided. Re-check the plan for completeness, source coverage, and alignment with the user's original request.";
+  const currentPlan = run.plan ? JSON.stringify(run.plan, null, 2) : "{}";
   return [
     `<BetterDeepSeek>`,
     `[BDS:DEEP_RESEARCH] Revision requested for run ${run.id}.`,
     `User feedback: ${safeFeedback}`,
+    `Current research plan:`,
+    currentPlan,
     `Please revise the research plan and output an updated plan using <BDS:DEEP_RESEARCH_PLAN runId="${run.id}">JSON</BDS:DEEP_RESEARCH_PLAN>.`,
     `</BetterDeepSeek>`,
   ].join("\n");
@@ -387,7 +390,7 @@ export function initDeepResearchRuntime() {
     upsertRun(run);
     emitRunState(run);
     void persistRuns(state.deepResearch.runs);
-    injectPureTextAndSend(buildApprovalMessage(run));
+    injectPureTextAndSend(buildApprovalMessage(run), "Deep Research approval");
   });
 
   window.addEventListener("bds:deep-research-revise", (event) => {
@@ -398,7 +401,10 @@ export function initDeepResearchRuntime() {
     upsertRun(run);
     emitRunState(run);
     void persistRuns(state.deepResearch.runs);
-    injectPureTextAndSend(buildRevisionMessage(run, String(detail.feedback || "")));
+    injectPureTextAndSend(
+      buildRevisionMessage(run, String(detail.feedback || "")),
+      "Deep Research revision request",
+    );
   });
 
   window.addEventListener("bds:deep-research-cancel", (event) => {

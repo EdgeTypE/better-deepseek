@@ -105,4 +105,46 @@ describe("MessageOverlay integration", () => {
     expect(listener.mock.calls[0][0].detail.plan.title).toBe("Gaming Laptop Research");
     cleanup();
   });
+
+  it("dispatches deep research revision feedback for request changes", async () => {
+    const plan = {
+      title: "Gaming Laptop Research",
+      steps: [{ id: 1, action: "search", query: "best gaming laptop", purpose: "overview" }],
+    };
+    const listener = vi.fn();
+    window.addEventListener("bds:deep-research-revise", listener, { once: true });
+    appState.deepResearch.enabled = true;
+    appState.deepResearch.runs = [{
+      id: "run-revise",
+      conversationId: "conv1",
+      status: "planning",
+      plan,
+      sourceLedger: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }];
+
+    const { target, cleanup } = renderSvelte(MessageOverlay, {
+      blocks: [{
+        name: "deep_research_plan",
+        attrs: { runId: "run-revise" },
+        content: JSON.stringify(plan),
+      }],
+    });
+    await flushUi();
+
+    target.querySelector('[data-testid="dr-revise-btn"]').click();
+    await flushUi();
+    const input = target.querySelector('[data-testid="dr-feedback-input"]');
+    input.value = "Add warranty and seller reputation checks.";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await flushUi();
+    target.querySelector('[data-testid="dr-submit-feedback-btn"]').click();
+
+    expect(listener).toHaveBeenCalledOnce();
+    expect(listener.mock.calls[0][0].detail.runId).toBe("run-revise");
+    expect(listener.mock.calls[0][0].detail.feedback).toBe("Add warranty and seller reputation checks.");
+    expect(listener.mock.calls[0][0].detail.plan.title).toBe("Gaming Laptop Research");
+    cleanup();
+  });
 });

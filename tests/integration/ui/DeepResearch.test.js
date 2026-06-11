@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mount, unmount } from "svelte";
 import DeepResearchPlanCard from "../../../src/content/ui/DeepResearchPlanCard.svelte";
 import DeepResearchStatusCard from "../../../src/content/ui/DeepResearchStatusCard.svelte";
 import DeepResearchReportCard from "../../../src/content/ui/DeepResearchReportCard.svelte";
@@ -270,6 +271,46 @@ describe("Deep Research UI components", () => {
       target.querySelector('[data-testid="deep-research-toggle"]').click();
       expect(onToggle).toHaveBeenCalledWith(true);
       cleanup();
+    });
+
+    it("copies native DeepThink pill sizing when mounted beside it", async () => {
+      const wrapper = document.createElement("div");
+      const mountPoint = document.createElement("div");
+      const deepThink = document.createElement("button");
+      mountPoint.className = "bds-deep-research-mount";
+      deepThink.textContent = "DeepThink";
+      deepThink.style.height = "44px";
+      deepThink.style.padding = "0px 13px";
+      deepThink.style.fontSize = "15px";
+      deepThink.style.fontWeight = "700";
+      deepThink.style.borderRadius = "22px";
+      deepThink.style.display = "inline-flex";
+      deepThink.style.columnGap = "8px";
+      const deepThinkIcon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      deepThinkIcon.style.width = "20px";
+      deepThinkIcon.style.height = "21px";
+      deepThink.appendChild(deepThinkIcon);
+      wrapper.append(mountPoint, deepThink);
+      document.body.appendChild(wrapper);
+
+      const instance = mount(DeepResearchToggle, {
+        target: mountPoint,
+        props: { enabled: false },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      const btn = mountPoint.querySelector('[data-testid="deep-research-toggle"]');
+      expect(btn.style.getPropertyValue("--bds-drt-height")).toBe("44px");
+      expect(btn.style.getPropertyValue("--bds-drt-padding")).toBe("0px 13px 0px 13px");
+      expect(btn.style.getPropertyValue("--bds-drt-font-size")).toBe("15px");
+      expect(btn.style.getPropertyValue("--bds-drt-font-weight")).toBe("700");
+      expect(btn.style.getPropertyValue("--bds-drt-border-radius")).toBe("22px");
+      expect(btn.style.getPropertyValue("--bds-drt-gap")).toBe("8px");
+      expect(btn.style.getPropertyValue("--bds-drt-icon-width")).toBe("20px");
+      expect(btn.style.getPropertyValue("--bds-drt-icon-height")).toBe("21px");
+
+      unmount(instance);
+      wrapper.remove();
     });
   });
 });

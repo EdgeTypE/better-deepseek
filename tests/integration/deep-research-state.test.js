@@ -191,10 +191,12 @@ describe("Deep Research state machine", () => {
 
     it("buildRevisionMessage includes feedback", () => {
       const run = createRun("c1");
+      run.plan = { title: "Laptop plan", steps: [{ id: 1, action: "search", query: "laptops" }] };
       const msg = buildRevisionMessage(run, "Add more laptop brands");
       expect(msg).toContain("<BetterDeepSeek>");
       expect(msg).toContain("Revision requested");
       expect(msg).toContain("Add more laptop brands");
+      expect(msg).toContain("Laptop plan");
       expect(msg).toContain("BDS:DEEP_RESEARCH_PLAN");
     });
 
