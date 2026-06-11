@@ -140,7 +140,9 @@ describe("Deep Research UI components", () => {
       vi.useFakeTimers();
       try {
         document.body.innerHTML = '<div class="ds-textarea"><textarea id="chat-input"></textarea></div>';
-        const listener = vi.fn();
+        const listener = vi.fn(() => {
+          expect(document.querySelector('[data-testid="deep-research-revision-panel"]')).toBeNull();
+        });
         window.addEventListener("bds:deep-research-revise", listener, { once: true });
         const plan = { title: "Test Plan", steps: [] };
         const { cleanup } = renderSvelte(DeepResearchRevisionPanel);
@@ -154,11 +156,14 @@ describe("Deep Research UI components", () => {
 
         const panel = document.querySelector('[data-testid="deep-research-revision-panel"]');
         expect(panel?.parentElement?.classList.contains("ds-textarea")).toBe(true);
+        expect(panel.classList.contains("bds-dr-revision-panel--hidden")).toBe(false);
+        expect(panel.getAttribute("aria-hidden")).toBe("false");
         const input = document.querySelector('[data-testid="deep-research-revision-input"]');
         input.value = "Add seller warranty checks";
         input.dispatchEvent(new Event("input", { bubbles: true }));
         await flushUi();
         document.querySelector('[data-testid="deep-research-revision-submit"]').click();
+        await flushUi();
 
         expect(listener).toHaveBeenCalledOnce();
         expect(listener.mock.calls[0][0].detail).toMatchObject({
@@ -170,6 +175,27 @@ describe("Deep Research UI components", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+
+    it("reveals a usable fallback panel when no composer target is available", async () => {
+      const { cleanup } = renderSvelte(DeepResearchRevisionPanel);
+      await flushUi();
+
+      window.dispatchEvent(new CustomEvent("bds:deep-research-open-revision", {
+        detail: { runId: "run-hidden", plan: { title: "Plan", steps: [] } },
+      }));
+      await flushUi();
+
+      const panel = document.querySelector('[data-testid="deep-research-revision-panel"]');
+      const input = document.querySelector('[data-testid="deep-research-revision-input"]');
+      expect(panel).toBeTruthy();
+      expect(panel.classList.contains("bds-dr-revision-panel--hidden")).toBe(false);
+      expect(panel.getAttribute("aria-hidden")).toBe("false");
+      input.value = "Keep this typable";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await flushUi();
+      expect(input.value).toBe("Keep this typable");
+      cleanup();
     });
 
     it("attaches to a contenteditable composer and focuses the feedback input", async () => {
@@ -188,6 +214,35 @@ describe("Deep Research UI components", () => {
         const panel = document.querySelector('[data-testid="deep-research-revision-panel"]');
         const input = document.querySelector('[data-testid="deep-research-revision-input"]');
         expect(panel?.parentElement?.classList.contains("composer-shell")).toBe(true);
+        expect(panel.classList.contains("bds-dr-revision-panel--hidden")).toBe(false);
+        expect(document.activeElement).toBe(input);
+        cleanup();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("can refocus the feedback input after the main composer receives focus", async () => {
+      vi.useFakeTimers();
+      try {
+        document.body.innerHTML = '<div class="composer-shell"><div role="textbox" contenteditable="plaintext-only"></div></div>';
+        const { cleanup } = renderSvelte(DeepResearchRevisionPanel);
+        await flushUi();
+
+        window.dispatchEvent(new CustomEvent("bds:deep-research-open-revision", {
+          detail: { runId: "run-refocus", plan: { title: "Plan", steps: [] } },
+        }));
+        await flushUi();
+
+        const editor = document.querySelector('[role="textbox"]');
+        const input = document.querySelector('[data-testid="deep-research-revision-input"]');
+        editor.focus();
+        expect(document.activeElement).toBe(editor);
+
+        input.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+        await vi.advanceTimersByTimeAsync(1);
+        await flushUi();
+
         expect(document.activeElement).toBe(input);
         cleanup();
       } finally {
@@ -284,6 +339,8 @@ describe("Deep Research UI components", () => {
       expect(btn.textContent).toContain("DeepResearch");
       expect(btn.querySelector("svg")).toBeTruthy();
       expect(btn.getAttribute("aria-pressed")).toBe("false");
+      expect(btn.getAttribute("aria-label")).toBe("Deep Research disabled");
+      expect(btn.getAttribute("data-tooltip")).toBe("Deep Research disabled");
       expect(btn.classList.contains("ds-toggle-button")).toBe(true);
       expect(btn.classList.contains("ds-toggle-button--m")).toBe(true);
       expect(btn.classList.contains("ds-toggle-button--selected")).toBe(false);
@@ -299,6 +356,8 @@ describe("Deep Research UI components", () => {
       const btn = target.querySelector('[data-testid="deep-research-toggle"]');
       expect(btn.textContent).toContain("DeepResearch");
       expect(btn.getAttribute("aria-pressed")).toBe("true");
+      expect(btn.getAttribute("aria-label")).toBe("Deep Research enabled");
+      expect(btn.getAttribute("data-tooltip")).toBe("Deep Research enabled");
       expect(btn.classList.contains("ds-toggle-button--selected")).toBe(true);
       cleanup();
     });
@@ -326,7 +385,7 @@ describe("Deep Research UI components", () => {
       expect(btn.tagName.toLowerCase()).toBe("div");
       expect(btn.hasAttribute("role")).toBe(false);
       expect(btn.hasAttribute("title")).toBe(false);
-      expect(btn.hasAttribute("aria-label")).toBe(false);
+      expect(btn.hasAttribute("aria-label")).toBe(true);
       expect(btn.querySelector(".ds-toggle-button__icon .ds-icon svg")).toBeTruthy();
       expect(btn.querySelector(".ds-focus-ring")).toBeTruthy();
       expect(btn.querySelector("span._6dbc175")?.textContent).toBe("DeepResearch");

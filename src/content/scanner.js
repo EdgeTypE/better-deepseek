@@ -463,7 +463,9 @@ function ensureComposerMount(wrapper, className, descendantSelector, beforeNode)
   if (mountPoint.querySelector && mountPoint.querySelector(descendantSelector)) {
     mountPoint.dataset.bdsMounted = "1";
   }
-  wrapper.insertBefore(mountPoint, beforeNode);
+  if (mountPoint.parentElement !== wrapper || mountPoint.nextSibling !== beforeNode) {
+    wrapper.insertBefore(mountPoint, beforeNode);
+  }
   return mountPoint;
 }
 

@@ -297,16 +297,30 @@ export function injectPureTextAndSend(autoMessage, logLabel = "Text prompt") {
 }
 
 function findChatEditor() {
-  return (
-    document.querySelector("textarea#chat-input") ||
-    document.querySelector(".ds-textarea textarea") ||
-    document.querySelector('[role="textbox"][contenteditable]') ||
-    document.querySelector('[role="textbox"]') ||
-    document.querySelector('.ProseMirror[contenteditable]') ||
-    document.querySelector("textarea[placeholder]") ||
-    document.querySelector("input[placeholder]") ||
-    document.querySelector("[contenteditable]")
-  );
+  const selectors = [
+    "textarea#chat-input",
+    ".ds-textarea textarea",
+    '[role="textbox"][contenteditable]',
+    '[role="textbox"]',
+    ".ProseMirror[contenteditable]",
+    "textarea[placeholder]",
+    "input[placeholder]",
+    "[contenteditable]",
+  ];
+
+  for (const selector of selectors) {
+    const editor = Array.from(document.querySelectorAll(selector))
+      .find((candidate) => !isBdsOwnedElement(candidate));
+    if (editor) return editor;
+  }
+
+  return null;
+}
+
+function isBdsOwnedElement(element) {
+  return Boolean(element?.closest?.(
+    "#bds-root, .bds-question-panel, .bds-dr-revision-panel, .bds-attach-wrapper, .bds-rag-preview",
+  ));
 }
 
 function makeInputEvent(inputType = "insertText", data = "") {
@@ -446,6 +460,7 @@ function findSendButton() {
     const isBdsControl =
       button.classList.contains("bds-plus-btn") ||
       button.classList.contains("bds-deep-research-toggle") ||
+      isBdsOwnedElement(button) ||
       button.closest("#bds-root");
     return isSend && !isBdsControl;
   });

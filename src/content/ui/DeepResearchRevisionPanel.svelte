@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import appState from "../state.js";
 
   let visible = $state(false);
@@ -7,6 +7,8 @@
   let plan = $state(null);
   let feedbackText = $state("");
   let panelElement = $state(null);
+  let attached = $state(false);
+  let initialAttachAttempted = $state(false);
 
   onMount(() => {
     const handleOpenRevision = (event) => {
@@ -14,11 +16,14 @@
       runId = String(detail.runId || "");
       plan = detail.plan || null;
       feedbackText = "";
+      attached = false;
+      initialAttachAttempted = false;
       visible = true;
-      setTimeout(() => {
+      void tick().then(() => {
         attachToPromptBox();
+        initialAttachAttempted = true;
         focusFeedbackInput();
-      }, 100);
+      });
     };
 
     window.addEventListener("bds:deep-research-open-revision", handleOpenRevision);
@@ -53,6 +58,7 @@
         setTimeout(() => activeElement.focus(), 10);
       }
     }
+    attached = Boolean(target && panelElement.parentElement === target);
   }
 
   function findEditor() {
@@ -85,25 +91,29 @@
     panelElement?.querySelector?.(".bds-dr-revision-input")?.focus();
   }
 
-  function submitFeedback(event) {
+  async function submitFeedback(event) {
     event?.preventDefault?.();
     event?.stopPropagation?.();
     const feedback = feedbackText.trim();
+    const detail = { runId, plan, feedback };
 
-    window.dispatchEvent(new CustomEvent("bds:deep-research-revise", {
-      detail: { runId, plan, feedback },
-    }));
-    window.dispatchEvent(new CustomEvent("bds:deep-research-revision-submitted", {
-      detail: { runId, feedback },
-    }));
-
+    attached = false;
+    initialAttachAttempted = false;
     visible = false;
     feedbackText = "";
+    await tick();
+
+    window.dispatchEvent(new CustomEvent("bds:deep-research-revise", { detail }));
+    window.dispatchEvent(new CustomEvent("bds:deep-research-revision-submitted", {
+      detail: { runId: detail.runId, feedback: detail.feedback },
+    }));
   }
 
   function dismiss(event) {
     event?.preventDefault?.();
     event?.stopPropagation?.();
+    attached = false;
+    initialAttachAttempted = false;
     visible = false;
     feedbackText = "";
     if (appState.ui?.showToast) {
@@ -113,11 +123,32 @@
 
   function stopNativeEvent(event) {
     event?.stopPropagation?.();
+    event?.stopImmediatePropagation?.();
+  }
+
+  function handlePanelPointerDown(event) {
+    event?.stopPropagation?.();
+    event?.stopImmediatePropagation?.();
+    if (event?.target?.closest?.("button")) return;
+    setTimeout(focusFeedbackInput, 0);
+  }
+
+  function handleFeedbackPointerDown(event) {
+    event?.stopPropagation?.();
+    event?.stopImmediatePropagation?.();
+    setTimeout(focusFeedbackInput, 0);
   }
 </script>
 
 {#if visible}
-  <div class="bds-dr-revision-panel" bind:this={panelElement} data-testid="deep-research-revision-panel">
+  <div
+    class="bds-dr-revision-panel"
+    class:bds-dr-revision-panel--hidden={!attached && !initialAttachAttempted}
+    bind:this={panelElement}
+    onpointerdown={handlePanelPointerDown}
+    aria-hidden={!attached && !initialAttachAttempted}
+    data-testid="deep-research-revision-panel"
+  >
     <div class="bds-dr-revision-header">
       <div>
         <div class="bds-dr-revision-title">Request Plan Changes</div>
@@ -132,7 +163,7 @@
       class="bds-dr-revision-input"
       placeholder="Describe what should change in the research plan..."
       bind:value={feedbackText}
-      onpointerdown={stopNativeEvent}
+      onpointerdown={handleFeedbackPointerDown}
       onmousedown={stopNativeEvent}
       onclick={stopNativeEvent}
       onkeydown={stopNativeEvent}
@@ -167,6 +198,11 @@
     font-family: inherit;
     width: 100%;
     margin-bottom: 12px;
+  }
+
+  .bds-dr-revision-panel--hidden {
+    visibility: hidden;
+    pointer-events: none !important;
   }
 
   .bds-dr-revision-header {

@@ -34,6 +34,8 @@
 <div
   tabindex="0"
   aria-pressed={localEnabled}
+  aria-label={localEnabled ? "Deep Research enabled" : "Deep Research disabled"}
+  data-tooltip={localEnabled ? "Deep Research enabled" : "Deep Research disabled"}
   class="bds-deep-research-toggle f79352dc ds-toggle-button ds-toggle-button--m"
   class:ds-toggle-button--selected={localEnabled}
   class:bds-deep-research-toggle--selected={localEnabled}
@@ -73,8 +75,28 @@
   }
 
   .bds-deep-research-toggle {
+    position: relative;
     cursor: pointer;
     user-select: none;
+  }
+
+  .bds-deep-research-toggle:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 10px);
+    transform: translateX(-50%);
+    z-index: 100000;
+    pointer-events: none;
+    white-space: nowrap;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: rgba(54, 55, 61, 0.96);
+    color: #f3f4f6;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.2;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
   }
 
   .bds-deep-research-toggle:focus,

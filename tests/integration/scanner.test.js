@@ -144,6 +144,26 @@ describe("scanner input controls", () => {
     expect(mountMock.mock.calls[0][0]).toBe(deepResearchToggleMock);
   });
 
+  it("does not reinsert the Deep Research mount when rescanning an unchanged action row", async () => {
+    document.body.innerHTML = `
+      <div id="composer">
+        <textarea id="chat-input" placeholder="Message DeepSeek"></textarea>
+        <div id="prompt-actions">
+          <button id="deepthink" type="button">DeepThink</button>
+        </div>
+      </div>
+    `;
+    const { scanInputArea } = await import("../../src/content/scanner.js");
+
+    scanInputArea();
+    const promptActions = document.querySelector("#prompt-actions");
+    const insertSpy = vi.spyOn(promptActions, "insertBefore");
+
+    scanInputArea();
+
+    expect(insertSpy).not.toHaveBeenCalled();
+  });
+
   it("keeps Deep Research out of the send cluster when Expert mode still exposes a file input", async () => {
     document.body.innerHTML = `
       <div id="composer">

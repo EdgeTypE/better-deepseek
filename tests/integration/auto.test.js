@@ -113,6 +113,25 @@ describe("auto integration", () => {
     expect(inputListener).toHaveBeenCalled();
   });
 
+  it("ignores BDS panel textareas when choosing the chat input", async () => {
+    document.body.innerHTML = `
+      <div class="ds-textarea">
+        <div role="textbox" contenteditable="plaintext-only"></div>
+        <div class="bds-dr-revision-panel">
+          <textarea placeholder="Describe what should change"></textarea>
+        </div>
+      </div>
+    `;
+    const editor = document.querySelector('[role="textbox"]');
+    const panelTextarea = document.querySelector(".bds-dr-revision-panel textarea");
+    const { setChatInputText } = await importAutoModule();
+
+    expect(setChatInputText("Revision request")).toBe(true);
+
+    expect(editor.textContent).toBe("Revision request");
+    expect(panelTextarea.value).toBe("");
+  });
+
   it("sets ProseMirror-style contenteditable chat input as paragraphs", async () => {
     document.body.innerHTML = '<div class="ProseMirror" contenteditable="true"><p><br></p></div>';
     const editor = document.querySelector(".ProseMirror");
