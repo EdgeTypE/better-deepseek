@@ -13,21 +13,23 @@
 /** Exact trimmed text of the settings menu item to hide. */
 export const DRAWER_APP_ITEM_TEXT = "Download mobile App";
 
+const HIDE_ATTR = "data-bds-hide";
+
 export function hideDrawerAppItem() {
   if (window.__bdsDrawerItemObserver) return;
 
   function hideItem(menu) {
     const options = menu.querySelectorAll(".ds-dropdown-menu-option");
     for (const opt of options) {
+      if (opt.hasAttribute(HIDE_ATTR)) continue;
       const label = opt.querySelector(".ds-dropdown-menu-option__label");
       if (label?.textContent.trim().includes(DRAWER_APP_ITEM_TEXT)) {
-        opt.style.display = "none";
+        opt.setAttribute(HIDE_ATTR, "");
         console.log("[BDS] Hidden drawer app item");
       }
     }
   }
 
-  // Handle any menus already in the DOM at injection time.
   document.querySelectorAll(".ds-dropdown-menu").forEach(hideItem);
 
   const observer = new MutationObserver((mutations) => {

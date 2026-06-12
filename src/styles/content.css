@@ -713,6 +713,10 @@ textarea.bds-input,
    ══════════════════════════════════ */
 .bds-host-wrapper {
   margin: 10px 0 2px;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .bds-tool-host,

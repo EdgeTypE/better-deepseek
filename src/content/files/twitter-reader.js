@@ -3,9 +3,12 @@
  * Fetches tweet text and metadata via Twitter's OEmbed API.
  */
 
+import { normalizeHttpUrl } from "../../lib/utils/url-normalizer.js";
+
 export async function fetchTwitterTweet(tweetUrl) {
   try {
-    const apiUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(tweetUrl)}`;
+    const normalizedTweetUrl = normalizeHttpUrl(tweetUrl);
+    const apiUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(normalizedTweetUrl)}`;
     
     const response = await chrome.runtime.sendMessage({
       type: "bds-fetch-url",
@@ -34,7 +37,7 @@ export async function fetchTwitterTweet(tweetUrl) {
 
     const finalOutput = [
       `Author: ${authorName} (@${authorUrl.split("/").pop()})`,
-      `URL: ${tweetUrl}`,
+      `URL: ${normalizedTweetUrl}`,
       `---`,
       tweetText
     ].join("\n\n");

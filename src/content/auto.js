@@ -12,6 +12,7 @@ import appState from "./state.js";
 import { XLSX_SKILL } from "../lib/office-skills/xlsx.js";
 import { PPTX_SKILL } from "../lib/office-skills/pptx.js";
 import { DOCX_SKILL } from "../lib/office-skills/docx.js";
+import { extractHttpUrl, normalizeHttpUrl } from "../lib/utils/url-normalizer.js";
 
 const TOOL_TO_SKILL = {
   PPTX: { tag: "pptx", skill: PPTX_SKILL },
@@ -29,38 +30,49 @@ const processedSearchQueries = new Set();
 const processedRunSearchQueries = new Map();
 
 export async function handleAutoWebFetch(url) {
-  if (processedWebFetches.has(url)) return;
-  processedWebFetches.add(url);
+  let targetUrl;
+  try {
+    targetUrl = normalizeHttpUrl(url);
+  } catch (err) {
+    console.error("[BDS:AUTO] Invalid Web Fetch URL:", err);
+    return;
+  }
 
-  console.log(`[BDS:AUTO] Starting automatic web fetch for: ${url}`);
+  if (processedWebFetches.has(targetUrl)) return;
+  processedWebFetches.add(targetUrl);
+
+  console.log(`[BDS:AUTO] Starting automatic web fetch for: ${targetUrl}`);
 
   try {
-    const file = await fetchAndConvertWebPage(url, (status) => {
+    const file = await fetchAndConvertWebPage(targetUrl, (status) => {
       console.log(`[BDS:AUTO] Web Fetch Status: ${status}`);
     });
 
     if (file) {
-      injectFileAndSend(file, `<BetterDeepSeek>\n[BDS:AUTO] Web Fetch Result for: ${url}\n</BetterDeepSeek>`);
+      injectFileAndSend(file, `<BetterDeepSeek>\n[BDS:AUTO] Web Fetch Result for: ${targetUrl}\n</BetterDeepSeek>`);
     }
   } catch (err) {
     console.error("[BDS:AUTO] Web Fetch Failed:", err);
     // Optionally create a text file with the error so DeepSeek knows it failed
-    const errorBlob = new Blob([`Failed to fetch ${url}:\n\n${err.message}`], { type: "text/plain" });
-    const errorFile = new File([errorBlob], `error_${url.replace(/[^a-zA-Z0-9]/g, "_")}.txt`, { type: "text/plain" });
-    injectFileAndSend(errorFile, `<BetterDeepSeek>\n[BDS:AUTO] Web fetch failed for ${url}\n</BetterDeepSeek>`);
+    const errorBlob = new Blob([`Failed to fetch ${targetUrl}:\n\n${err.message}`], { type: "text/plain" });
+    const errorFile = new File([errorBlob], `error_${targetUrl.replace(/[^a-zA-Z0-9]/g, "_")}.txt`, { type: "text/plain" });
+    injectFileAndSend(errorFile, `<BetterDeepSeek>\n[BDS:AUTO] Web fetch failed for ${targetUrl}\n</BetterDeepSeek>`);
   }
 }
 
 export async function handleAutoGitHubFetch(repoUrl) {
-  if (processedGitHubFetches.has(repoUrl)) return;
-  processedGitHubFetches.add(repoUrl);
+  const targetRepoUrl = extractHttpUrl(repoUrl) || String(repoUrl || "").trim();
+  if (!targetRepoUrl) return;
 
-  console.log(`[BDS:AUTO] Starting automatic GitHub fetch for: ${repoUrl}`);
+  if (processedGitHubFetches.has(targetRepoUrl)) return;
+  processedGitHubFetches.add(targetRepoUrl);
+
+  console.log(`[BDS:AUTO] Starting automatic GitHub fetch for: ${targetRepoUrl}`);
 
   try {
     const token = String(appState.settings.githubToken || "").trim();
     const file = await fetchGitHubRepo(
-      repoUrl,
+      targetRepoUrl,
       (status) => {
         console.log(`[BDS:AUTO] GitHub Fetch Status: ${status}`);
       },
@@ -68,51 +80,67 @@ export async function handleAutoGitHubFetch(repoUrl) {
     );
 
     if (file) {
-      injectFileAndSend(file, `<BetterDeepSeek>\n[BDS:AUTO] GitHub Fetch Result for: ${repoUrl}\n</BetterDeepSeek>`);
+      injectFileAndSend(file, `<BetterDeepSeek>\n[BDS:AUTO] GitHub Fetch Result for: ${targetRepoUrl}\n</BetterDeepSeek>`);
     }
   } catch (err) {
     console.error("[BDS:AUTO] GitHub Fetch Failed:", err);
-    const errorBlob = new Blob([`Failed to fetch GitHub repo ${repoUrl}:\n\n${err.message}`], { type: "text/plain" });
-    const errorFile = new File([errorBlob], `github_error_${repoUrl.replace(/[^a-zA-Z0-9]/g, "_")}.txt`, { type: "text/plain" });
-    injectFileAndSend(errorFile, `<BetterDeepSeek>\n[BDS:AUTO] GitHub fetch failed for ${repoUrl}\n</BetterDeepSeek>`);
+    const errorBlob = new Blob([`Failed to fetch GitHub repo ${targetRepoUrl}:\n\n${err.message}`], { type: "text/plain" });
+    const errorFile = new File([errorBlob], `github_error_${targetRepoUrl.replace(/[^a-zA-Z0-9]/g, "_")}.txt`, { type: "text/plain" });
+    injectFileAndSend(errorFile, `<BetterDeepSeek>\n[BDS:AUTO] GitHub fetch failed for ${targetRepoUrl}\n</BetterDeepSeek>`);
   }
 }
 
 export async function handleAutoTwitterFetch(url) {
-  if (processedTwitterFetches.has(url)) return;
-  processedTwitterFetches.add(url);
+  let targetUrl;
+  try {
+    targetUrl = normalizeHttpUrl(url);
+  } catch (err) {
+    console.error("[BDS:AUTO] Invalid Twitter URL:", err);
+    return;
+  }
 
-  console.log(`[BDS:AUTO] Starting automatic Twitter fetch for: ${url}`);
+  if (processedTwitterFetches.has(targetUrl)) return;
+  processedTwitterFetches.add(targetUrl);
+
+  console.log(`[BDS:AUTO] Starting automatic Twitter fetch for: ${targetUrl}`);
 
   try {
-    const file = await fetchTwitterTweet(url);
+    const file = await fetchTwitterTweet(targetUrl);
     if (file) {
-      injectFileAndSend(file, `<BetterDeepSeek>\n[BDS:AUTO] Twitter Fetch Result for: ${url}\n</BetterDeepSeek>`);
+      injectFileAndSend(file, `<BetterDeepSeek>\n[BDS:AUTO] Twitter Fetch Result for: ${targetUrl}\n</BetterDeepSeek>`);
     }
   } catch (err) {
     console.error("[BDS:AUTO] Twitter Fetch Failed:", err);
-    const errorBlob = new Blob([`Failed to fetch tweet ${url}:\n\n${err.message}`], { type: "text/plain" });
-    const errorFile = new File([errorBlob], `twitter_error_${url.replace(/[^a-zA-Z0-9]/g, "_")}.md`, { type: "text/plain" });
-    injectFileAndSend(errorFile, `<BetterDeepSeek>\n[BDS:AUTO] Twitter fetch failed for ${url}\n</BetterDeepSeek>`);
+    const errorBlob = new Blob([`Failed to fetch tweet ${targetUrl}:\n\n${err.message}`], { type: "text/plain" });
+    const errorFile = new File([errorBlob], `twitter_error_${targetUrl.replace(/[^a-zA-Z0-9]/g, "_")}.md`, { type: "text/plain" });
+    injectFileAndSend(errorFile, `<BetterDeepSeek>\n[BDS:AUTO] Twitter fetch failed for ${targetUrl}\n</BetterDeepSeek>`);
   }
 }
 
 export async function handleAutoYouTubeFetch(url) {
-  if (processedYouTubeFetches.has(url)) return;
-  processedYouTubeFetches.add(url);
+  let targetUrl;
+  try {
+    targetUrl = normalizeHttpUrl(url);
+  } catch (err) {
+    console.error("[BDS:AUTO] Invalid YouTube URL:", err);
+    return;
+  }
 
-  console.log(`[BDS:AUTO] Starting automatic YouTube fetch for: ${url}`);
+  if (processedYouTubeFetches.has(targetUrl)) return;
+  processedYouTubeFetches.add(targetUrl);
+
+  console.log(`[BDS:AUTO] Starting automatic YouTube fetch for: ${targetUrl}`);
 
   try {
-    const file = await fetchYouTubeData(url);
+    const file = await fetchYouTubeData(targetUrl);
     if (file) {
-      injectFileAndSend(file, `<BetterDeepSeek>\n[BDS:AUTO] YouTube Fetch Result for: ${url}\n</BetterDeepSeek>`);
+      injectFileAndSend(file, `<BetterDeepSeek>\n[BDS:AUTO] YouTube Fetch Result for: ${targetUrl}\n</BetterDeepSeek>`);
     }
   } catch (err) {
     console.error("[BDS:AUTO] YouTube Fetch Failed:", err);
-    const errorBlob = new Blob([`Failed to fetch YouTube video ${url}:\n\n${err.message}`], { type: "text/plain" });
-    const errorFile = new File([errorBlob], `youtube_error_${url.replace(/[^a-zA-Z0-9]/g, "_")}.txt`, { type: "text/plain" });
-    injectFileAndSend(errorFile, `<BetterDeepSeek>\n[BDS:AUTO] YouTube fetch failed for ${url}\n</BetterDeepSeek>`);
+    const errorBlob = new Blob([`Failed to fetch YouTube video ${targetUrl}:\n\n${err.message}`], { type: "text/plain" });
+    const errorFile = new File([errorBlob], `youtube_error_${targetUrl.replace(/[^a-zA-Z0-9]/g, "_")}.txt`, { type: "text/plain" });
+    injectFileAndSend(errorFile, `<BetterDeepSeek>\n[BDS:AUTO] YouTube fetch failed for ${targetUrl}\n</BetterDeepSeek>`);
   }
 }
 

@@ -16,11 +16,13 @@
   let expandedResults = $state(new Set());
 
   function toggleResult(index) {
-    if (expandedResults.has(index)) {
-      expandedResults.delete(index);
+    const next = new Set(expandedResults);
+    if (next.has(index)) {
+      next.delete(index);
     } else {
-      expandedResults.add(index);
+      next.add(index);
     }
+    expandedResults = next;
   }
 
   function openUrl(url) {
@@ -72,6 +74,10 @@
 <style>
   .bds-search-card {
     margin: 8px 0;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     border: 1px solid var(--bds-border);
     border-radius: 12px;
     background: var(--bds-bg-panel);
@@ -84,13 +90,17 @@
     align-items: center;
     justify-content: space-between;
     padding: 10px 14px;
+    min-width: 0;
+    max-width: 100%;
   }
 
   .bds-search-info {
     display: flex;
     align-items: center;
+    flex: 1 1 auto;
     gap: 12px;
     min-width: 0;
+    max-width: 100%;
   }
 
   .bds-search-icon {
@@ -111,7 +121,9 @@
   }
 
   .bds-search-details {
+    flex: 1 1 auto;
     min-width: 0;
+    max-width: 100%;
   }
 
   .bds-search-details h4 {
@@ -135,10 +147,15 @@
 
   .bds-search-entries {
     border-top: 1px solid var(--bds-border);
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
   }
 
   .bds-search-entry {
     border-bottom: 1px solid var(--bds-border);
+    min-width: 0;
+    max-width: 100%;
   }
 
   .bds-search-entry:last-child {
@@ -150,6 +167,9 @@
     align-items: center;
     gap: 8px;
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
     padding: 10px 14px;
     background: transparent;
     border: none;
@@ -174,6 +194,9 @@
 
   .bds-search-title {
     flex: 1;
+    display: block;
+    min-width: 0;
+    max-width: 100%;
     font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -188,6 +211,10 @@
 
   .bds-search-entry-body {
     padding: 0 14px 10px 44px;
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
   }
 
   .bds-search-snippet {
@@ -195,10 +222,16 @@
     font-size: 11px;
     color: var(--bds-text-secondary);
     line-height: 1.4;
+    display: -webkit-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
   }
 
   .bds-search-url {
     display: block;
+    max-width: 100%;
     margin: 0;
     padding: 0;
     background: transparent;
@@ -208,7 +241,10 @@
     cursor: pointer;
     text-decoration: underline;
     text-align: left;
-    word-break: break-all;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    word-break: normal;
   }
 
   .bds-search-url:hover {

@@ -77,6 +77,19 @@ describe("auto integration", () => {
     expect(sendButton.click).toHaveBeenCalledOnce();
   });
 
+  it("normalizes markdown links before fetching a web page", async () => {
+    const file = new File(["page"], "page.txt", { type: "text/plain" });
+    readerMocks.fetchAndConvertWebPage.mockResolvedValue(file);
+    const { handleAutoWebFetch } = await importAutoModule();
+
+    await handleAutoWebFetch("[Example](https://example.com/page)");
+
+    expect(readerMocks.fetchAndConvertWebPage).toHaveBeenCalledWith(
+      "https://example.com/page",
+      expect.any(Function),
+    );
+  });
+
   it("injects pure text and sends it through the chat input", async () => {
     const { injectPureTextAndSend } = await importAutoModule();
 

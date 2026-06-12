@@ -53,21 +53,21 @@ describe("hideDrawerAppItem", () => {
   it("hides the Download mobile App option", () => {
     makeMenu(STANDARD_ITEMS);
     hideDrawerAppItem();
-    expect(document.querySelector('[data-testid="item-download"]').style.display).toBe("none");
+    expect(document.querySelector('[data-testid="item-download"]').hasAttribute("data-bds-hide")).toBe(true);
   });
 
   it("leaves unrelated options visible", () => {
     makeMenu(STANDARD_ITEMS);
     hideDrawerAppItem();
-    expect(document.querySelector('[data-testid="item-settings"]').style.display).not.toBe("none");
-    expect(document.querySelector('[data-testid="item-report"]').style.display).not.toBe("none");
-    expect(document.querySelector('[data-testid="item-logout"]').style.display).not.toBe("none");
+    expect(document.querySelector('[data-testid="item-settings"]').hasAttribute("data-bds-hide")).toBe(false);
+    expect(document.querySelector('[data-testid="item-report"]').hasAttribute("data-bds-hide")).toBe(false);
+    expect(document.querySelector('[data-testid="item-logout"]').hasAttribute("data-bds-hide")).toBe(false);
   });
 
   it("hides the option when label has surrounding whitespace", () => {
     makeMenu([{ text: `  ${DRAWER_APP_ITEM_TEXT}  `, testid: "item" }]);
     hideDrawerAppItem();
-    expect(document.querySelector('[data-testid="item"]').style.display).toBe("none");
+    expect(document.querySelector('[data-testid="item"]').hasAttribute("data-bds-hide")).toBe(true);
   });
 
   it("does nothing when no .ds-dropdown-menu is present", () => {
@@ -79,31 +79,31 @@ describe("hideDrawerAppItem", () => {
   it("does not hide options with only partial text", () => {
     makeMenu([{ text: "Download App", testid: "item" }]);
     hideDrawerAppItem();
-    expect(document.querySelector('[data-testid="item"]').style.display).not.toBe("none");
+    expect(document.querySelector('[data-testid="item"]').hasAttribute("data-bds-hide")).toBe(false);
   });
 
   it("does not hide options with different casing", () => {
     makeMenu([{ text: "download mobile app", testid: "item" }]);
     hideDrawerAppItem();
-    expect(document.querySelector('[data-testid="item"]').style.display).not.toBe("none");
+    expect(document.querySelector('[data-testid="item"]').hasAttribute("data-bds-hide")).toBe(false);
   });
 
   it("does not hide options with alternate phrasing (Get the App)", () => {
     makeMenu([{ text: "Get the App", testid: "item" }]);
     hideDrawerAppItem();
-    expect(document.querySelector('[data-testid="item"]').style.display).not.toBe("none");
+    expect(document.querySelector('[data-testid="item"]').hasAttribute("data-bds-hide")).toBe(false);
   });
 
   it("hides the option when label has a leading icon before the target text", () => {
     makeMenu([{ text: "📱 Download mobile App", testid: "item" }]);
     hideDrawerAppItem();
-    expect(document.querySelector('[data-testid="item"]').style.display).toBe("none");
+    expect(document.querySelector('[data-testid="item"]').hasAttribute("data-bds-hide")).toBe(true);
   });
 
   it("does not hide options with unrelated text", () => {
     makeMenu([{ text: "Mobile settings", testid: "item" }]);
     hideDrawerAppItem();
-    expect(document.querySelector('[data-testid="item"]').style.display).not.toBe("none");
+    expect(document.querySelector('[data-testid="item"]').hasAttribute("data-bds-hide")).toBe(false);
   });
 
   // ── idempotency ────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ describe("hideDrawerAppItem", () => {
     window.__bdsDrawerItemObserver = sentinel;
     makeMenu(STANDARD_ITEMS);
     hideDrawerAppItem();
-    expect(document.querySelector('[data-testid="item-download"]').style.display).not.toBe("none");
+    expect(document.querySelector('[data-testid="item-download"]').hasAttribute("data-bds-hide")).toBe(false);
     expect(window.__bdsDrawerItemObserver).toBe(sentinel);
   });
 
@@ -128,7 +128,7 @@ describe("hideDrawerAppItem", () => {
     hideDrawerAppItem();
     makeMenu(STANDARD_ITEMS);
     await vi.waitFor(() =>
-      expect(document.querySelector('[data-testid="item-download"]').style.display).toBe("none"),
+      expect(document.querySelector('[data-testid="item-download"]').hasAttribute("data-bds-hide")).toBe(true),
     );
   });
 
@@ -136,10 +136,10 @@ describe("hideDrawerAppItem", () => {
     hideDrawerAppItem();
     makeMenu(STANDARD_ITEMS);
     await vi.waitFor(() =>
-      expect(document.querySelector('[data-testid="item-download"]').style.display).toBe("none"),
+      expect(document.querySelector('[data-testid="item-download"]').hasAttribute("data-bds-hide")).toBe(true),
     );
-    expect(document.querySelector('[data-testid="item-settings"]').style.display).not.toBe("none");
-    expect(document.querySelector('[data-testid="item-logout"]').style.display).not.toBe("none");
+    expect(document.querySelector('[data-testid="item-settings"]').hasAttribute("data-bds-hide")).toBe(false);
+    expect(document.querySelector('[data-testid="item-logout"]').hasAttribute("data-bds-hide")).toBe(false);
   });
 
   it("does not affect per-chat menus that have no matching option", async () => {
@@ -151,8 +151,8 @@ describe("hideDrawerAppItem", () => {
       { text: "Delete", testid: "chat-delete" },
     ]);
     await vi.waitFor(() => expect(document.querySelector('[data-testid="chat-rename"]')).toBeTruthy());
-    expect(document.querySelector('[data-testid="chat-rename"]').style.display).not.toBe("none");
-    expect(document.querySelector('[data-testid="chat-delete"]').style.display).not.toBe("none");
+    expect(document.querySelector('[data-testid="chat-rename"]').hasAttribute("data-bds-hide")).toBe(false);
+    expect(document.querySelector('[data-testid="chat-delete"]').hasAttribute("data-bds-hide")).toBe(false);
   });
 
   // ── SPA persistence ───────────────────────────────────────────────────
@@ -160,12 +160,12 @@ describe("hideDrawerAppItem", () => {
   it("re-hides option when menu is removed and re-added (SPA nav)", async () => {
     const menu = makeMenu(STANDARD_ITEMS);
     hideDrawerAppItem();
-    expect(document.querySelector('[data-testid="item-download"]').style.display).toBe("none");
+    expect(document.querySelector('[data-testid="item-download"]').hasAttribute("data-bds-hide")).toBe(true);
 
     menu.remove();
     makeMenu(STANDARD_ITEMS);
     await vi.waitFor(() =>
-      expect(document.querySelector('[data-testid="item-download"]').style.display).toBe("none"),
+      expect(document.querySelector('[data-testid="item-download"]').hasAttribute("data-bds-hide")).toBe(true),
     );
   });
 });

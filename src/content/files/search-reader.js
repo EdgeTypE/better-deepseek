@@ -1,14 +1,41 @@
 /**
  * Search Reader
- * Fetches DuckDuckGo Lite search results via background script,
- * parses the HTML, and returns formatted markdown results.
- * Supports optional deepFetch to auto-read content from top N results.
+ * Fetches search results via background script / Android bridge, parses the
+ * HTML, and returns formatted markdown results. Supports optional deepFetch to
+ * auto-read content from top N results.
  */
 
 import { fetchAndConvertWebPage } from "./web-reader.js";
 
-const SEARCH_URL = "https://lite.duckduckgo.com/lite/?q=";
+const DUCKDUCKGO_SEARCH_URL = "https://lite.duckduckgo.com/lite/?q=";
+const BING_SEARCH_URL = "https://www.bing.com/search?q=";
 const MAX_DEEP_FETCH = 5;
+
+const SEARCH_PROVIDERS = [
+  {
+    name: "DuckDuckGo",
+    url: (query) => DUCKDUCKGO_SEARCH_URL + encodeURIComponent(query),
+    parse: parseDuckDuckGoSearchResults,
+  },
+  {
+    name: "Bing",
+    url: (query) => BING_SEARCH_URL + encodeURIComponent(query),
+    parse: parseBingSearchResults,
+  },
+];
+
+function cleanSearchText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function isHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Extract the actual destination URL from a DDG click-track redirect link.
@@ -25,48 +52,113 @@ function extractUrlFromDdgLink(href) {
   }
 }
 
+function decodeBase64Url(value) {
+  if (!value) return "";
+
+  try {
+    const normalized = value
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(value.length / 4) * 4, "=");
+    const binary =
+      typeof atob === "function"
+        ? atob(normalized)
+        : typeof Buffer !== "undefined"
+          ? Buffer.from(normalized, "base64").toString("binary")
+          : "";
+    if (!binary) return "";
+
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return "";
+  }
+}
+
 /**
- * Parse DDG Lite HTML and extract search results.
- * Current DDG Lite structure (tables, no table.result class):
- *   <table border="0">
- *     <tr>              ← link row
- *       <td valign="top">1.&nbsp;</td>
- *       <td><a class="result-link" href="//...?uddg=...">Title</a></td>
- *     </tr>
- *     <tr>              ← snippet row (may be absent)
- *       <td>&nbsp;&nbsp;&nbsp;</td>
- *       <td class="result-snippet">snippet</td>
- *     </tr>
- *     <tr>              ← URL row
- *       <td>&nbsp;&nbsp;&nbsp;</td>
- *       <td><span class="link-text">example.com/page</span></td>
- *     </tr>
- *     <tr><td>&nbsp;</td><td>&nbsp;</td></tr>  ← spacer
- *   </table>
+ * Extract the actual destination URL from a Bing click-track redirect link.
+ * Bing wraps URLs in /ck/a?...&u=a1<base64url(destination)>&...
  */
-function parseSearchResults(html) {
+function extractUrlFromBingLink(href) {
+  if (!href) return "";
+
+  try {
+    const url = new URL(href, "https://www.bing.com");
+    const wrapped = url.searchParams.get("u");
+
+    if (wrapped) {
+      const decodedParam = decodeURIComponent(wrapped);
+      const candidates = [
+        decodedParam,
+        decodedParam.startsWith("a1") || decodedParam.startsWith("a2")
+          ? decodedParam.slice(2)
+          : "",
+      ];
+
+      for (const candidate of candidates) {
+        if (isHttpUrl(candidate)) return candidate;
+
+        const decodedUrl = decodeBase64Url(candidate);
+        if (isHttpUrl(decodedUrl)) return decodedUrl;
+      }
+    }
+
+    if (url.hostname.endsWith("bing.com") && url.pathname.startsWith("/ck/")) {
+      return "";
+    }
+
+    return isHttpUrl(url.toString()) ? url.toString() : href;
+  } catch {
+    return href;
+  }
+}
+
+/**
+ * Parse DuckDuckGo Lite / HTML result pages.
+ *
+ * DDG Lite currently uses simple table rows:
+ *   <tr>
+ *     <td valign="top">1.&nbsp;</td>
+ *     <td><a class="result-link" href="//duckduckgo.com/l/?uddg=...">Title</a></td>
+ *   </tr>
+ *   <tr>
+ *     <td>&nbsp;&nbsp;&nbsp;</td>
+ *     <td class="result-snippet">Snippet text</td>
+ *   </tr>
+ *   <tr>
+ *     <td>&nbsp;&nbsp;&nbsp;</td>
+ *     <td><span class="link-text">example.com/page</span></td>
+ *   </tr>
+ *
+ * DDG HTML can instead use block results:
+ *   <div class="result">
+ *     <a class="result__a" href="/l/?uddg=...">Title</a>
+ *     <a class="result__snippet">Snippet text</a>
+ *   </div>
+ */
+function parseDuckDuckGoSearchResults(html) {
   const doc = new DOMParser().parseFromString(html, "text/html");
-  const links = doc.querySelectorAll("a.result-link");
+  const links = doc.querySelectorAll("a.result-link, a.result__a");
   const results = [];
 
   for (const link of links) {
-    const linkRow = link.closest("tr");
-    if (!linkRow) continue;
-
-    const title = link.textContent.trim();
+    const title = cleanSearchText(link.textContent);
     const rawHref = link.getAttribute("href") || "";
     const url = extractUrlFromDdgLink(rawHref);
+    if (!title || !isHttpUrl(url)) continue;
 
     let snippet = "";
-    let nextRow = linkRow.nextElementSibling;
+    const resultContainer = link.closest(".result");
 
-    // The next row may be the snippet row, the URL row, or absent
-    if (nextRow) {
-      const snippetEl = nextRow.querySelector(".result-snippet");
-      if (snippetEl) {
-        snippet = snippetEl.textContent.trim();
-        nextRow = nextRow.nextElementSibling;
-      }
+    if (resultContainer) {
+      snippet = cleanSearchText(resultContainer.querySelector(".result__snippet")?.textContent);
+    } else {
+      const linkRow = link.closest("tr");
+      if (!linkRow) continue;
+
+      const nextRow = linkRow.nextElementSibling;
+      const snippetEl = nextRow?.querySelector(".result-snippet");
+      snippet = cleanSearchText(snippetEl?.textContent);
     }
 
     results.push({ title, url, snippet });
@@ -76,13 +168,73 @@ function parseSearchResults(html) {
 }
 
 /**
+ * Parse Bing HTML result pages used as a fallback when DuckDuckGo returns its
+ * Android/OkHttp anomaly page.
+ *
+ * Bing organic results are list items:
+ *   <li class="b_algo">
+ *     <h2><a href="https://www.bing.com/ck/a?...&u=a1BASE64URL...">Title</a></h2>
+ *     <div class="b_caption"><p>Snippet text</p></div>
+ *   </li>
+ *
+ * The direct destination is stored in the `u` query parameter. Bing prefixes
+ * the base64url payload with `a1` / `a2`, so extractUrlFromBingLink strips that
+ * marker and decodes the URL before deep-fetch uses it.
+ */
+function parseBingSearchResults(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const results = [];
+  const seenUrls = new Set();
+
+  for (const item of doc.querySelectorAll("li.b_algo")) {
+    const link = item.querySelector("h2 a[href]");
+    if (!link) continue;
+
+    const title = cleanSearchText(link.textContent);
+    const url = extractUrlFromBingLink(link.getAttribute("href") || "");
+    if (!title || !isHttpUrl(url) || seenUrls.has(url)) continue;
+
+    const snippet = cleanSearchText(
+      item.querySelector(".b_caption p, .b_snippet, .b_lineclamp2, p")?.textContent
+    );
+
+    seenUrls.add(url);
+    results.push({ title, url, snippet });
+  }
+
+  return results;
+}
+
+function parseSearchResults(html) {
+  const duckDuckGoResults = parseDuckDuckGoSearchResults(html);
+  return duckDuckGoResults.length > 0 ? duckDuckGoResults : parseBingSearchResults(html);
+}
+
+function isSearchChallengePage(html, status) {
+  if (Number(status) === 202) return true;
+
+  const content = String(html || "");
+  if (/result-link|result__a|b_algo/.test(content)) return false;
+
+  return /anomaly|captcha|unusual traffic|verify you are human|robot|bot detection/i.test(content);
+}
+
+function searchFailureMessage(errors) {
+  const messages = errors.map((error) => error.replace(/^[^:]+:\s*/, ""));
+  const uniqueMessages = [...new Set(messages)];
+  return uniqueMessages.length === 1
+    ? `Search failed: ${uniqueMessages[0]}`
+    : `Search failed: ${errors.join("; ")}`;
+}
+
+/**
  * Format search results as a markdown document.
  */
-function formatSearchResults(query, results) {
+function formatSearchResults(query, results, provider = "DuckDuckGo") {
   const lines = [];
   lines.push(`# Search Results: ${query}`);
   lines.push("");
-  lines.push(`> ${results.length} results found via DuckDuckGo`);
+  lines.push(`> ${results.length} results found via ${provider}`);
   lines.push("");
   lines.push("---");
   lines.push("");
@@ -121,14 +273,20 @@ function formatDeepFetchContent(title, url, markdown) {
 }
 
 /**
- * Search the web via DuckDuckGo Lite.
+ * Search the web.
  *
  * @param {string} query - Search query
  * @param {number} [deepFetch=0] - Number of top results to also fetch full content for
  * @param {(status: string) => void} [onStatus] - Optional status callback
- * @returns {Promise<{file: File, results: Array<{title: string, url: string, snippet: string}>, query: string, deepFetch: number}>}
+ * @returns {Promise<{file: File, results: Array<{title: string, url: string, snippet: string}>, query: string, deepFetch: number, provider: string}>}
  */
-export { parseSearchResults, formatSearchResults, formatDeepFetchContent, extractUrlFromDdgLink };
+export {
+  parseSearchResults,
+  formatSearchResults,
+  formatDeepFetchContent,
+  extractUrlFromDdgLink,
+  extractUrlFromBingLink,
+};
 
 export async function searchWeb(query, deepFetch = 0, onStatus = () => {}) {
   const trimmedQuery = String(query || "").trim();
@@ -138,31 +296,55 @@ export async function searchWeb(query, deepFetch = 0, onStatus = () => {}) {
 
   const safeDeepFetch = Math.max(0, Math.min(MAX_DEEP_FETCH, Number(deepFetch) || 0));
 
-  onStatus("Searching DuckDuckGo...");
+  let providerName = "";
+  let results = [];
+  const errors = [];
 
-  let html;
-  try {
-    const response = await chrome.runtime.sendMessage({
-      type: "bds-fetch-url",
-      url: SEARCH_URL + encodeURIComponent(trimmedQuery),
-    });
+  for (const provider of SEARCH_PROVIDERS) {
+    onStatus(`Searching ${provider.name}...`);
+
+    let response;
+    try {
+      response = await chrome.runtime.sendMessage({
+        type: "bds-fetch-url",
+        url: provider.url(trimmedQuery),
+      });
+    } catch (err) {
+      errors.push(`${provider.name}: ${err.message}`);
+      continue;
+    }
 
     if (!response || !response.ok) {
-      throw new Error(response?.error || "Search request failed.");
+      errors.push(`${provider.name}: ${response?.error || "Search request failed."}`);
+      continue;
     }
-    html = response.html;
-  } catch (err) {
-    throw new Error(`Search failed: ${err.message}`);
-  }
 
-  onStatus("Parsing search results...");
-  const results = parseSearchResults(html);
+    onStatus(`Parsing ${provider.name} results...`);
+    const parsedResults = provider.parse(response.html || "");
+    if (parsedResults.length > 0) {
+      providerName = provider.name;
+      results = parsedResults;
+      break;
+    }
+
+    errors.push(
+      `${provider.name}: ${
+        isSearchChallengePage(response.html, response.status)
+          ? "search provider returned an anti-bot challenge"
+          : "no results"
+      }`
+    );
+  }
 
   if (results.length === 0) {
-    throw new Error("No search results found for query: " + trimmedQuery);
+    const onlyNoResults = errors.length > 0 && errors.every((error) => /: no results$/.test(error));
+    if (onlyNoResults) {
+      throw new Error("No search results found for query: " + trimmedQuery);
+    }
+    throw new Error(searchFailureMessage(errors));
   }
 
-  let output = formatSearchResults(trimmedQuery, results);
+  let output = formatSearchResults(trimmedQuery, results, providerName);
 
   if (safeDeepFetch > 0) {
     onStatus(`Fetching content from top ${safeDeepFetch} results...`);
@@ -187,11 +369,12 @@ export async function searchWeb(query, deepFetch = 0, onStatus = () => {}) {
 
   onStatus("Creating file...");
   const blob = new Blob([output], { type: "text/markdown" });
-  const safeFilename = trimmedQuery
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "-")
-    .slice(0, 50) + "-search.md";
+  const safeFilename =
+    trimmedQuery
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "-")
+      .slice(0, 50) + "-search.md";
 
   const file = new File([blob], safeFilename, { type: "text/markdown" });
-  return { file, results, query: trimmedQuery, deepFetch: safeDeepFetch };
+  return { file, results, query: trimmedQuery, deepFetch: safeDeepFetch, provider: providerName };
 }

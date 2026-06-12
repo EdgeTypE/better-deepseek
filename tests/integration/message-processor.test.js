@@ -220,7 +220,19 @@ describe("message processor integration", () => {
     vi.advanceTimersByTime(3000);
     processMessageNode(node);
 
-    expect(mocks.handleAutoWebFetch).toHaveBeenCalledWith("https://example.com");
+    expect(mocks.handleAutoWebFetch).toHaveBeenCalledWith("https://example.com/");
+  });
+
+  it("normalizes markdown links before firing AUTO web fetch", () => {
+    const node = createMessageNode(
+      "<BDS:AUTO:REQUEST_WEB_FETCH>[Example](https://example.com/page)</BDS:AUTO:REQUEST_WEB_FETCH>",
+    );
+
+    processMessageNode(node);
+    vi.advanceTimersByTime(3000);
+    processMessageNode(node);
+
+    expect(mocks.handleAutoWebFetch).toHaveBeenCalledWith("https://example.com/page");
   });
 
   it("routes run-scoped AUTO search requests to the deep research handler", () => {

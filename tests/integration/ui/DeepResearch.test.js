@@ -346,7 +346,6 @@ describe("Deep Research UI components", () => {
       expect(btn.querySelector("svg")).toBeTruthy();
       expect(btn.getAttribute("aria-pressed")).toBe("false");
       expect(btn.getAttribute("aria-label")).toBe("Research online sources and consolidate findings");
-      expect(btn.getAttribute("data-tooltip")).toBe("Research online sources and consolidate findings");
       expect(btn.hasAttribute("aria-describedby")).toBe(false);
       expect(btn.classList.contains("ds-toggle-button")).toBe(true);
       expect(btn.classList.contains("ds-toggle-button--m")).toBe(true);
@@ -364,13 +363,12 @@ describe("Deep Research UI components", () => {
       expect(btn.textContent).toContain("DeepResearch");
       expect(btn.getAttribute("aria-pressed")).toBe("true");
       expect(btn.getAttribute("aria-label")).toBe("Research online sources and consolidate findings");
-      expect(btn.getAttribute("data-tooltip")).toBe("Research online sources and consolidate findings");
       expect(btn.hasAttribute("aria-describedby")).toBe(false);
       expect(btn.classList.contains("ds-toggle-button--selected")).toBe(true);
       cleanup();
     });
 
-    it("shows a native-looking tooltip on hover", async () => {
+    it("does not create a hover tooltip", async () => {
       const { target, cleanup } = renderSvelte(DeepResearchToggle, {
         enabled: false,
       });
@@ -380,16 +378,12 @@ describe("Deep Research UI components", () => {
       btn.dispatchEvent(new MouseEvent("mouseenter"));
       await flushUi();
 
-      const tooltipId = btn.getAttribute("aria-describedby");
-      const tooltip = document.getElementById(tooltipId);
-      expect(tooltip).toBeTruthy();
-      expect(tooltip.getAttribute("role")).toBe("tooltip");
-      expect(tooltip.classList.contains("bds-deep-research-tooltip")).toBe(true);
-      expect(tooltip.textContent).toBe("Research online sources and consolidate findings");
+      expect(btn.hasAttribute("aria-describedby")).toBe(false);
+      expect(document.querySelector(".bds-deep-research-tooltip")).toBeNull();
 
       btn.click();
       await flushUi();
-      expect(tooltip.textContent).toBe("Research online sources and consolidate findings");
+      expect(document.querySelector(".bds-deep-research-tooltip")).toBeNull();
 
       btn.dispatchEvent(new MouseEvent("mouseleave"));
       await flushUi();

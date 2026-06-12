@@ -16,9 +16,20 @@ import {
 import { parseLooseJson } from "./json-repair.js";
 import { parseMemoryWrite } from "./memory-parser.js";
 import { sanitizeVisibleText } from "./text-sanitizer.js";
+import { extractHttpUrl } from "../../lib/utils/url-normalizer.js";
 
 // Tool renderers that have visual cards
 const RENDERABLE_TOOLS = new Set(["html", "latex", "visualizer", "pptx", "excel", "docx", "ask_question", "character_create", "skill_create", "auto:code_runner", "auto_code_result", "auto:request_web_fetch", "auto:request_github_fetch", "auto:search", "deep_research_plan", "deep_research_status", "deep_research_report"]);
+
+function normalizeAutoHttpTarget(value) {
+  return extractHttpUrl(value);
+}
+
+function normalizeAutoTextTarget(value) {
+  const input = String(value || "").trim();
+  const linkedUrl = extractHttpUrl(input);
+  return linkedUrl || input;
+}
 
 /**
  * Parse a raw message text for all BDS tags.
@@ -213,7 +224,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
 
   const autoWebFetchRegex = /<BDS:AUTO:REQUEST_WEB_FETCH>([\s\S]*?)<\/BDS:AUTO:REQUEST_WEB_FETCH>/gi;
   while ((match = autoWebFetchRegex.exec(text)) !== null) {
-     const cleanUrl = String(match[1] || "").trim();
+     const cleanUrl = normalizeAutoHttpTarget(match[1]);
      if (cleanUrl) {
        result.autoRequests.webFetch.push(cleanUrl);
      }
@@ -221,7 +232,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
 
   const autoGitHubFetchRegex = /<BDS:AUTO:REQUEST_GITHUB_FETCH>([\s\S]*?)<\/BDS:AUTO:REQUEST_GITHUB_FETCH>/gi;
   while ((match = autoGitHubFetchRegex.exec(text)) !== null) {
-     const cleanUrl = String(match[1] || "").trim();
+     const cleanUrl = normalizeAutoTextTarget(match[1]);
      if (cleanUrl) {
        result.autoRequests.githubFetch.push(cleanUrl);
      }
@@ -229,7 +240,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
 
   const autoTwitterFetchRegex = /<BDS:AUTO:REQUEST_TWITTER_FETCH>([\s\S]*?)<\/BDS:AUTO:REQUEST_TWITTER_FETCH>/gi;
   while ((match = autoTwitterFetchRegex.exec(text)) !== null) {
-     const cleanUrl = String(match[1] || "").trim();
+     const cleanUrl = normalizeAutoHttpTarget(match[1]);
      if (cleanUrl) {
        result.autoRequests.twitterFetch.push(cleanUrl);
      }
@@ -237,7 +248,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
 
   const autoYouTubeFetchRegex = /<BDS:AUTO:REQUEST_YOUTUBE_FETCH>([\s\S]*?)<\/BDS:AUTO:REQUEST_YOUTUBE_FETCH>/gi;
   while ((match = autoYouTubeFetchRegex.exec(text)) !== null) {
-     const cleanUrl = String(match[1] || "").trim();
+     const cleanUrl = normalizeAutoHttpTarget(match[1]);
      if (cleanUrl) {
         result.autoRequests.youtubeFetch.push(cleanUrl);
      }

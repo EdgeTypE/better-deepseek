@@ -175,4 +175,22 @@ Findings.</BDS:DEEP_RESEARCH_REPORT>`;
       ]);
     });
   });
+
+  describe("AUTO URL normalization", () => {
+    it("extracts the URL from markdown web fetch tags", () => {
+      const text = `<BDS:AUTO:REQUEST_WEB_FETCH>[https://www.reddit.com/r/GamingLaptops/comments/16w0x23/ptm7950_for_laptop_gpu_cpu_how_much_do_i_need/](https://www.reddit.com/r/GamingLaptops/comments/16w0x23/ptm7950_for_laptop_gpu_cpu_how_much_do_i_need/)</BDS:AUTO:REQUEST_WEB_FETCH>`;
+      const result = parseBdsMessage(text);
+
+      expect(result.autoRequests.webFetch).toEqual([
+        "https://www.reddit.com/r/GamingLaptops/comments/16w0x23/ptm7950_for_laptop_gpu_cpu_how_much_do_i_need/",
+      ]);
+    });
+
+    it("does not schedule malformed web fetch targets", () => {
+      const text = `<BDS:AUTO:REQUEST_WEB_FETCH>[not a url](not-a-url)</BDS:AUTO:REQUEST_WEB_FETCH>`;
+      const result = parseBdsMessage(text);
+
+      expect(result.autoRequests.webFetch).toEqual([]);
+    });
+  });
 });

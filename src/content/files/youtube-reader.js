@@ -3,9 +3,12 @@
  * Extracts metadata and transcripts from YouTube video pages.
  */
 
+import { normalizeHttpUrl } from "../../lib/utils/url-normalizer.js";
+
 export async function fetchYouTubeData(videoUrl) {
   try {
-    const videoId = extractVideoId(videoUrl);
+    const normalizedVideoUrl = normalizeHttpUrl(videoUrl);
+    const videoId = extractVideoId(normalizedVideoUrl);
     if (!videoId) throw new Error("Invalid YouTube URL.");
 
     // 1. Fetch metadata (Title/Description) via simple page fetch
@@ -48,7 +51,7 @@ export async function fetchYouTubeData(videoUrl) {
 
     const finalOutput = [
       `Title: ${title}`,
-      `URL: ${videoUrl}`,
+      `URL: ${normalizedVideoUrl}`,
       `Description: ${description}`,
       `\n${"=".repeat(64)}\n`,
       `TRANSCRIPT:`,

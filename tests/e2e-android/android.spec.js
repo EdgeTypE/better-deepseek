@@ -33,6 +33,10 @@ test("loads the bundle and surfaces the BDS toggle inside the WebView simulator"
   await expect(page.locator("#bds-toggle")).toBeVisible();
 });
 
+test("hides the Get App promotional button from the Android content bundle", async ({ page }) => {
+  await expect(page.getByTestId("get-app-container")).toHaveAttribute("data-bds-hide", "");
+});
+
 test("shows the folder upload menu item on Android when native picker is available", async ({ page }) => {
   await page.locator(".bds-plus-btn").click({ force: true });
   await expect(page.locator(".bds-attach-dropdown")).toBeVisible();

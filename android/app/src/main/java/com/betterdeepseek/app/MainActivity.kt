@@ -44,6 +44,24 @@ internal fun applyRootWindowInsets(view: View, windowInsets: WindowInsetsCompat)
     return WindowInsetsCompat.CONSUMED
 }
 
+internal fun shouldOpenExternally(url: Uri, assetHost: String = "bds-asset.local"): Boolean {
+    val scheme = url.scheme?.lowercase() ?: return false
+    if (scheme != "http" && scheme != "https") return false
+
+    val host = url.host?.lowercase() ?: return false
+    if (host == assetHost.lowercase()) return false
+    if (host == "deepseek.com" || host.endsWith(".deepseek.com")) return false
+    if (
+            host == "accounts.google.com" ||
+                    host.endsWith(".accounts.google.com") ||
+                    host == "accounts.youtube.com"
+    ) {
+        return false
+    }
+
+    return true
+}
+
 /**
  * Single-activity host. Loads chat.deepseek.com inside a full-screen WebView and injects the BDS
  * extension scripts on every page finish.
@@ -296,6 +314,17 @@ class MainActivity : ComponentActivity() {
                     return null
                 }
 
+                override fun shouldOverrideUrlLoading(
+                        view: WebView,
+                        request: WebResourceRequest
+                ): Boolean {
+                    val url = request.url ?: return false
+                    if (!shouldOpenExternally(url, getString(R.string.bds_asset_authority))) {
+                        return false
+                    }
+                    return openExternalUrl(url)
+                }
+
                 override fun onPageFinished(view: WebView, url: String?) {
                     super.onPageFinished(view, url)
                     if (url.isNullOrEmpty()) return
@@ -340,6 +369,15 @@ class MainActivity : ComponentActivity() {
                         isUserGesture: Boolean,
                         resultMsg: android.os.Message?
                 ): Boolean {
+                    val targetUrl = view?.hitTestResult?.extra
+                    if (!targetUrl.isNullOrBlank()) {
+                        val uri = Uri.parse(targetUrl)
+                        if (shouldOpenExternally(uri, getString(R.string.bds_asset_authority))) {
+                            openExternalUrl(uri)
+                            return false
+                        }
+                    }
+
                     val transport = resultMsg?.obj as? WebView.WebViewTransport
                     val stub = WebView(this@MainActivity)
                     transport?.webView = stub
@@ -349,6 +387,18 @@ class MainActivity : ComponentActivity() {
             }
 
     // ── OAuth proxy ──────────────────────────────────────────────────────
+
+    private fun openExternalUrl(url: Uri): Boolean {
+        return runCatching {
+                    val intent =
+                            Intent(Intent.ACTION_VIEW, url).apply {
+                                addCategory(Intent.CATEGORY_BROWSABLE)
+                            }
+                    startActivity(intent)
+                }
+                .onFailure { Log.w(TAG, "Failed to open external URL: $url", it) }
+                .isSuccess
+    }
 
     /** Domains that must be proxied so the OAuth code_verifier state survives. */
     private fun isGoogleOAuthUrl(url: Uri): Boolean {
@@ -478,84 +528,12 @@ class MainActivity : ComponentActivity() {
             })();
         """.trimIndent()
 
-        // Hides the "Get App" promotional button shown on mobile viewports.
-        // Detection is text-based so it survives DeepSeek's dynamic class renames.
-        // The observer stays alive for the lifetime of the page so SPA navigations that
-        // re-insert the button are caught automatically.
-        val hideGetApp =
-                """
-            (function () {
-                if (window.__bdsGetAppObserver) return;
-                function hideButton() {
-                    var spans = document.querySelectorAll('span');
-                    for (var i = 0; i < spans.length; i++) {
-                        var span = spans[i];
-                        if (span.textContent.trim() !== 'Get App') continue;
-                        var el = span.parentElement;
-                        while (el && el.tagName !== 'BUTTON') { el = el.parentElement; }
-                        if (el && el.parentElement) {
-                            el.parentElement.style.display = 'none';
-                            console.log('[BDS] Hidden Get App container');
-                        }
-                    }
-                }
-                hideButton();
-                var observer = new MutationObserver(hideButton);
-                observer.observe(document.body, { subtree: true, childList: true });
-                window.__bdsGetAppObserver = observer;
-            })();
-        """.trimIndent()
-
-        // Hides the "Download mobile App" (or equivalent) item from the settings drawer
-        // (.ds-floating-position-wrapper). Detection is text-based (/download.*app|get.*app/i)
-        // so it survives class-name renames. The observer stays alive for the page lifetime.
-        // NodeFilter.SHOW_TEXT = 4.
-        // Hides the "Download mobile App" item from DeepSeek's settings dropdown.
-        // Uses the same .ds-dropdown-menu / .ds-dropdown-menu-option__label structure
-        // as SidebarMenuInjector. Update TARGET if DeepSeek renames the item (e.g. i18n).
-        val hideDrawerItem =
-                """
-            (function () {
-                if (window.__bdsDrawerItemObserver) return;
-                var TARGET = 'Download mobile App';
-                function hideItem(menu) {
-                    var options = menu.querySelectorAll('.ds-dropdown-menu-option');
-                    for (var i = 0; i < options.length; i++) {
-                        var label = options[i].querySelector('.ds-dropdown-menu-option__label');
-                        if (label && label.textContent.trim().includes(TARGET)) {
-                            options[i].style.display = 'none';
-                            console.log('[BDS] Hidden drawer app item');
-                        }
-                    }
-                }
-                document.querySelectorAll('.ds-dropdown-menu').forEach(hideItem);
-                var observer = new MutationObserver(function (mutations) {
-                    for (var m = 0; m < mutations.length; m++) {
-                        var added = mutations[m].addedNodes;
-                        for (var n = 0; n < added.length; n++) {
-                            var node = added[n];
-                            if (node.nodeType !== 1) continue;
-                            if (node.classList.contains('ds-dropdown-menu')) {
-                                hideItem(node);
-                            } else {
-                                var menu = node.querySelector && node.querySelector('.ds-dropdown-menu');
-                                if (menu) hideItem(menu);
-                            }
-                        }
-                    }
-                });
-                observer.observe(document.body, { childList: true, subtree: true });
-                window.__bdsDrawerItemObserver = observer;
-            })();
-        """.trimIndent()
-
         view.evaluateJavascript(injected, null)
         view.evaluateJavascript(bootstrap, null)
-        // content.js calls startThemeWatcher() which persists pageIsDark via chrome.storage and
-        // fires AndroidBridge.reportTheme() for the live native bar-icon colour update.
+        // content.js installs Android platform helpers, mounts the UI, and calls
+        // startThemeWatcher(), which persists pageIsDark via chrome.storage and fires
+        // AndroidBridge.reportTheme() for the live native bar-icon colour update.
         view.evaluateJavascript(content, null)
-        view.evaluateJavascript(hideGetApp, null)
-        view.evaluateJavascript(hideDrawerItem, null)
     }
 
     private fun readAsset(path: String): String? =

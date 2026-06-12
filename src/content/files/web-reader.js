@@ -6,6 +6,7 @@
 
 import { Readability } from "@mozilla/readability";
 import TurndownService from "turndown";
+import { normalizeHttpUrl } from "../../lib/utils/url-normalizer.js";
 
 /**
  * Attempt to fix mojibake by reinterpreting UTF-8-decoded bytes
@@ -60,10 +61,11 @@ function convertHtmlToMarkdown(html, url) {
 
 export async function fetchAndConvertWebPage(url, onStatus = () => {}) {
   try {
+    const normalizedUrl = normalizeHttpUrl(url);
     onStatus("Fetching page content...");
     const response = await chrome.runtime.sendMessage({
       type: "bds-fetch-url",
-      url: url
+      url: normalizedUrl
     });
 
     if (!response || !response.ok) {
@@ -75,13 +77,13 @@ export async function fetchAndConvertWebPage(url, onStatus = () => {}) {
 
     let result;
     try {
-      result = convertHtmlToMarkdown(html, url);
+      result = convertHtmlToMarkdown(html, normalizedUrl);
     } catch (firstErr) {
       // If parsing failed, try mojibake fix as fallback
       const fixedHtml = attemptMojibakeFix(html);
       if (fixedHtml) {
         html = fixedHtml;
-        result = convertHtmlToMarkdown(html, url);
+        result = convertHtmlToMarkdown(html, normalizedUrl);
       } else {
         throw firstErr;
       }
@@ -93,7 +95,7 @@ export async function fetchAndConvertWebPage(url, onStatus = () => {}) {
       const fixedHtml = attemptMojibakeFix(html);
       if (fixedHtml) {
         try {
-          result = convertHtmlToMarkdown(fixedHtml, url);
+          result = convertHtmlToMarkdown(fixedHtml, normalizedUrl);
         } catch {
           // fall through to original result
         }
@@ -101,7 +103,7 @@ export async function fetchAndConvertWebPage(url, onStatus = () => {}) {
     }
 
     onStatus("Converting to Markdown...");
-    const finalOutput = `Title: ${result.title}\nURL: ${url}\nAuthor: ${result.author}\nSite: ${result.siteName}\n\n${"=".repeat(64)}\n\n${result.markdown}`;
+    const finalOutput = `Title: ${result.title}\nURL: ${normalizedUrl}\nAuthor: ${result.author}\nSite: ${result.siteName}\n\n${"=".repeat(64)}\n\n${result.markdown}`;
 
     onStatus("Creating file...");
     const blob = new Blob([finalOutput], { type: "text/markdown" });

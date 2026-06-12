@@ -15,6 +15,7 @@ import {
   formatSearchResults,
   formatDeepFetchContent,
   extractUrlFromDdgLink,
+  extractUrlFromBingLink,
 } from "./search-reader.js";
 
 function readFileAsText(file) {
@@ -55,13 +56,41 @@ function makeResultHtml(results) {
       <td>&nbsp;&nbsp;&nbsp;</td>
       <td><span class="link-text">${displayUrl}</span></td>
     </tr>`);
-    rows.push(`<tr><td>&nbsp;</td><td>&nbsp;</td></tr>`);
+    rows.push("<tr><td>&nbsp;</td><td>&nbsp;</td></tr>");
   });
   return `<html><body><table border="0">${rows.join("\n")}</table></body></html>`;
 }
 
+function toBase64Url(value) {
+  return btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function bingHref(realUrl) {
+  return `https://www.bing.com/ck/a?!&&u=a1${toBase64Url(realUrl)}&ntb=1`;
+}
+
+function makeBingResultHtml(results) {
+  const rows = results
+    .map(
+      (r) => `<li class="b_algo">
+        <h2><a href="${bingHref(r.url || "")}">${r.title}</a></h2>
+        <div class="b_caption"><p>${r.snippet || ""}</p></div>
+      </li>`
+    )
+    .join("\n");
+  return `<html><body><ol id="b_results">${rows}</ol></body></html>`;
+}
+
+function makeDdgChallengeHtml() {
+  return `<html><body>
+    <form id="challenge-form" action="/anomaly.js">
+      <p>Unfortunately, bots use DuckDuckGo too. Please verify you are human.</p>
+    </form>
+  </body></html>`;
+}
+
 describe("parseSearchResults", () => {
-  it("parses a single result with title, url, and snippet", () => {
+  it("parses a single DuckDuckGo result with title, url, and snippet", () => {
     const html = makeResultHtml([
       { title: "Example", url: "https://example.com", snippet: "An example site" },
     ]);
@@ -74,7 +103,7 @@ describe("parseSearchResults", () => {
     });
   });
 
-  it("parses multiple results", () => {
+  it("parses multiple DuckDuckGo results", () => {
     const html = makeResultHtml([
       { title: "First", url: "https://a.com", snippet: "First result" },
       { title: "Second", url: "https://b.com", snippet: "Second result" },
@@ -85,7 +114,7 @@ describe("parseSearchResults", () => {
     expect(results[1].title).toBe("Second");
   });
 
-  it("returns empty array when no result-link elements exist", () => {
+  it("returns empty array when no supported result elements exist", () => {
     const html = "<html><body>no results here</body></html>";
     expect(parseSearchResults(html)).toEqual([]);
   });
@@ -111,12 +140,32 @@ describe("parseSearchResults", () => {
     expect(results[0].url).toBe("https://example.com/page?x=1");
   });
 
-  it("decodes non-ASCII URLs from uddg parameter", () => {
+  it("decodes percent-encoded URLs from uddg parameter", () => {
     const html = makeResultHtml([
-      { title: "Unicode", url: "https://example.com/éco", snippet: "unicode" },
+      { title: "Encoded", url: "https://example.com/%C3%A9co", snippet: "encoded" },
     ]);
     const results = parseSearchResults(html);
-    expect(results[0].url).toBe("https://example.com/éco");
+    expect(results[0].url).toBe("https://example.com/" + decodeURIComponent("%C3%A9") + "co");
+  });
+
+  it("parses Bing result HTML and decodes redirect URLs", () => {
+    const html = makeBingResultHtml([
+      {
+        title: "Bing Result",
+        url: "https://example.com/page?x=1",
+        snippet: "A Bing result snippet",
+      },
+    ]);
+
+    const results = parseSearchResults(html);
+
+    expect(results).toEqual([
+      {
+        title: "Bing Result",
+        url: "https://example.com/page?x=1",
+        snippet: "A Bing result snippet",
+      },
+    ]);
   });
 
   it("handles entirely malformed HTML without crashing", () => {
@@ -140,6 +189,11 @@ describe("formatSearchResults", () => {
     expect(md).toContain("**URL:** https://a.com");
     expect(md).toContain("## 2. B");
     expect(md).toContain("**URL:** https://b.com");
+  });
+
+  it("can label fallback provider results", () => {
+    const md = formatSearchResults("test query", [], "Bing");
+    expect(md).toContain("> 0 results found via Bing");
   });
 
   it("handles empty results array", () => {
@@ -181,9 +235,27 @@ describe("extractUrlFromDdgLink", () => {
     expect(extractUrlFromDdgLink("://")).toBe("://");
   });
 
-  it("decodes non-ASCII URLs correctly", () => {
+  it("decodes encoded URL paths correctly", () => {
     const href = "//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2F%25C3%25A9co&rut=abc";
-    expect(extractUrlFromDdgLink(href)).toBe("https://example.com/éco");
+    expect(extractUrlFromDdgLink(href)).toBe(
+      "https://example.com/" + decodeURIComponent("%C3%A9") + "co"
+    );
+  });
+});
+
+describe("extractUrlFromBingLink", () => {
+  it("extracts URL from Bing base64 redirect", () => {
+    expect(extractUrlFromBingLink(bingHref("https://example.com/page?x=1"))).toBe(
+      "https://example.com/page?x=1"
+    );
+  });
+
+  it("keeps direct non-Bing URLs", () => {
+    expect(extractUrlFromBingLink("https://example.com/direct")).toBe("https://example.com/direct");
+  });
+
+  it("returns empty string for undecodable Bing click redirects", () => {
+    expect(extractUrlFromBingLink("https://www.bing.com/ck/a?!&&u=not-valid")).toBe("");
   });
 });
 
@@ -230,6 +302,7 @@ describe("searchWeb", () => {
     expect(result.file.type).toBe("text/markdown");
     expect(result.query).toBe("test query");
     expect(result.deepFetch).toBe(0);
+    expect(result.provider).toBe("DuckDuckGo");
     expect(result.results).toHaveLength(1);
     expect(result.results[0]).toEqual({
       title: "Result One",
@@ -240,6 +313,39 @@ describe("searchWeb", () => {
     expect(text).toContain("# Search Results: test query");
     expect(text).toContain("## 1. Result One");
     expect(ON_STATUS).toHaveBeenCalled();
+  });
+
+  it("falls back to Bing when DuckDuckGo returns the Android anomaly page", async () => {
+    chromeSendMessageMock
+      .mockResolvedValueOnce({ ok: true, status: 202, html: makeDdgChallengeHtml() })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        html: makeBingResultHtml([
+          {
+            title: "Top Dog Breeds in the Philippines",
+            url: "https://example.com/dogs-philippines",
+            snippet: "Popular dogs for pet owners in the Philippines.",
+          },
+        ]),
+      });
+
+    const result = await searchWeb("top dog breeds Philippines pet owners", 0, ON_STATUS);
+    const text = await readFileAsText(result.file);
+
+    expect(chromeSendMessageMock).toHaveBeenCalledTimes(2);
+    expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("lite.duckduckgo.com");
+    expect(chromeSendMessageMock.mock.calls[1][0].url).toContain("www.bing.com/search");
+    expect(result.provider).toBe("Bing");
+    expect(result.results).toEqual([
+      {
+        title: "Top Dog Breeds in the Philippines",
+        url: "https://example.com/dogs-philippines",
+        snippet: "Popular dogs for pet owners in the Philippines.",
+      },
+    ]);
+    expect(text).toContain("> 1 results found via Bing");
+    expect(ON_STATUS).toHaveBeenCalledWith("Searching Bing...");
   });
 
   it("throws on empty query", async () => {
@@ -343,9 +449,7 @@ describe("searchWeb", () => {
   });
 
   it("generates a safe filename from the query", async () => {
-    const html = makeResultHtml([
-      { title: "X", url: "https://x.com", snippet: "x" },
-    ]);
+    const html = makeResultHtml([{ title: "X", url: "https://x.com", snippet: "x" }]);
     chromeSendMessageMock.mockResolvedValue({ ok: true, html });
 
     const result = await searchWeb("Hello World! @#$", 0, ON_STATUS);

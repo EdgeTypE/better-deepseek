@@ -134,6 +134,23 @@ class WebViewBridgeTest {
     }
 
     @Test
+    fun `fetch accepts markdown-wrapped URL targets`() {
+        server.enqueue(MockResponse().setBody("<html>markdown ok</html>").setResponseCode(200))
+
+        val target = server.url("/markdown-page").toString()
+        val payload = JSONObject().apply {
+            put("type", "bds-fetch-url")
+            put("url", "[Example]($target)")
+        }
+        val response = JSONObject(bridge.fetch(payload.toString()))
+
+        assertTrue(response.getBoolean("ok"))
+        assertEquals(200, response.getInt("status"))
+        assertEquals("<html>markdown ok</html>", response.getString("html"))
+        assertEquals("/markdown-page", server.takeRequest().requestUrl?.encodedPath)
+    }
+
+    @Test
     fun `fetch returns ok=false with status for non-2xx responses`() {
         server.enqueue(MockResponse().setResponseCode(503).setBody("server down"))
 
@@ -154,6 +171,18 @@ class WebViewBridgeTest {
         val response = JSONObject(bridge.fetch(payload.toString()))
         assertFalse(response.getBoolean("ok"))
         assertEquals("No URL provided.", response.getString("error"))
+    }
+
+    @Test
+    fun `fetch returns ok=false when URL has no http scheme`() {
+        val payload = JSONObject().apply {
+            put("type", "bds-fetch-url")
+            put("url", "[Example](not-a-url)")
+        }
+        val response = JSONObject(bridge.fetch(payload.toString()))
+
+        assertFalse(response.getBoolean("ok"))
+        assertEquals("Expected an http or https URL.", response.getString("error"))
     }
 
     @Test

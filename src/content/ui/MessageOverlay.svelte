@@ -364,6 +364,10 @@
     align-items: center;
     gap: 14px;
     margin: 10px 0;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    box-sizing: border-box;
   }
 
   .bds-question-icon {
@@ -385,10 +389,19 @@
     color: var(--bds-text-primary, #ececec);
   }
 
+  .bds-question-content {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+
   .bds-question-subtitle {
     font-size: 13px;
     color: var(--bds-text-secondary, #8e8ea0);
     margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .bds-character-icon {
@@ -610,6 +623,10 @@
     gap: 12px;
     font-family: inherit;
     color: inherit;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    box-sizing: border-box;
   }
 
   .bds-sanitized-text {

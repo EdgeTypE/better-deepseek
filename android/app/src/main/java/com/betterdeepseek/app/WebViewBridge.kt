@@ -22,6 +22,7 @@ import java.io.FileOutputStream
 import java.util.Locale
 import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -452,12 +453,20 @@ class WebViewBridge(
     }
 
     private fun handleFetchUrl(payload: JSONObject, response: JSONObject) {
-        val url = payload.optString("url")
-        if (url.isEmpty()) {
+        val rawUrl = payload.optString("url")
+        if (rawUrl.isEmpty()) {
             response.put("ok", false)
             response.put("error", "No URL provided.")
             return
         }
+
+        val url = normalizeHttpUrl(rawUrl)
+        if (url == null) {
+            response.put("ok", false)
+            response.put("error", "Expected an http or https URL.")
+            return
+        }
+
         val options = payload.optJSONObject("options")
         val method = options?.optString("method")?.uppercase()?.ifEmpty { "GET" } ?: "GET"
         val headersJson = options?.optJSONObject("headers")
@@ -510,6 +519,30 @@ class WebViewBridge(
                 response.put("html", "")
             }
         }
+    }
+
+    private fun normalizeHttpUrl(rawUrl: String): String? {
+        val input = rawUrl.trim()
+        if (input.isEmpty()) return null
+
+        val markdownUrl =
+                Regex("""\[[^\]]*]\(\s*(https?://[^\)\s]+)""", RegexOption.IGNORE_CASE)
+                        .find(input)
+                        ?.groupValues
+                        ?.getOrNull(1)
+        val inlineUrl =
+                Regex("""https?://[^\s<>"'\)\]]+""", RegexOption.IGNORE_CASE)
+                        .find(input)
+                        ?.value
+        val candidate =
+                (markdownUrl ?: inlineUrl ?: input)
+                        .trim()
+                        .trim('`', '"', '\'')
+                        .removeSurrounding("<", ">")
+                        .replace("&amp;", "&")
+                        .replace(Regex("[.,;:]+$"), "")
+
+        return candidate.toHttpUrlOrNull()?.toString()
     }
 
     private fun detectCharsetFromHeaders(resp: okhttp3.Response): String? {

@@ -3,32 +3,20 @@
 
   let { enabled = false, onToggle = null } = $props();
   let localEnabled = $state(false);
-  let toggleElement = $state(null);
-  let tooltipElement = null;
-  let tooltipVisible = $state(false);
-  const tooltipId = `bds-deep-research-tooltip-${Math.random().toString(36).slice(2)}`;
-  const tooltipText = "Research online sources and consolidate findings";
+  const labelText = "Research online sources and consolidate findings";
 
   $effect(() => {
     localEnabled = Boolean(enabled);
-  });
-
-  $effect(() => {
-    if (!tooltipElement) return;
-    syncTooltipText();
-    positionTooltip();
   });
 
   onMount(() => {
     const handler = (event) => {
       const nextEnabled = Boolean(event.detail?.enabled);
       localEnabled = nextEnabled;
-      syncTooltipText();
     };
     window.addEventListener("bds:deep-research-toggle-state", handler);
     return () => {
       window.removeEventListener("bds:deep-research-toggle-state", handler);
-      hideTooltip();
     };
   });
 
@@ -37,7 +25,6 @@
     event?.stopPropagation?.();
     const nextEnabled = !localEnabled;
     localEnabled = nextEnabled;
-    syncTooltipText();
     if (onToggle) onToggle(nextEnabled);
   }
 
@@ -46,80 +33,20 @@
     handleToggle(event);
   }
 
-  function ensureTooltip() {
-    if (tooltipElement && document.body.contains(tooltipElement)) return tooltipElement;
-
-    tooltipElement = document.createElement("div");
-    tooltipElement.id = tooltipId;
-    tooltipElement.className = "bds-deep-research-tooltip";
-    tooltipElement.setAttribute("role", "tooltip");
-    tooltipElement.textContent = tooltipText;
-    document.body.appendChild(tooltipElement);
-    return tooltipElement;
-  }
-
-  function syncTooltipText() {
-    if (!tooltipElement) return;
-    tooltipElement.textContent = tooltipText;
-  }
-
-  function positionTooltip() {
-    if (!toggleElement || !tooltipElement) return;
-
-    const toggleRect = toggleElement.getBoundingClientRect();
-    const tooltipRect = tooltipElement.getBoundingClientRect();
-    const gap = 8;
-    const viewportMargin = 8;
-    const tooltipHalfWidth = tooltipRect.width / 2;
-    const minLeft = viewportMargin + tooltipHalfWidth;
-    const maxLeft = window.innerWidth - viewportMargin - tooltipHalfWidth;
-    const preferredLeft = toggleRect.left + toggleRect.width / 2;
-    const left = Math.min(Math.max(preferredLeft, minLeft), maxLeft);
-    const hasRoomAbove = toggleRect.top - tooltipRect.height - gap > viewportMargin;
-
-    tooltipElement.dataset.placement = hasRoomAbove ? "top" : "bottom";
-    tooltipElement.style.left = `${Math.round(left)}px`;
-    tooltipElement.style.top = hasRoomAbove
-      ? `${Math.round(toggleRect.top - gap)}px`
-      : `${Math.round(toggleRect.bottom + gap)}px`;
-  }
-
-  function showTooltip() {
-    tooltipVisible = true;
-    ensureTooltip();
-    positionTooltip();
-    window.addEventListener("scroll", positionTooltip, true);
-    window.addEventListener("resize", positionTooltip);
-  }
-
-  function hideTooltip() {
-    tooltipVisible = false;
-    window.removeEventListener("scroll", positionTooltip, true);
-    window.removeEventListener("resize", positionTooltip);
-    tooltipElement?.remove();
-    tooltipElement = null;
-  }
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  bind:this={toggleElement}
   tabindex="0"
   aria-pressed={localEnabled}
-  aria-label={tooltipText}
-  aria-describedby={tooltipVisible ? tooltipId : undefined}
-  data-tooltip={tooltipText}
+  aria-label={labelText}
   class="bds-deep-research-toggle f79352dc ds-toggle-button ds-toggle-button--m"
   class:ds-toggle-button--selected={localEnabled}
   class:bds-deep-research-toggle--selected={localEnabled}
   style="transform: translateZ(0px);"
   onclick={handleToggle}
   onkeydown={handleKeydown}
-  onmouseenter={showTooltip}
-  onmouseleave={hideTooltip}
-  onfocus={showTooltip}
-  onblur={hideTooltip}
   data-testid="deep-research-toggle"
 >
   <div class="ds-toggle-button__icon">
@@ -154,28 +81,11 @@
 
   .bds-deep-research-toggle {
     position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
     cursor: pointer;
     user-select: none;
-  }
-
-  :global(.bds-deep-research-tooltip) {
-    position: fixed;
-    transform: translate(-50%, -100%);
-    z-index: 100000;
-    pointer-events: none;
-    white-space: nowrap;
-    padding: 6px 12px;
-    border-radius: 10px;
-    background: rgb(72, 73, 80);
-    color: #ffffff;
-    font-size: 14px;
-    font-weight: 600;
-    line-height: 20px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
-  }
-
-  :global(.bds-deep-research-tooltip[data-placement="bottom"]) {
-    transform: translateX(-50%);
   }
 
   .bds-deep-research-toggle:focus,
@@ -185,5 +95,11 @@
 
   .bds-deep-research-toggle :global(svg) {
     display: block;
+  }
+
+  @media (max-width: 560px) {
+    .bds-deep-research-toggle span._6dbc175 {
+      display: none !important;
+    }
   }
 </style>
