@@ -106,6 +106,7 @@ describe("storage integration", () => {
       refreshCharacters: vi.fn(),
       refreshProjects: vi.fn(),
       refreshSavedItems: vi.fn(),
+      showConfirm: vi.fn(() => Promise.resolve(true)),
     };
 
     bindStorageChangeListener();

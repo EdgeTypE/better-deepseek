@@ -115,6 +115,11 @@
   }
 
   async function deleteCharacter(charId) {
+    const char = appState.characters.find((c) => c.id === charId);
+    if (!char) return;
+    if (!appState.settings?.skipDeletionConfirmation) {
+      if (!(await appState.ui.showConfirm(`Delete character "${char.name}"?`))) return;
+    }
     appState.characters = appState.characters.filter((c) => c.id !== charId);
     await chrome.storage.local.set({
       [STORAGE_KEYS.characters]: appState.characters,

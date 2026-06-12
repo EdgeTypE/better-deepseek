@@ -83,6 +83,7 @@
       "disableSystemPrompt": "停用系统提示词",
       "disableMemory": "停用记忆注入",
       "injectSystemDateTime": "在消息中注入系统日期和时间",
+      "skipDeletionConfirmation": "跳过删除确认",
       "injectionFrequency": "系统提示词注入频率",
       "firstMessage": "仅首条消息",
       "everyMessage": "始终注入（每条消息）",

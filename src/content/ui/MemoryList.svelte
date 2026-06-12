@@ -15,6 +15,7 @@
   let fileInput = $state(null);
   let showMemoryImport = $state(false);
   let showPopup = $state(false);
+  let confirmActive = $state(false);
   let popupRef = $state(null);
   let editingKey = $state(null);
   let editingValue = $state("");
@@ -72,6 +73,14 @@
   }
 
   async function deleteMemory(key) {
+    if (!appState.settings?.skipDeletionConfirmation) {
+      confirmActive = true;
+      if (!(await appState.ui.showConfirm(`Delete memory "${key}"?`))) {
+        confirmActive = false;
+        return;
+      }
+      confirmActive = false;
+    }
     delete appState.memories[key];
     await chrome.storage.local.set({
       [STORAGE_KEYS.memories]: { ...appState.memories },
@@ -111,12 +120,12 @@
   }
 
   function handleKeydown(e) {
-    if (e.key === "Escape") showPopup = false;
+    if (e.key === "Escape" && !confirmActive) showPopup = false;
   }
 
   onMount(() => {
     function handleClick(e) {
-      if (showPopup && popupRef && !popupRef.contains(e.target)) {
+      if (showPopup && !confirmActive && popupRef && !popupRef.contains(e.target)) {
         showPopup = false;
       }
     }

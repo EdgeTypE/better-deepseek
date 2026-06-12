@@ -318,7 +318,7 @@ describe("bookmark button injection", () => {
     });
     document.body.innerHTML = "";
     vi.useFakeTimers();
-    state.ui = { showToast: vi.fn() };
+    state.ui = { showToast: vi.fn(), showConfirm: vi.fn(() => Promise.resolve(true)) };
   });
 
   function createUserBookmarkNode() {

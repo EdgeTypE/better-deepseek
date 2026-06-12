@@ -99,6 +99,7 @@ describe("bridge integration", () => {
     state.ui = {
       showLongWorkOverlay: vi.fn(),
       showToast: vi.fn(),
+      showConfirm: vi.fn(() => Promise.resolve(true)),
     };
     state.longWork.active = true;
     state.longWork.files = new Map([["a.txt", "x"]]);

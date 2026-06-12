@@ -692,6 +692,7 @@ export const DEFAULT_SETTINGS = {
   processGitignoreOnUpload: true,
   collapseLongUserMessages: true,
   injectSystemDateTime: true,
+  skipDeletionConfirmation: false,
   customCSS: "",
   systemPromptMultiMode: false,
   systemPromptEntries: [],

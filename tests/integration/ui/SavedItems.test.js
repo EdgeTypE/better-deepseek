@@ -23,7 +23,7 @@ const mockSnippets = [
 
 function setupSavedItems(bookmarks = [], snippets = []) {
   appState.savedItems = [...bookmarks, ...snippets];
-  appState.ui = { showToast: vi.fn() };
+  appState.ui = { showToast: vi.fn(), showConfirm: vi.fn(() => Promise.resolve(true)) };
 }
 
 describe("SavedItems", () => {

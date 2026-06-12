@@ -57,6 +57,12 @@ if (!globalThis.ResizeObserver) {
   };
 }
 
+if (typeof window !== "undefined") {
+  window.confirm = vi.fn(() => true);
+} else if (!globalThis.confirm) {
+  globalThis.confirm = vi.fn(() => true);
+}
+
 if (!globalThis.DataTransfer) {
   globalThis.DataTransfer = class {
     constructor() {

@@ -53,7 +53,7 @@ describe("file emission integration", () => {
     document.body.appendChild(node);
     state.longWork.active = true;
     state.longWork.files = new Map([["src/app.js", "x"]]);
-    state.ui = { showToast: vi.fn() };
+    state.ui = { showToast: vi.fn(), showConfirm: vi.fn(() => Promise.resolve(true)) };
 
     finalizeLongWork(node);
 

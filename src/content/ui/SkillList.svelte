@@ -96,6 +96,11 @@
   }
 
   async function deleteSkill(skillId) {
+    const skill = appState.skills.find((s) => s.id === skillId);
+    if (!skill) return;
+    if (!appState.settings?.skipDeletionConfirmation) {
+      if (!(await appState.ui.showConfirm(`Delete skill "${skill.name}"?`))) return;
+    }
     const before = appState.skills.length;
     appState.skills = appState.skills.filter((s) => s.id !== skillId);
     if (appState.skills.length === before) return;

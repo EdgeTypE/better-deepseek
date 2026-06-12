@@ -26,6 +26,11 @@
   }
 
   async function deleteSnippet(snippetId) {
+    const snippet = appState.cssSnippets.find((s) => s.id === snippetId);
+    if (!snippet) return;
+    if (!appState.settings?.skipDeletionConfirmation) {
+      if (!(await appState.ui.showConfirm(`Delete CSS snippet "${snippet.name}"?`))) return;
+    }
     const before = appState.cssSnippets.length;
     appState.cssSnippets = appState.cssSnippets.filter((s) => s.id !== snippetId);
     if (appState.cssSnippets.length === before) return;

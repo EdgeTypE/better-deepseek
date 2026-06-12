@@ -353,6 +353,9 @@
   }
 
   async function handleDeleteFile(file) {
+    if (!appState.settings?.skipDeletionConfirmation) {
+      if (!(await appState.ui.showConfirm(`Delete file "${file.name}" from project?`))) return;
+    }
     await deleteProjectFile(file.id);
     projectFiles = getFilesForProject(selectedProject.id);
     pushConfigToPage();

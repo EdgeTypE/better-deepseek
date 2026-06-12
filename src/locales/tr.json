@@ -83,6 +83,7 @@
       "disableSystemPrompt": "Gizli Sistem Yönergesini Devre Dışı Bırak",
       "disableMemory": "Kayıtlı Bellek Enjeksiyonunu Devre Dışı Bırak",
       "injectSystemDateTime": "Mesajlara sistem tarih ve saatini ekle",
+      "skipDeletionConfirmation": "Silme onayını atla",
       "injectionFrequency": "Sistem Yönergesi Enjeksiyon Sıklığı",
       "firstMessage": "Sadece ilk mesajda",
       "everyMessage": "Her zaman (her mesajda)",

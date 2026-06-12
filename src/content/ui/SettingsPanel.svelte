@@ -66,6 +66,7 @@
   let projectRagLimit = $state(Number(appState.settings.projectRagLimit) || 5);
   let processGitignoreOnUpload = $state(Boolean(appState.settings.processGitignoreOnUpload));
   let injectSystemDateTime = $state(Boolean(appState.settings.injectSystemDateTime));
+  let skipDeletionConfirmation = $state(Boolean(appState.settings.skipDeletionConfirmation));
   let locale = $state(appState.settings.locale || availableLocaleCodes[0] || "en");
   let syncLocale = $state(Boolean(appState.settings.syncLocale));
   let customCSS = $state(appState.settings.customCSS || "");
@@ -122,7 +123,7 @@
       systemPromptInjectionFrequency, systemPromptInjectionInterval,
       disableMemory, htmlToMarkdownMaxDepth, maxChatSessions,
       tokenPriceDisplay, projectRagEnabled, projectRagLimit,
-      processGitignoreOnUpload, injectSystemDateTime, locale, syncLocale, collapseLongUserMessages,
+      processGitignoreOnUpload, injectSystemDateTime, skipDeletionConfirmation, locale, syncLocale, collapseLongUserMessages,
       customCSS
     });
   }
@@ -408,6 +409,7 @@
     projectRagLimit = Number(appState.settings.projectRagLimit) || 5;
     processGitignoreOnUpload = Boolean(appState.settings.processGitignoreOnUpload);
     injectSystemDateTime = Boolean(appState.settings.injectSystemDateTime);
+    skipDeletionConfirmation = Boolean(appState.settings.skipDeletionConfirmation);
     locale = appState.settings.locale || availableLocaleCodes[0] || "en";
     syncLocale = Boolean(appState.settings.syncLocale);
     customCSS = appState.settings.customCSS || "";
@@ -631,6 +633,7 @@
     appState.settings.projectRagLimit = Number(projectRagLimit) || 5;
     appState.settings.processGitignoreOnUpload = processGitignoreOnUpload;
     appState.settings.injectSystemDateTime = injectSystemDateTime;
+    appState.settings.skipDeletionConfirmation = skipDeletionConfirmation;
     appState.settings.locale = locale;
     appState.settings.syncLocale = syncLocale;
     appState.settings.customCSS = customCSS;
@@ -695,7 +698,12 @@
     save(); // Persist immediately
   }
 
-  function deletePrompt(id) {
+  async function deletePrompt(id) {
+    const prompt = customSystemPrompts.find(p => p.id === id);
+    if (!prompt) return;
+    if (!appState.settings?.skipDeletionConfirmation) {
+      if (!(await appState.ui.showConfirm(`Delete system prompt "${prompt.name}"?`))) return;
+    }
     if (activeSystemPromptId === id) {
       activeSystemPromptId = "default";
     }
@@ -777,7 +785,10 @@
     save();
   }
 
-  function deleteMultiEntry(id) {
+  async function deleteMultiEntry(id) {
+    if (!appState.settings?.skipDeletionConfirmation) {
+      if (!(await appState.ui.showConfirm(`Delete system prompt entry?`))) return;
+    }
     systemPromptEntries = systemPromptEntries.filter(e => e.id !== id);
     save();
   }
@@ -1224,6 +1235,18 @@
           id="bds-inject-datetime"
           type="checkbox"
           bind:checked={injectSystemDateTime}
+        />
+        <span class="bds-switch-track"></span>
+      </label>
+    </div>
+
+    <div class="bds-toggle-row">
+      <span class="bds-toggle-label">{t('settings.skipDeletionConfirmation')}</span>
+      <label class="bds-switch">
+        <input
+          id="bds-skip-deletion-confirm"
+          type="checkbox"
+          bind:checked={skipDeletionConfirmation}
         />
         <span class="bds-switch-track"></span>
       </label>

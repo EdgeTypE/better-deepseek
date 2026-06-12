@@ -8,6 +8,7 @@
   import StatusBanner from "./StatusBanner.svelte";
   import AnnouncementBanner from "./AnnouncementBanner.svelte";
   import PreviewPanel from "./PreviewPanel.svelte";
+  import ConfirmDialog from "./ConfirmDialog.svelte";
   import ApiPlayground from "../api-playground/ApiPlayground.svelte";
   import appState from "../state.js";
 
@@ -22,6 +23,27 @@
   /** @type {Array<{id: number, message: string}>} */
   let toasts = $state([]);
   let toastId = 0;
+
+  let confirmVisible = $state(false);
+  let confirmMessage = $state("");
+  let confirmResolve = null;
+
+  export function showConfirm(message) {
+    return new Promise((resolve) => {
+      confirmResolve = resolve;
+      confirmMessage = message;
+      confirmVisible = true;
+    });
+  }
+
+  function handleConfirm(result) {
+    confirmVisible = false;
+    confirmMessage = "";
+    if (confirmResolve) {
+      confirmResolve(result);
+      confirmResolve = null;
+    }
+  }
 
   // ── Public API (called from non-Svelte code via mount.js) ──
 
@@ -136,4 +158,11 @@
   title={previewTitle}
   content={previewContent}
   onclose={hidePreviewPanel}
+/>
+
+<ConfirmDialog
+  show={confirmVisible}
+  message={confirmMessage}
+  onconfirm={() => handleConfirm(true)}
+  oncancel={() => handleConfirm(false)}
 />

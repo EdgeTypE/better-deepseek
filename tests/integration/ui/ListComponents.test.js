@@ -39,7 +39,7 @@ function getButtonByText(target, text) {
 describe("memory, character, and skill components", () => {
   beforeEach(() => {
     resetAppState({
-      ui: { showToast: vi.fn() },
+      ui: { showToast: vi.fn(), showConfirm: vi.fn(() => Promise.resolve(true)) },
     });
     bridgeMocks.pushConfigToPage.mockReset();
     nativeFileInputMocks.openNativeFilePicker.mockReset();

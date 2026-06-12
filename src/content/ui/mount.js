@@ -10,6 +10,7 @@ import state from "../state.js";
 /**
  * @typedef {object} UiApi
  * @property {(message: string) => void} showToast
+ * @property {(message: string) => Promise<boolean>} showConfirm
  * @property {() => void} refreshSettings
  * @property {() => void} refreshSkills
  * @property {() => void} refreshMemories
@@ -42,6 +43,7 @@ export function mountUi() {
   /** @type {UiApi} */
   const api = {
     showToast: (message) => app.showToast(message),
+    showConfirm: (message) => app.showConfirm(message),
     refreshSettings: () => app.refreshSettings(),
     refreshSkills: () => app.refreshSkills(),
     refreshCharacters: () => app.refreshCharacters(),

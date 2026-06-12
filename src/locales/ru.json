@@ -83,6 +83,7 @@
       "disableSystemPrompt": "Отключить скрытый системный промпт",
       "disableMemory": "Отключить инъекцию сохранённой памяти",
       "injectSystemDateTime": "Вставлять системные дату и время в сообщения",
+      "skipDeletionConfirmation": "Пропустить подтверждение удаления",
       "injectionFrequency": "Частота инъекции системного промпта",
       "firstMessage": "Только в первом сообщении",
       "everyMessage": "Всегда (в каждом сообщении)",

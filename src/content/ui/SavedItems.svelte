@@ -44,6 +44,9 @@
   }
 
   async function deleteItem(id) {
+    if (!appState.settings?.skipDeletionConfirmation) {
+      if (!(await appState.ui.showConfirm(`Delete saved item?`))) return;
+    }
     appState.savedItems = appState.savedItems.filter(i => i.id !== id);
     await chrome.storage.local.set({ [STORAGE_KEYS.savedItems]: appState.savedItems });
     items = [...appState.savedItems];

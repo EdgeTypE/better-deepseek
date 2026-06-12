@@ -286,7 +286,7 @@ describe("SidebarMenuInjector", () => {
       // Import the real state module to check its value
       const stateModule = await import("../../../src/content/state.js");
       const appState = stateModule.default;
-      appState.ui = { refreshWhatsNew: vi.fn() };
+      appState.ui = { refreshWhatsNew: vi.fn(), showConfirm: vi.fn(() => Promise.resolve(true)) };
 
       menu.querySelector(".bds-whats-new-option").click();
 
