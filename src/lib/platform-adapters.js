@@ -68,8 +68,20 @@ export const PLATFORM_ADAPTERS = {
   "kimi.moonshot.cn": {
     name: "Kimi",
     enabled: false,
-    inputSelectors: ['div[contenteditable="true"]'],
-    sendButtonMatcher: (el) => el.classList.contains("send-btn"),
+    inputSelectors: [".chat-input-editor", 'div[contenteditable="true"]'],
+    sendButtonMatcher: (el) => {
+      const cls = el.className || "";
+      const text = (el.textContent || "").trim();
+      const ariaLabel = el.getAttribute("aria-label") || "";
+      return (
+        cls.includes("send-button") ||
+        cls.includes("send-btn") ||
+        ariaLabel.includes("发送") ||
+        ariaLabel.toLowerCase().includes("send") ||
+        text === "发送" ||
+        text.toLowerCase() === "send"
+      );
+    },
     injectText: (el, text) => {
       el.focus();
       const selection = window.getSelection();

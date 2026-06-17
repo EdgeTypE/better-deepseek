@@ -10,6 +10,8 @@
   import PreviewPanel from "./PreviewPanel.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import ApiPlayground from "../api-playground/ApiPlayground.svelte";
+  import PlatformIcon from "./PlatformIcon.svelte";
+  import { getPlatformBrand } from "../../lib/platform-brand.js";
   import appState from "../state.js";
 
   let drawerOpen = $state(false);
@@ -131,9 +133,9 @@
   });
 </script>
 
-<button id="bds-toggle" type="button" onclick={toggleDrawer} aria-label="Better DeepSeek">
-  <span class="bds-toggle-full" aria-hidden="true">BDS</span>
-  <span class="bds-toggle-short" aria-hidden="true">B</span>
+<button id="bds-toggle" type="button" onclick={toggleDrawer} aria-label="Better {getPlatformBrand().name}">
+  <PlatformIcon size={20} />
+  <span class="bds-toggle-label" aria-hidden="true">{getPlatformBrand().short}</span>
 </button>
 
 <Drawer bind:this={drawerRef} open={drawerOpen} onclose={closeDrawer} onopenapiplayground={openApiPlayground} />

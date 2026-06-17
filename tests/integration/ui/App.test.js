@@ -66,26 +66,17 @@ describe("App toggle button", () => {
     cleanup();
   });
 
-  it("toggle contains .bds-toggle-full span with text BDS", async () => {
+  it("toggle contains a platform icon and short label", async () => {
     const { target, cleanup } = renderSvelte(App);
     await flushUi();
 
-    const fullSpan = target.querySelector("#bds-toggle .bds-toggle-full");
-    expect(fullSpan).not.toBeNull();
-    expect(fullSpan.textContent).toBe("BDS");
-    expect(fullSpan.getAttribute("aria-hidden")).toBe("true");
+    const toggle = target.querySelector("#bds-toggle");
+    expect(toggle).not.toBeNull();
+    expect(toggle.querySelector("svg")).not.toBeNull();
 
-    cleanup();
-  });
-
-  it("toggle contains .bds-toggle-short span with text B", async () => {
-    const { target, cleanup } = renderSvelte(App);
-    await flushUi();
-
-    const shortSpan = target.querySelector("#bds-toggle .bds-toggle-short");
-    expect(shortSpan).not.toBeNull();
-    expect(shortSpan.textContent).toBe("B");
-    expect(shortSpan.getAttribute("aria-hidden")).toBe("true");
+    const label = toggle.querySelector(".bds-toggle-label");
+    expect(label).not.toBeNull();
+    expect(label.textContent).toBeTruthy();
 
     cleanup();
   });

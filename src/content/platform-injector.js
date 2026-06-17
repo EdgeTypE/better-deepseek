@@ -167,7 +167,7 @@ export function initPlatformInjector() {
 
       const target = e.target;
       if (!(target instanceof Element)) return;
-      const sendBtn = target.closest("button, div[role='button']");
+      const sendBtn = target.closest("button, div[role='button'], .send-button, .send-btn");
       if (!sendBtn) return;
       if (!adapter.sendButtonMatcher(sendBtn)) return;
 

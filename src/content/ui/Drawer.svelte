@@ -6,8 +6,10 @@
   import ProjectsManager from "./ProjectsManager.svelte";
   import ProjectsCard from "./ProjectsCard.svelte";
   import SavedItems from "./SavedItems.svelte";
+  import PlatformIcon from "./PlatformIcon.svelte";
   import appState from "../state.js";
   import { t } from "../../lib/i18n.svelte.js";
+  import { getPlatformBrand } from "../../lib/platform-brand.js";
 
   let { open = false, onclose, onopenapiplayground } = $props();
 
@@ -68,7 +70,10 @@
 
 <aside id="bds-drawer" class={open ? "bds-open" : "bds-closed"}>
   <div class="bds-drawer-header">
-    <div class="ds-modal-content__title">{t('drawer.title')}</div>
+    <div class="ds-modal-content__title bds-platform-title">
+      <PlatformIcon size={22} />
+      <span>Better {getPlatformBrand().name}</span>
+    </div>
     <button id="bds-close" type="button" onclick={handleClose} aria-label={t('drawer.close')}>
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M14.1871 13.1265L13.1265 14.1872L1.81275 2.87347L2.87341 1.81281L14.1871 13.1265Z" fill="currentColor"></path>

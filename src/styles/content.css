@@ -89,11 +89,25 @@ html.dark, body.dark, .dark :root {
   color: #ffffff;
   font-size: 13px;
   font-weight: 600;
-  padding: 10px 18px;
+  padding: 8px 14px;
   letter-spacing: 0.3px;
   box-shadow: var(--bds-shadow);
   cursor: pointer;
   transition: transform var(--bds-transition), opacity var(--bds-transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+}
+
+.bds-toggle-label {
+  display: inline;
+}
+
+.bds-platform-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 #bds-toggle:hover {
@@ -1570,8 +1584,8 @@ textarea.bds-input,
 
   /* Toggle: small semi-transparent circle — unintrusive at top-center */
   #bds-toggle {
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     padding: 0;
     border-radius: 50%;
     font-size: 9px;
@@ -1580,6 +1594,11 @@ textarea.bds-input,
     margin-bottom: 0;
     opacity: 0.4;
     transition: opacity 0.2s ease;
+    justify-content: center;
+  }
+
+  .bds-toggle-label {
+    display: none;
   }
 
   #bds-toggle:hover,
