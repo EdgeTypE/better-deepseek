@@ -16,6 +16,15 @@ import { hideTagsInSidebar, hideTagsInHeader } from "./tags/tag-hider.js";
 import { setDeepResearchEnabled } from "./deep-research.js";
 
 /**
+ * Whether the current page is the DeepSeek chat site.
+ * Exported so tests can mock the host.
+ * @returns {boolean}
+ */
+export function isDeepSeekHost() {
+  return location.hostname === "chat.deepseek.com";
+}
+
+/**
  * Collect all message nodes from the chat DOM.
  */
 export function collectMessageNodes() {
@@ -180,32 +189,38 @@ export function scanInputArea() {
     return;
   }
 
+  const isDeepSeek = isDeepSeekHost();
+
   const insertBeforeNode = findDeepResearchInsertAnchor(
     deepResearchWrapper,
     fileInput,
     wrapper,
   );
-  const nativeButton = fileInput ? findNativeFileInputTrigger(fileInput) : null;
 
-  if (nativeButton) {
-    nativeButton.style.setProperty("display", "none", "important");
-  }
+  // DeepResearch toggle and native file-input replacement are DeepSeek-only.
+  if (isDeepSeek) {
+    const nativeButton = fileInput ? findNativeFileInputTrigger(fileInput) : null;
 
-  const deepResearchMountPoint = ensureComposerMount(
-    deepResearchWrapper,
-    "bds-deep-research-mount",
-    ".bds-deep-research-toggle",
-    insertBeforeNode,
-  );
-  if (!deepResearchMountPoint.dataset.bdsMounted) {
-    mount(DeepResearchToggle, {
-      target: deepResearchMountPoint,
-      props: {
-        enabled: state.deepResearch.enabled,
-        onToggle: (enabled) => setDeepResearchEnabled(enabled),
-      },
-    });
-    deepResearchMountPoint.dataset.bdsMounted = "1";
+    if (nativeButton) {
+      nativeButton.style.setProperty("display", "none", "important");
+    }
+
+    const deepResearchMountPoint = ensureComposerMount(
+      deepResearchWrapper,
+      "bds-deep-research-mount",
+      ".bds-deep-research-toggle",
+      insertBeforeNode,
+    );
+    if (!deepResearchMountPoint.dataset.bdsMounted) {
+      mount(DeepResearchToggle, {
+        target: deepResearchMountPoint,
+        props: {
+          enabled: state.deepResearch.enabled,
+          onToggle: (enabled) => setDeepResearchEnabled(enabled),
+        },
+      });
+      deepResearchMountPoint.dataset.bdsMounted = "1";
+    }
   }
 
   if (!fileInput || !wrapper) {

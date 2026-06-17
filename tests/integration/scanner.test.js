@@ -55,6 +55,7 @@ describe("scanner input controls", () => {
     resetAppState();
     mountMock.mockClear();
     document.body.innerHTML = "";
+    vi.stubGlobal("location", { hostname: "chat.deepseek.com" });
   });
 
   it("mounts Deep Research before the attach menu when the composer was already partially mounted", async () => {
@@ -280,5 +281,21 @@ describe("scanner input controls", () => {
 
     expect(deepResearchMount).toBeTruthy();
     expect(mountMock.mock.calls[0][0]).toBe(deepResearchToggleMock);
+  });
+
+  it("does not mount Deep Research on non-DeepSeek sites", async () => {
+    vi.stubGlobal("location", { hostname: "claude.ai" });
+    document.body.innerHTML = `
+      <div id="composer">
+        <button id="native-upload" type="button"></button>
+        <input type="file" multiple />
+      </div>
+    `;
+    const { scanInputArea } = await import("../../src/content/scanner.js");
+
+    scanInputArea();
+
+    expect(document.querySelector(".bds-deep-research-mount")).toBeNull();
+    expect(document.querySelector("#native-upload").style.display).not.toBe("none");
   });
 });
