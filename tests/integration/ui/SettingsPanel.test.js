@@ -8,6 +8,7 @@ const bridgeMocks = vi.hoisted(() => ({
 
 const projectManagerMocks = vi.hoisted(() => ({
   getActiveProject: vi.fn(),
+  getActiveProjects: vi.fn(),
   updateProject: vi.fn(),
 }));
 
@@ -28,12 +29,20 @@ describe("SettingsPanel integration", () => {
     state.settings.githubToken = "ghp_secret";
     bridgeMocks.pushConfigToPage.mockReset();
     projectManagerMocks.getActiveProject.mockReset();
+    projectManagerMocks.getActiveProjects.mockReset();
     projectManagerMocks.updateProject.mockReset();
     projectManagerMocks.getActiveProject.mockReturnValue({
       id: "p1",
       name: "Project One",
       customInstructions: "Initial project instructions",
     });
+    projectManagerMocks.getActiveProjects.mockReturnValue([
+      {
+        id: "p1",
+        name: "Project One",
+        customInstructions: "Initial project instructions",
+      },
+    ]);
     document.body.innerHTML = "";
   });
 

@@ -25,6 +25,7 @@
     getLinkedDirectoryInfo,
     refreshDirectoryCache,
   } from "../../lib/local-directory-source.js";
+  import { parsePdfViaSandbox } from "../../lib/pdf-bridge.js";
 
   let { onback } = $props();
 
@@ -191,7 +192,19 @@
 
         let content;
         try {
-          content = await file.text();
+          if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+            const buffer = await file.arrayBuffer();
+            const text = await parsePdfViaSandbox(buffer);
+            const MAX_PDF_TEXT = 200 * 1024;
+            if (text.length > MAX_PDF_TEXT) {
+              content = text.slice(0, MAX_PDF_TEXT);
+              errors.push(t('projectsManager.pdfTruncated', { name: file.name }));
+            } else {
+              content = text;
+            }
+          } else {
+            content = await file.text();
+          }
         } catch {
           errors.push(t('projectsManager.fileUnreadable', { name: file.name }));
           continue;
@@ -673,7 +686,7 @@
   <input
     type="file"
     multiple
-    accept=".txt,.md,.json,.csv,.js,.ts,.jsx,.tsx,.py,.go,.rs,.java,.kt,.swift,.c,.cpp,.cs,.rb,.php,.html,.css,.sh,.yaml,.yml,.toml,.env"
+    accept=".txt,.md,.json,.csv,.js,.ts,.jsx,.tsx,.py,.go,.rs,.java,.kt,.swift,.c,.cpp,.cs,.rb,.php,.html,.css,.sh,.yaml,.yml,.toml,.env,.pdf"
     style="display: none;"
     bind:this={fileInput}
     onchange={handleFileUpload}

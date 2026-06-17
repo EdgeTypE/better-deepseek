@@ -368,29 +368,41 @@ export function buildHiddenPrefix(
     state.isNextVoiceMessage = false;
   }
 
-  // Inject project context if first turn OR if project changed
-  const project = state.config && state.config.activeProject;
-  if (project) {
+  // Inject project context if first turn OR if any active project changed.
+  const activeProjects = state.config && state.config.activeProjects;
+  const legacyProject = state.config && state.config.activeProject;
+  const projects = Array.isArray(activeProjects) && activeProjects.length > 0
+    ? activeProjects
+    : legacyProject ? [legacyProject] : [];
+
+  if (projects.length > 0) {
+    const projectNames = projects.map((p) => p.name).join(", ");
     let lastProjectName = null;
     if (!forceSystemPrompt && messages) {
       lastProjectName = getLastProjectNameInHistory(messages, excludeTarget);
     }
 
-    if (forceSystemPrompt || !lastProjectName || lastProjectName !== project.name) {
+    if (forceSystemPrompt || !lastProjectName || lastProjectName !== projectNames) {
       const projectBlock = buildProjectBlock(state);
       if (projectBlock) {
         blocks.push(projectBlock);
       }
     }
 
-    // Inject RAG context dynamically based on user prompt if RAG is enabled
-    if (state.config.projectRagEnabled && Array.isArray(project.files) && project.files.length > 0) {
-      const limit = Number(state.config.projectRagLimit) || 5;
-      const matchedChunks = searchActiveProjectRAG(userPrompt, project.files, limit);
-      if (matchedChunks && matchedChunks.length > 0) {
-        const ragBlock = formatRagInjections(matchedChunks, project.name);
-        if (ragBlock) {
-          blocks.push(ragBlock);
+    // Inject RAG context dynamically across all active projects.
+    if (state.config.projectRagEnabled) {
+      for (const project of projects) {
+        if (!Array.isArray(project.files) || project.files.length === 0) continue;
+        const limit = Number(state.config.projectRagLimit) || 5;
+        const matchedChunks = searchActiveProjectRAG(userPrompt, project.files, limit).map((chunk) => ({
+          ...chunk,
+          projectName: project.name,
+        }));
+        if (matchedChunks && matchedChunks.length > 0) {
+          const ragBlock = formatRagInjections(matchedChunks, project.name);
+          if (ragBlock) {
+            blocks.push(ragBlock);
+          }
         }
       }
     }
@@ -574,15 +586,22 @@ function sanitizeMemoryValue(value) {
  * Build the project context block from the active project config.
  */
 export function buildProjectBlock(state) {
-  const project = state.config && state.config.activeProject;
-  if (!project) return "";
+  const activeProjects = state.config && state.config.activeProjects;
+  const legacyProject = state.config && state.config.activeProject;
+  const projects = Array.isArray(activeProjects) && activeProjects.length > 0
+    ? activeProjects
+    : legacyProject ? [legacyProject] : [];
+  if (projects.length === 0) return "";
 
-  let inner = "";
-  if (project.instructions && project.instructions.trim()) {
-    inner += project.instructions.trim() + "\n";
-  }
+  const blocks = projects.map((project) => {
+    let inner = "";
+    if (project.instructions && project.instructions.trim()) {
+      inner += project.instructions.trim() + "\n";
+    }
+    return `<BDS:PROJECT name="${project.name}">\n${inner}</BDS:PROJECT>`;
+  });
 
-  return `<BetterDeepSeek>\n<BDS:PROJECT name="${project.name}">\n${inner}</BDS:PROJECT>\n</BetterDeepSeek>`;
+  return `<BetterDeepSeek>\n${blocks.join("\n\n")}\n</BetterDeepSeek>`;
 }
 
 /**
@@ -697,9 +716,9 @@ export function getLastProjectNameInHistory(messages, excludeTarget = null) {
     if (msg === excludeTarget) continue;
 
     const text = extractMessageText(msg);
-    const match = text.match(/<BDS:PROJECT name="(.*?)">/);
-    if (match && match[1]) {
-      return match[1];
+    const matches = Array.from(text.matchAll(/<BDS:PROJECT name="(.*?)">/g));
+    if (matches.length > 0) {
+      return matches.map((m) => m[1]).join(", ");
     }
   }
   return null;

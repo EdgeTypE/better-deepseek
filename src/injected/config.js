@@ -22,6 +22,9 @@ export function normalizeConfig(config) {
     : [];
 
   const activeProject = normalizeActiveProject(config.activeProject);
+  const activeProjects = Array.isArray(config.activeProjects)
+    ? config.activeProjects.map(normalizeActiveProject).filter(Boolean)
+    : (activeProject ? [activeProject] : []);
 
   const rawEntries = Array.isArray(config.systemPromptEntries) ? config.systemPromptEntries : [];
   const systemPromptEntries = rawEntries
@@ -45,6 +48,7 @@ export function normalizeConfig(config) {
     systemPromptInjectionFrequency: String(config.systemPromptInjectionFrequency || "first"),
     systemPromptInjectionInterval: Number(config.systemPromptInjectionInterval) || 3,
     activeProject,
+    activeProjects,
     projectRagEnabled: Boolean(config.projectRagEnabled),
     projectRagLimit: Number(config.projectRagLimit) || 5,
     injectSystemDateTime: Boolean(config.injectSystemDateTime),

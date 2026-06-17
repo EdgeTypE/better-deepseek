@@ -18,10 +18,10 @@ const state = {
   projects: [],
   /** @type {Array<{id:string,projectId:string,name:string,content:string,size:number,createdAt:number}>} */
   projectFiles: [],
-  /** @type {string|null} session-only, never persisted */
-  activeProjectId: null,
-  /** @type {string[]} session-only, never persisted */
-  activeFileIds: [],
+  /** @type {string[]} session-only, never persisted — up to 5 active projects */
+  activeProjectIds: [],
+  /** @type {Record<string, string[]>} session-only, never persisted — file ids keyed by project id */
+  activeFileIdsByProject: {},
   observer: null,
   scanTimer: 0,
   urlWatchTimer: 0,

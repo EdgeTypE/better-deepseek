@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import appState from "../state.js";
   import { pushConfigToPage } from "../bridge.js";
   import {
@@ -8,13 +8,17 @@
     DOWNLOAD_BEHAVIOR_VERSION,
     DEFAULT_SYSTEM_PROMPT,
   } from "../../lib/constants.js";
-  import { getActiveProject, updateProject } from "../project-manager.js";
+  import { getActiveProjects, updateProject } from "../project-manager.js";
   import { t, i18n, availableLocaleCodes } from "../../lib/i18n.svelte.js";
   import { CSS_PRESETS } from "../../lib/constants.js";
   import { openNativeFilePicker } from "../files/native-file-input.js";
   import { encryptData, decryptData } from "../../lib/utils/crypto.js";
   import { makeId } from "../../lib/utils/helpers.js";
   import SnippetList from "./SnippetList.svelte";
+  import {
+    PLATFORM_ADAPTERS,
+    getDefaultPlatformAdapterSettings,
+  } from "../../lib/platform-adapters.js";
 
   let { onapiplayground, onimportdata } = $props();
 
@@ -66,6 +70,9 @@
   let collapseLongUserMessages = $state(Boolean(appState.settings.collapseLongUserMessages));
   let projectRagEnabled = $state(Boolean(appState.settings.projectRagEnabled));
   let projectRagLimit = $state(Number(appState.settings.projectRagLimit) || 5);
+  let platformAdapters = $state(
+    appState.settings.platformAdapters || getDefaultPlatformAdapterSettings()
+  );
   let processGitignoreOnUpload = $state(Boolean(appState.settings.processGitignoreOnUpload));
   let injectSystemDateTime = $state(Boolean(appState.settings.injectSystemDateTime));
   let skipDeletionConfirmation = $state(Boolean(appState.settings.skipDeletionConfirmation));
@@ -127,7 +134,7 @@
       disableMemory, htmlToMarkdownMaxDepth, maxChatSessions,
       tokenPriceDisplay, projectRagEnabled, projectRagLimit,
       processGitignoreOnUpload, injectSystemDateTime, skipDeletionConfirmation, locale, syncLocale, collapseLongUserMessages,
-      customCSS
+      customCSS, platformAdapters
     });
   }
 
@@ -373,7 +380,8 @@
     }
   }
 
-  let activeProject = $state(getActiveProject());
+  let activeProjects = $state(getActiveProjects());
+  let activeProject = $state(activeProjects[0] || null);
   let projectInstructions = $state(activeProject?.customInstructions || "");
   let projectSaveTimer = null;
   const GITHUB_TOKEN_MASK_CHAR = "\u25cf";
@@ -563,7 +571,8 @@
   }
 
   export function refreshProject() {
-    activeProject = getActiveProject();
+    activeProjects = getActiveProjects();
+    activeProject = activeProjects[0] || null;
     projectInstructions = activeProject?.customInstructions || "";
   }
 
@@ -571,7 +580,7 @@
     if (projectSaveTimer) clearTimeout(projectSaveTimer);
     projectSaveTimer = setTimeout(async () => {
       projectSaveTimer = null;
-      const project = getActiveProject();
+      const project = activeProject;
       if (!project) return;
       await updateProject(project.id, {
         customInstructions: projectInstructions,
@@ -579,6 +588,10 @@
       pushConfigToPage();
     }, 600);
   }
+
+  onDestroy(() => {
+    if (projectSaveTimer) clearTimeout(projectSaveTimer);
+  });
 
   async function save() {
     // Ensure we are saving a plain array, not a Svelte proxy
@@ -637,6 +650,7 @@
     appState.settings.collapseLongUserMessages = collapseLongUserMessages;
     appState.settings.projectRagEnabled = projectRagEnabled;
     appState.settings.projectRagLimit = Number(projectRagLimit) || 5;
+    appState.settings.platformAdapters = $state.snapshot(platformAdapters);
     appState.settings.processGitignoreOnUpload = processGitignoreOnUpload;
     appState.settings.injectSystemDateTime = injectSystemDateTime;
     appState.settings.skipDeletionConfirmation = skipDeletionConfirmation;
@@ -1190,6 +1204,34 @@
         </p>
       </div>
     {/if}
+
+    <div style="padding: 10px 0 6px; border-top: 1px solid var(--bds-border);">
+      <span style="font-size: 13px; font-weight: 600; color: var(--bds-text-primary);">
+        {t('settings.crossPlatformInjection')}
+      </span>
+      <p style="font-size: 10px; opacity: 0.5; margin: 4px 0 0;">
+        {t('settings.crossPlatformHint')}
+      </p>
+    </div>
+
+    {#each Object.entries(PLATFORM_ADAPTERS) as [host, adapter]}
+      <div class="bds-toggle-row">
+        <span class="bds-toggle-label">{adapter.name}</span>
+        <label class="bds-switch">
+          <input
+            type="checkbox"
+            checked={platformAdapters[host]?.enabled ?? adapter.enabled}
+            onchange={(e) => {
+              platformAdapters = {
+                ...platformAdapters,
+                [host]: { ...(platformAdapters[host] || { enabled: adapter.enabled }), enabled: e.target.checked },
+              };
+            }}
+          />
+          <span class="bds-switch-track"></span>
+        </label>
+      </div>
+    {/each}
 
     <div class="bds-toggle-row" style="flex-wrap: wrap;">
       <span class="bds-toggle-label">{t('settings.processGitignore')}</span>

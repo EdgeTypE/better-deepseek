@@ -6,14 +6,23 @@
   "permissions": ["storage"],
   "host_permissions": [
     "https://chat.deepseek.com/*",
+    "https://claude.ai/*",
+    "https://chatgpt.com/*",
+    "https://kimi.moonshot.cn/*",
     "https://codeload.github.com/*",
     "https://cdn.jsdelivr.net/*",
+    "https://cdnjs.cloudflare.com/*",
     "https://pyscript.net/*",
     "<all_urls>"
   ],
   "content_scripts": [
     {
-      "matches": ["https://chat.deepseek.com/*"],
+      "matches": [
+        "https://chat.deepseek.com/*",
+        "https://claude.ai/*",
+        "https://chatgpt.com/*",
+        "https://kimi.moonshot.cn/*"
+      ],
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_start"
@@ -22,7 +31,12 @@
   "web_accessible_resources": [
     {
       "resources": ["injected.js", "sandbox.html", "sandbox.js", "static/loading/*.svg"],
-      "matches": ["https://chat.deepseek.com/*"]
+      "matches": [
+        "https://chat.deepseek.com/*",
+        "https://claude.ai/*",
+        "https://chatgpt.com/*",
+        "https://kimi.moonshot.cn/*"
+      ]
     }
   ],
   "background": {
@@ -31,11 +45,23 @@
   "sandbox": {
     "pages": ["sandbox.html"]
   },
+  "icons": {
+    "16": "static/icons/icon16.png",
+    "32": "static/icons/icon32.png",
+    "48": "static/icons/icon48.png",
+    "128": "static/icons/icon128.png"
+  },
   "action": {
-    "default_title": "Better DeepSeek"
+    "default_title": "Better DeepSeek",
+    "default_icon": {
+      "16": "static/icons/icon16.png",
+      "32": "static/icons/icon32.png",
+      "48": "static/icons/icon48.png",
+      "128": "static/icons/icon128.png"
+    }
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'",
-    "sandbox": "sandbox allow-scripts allow-forms allow-popups; script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:; object-src 'self'"
+    "sandbox": "sandbox allow-scripts allow-forms allow-popups; script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://cdnjs.cloudflare.com; object-src 'self'"
   }
 }

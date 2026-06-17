@@ -119,6 +119,8 @@
       "ragChunks8": "8 chunks (~1600 words)",
       "ragChunks10": "10 chunks (~2000 words)",
       "ragHint": "Automatically retrieves relevant pieces from your project files.",
+      "crossPlatformInjection": "Cross-platform injection",
+      "crossPlatformHint": "System prompt + RAG injection only. BDS tool tags only work on DeepSeek.",
       "projectInstructions": "Project Instructions",
       "projectInstructionsPlaceholder": "Custom instructions appended to the global system prompt for this project…",
       "autoSaved": "Auto-saved",
@@ -266,6 +268,7 @@
       "fileTooLarge": "\"{{name}}\" is too large ({{size}} KB)",
       "fileUnreadable": "Could not read \"{{name}}\"",
       "fileEmpty": "\"{{name}}\" is empty",
+      "pdfTruncated": "\"{{name}}\" PDF text exceeded 200 KB and was truncated.",
       "storageError": "Storage error: {{msg}}",
       "folderPickFailed": "Folder pick failed.",
       "folderRequiresNewer": "Folder upload requires a newer version of the app.",
@@ -282,7 +285,8 @@
     "projectsCard": {
       "title": "Projects",
       "manage": "Manage",
-      "description": "Project & file selection available below the chat input."
+      "description": "Project & file selection available below the chat input.",
+      "activeFilesCount": "{{count}} active files across projects"
     },
     "selectionOverlay": {
       "selected": "selected",
@@ -340,6 +344,7 @@
       "projectLabel": "Project",
       "noProject": "None",
       "projectHint": "Instructions from selected project apply at first message only.",
+      "multiProjectHint": "Select up to 5 projects. Their instructions and files will be combined.",
       "deselectAll": "Deselect all",
       "selectAll": "Select all",
       "file": "file",
@@ -518,7 +523,16 @@
       "webFetchRequested": "Web page is being fetched",
       "githubFetchRequested": "GitHub repository is being fetched",
       "searchRequested": "Searching DuckDuckGo...",
-      "memoryStored": "Memory stored ({{count}})."
+      "memoryStored": "Memory stored ({{count}}).",
+      "proposeLocalScript": "Local script proposal",
+      "copyToClipboard": "Copy",
+      "copied": "Copied!",
+      "saveAsFile": "Save as file",
+      "workflowSteps": "Workflow steps",
+      "workflowStepsInvalid": "Invalid workflow steps JSON.",
+      "diffRequest": "File diff",
+      "diffMissingFile": "Could not find {{file_a}} or {{file_b}} in linked projects.",
+      "diffEmpty": "No differences found."
     },
     "sidebarMenu": {
       "tags": "Tags (BDS)",

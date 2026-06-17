@@ -11,6 +11,8 @@ import { STORAGE_KEYS } from "../lib/constants.js";
 import { makeId } from "../lib/utils/helpers.js";
 import { unlinkDirectory } from "../lib/local-directory-source.js";
 
+export const MAX_ACTIVE_PROJECTS = 5;
+
 // ── Private storage helpers ──
 
 function saveProjects() {
@@ -56,10 +58,10 @@ export async function deleteProject(id) {
   state.projects = state.projects.filter((p) => p.id !== id);
   state.projectFiles = state.projectFiles.filter((f) => f.projectId !== id);
 
-  if (state.activeProjectId === id) {
-    state.activeProjectId = null;
-    state.activeFileIds = [];
-  }
+  // Remove from multi-project selection.
+  state.activeProjectIds = state.activeProjectIds.filter((pid) => pid !== id);
+  const { [id]: _removed, ...rest } = state.activeFileIdsByProject;
+  state.activeFileIdsByProject = rest;
 
   await Promise.all([saveProjects(), saveProjectFiles()]);
 }
@@ -86,19 +88,77 @@ export function clearProjectLinkedDir(id) {
   saveProjects();
 }
 
+/**
+ * Toggle a project's active state. Up to MAX_ACTIVE_PROJECTS can be active at once.
+ *
+ * @param {string} id
+ * @returns {boolean} true if the project is now active, false if it was removed or could not be added.
+ */
+export function toggleActiveProject(id) {
+  const active = new Set(state.activeProjectIds);
+  if (active.has(id)) {
+    active.delete(id);
+    const { [id]: _removed, ...rest } = state.activeFileIdsByProject;
+    state.activeFileIdsByProject = rest;
+    state.activeProjectIds = Array.from(active);
+    return false;
+  }
+  if (active.size >= MAX_ACTIVE_PROJECTS) {
+    return false;
+  }
+  active.add(id);
+  state.activeProjectIds = Array.from(active);
+  if (!state.activeFileIdsByProject[id]) {
+    state.activeFileIdsByProject[id] = [];
+  }
+  return true;
+}
+
+/**
+ * Replace the entire active project selection.
+ *
+ * @param {string[]} ids
+ */
+export function setActiveProjects(ids) {
+  const unique = Array.from(new Set(ids.filter((id) => state.projects.some((p) => p.id === id)))).slice(0, MAX_ACTIVE_PROJECTS);
+  state.activeProjectIds = unique;
+  const next = {};
+  for (const id of unique) {
+    next[id] = state.activeFileIdsByProject[id] || [];
+  }
+  state.activeFileIdsByProject = next;
+}
+
+/**
+ * Legacy single-project setter. Adds the project to the active set.
+ *
+ * @param {string} id
+ */
 export function setActiveProject(id) {
-  state.activeProjectId = id;
-  state.activeFileIds = [];
+  setActiveProjects([id]);
 }
 
 export function clearActiveProject() {
-  state.activeProjectId = null;
-  state.activeFileIds = [];
+  state.activeProjectIds = [];
+  state.activeFileIdsByProject = {};
 }
 
+/**
+ * @deprecated Use getActiveProjects for multi-project support.
+ * @returns {object|null}
+ */
 export function getActiveProject() {
-  if (!state.activeProjectId) return null;
-  return state.projects.find((p) => p.id === state.activeProjectId) || null;
+  const id = state.activeProjectIds[0];
+  if (!id) return null;
+  return state.projects.find((p) => p.id === id) || null;
+}
+
+export function getActiveProjects() {
+  return state.projects.filter((p) => state.activeProjectIds.includes(p.id));
+}
+
+export function isProjectActive(id) {
+  return state.activeProjectIds.includes(id);
 }
 
 // ── File CRUD ──
@@ -119,11 +179,6 @@ export async function addProjectFile(projectId, name, content) {
 
 /**
  * Adds multiple files to a project in a single storage write.
- *
- * Prefer this over calling addProjectFile() in a loop: sequential writes
- * trigger one chrome.storage.onChanged event per write, and the listener
- * updates state.projectFiles from storage — which can race against the
- * next iteration of the loop and cause mid-upload state corruption.
  *
  * @param {string} projectId
  * @param {{ name: string, content: string }[]} fileDataArray
@@ -148,7 +203,9 @@ export async function addProjectFilesBatch(projectId, fileDataArray) {
 
 export async function deleteProjectFile(id) {
   state.projectFiles = state.projectFiles.filter((f) => f.id !== id);
-  state.activeFileIds = state.activeFileIds.filter((fid) => fid !== id);
+  for (const projectId of Object.keys(state.activeFileIdsByProject)) {
+    state.activeFileIdsByProject[projectId] = state.activeFileIdsByProject[projectId].filter((fid) => fid !== id);
+  }
   await saveProjectFiles();
 }
 
@@ -156,27 +213,85 @@ export function getFilesForProject(projectId) {
   return state.projectFiles.filter((f) => f.projectId === projectId);
 }
 
+/**
+ * Get all files across all active projects.
+ * If RAG is enabled, returns every file in each active project.
+ * Otherwise returns only the explicitly ticked files per project.
+ *
+ * @param {boolean} ragEnabled
+ * @returns {Array<{ id: string, projectId: string, name: string, content: string, projectName?: string }>}
+ */
+export function getFilesForActiveProjects(ragEnabled = false) {
+  const files = [];
+  for (const projectId of state.activeProjectIds) {
+    const project = state.projects.find((p) => p.id === projectId);
+    if (!project) continue;
+
+    let projectFiles;
+    if (ragEnabled) {
+      projectFiles = getFilesForProject(projectId);
+    } else {
+      const activeIds = state.activeFileIdsByProject[projectId] || [];
+      projectFiles = state.projectFiles.filter((f) => activeIds.includes(f.id));
+    }
+
+    for (const file of projectFiles) {
+      files.push({ ...file, projectName: project.name });
+    }
+  }
+  return files;
+}
+
 // ── File selection (session-only — no storage writes) ──
 
-export function tickFile(fileId) {
-  if (!state.activeFileIds.includes(fileId)) {
-    state.activeFileIds = [...state.activeFileIds, fileId];
+export function tickFile(fileId, projectId) {
+  if (!projectId) {
+    const file = state.projectFiles.find((f) => f.id === fileId);
+    if (!file) return;
+    projectId = file.projectId;
+  }
+  if (!state.activeFileIdsByProject[projectId]) {
+    state.activeFileIdsByProject[projectId] = [];
+  }
+  if (!state.activeFileIdsByProject[projectId].includes(fileId)) {
+    state.activeFileIdsByProject[projectId] = [...state.activeFileIdsByProject[projectId], fileId];
   }
 }
 
-export function untickFile(fileId) {
-  state.activeFileIds = state.activeFileIds.filter((id) => id !== fileId);
+export function untickFile(fileId, projectId) {
+  if (!projectId) {
+    const file = state.projectFiles.find((f) => f.id === fileId);
+    if (!file) return;
+    projectId = file.projectId;
+  }
+  if (state.activeFileIdsByProject[projectId]) {
+    state.activeFileIdsByProject[projectId] = state.activeFileIdsByProject[projectId].filter((id) => id !== fileId);
+  }
 }
 
-export function clearActiveFiles() {
-  state.activeFileIds = [];
+export function clearActiveFiles(projectId) {
+  if (projectId) {
+    state.activeFileIdsByProject[projectId] = [];
+  } else {
+    state.activeFileIdsByProject = {};
+  }
 }
 
 export function getActiveFiles() {
-  return state.projectFiles.filter((f) => state.activeFileIds.includes(f.id));
+  return getFilesForActiveProjects(false);
 }
 
-export function isFileTicked(fileId) {
-  return state.activeFileIds.includes(fileId);
+export function isFileTicked(fileId, projectId) {
+  if (!projectId) {
+    const file = state.projectFiles.find((f) => f.id === fileId);
+    if (!file) return false;
+    projectId = file.projectId;
+  }
+  return (state.activeFileIdsByProject[projectId] || []).includes(fileId);
 }
 
+export function getTickedFilesForProject(projectId) {
+  return (state.activeFileIdsByProject[projectId] || [])
+    .map((id) => state.projectFiles.find((f) => f.id === id))
+    .filter(Boolean);
+}

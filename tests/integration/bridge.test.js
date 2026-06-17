@@ -43,8 +43,8 @@ describe("bridge integration", () => {
     state.characters = [{ id: "1", name: "Mage", content: "wise", usage: "rp", active: true }];
     state.projects = [{ id: "p1", name: "Proj", customInstructions: "Project rules" }];
     state.projectFiles = [{ id: "f1", projectId: "p1", name: "README.md", content: "# Demo" }];
-    state.activeProjectId = "p1";
-    state.activeFileIds = ["f1"];
+    state.activeProjectIds = ["p1"];
+    state.activeFileIdsByProject = { p1: ["f1"] };
 
     // Activate a custom prompt so the system prompt resolves from customSystemPrompts
     const customPrompt = { id: "cp1", name: "Custom", content: "You are a test assistant." };
@@ -64,11 +64,13 @@ describe("bridge integration", () => {
       skills: [{ name: "Active", content: "Use me" }],
       memories: [{ key: "user_name", value: "Alex", importance: "always" }],
       activeCharacter: { name: "Mage", content: "wise", usage: "rp", active: true, id: "1" },
-      activeProject: {
-        name: "Proj",
-        instructions: "Project rules",
-        files: [{ name: "README.md", content: "# Demo" }],
-      },
+      activeProjects: [
+        {
+          name: "Proj",
+          instructions: "Project rules",
+          files: [{ name: "README.md", content: "# Demo" }],
+        },
+      ],
     });
   });
 

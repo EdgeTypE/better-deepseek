@@ -6,7 +6,7 @@ import state from "./state.js";
 import { BRIDGE_EVENTS, DEFAULT_SYSTEM_PROMPT } from "../lib/constants.js";
 import { findLatestAssistantMessageNode, collectMessageNodes } from "./scanner.js";
 import { finalizeLongWork } from "./files/long-work.js";
-import { getActiveProject, getActiveFiles, getFilesForProject } from "./project-manager.js";
+import { getActiveProjects, getFilesForActiveProjects, getFilesForProject } from "./project-manager.js";
 import { getDirectoryFiles } from "../lib/local-directory-source.js";
 import { discoverTags } from "./tags/tag-manager.js";
 
@@ -122,7 +122,7 @@ function handleSessionData(data) {
  */
 export async function pushConfigToPage() {
   try {
-    const activeProject = getActiveProject();
+    const activeProjects = getActiveProjects();
     let activeSystemPrompt;
     if (!state.settings.activeSystemPromptId || state.settings.activeSystemPromptId === "default") {
       activeSystemPrompt = DEFAULT_SYSTEM_PROMPT;
@@ -134,16 +134,20 @@ export async function pushConfigToPage() {
     }
 
     const projectRagEnabled = Boolean(state.settings.projectRagEnabled);
-    const activeProjectFiles = activeProject
-      ? (projectRagEnabled ? getFilesForProject(activeProject.id) : getActiveFiles())
-      : [];
 
-    let localDirFiles = [];
-    if (activeProject && activeProject.linkedDirId) {
+    // Gather files for all active projects.
+    const activeProjectFiles = getFilesForActiveProjects(projectRagEnabled);
+
+    // Gather linked directory files for all active projects.
+    const localDirFiles = [];
+    for (const project of activeProjects) {
+      if (!project.linkedDirId) continue;
       try {
-        const dirFiles = await getDirectoryFiles(activeProject.id);
+        const dirFiles = await getDirectoryFiles(project.id);
         if (dirFiles) {
-          localDirFiles = dirFiles;
+          for (const f of dirFiles) {
+            localDirFiles.push({ ...f, projectName: project.name });
+          }
         }
       } catch (e) {
         console.warn("[BDS] Failed to read linked directory:", e);
@@ -184,10 +188,25 @@ export async function pushConfigToPage() {
         enabled: Boolean(state.deepResearch.enabled && state.deepResearch.pendingRun),
         runId: state.deepResearch.pendingRun?.id || "",
       },
-      activeProject: activeProject
+      activeProjects: activeProjects.map((project) => {
+        const projectFiles = projectRagEnabled
+          ? getFilesForProject(project.id)
+          : (state.activeFileIdsByProject[project.id] || [])
+              .map((id) => state.projectFiles.find((f) => f.id === id))
+              .filter(Boolean);
+        const files = projectFiles.map((f) => ({ name: f.name, content: f.content }));
+        return {
+          id: project.id,
+          name: project.name,
+          instructions: project.customInstructions,
+          files,
+        };
+      }),
+      // Backward-compatible single-project field for older injected script versions.
+      activeProject: activeProjects.length > 0
         ? {
-          name: activeProject.name,
-          instructions: activeProject.customInstructions,
+          name: activeProjects[0].name,
+          instructions: activeProjects[0].customInstructions,
           files: allFiles.map((f) => ({ name: f.name, content: f.content })),
         }
         : null,

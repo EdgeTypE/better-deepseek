@@ -29,6 +29,7 @@ import { initPricing } from "../lib/pricing.js";
 import { startStatusMonitor } from "./status-monitor.js";
 import { startThemeWatcher } from "./theme.js";
 import { initDeepResearchRuntime } from "./deep-research.js";
+import { initPlatformInjector } from "./platform-injector.js";
 import { i18n } from "../lib/i18n.svelte.js";
 import { remoteConfig, REMOTE_CONFIG_EVENT, detectModelType } from "../lib/remote-config.svelte.js";
 import { STORAGE_KEYS, CSS_PRESETS } from "../lib/constants.js";
@@ -60,6 +61,7 @@ async function init() {
   setupBridgeEvents();
   mountUi();
   initDeepResearchRuntime();
+  initPlatformInjector();
   bindStorageChangeListener();
   startUrlWatcher();
   observeChatDom();

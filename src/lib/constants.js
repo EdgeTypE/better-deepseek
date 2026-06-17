@@ -35,7 +35,7 @@ export const BRIDGE_EVENTS = {
 };
 
 // ── Versioning ──
-export const SYSTEM_PROMPT_TEMPLATE_VERSION = 12;
+export const SYSTEM_PROMPT_TEMPLATE_VERSION = 13;
 export const DOWNLOAD_BEHAVIOR_VERSION = 2;
 export const LONG_WORK_STALE_MS = 30000;
 
@@ -134,6 +134,9 @@ export const DEFAULT_SYSTEM_PROMPT = [
    "11. Character(Persona File) Creator: <BDS:character_create name=\"...\" usage=\"...\">...</BDS:character_create>",
    "12. Skill Creator: <BDS:skill_create name=\"...\">...</BDS:skill_create>",
    "13. Clarifying Questions: <BDS:ask_question>[{\"id\":\"...\",\"question\":\"...\",\"type\":\"...\"}]</BDS:ask_question>",
+   "14. Propose Local Script: <BDS:propose_local_script lang=\"python|bash|node\">script code</BDS:propose_local_script>",
+   "15. File Diff: <BDS:diff_request file_a=\"path/to/a\" file_b=\"path/to/b\"/>",
+   "16. Workflow Steps: <BDS:workflow_steps>[{step,title,cmd,status}]</BDS:workflow_steps>",
   "",
   "When using <BDS:ask_question>JSON_ARRAY</BDS:ask_question>:",
   "- Use this tool when you are not 90% sure about the user's project, task, or ambiguous request.",
@@ -688,6 +691,12 @@ export const DEFAULT_SETTINGS = {
   tokenPriceDisplay: false,
   projectRagEnabled: false,
   projectRagLimit: 5,
+  platformAdapters: {
+    "chat.deepseek.com": { enabled: true },
+    "claude.ai": { enabled: false },
+    "chatgpt.com": { enabled: false },
+    "kimi.moonshot.cn": { enabled: false },
+  },
   locale: "en",
   syncLocale: true,
   processGitignoreOnUpload: true,

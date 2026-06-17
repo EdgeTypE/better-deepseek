@@ -1,5 +1,5 @@
 /**
- * Sandbox script for safe PPTX generation.
+ * Sandbox script for safe document generation and PDF parsing.
  * Runs in a null-origin iframe with 'unsafe-eval' allowed.
  */
 
@@ -15,7 +15,7 @@ window.docx = docx;
 window.DOCX = docx; // Common naming convention
 
 // Expose all docx exports as globals for easier AI access
-Object.keys(docx).forEach(key => {
+Object.keys(docx).forEach((key) => {
   if (!(key in window)) {
     window[key] = docx[key];
   }
@@ -26,8 +26,24 @@ console.log("BDS Sandbox: Initialized");
 // Helper for executing AI code which might contain 'await'
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
+const PDF_JS_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+
+function loadPdfJs() {
+  return new Promise((resolve, reject) => {
+    if (window.pdfjsLib) {
+      resolve(window.pdfjsLib);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = PDF_JS_URL;
+    script.onload = () => resolve(window.pdfjsLib);
+    script.onerror = () => reject(new Error("Failed to load pdf.js"));
+    document.head.appendChild(script);
+  });
+}
+
 window.addEventListener("message", async (event) => {
-  const { type, code, id } = event.data;
+  const { type, code, id, buffer } = event.data;
 
   if (type === "GEN_PPTX") {
     console.log("BDS Sandbox: Received PPTX generation request", id);
@@ -35,20 +51,20 @@ window.addEventListener("message", async (event) => {
       // Intercept writeFile to capture the promise
       const originalWriteFile = PptxGenJS.prototype.writeFile;
       let generationPromise = null;
-      
-      PptxGenJS.prototype.writeFile = function(args) {
+
+      PptxGenJS.prototype.writeFile = function () {
         console.log("BDS Sandbox: pptx.writeFile() intercepted");
-        generationPromise = this.write({ outputType: 'base64' });
+        generationPromise = this.write({ outputType: "base64" });
         return generationPromise;
       };
 
-      // Execute the AI code. 
+      // Execute the AI code.
       const func = new AsyncFunction(code);
       await func();
-      
+
       if (generationPromise) {
         const capturedBase64 = await generationPromise;
-        window.parent.postMessage({ type: "PPTX_RESULT", base64: capturedBase64, id }, "*");
+        event.source.postMessage({ type: "PPTX_RESULT", base64: capturedBase64, id }, "*");
       } else {
         throw new Error("No PPTX data was generated. Did the script call pptx.writeFile()?");
       }
@@ -56,7 +72,7 @@ window.addEventListener("message", async (event) => {
       PptxGenJS.prototype.writeFile = originalWriteFile;
     } catch (err) {
       console.error("BDS Sandbox Error (PPTX):", err);
-      window.parent.postMessage({ type: "PPTX_ERROR", error: err.message, id }, "*");
+      event.source.postMessage({ type: "PPTX_ERROR", error: err.message, id }, "*");
     }
   }
 
@@ -70,8 +86,8 @@ window.addEventListener("message", async (event) => {
         ...XLSX,
         writeFile: (wb, filename, opts) => {
           console.log("BDS Sandbox: XLSX.writeFile() intercepted");
-          capturedBase64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx', ...opts });
-        }
+          capturedBase64 = XLSX.write(wb, { type: "base64", bookType: "xlsx", ...opts });
+        },
       };
 
       // Temporarily override global XLSX for this execution
@@ -82,7 +98,7 @@ window.addEventListener("message", async (event) => {
       await func();
 
       if (capturedBase64) {
-        window.parent.postMessage({ type: "EXCEL_RESULT", base64: capturedBase64, id }, "*");
+        event.source.postMessage({ type: "EXCEL_RESULT", base64: capturedBase64, id }, "*");
       } else {
         throw new Error("No Excel data was generated. Did the script call XLSX.writeFile()?");
       }
@@ -91,7 +107,7 @@ window.addEventListener("message", async (event) => {
       window.XLSX = originalGlobalXLSX;
     } catch (err) {
       console.error("BDS Sandbox Error (Excel):", err);
-      window.parent.postMessage({ type: "EXCEL_ERROR", error: err.message, id }, "*");
+      event.source.postMessage({ type: "EXCEL_ERROR", error: err.message, id }, "*");
     }
   }
 
@@ -103,24 +119,24 @@ window.addEventListener("message", async (event) => {
       // Create a wrapper for docx to provide a simple save() method and intercept Packer
       const DOCX_WRAPPER = {
         ...docx,
-        save: (doc) => {
+        save: (document) => {
           console.log("BDS Sandbox: docx.save() called");
-          generationPromise = docx.Packer.toBase64String(doc);
+          generationPromise = docx.Packer.toBase64String(document);
           return generationPromise;
         },
         Packer: {
           ...docx.Packer,
-          toBase64String: (doc, ...args) => {
+          toBase64String: (document, ...args) => {
             console.log("BDS Sandbox: Packer.toBase64String() intercepted");
-            generationPromise = docx.Packer.toBase64String(doc, ...args);
+            generationPromise = docx.Packer.toBase64String(document, ...args);
             return generationPromise;
           },
-          toBlob: (doc, ...args) => {
+          toBlob: (document, ...args) => {
             console.log("BDS Sandbox: Packer.toBlob() intercepted");
-            generationPromise = docx.Packer.toBase64String(doc, ...args);
-            return docx.Packer.toBlob(doc, ...args);
-          }
-        }
+            generationPromise = docx.Packer.toBase64String(document, ...args);
+            return docx.Packer.toBlob(document, ...args);
+          },
+        },
       };
 
       // Temporarily override globals
@@ -137,9 +153,11 @@ window.addEventListener("message", async (event) => {
 
       if (generationPromise) {
         const capturedBase64 = await generationPromise;
-        window.parent.postMessage({ type: "DOCX_RESULT", base64: capturedBase64, id }, "*");
+        event.source.postMessage({ type: "DOCX_RESULT", base64: capturedBase64, id }, "*");
       } else {
-        throw new Error("No Word document data was generated. Did the script call DOCX.save(doc) or Packer.toBlob(doc)?");
+        throw new Error(
+          "No Word document data was generated. Did the script call DOCX.save(doc) or Packer.toBlob(doc)?"
+        );
       }
 
       window.docx = originalDocx;
@@ -147,8 +165,26 @@ window.addEventListener("message", async (event) => {
       window.Packer = originalPacker;
     } catch (err) {
       console.error("BDS Sandbox Error (DOCX):", err);
-      window.parent.postMessage({ type: "DOCX_ERROR", error: err.message, id }, "*");
+      event.source.postMessage({ type: "DOCX_ERROR", error: err.message, id }, "*");
+    }
+  }
+
+  if (type === "BDS_PARSE_PDF") {
+    console.log("BDS Sandbox: Received PDF parse request", id);
+    try {
+      await loadPdfJs();
+      const data = new Uint8Array(buffer);
+      const pdf = await window.pdfjsLib.getDocument({ data }).promise;
+      let text = "";
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map((item) => item.str).join(" ") + "\n";
+      }
+      event.source.postMessage({ type: "BDS_PDF_RESULT", id, text }, "*");
+    } catch (err) {
+      console.error("BDS Sandbox Error (PDF):", err);
+      event.source.postMessage({ type: "BDS_PDF_ERROR", id, error: err.message }, "*");
     }
   }
 });
-

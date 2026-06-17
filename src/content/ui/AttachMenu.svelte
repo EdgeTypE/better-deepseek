@@ -17,11 +17,16 @@
   } from "../../platform/android-file-picker.js";
   import {
     getFilesForProject,
-    setActiveProject,
+    getActiveProjects,
+    toggleActiveProject,
+    setActiveProjects,
     clearActiveProject,
     tickFile,
     untickFile,
     clearActiveFiles,
+    isProjectActive,
+    isFileTicked,
+    MAX_ACTIVE_PROJECTS,
   } from "../project-manager.js";
   import { pushConfigToPage } from "../bridge.js";
   import appState from "../state.js";
@@ -61,9 +66,6 @@
   let projectBtnRef;
   let projectPanelRef;
   let panelProjects = $state([...appState.projects]);
-  let panelActiveProjectId = $state("");
-  let panelFiles = $state([]);
-  let panelTickedIds = $state([]);
 
   // Speech Recognition state
   let isRecording = $state(false);
@@ -756,63 +758,66 @@
 
   function refreshProjectPanel() {
     panelProjects = [...appState.projects];
-    panelActiveProjectId = appState.activeProjectId || "";
-    panelFiles = panelActiveProjectId
-      ? getFilesForProject(panelActiveProjectId)
-      : [];
-    panelTickedIds = [...appState.activeFileIds];
   }
 
-  function handlePanelProjectChange(e) {
-    applyPanelSwitch(e.target.value || "");
-  }
-
-  function applyPanelSwitch(id) {
-    if (id) setActiveProject(id);
-    else clearActiveProject();
-    panelActiveProjectId = appState.activeProjectId || "";
-    panelFiles = panelActiveProjectId
-      ? getFilesForProject(panelActiveProjectId)
-      : [];
-    panelTickedIds = [...appState.activeFileIds];
+  function handlePanelProjectToggle(projectId, checked) {
+    toggleActiveProject(projectId);
+    if (checked && !isProjectActive(projectId)) {
+      // Could not add (max reached) — UI will reflect current state.
+    }
     pushConfigToPage();
     if (appState.ui) appState.ui.refreshProjects();
   }
 
-  function handlePanelFileToggle(fileId, checked) {
-    if (checked) tickFile(fileId);
-    else untickFile(fileId);
-    panelTickedIds = [...appState.activeFileIds];
+  function handlePanelFileToggle(projectId, fileId, checked) {
+    if (checked) tickFile(fileId, projectId);
+    else untickFile(fileId, projectId);
     pushConfigToPage();
   }
 
   function attachPanelFiles() {
-    if (!nativeInput || !panelTickedIds.length) return;
-    const activeFiles = panelFiles.filter((f) => panelTickedIds.includes(f.id));
-    if (!activeFiles.length) return;
-    const activeProject = panelProjects.find(
-      (p) => p.id === panelActiveProjectId,
-    );
-    const file = projectFilesToFile(
-      activeFiles,
-      activeProject?.name || "Project",
-    );
+    if (!nativeInput) return;
+    const activeProjects = getActiveProjects();
+    if (!activeProjects.length) return;
+
+    const allActiveFiles = [];
+    for (const project of activeProjects) {
+      const tickedIds = appState.activeFileIdsByProject[project.id] || [];
+      const projectFiles = getFilesForProject(project.id).filter((f) =>
+        tickedIds.includes(f.id),
+      );
+      allActiveFiles.push(...projectFiles);
+    }
+
+    if (!allActiveFiles.length) return;
+    const projectName = activeProjects.length === 1
+      ? activeProjects[0].name
+      : "Multi-Project";
+    const file = projectFilesToFile(allActiveFiles, projectName);
     if (!file) return;
     injectFile(file);
     showProjectPanel = false;
   }
 
-  function toggleSelectAll() {
-    if (panelTickedIds.length === panelFiles.length) {
-      for (const id of [...panelTickedIds]) untickFile(id);
-      panelTickedIds = [];
+  function toggleSelectAll(projectId) {
+    const projectFiles = getFilesForProject(projectId);
+    const tickedIds = appState.activeFileIdsByProject[projectId] || [];
+    if (tickedIds.length === projectFiles.length) {
+      for (const id of [...tickedIds]) untickFile(id, projectId);
     } else {
-      for (const file of panelFiles) {
-        if (!panelTickedIds.includes(file.id)) tickFile(file.id);
+      for (const file of projectFiles) {
+        if (!tickedIds.includes(file.id)) tickFile(file.id, projectId);
       }
-      panelTickedIds = [...appState.activeFileIds];
     }
     pushConfigToPage();
+  }
+
+  function getTotalActiveFiles() {
+    let count = 0;
+    for (const projectId of appState.activeProjectIds) {
+      count += (appState.activeFileIdsByProject[projectId] || []).length;
+    }
+    return count;
   }
 
   function handleDialogKeydown(e, type) {
@@ -1172,68 +1177,85 @@
   >
     <div class="bds-pp-header">
       <span class="bds-pp-label">{t('attachMenu.projectLabel')}</span>
-      <select
-        class="bds-pp-select"
-        value={panelActiveProjectId}
-        onchange={handlePanelProjectChange}
-      >
-        <option value="">{t('attachMenu.noProject')}</option>
-        {#each panelProjects as p (p.id)}
-          <option value={p.id}>{p.name}</option>
-        {/each}
-      </select>
+      <span class="bds-pp-count">{appState.activeProjectIds.length}/{MAX_ACTIVE_PROJECTS}</span>
     </div>
 
     <p class="bds-pp-hint">
-      {t('attachMenu.projectHint')}
+      {t('attachMenu.multiProjectHint')}
     </p>
 
-    {#if panelActiveProjectId && panelFiles.length > 0}
-      <div class="bds-pp-files-header">
-        <span class="bds-pp-files-count"
-          >{panelFiles.length} {panelFiles.length === 1 ? t('attachMenu.file') : t('attachMenu.files')}</span
-        >
-        <button type="button" class="bds-pp-select-all" onclick={toggleSelectAll}>
-          {panelTickedIds.length === panelFiles.length
-            ? t('attachMenu.deselectAll')
-            : t('attachMenu.selectAll')}
-        </button>
-      </div>
-      <div class="bds-pp-files">
-        {#each panelFiles as file (file.id)}
-          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <label
-            class="bds-pp-pill{panelTickedIds.includes(file.id)
-              ? ' bds-pp-pill--active'
-              : ''}"
-            title={file.name}
-          >
-            <input
-              type="checkbox"
-              class="bds-sr-only"
-              checked={panelTickedIds.includes(file.id)}
-              onchange={(e) =>
-                handlePanelFileToggle(file.id, e.target.checked)}
-            />
-            <span class="bds-pp-pill-check" aria-hidden="true">
-              {#if panelTickedIds.includes(file.id)}
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 10 10"
-                  fill="currentColor"
-                  ><path d="M8.5 2L4 7 1.5 4.5l-.7.7L4 8.5 9.2 2.7z" /></svg
-                >
-              {:else}
-                <span class="bds-pp-pill-box"></span>
-              {/if}
-            </span>
-            <span class="bds-pp-pill-name">{file.name.split("/").pop()}</span>
-          </label>
+    {#if panelProjects.length === 0}
+      <p class="bds-pp-empty">{t('attachMenu.noProjectSelected')}</p>
+    {:else}
+      <div class="bds-pp-projects">
+        {#each panelProjects as project (project.id)}
+          {@const projectFiles = getFilesForProject(project.id)}
+          {@const active = isProjectActive(project.id)}
+          {@const tickedIds = appState.activeFileIdsByProject[project.id] || []}
+          <div class="bds-pp-project-group" class:active>
+            <label
+              class="bds-pp-project-row"
+              title={project.description}
+            >
+              <input
+                type="checkbox"
+                class="bds-sr-only"
+                checked={active}
+                onchange={(e) => handlePanelProjectToggle(project.id, e.target.checked)}
+              />
+              <span class="bds-pp-pill-check" aria-hidden="true">
+                {#if active}
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M8.5 2L4 7 1.5 4.5l-.7.7L4 8.5 9.2 2.7z" /></svg>
+                {:else}
+                  <span class="bds-pp-pill-box"></span>
+                {/if}
+              </span>
+              <span class="bds-pp-project-name">{project.name}</span>
+              <span class="bds-pp-project-meta">{projectFiles.length} {projectFiles.length === 1 ? t('attachMenu.file') : t('attachMenu.files')}</span>
+            </label>
+
+            {#if active && projectFiles.length > 0}
+              <div class="bds-pp-files-header">
+                <span class="bds-pp-files-count">
+                  {tickedIds.length}/{projectFiles.length} {projectFiles.length === 1 ? t('attachMenu.file') : t('attachMenu.files')}
+                </span>
+                <button type="button" class="bds-pp-select-all" onclick={() => toggleSelectAll(project.id)}>
+                  {tickedIds.length === projectFiles.length
+                    ? t('attachMenu.deselectAll')
+                    : t('attachMenu.selectAll')}
+                </button>
+              </div>
+              <div class="bds-pp-files">
+                {#each projectFiles as file (file.id)}
+                  <label
+                    class="bds-pp-pill{tickedIds.includes(file.id) ? ' bds-pp-pill--active' : ''}"
+                    title={file.name}
+                  >
+                    <input
+                      type="checkbox"
+                      class="bds-sr-only"
+                      checked={tickedIds.includes(file.id)}
+                      onchange={(e) => handlePanelFileToggle(project.id, file.id, e.target.checked)}
+                    />
+                    <span class="bds-pp-pill-check" aria-hidden="true">
+                      {#if tickedIds.includes(file.id)}
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M8.5 2L4 7 1.5 4.5l-.7.7L4 8.5 9.2 2.7z" /></svg>
+                      {:else}
+                        <span class="bds-pp-pill-box"></span>
+                      {/if}
+                    </span>
+                    <span class="bds-pp-pill-name">{file.name.split("/").pop()}</span>
+                  </label>
+                {/each}
+              </div>
+            {:else if active}
+              <p class="bds-pp-empty" style="padding: 8px 12px;">{t('attachMenu.noFiles')}</p>
+            {/if}
+          </div>
         {/each}
       </div>
-      {#if panelTickedIds.length > 0}
+
+      {#if getTotalActiveFiles() > 0}
         <div class="bds-pp-footer">
           <button type="button" class="bds-pp-attach" onclick={attachPanelFiles}>
             <svg
@@ -1251,14 +1273,10 @@
                 d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"
               />
             </svg>
-            {t('attachMenu.attach', { count: panelTickedIds.length })}
+            {t('attachMenu.attach', { count: getTotalActiveFiles() })}
           </button>
         </div>
       {/if}
-    {:else if panelActiveProjectId}
-      <p class="bds-pp-empty">{t('attachMenu.noFiles')}</p>
-    {:else}
-      <p class="bds-pp-empty">{t('attachMenu.noProjectSelected')}</p>
     {/if}
   </div>
 {/if}
@@ -1815,6 +1833,7 @@
   .bds-pp-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 8px;
     padding: 10px 12px;
     border-bottom: 1px solid var(--bds-border);
@@ -1825,6 +1844,63 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
+    color: var(--bds-text-tertiary);
+    flex-shrink: 0;
+  }
+
+  .bds-pp-count {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--bds-accent);
+    background: var(--bds-accent-glow);
+    padding: 2px 7px;
+    border-radius: 99px;
+  }
+
+  .bds-pp-projects {
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .bds-pp-project-group {
+    border-bottom: 1px solid var(--bds-border);
+  }
+
+  .bds-pp-project-group:last-child {
+    border-bottom: none;
+  }
+
+  .bds-pp-project-group.active {
+    background: var(--bds-accent-glow, rgba(79, 110, 247, 0.06));
+  }
+
+  .bds-pp-project-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--bds-text-primary);
+    transition: background 0.12s;
+    user-select: none;
+  }
+
+  .bds-pp-project-row:hover {
+    background: var(--bds-bg-hover);
+  }
+
+  .bds-pp-project-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+
+  .bds-pp-project-meta {
+    font-size: 10px;
     color: var(--bds-text-tertiary);
     flex-shrink: 0;
   }

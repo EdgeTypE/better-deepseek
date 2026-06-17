@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { slide } from "svelte/transition";
   import { searchActiveProjectRAG } from "../../lib/rag-engine.js";
-  import { getActiveProject, getFilesForProject, getActiveFiles } from "../project-manager.js";
+  import { getActiveProjects, getFilesForActiveProjects, getFilesForProject } from "../project-manager.js";
   import appState from "../state.js";
   import { t } from "../../lib/i18n.svelte.js";
 
@@ -27,16 +27,18 @@
   let fileGroups = $derived.by(() => {
     const map = new Map();
     for (const chunk of allChunks) {
-      if (!map.has(chunk.fileName)) {
-        map.set(chunk.fileName, []);
+      const key = `${chunk.projectName || ""}|${chunk.fileName}`;
+      if (!map.has(key)) {
+        map.set(key, { fileName: chunk.fileName, projectName: chunk.projectName, chunks: [] });
       }
-      map.get(chunk.fileName).push(chunk);
+      map.get(key).chunks.push(chunk);
     }
-    const entries = Array.from(map.entries()).slice(0, MAX_FILES);
-    return entries.map(([fileName, chunks]) => ({
-      fileName,
-      lines: chunks.map(c => `${c.startLine}-${c.endLine}`).join(", "),
-      chunks: chunks.map(c => ({
+    const entries = Array.from(map.values()).slice(0, MAX_FILES);
+    return entries.map((group) => ({
+      fileName: group.fileName,
+      projectName: group.projectName,
+      lines: group.chunks.map(c => `${c.startLine}-${c.endLine}`).join(", "),
+      chunks: group.chunks.map(c => ({
         startLine: c.startLine,
         endLine: c.endLine,
         content: c.content,
@@ -76,13 +78,13 @@
   }
 
   function getProjectFiles() {
-    const project = getActiveProject();
-    if (!project) return null;
+    const projects = getActiveProjects();
+    if (!projects.length) return null;
 
     if (appState.settings.projectRagEnabled) {
-      return getFilesForProject(project.id);
+      return getFilesForActiveProjects(true);
     }
-    return getActiveFiles();
+    return getFilesForActiveProjects(false);
   }
 
   function runRagSearch(query) {
@@ -93,7 +95,22 @@
     }
 
     const limit = Number(appState.settings.projectRagLimit) || 5;
-    const chunks = searchActiveProjectRAG(query, files, limit);
+    const projectGroups = new Map();
+    for (const file of files) {
+      const projectName = file.projectName || "Project";
+      if (!projectGroups.has(projectName)) projectGroups.set(projectName, []);
+      projectGroups.get(projectName).push(file);
+    }
+
+    const chunks = [];
+    const perProjectLimit = Math.max(1, Math.ceil(limit / projectGroups.size));
+    for (const [projectName, projectFiles] of projectGroups) {
+      const projectChunks = searchActiveProjectRAG(query, projectFiles, perProjectLimit);
+      for (const chunk of projectChunks) {
+        chunks.push({ ...chunk, projectName });
+      }
+    }
+    chunks.sort((a, b) => (b.score || 0) - (a.score || 0));
 
     if (chunks && chunks.length > 0) {
       allChunks = chunks;
@@ -184,7 +201,10 @@
               <span class="bds-rag-file-chevron">
                 {expandedFiles.has(group.fileName) ? "▼" : "▶"}
               </span>
-              <span class="bds-rag-file-name">{group.fileName}</span>
+              <span class="bds-rag-file-name">
+                {#if group.projectName}<span class="bds-rag-project-name">{group.projectName}</span> {/if}
+                {group.fileName}
+              </span>
               <span class="bds-rag-file-lines">{group.lines}</span>
             </button>
 
@@ -337,6 +357,18 @@
     white-space: nowrap;
     min-width: 0;
     flex: 1;
+  }
+
+  .bds-rag-project-name {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--bds-text-secondary, rgba(255, 255, 255, 0.65));
+    background: var(--bds-bg-elevated, rgba(255, 255, 255, 0.06));
+    padding: 1px 5px;
+    border-radius: 4px;
+    margin-right: 4px;
+    vertical-align: middle;
   }
 
   .bds-rag-file-lines {

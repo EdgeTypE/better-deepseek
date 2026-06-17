@@ -19,7 +19,14 @@ import { sanitizeVisibleText } from "./text-sanitizer.js";
 import { extractHttpUrl } from "../../lib/utils/url-normalizer.js";
 
 // Tool renderers that have visual cards
-const RENDERABLE_TOOLS = new Set(["html", "latex", "visualizer", "pptx", "excel", "docx", "ask_question", "character_create", "skill_create", "auto:code_runner", "auto_code_result", "auto:request_web_fetch", "auto:request_github_fetch", "auto:search", "deep_research_plan", "deep_research_status", "deep_research_report"]);
+const RENDERABLE_TOOLS = new Set([
+  "html", "latex", "visualizer", "pptx", "excel", "docx",
+  "ask_question", "character_create", "skill_create",
+  "auto:code_runner", "auto_code_result",
+  "auto:request_web_fetch", "auto:request_github_fetch", "auto:search",
+  "deep_research_plan", "deep_research_status", "deep_research_report",
+  "propose_local_script", "diff_request", "workflow_steps"
+]);
 
 function normalizeAutoHttpTarget(value) {
   return extractHttpUrl(value);
@@ -284,6 +291,14 @@ export function parseBdsMessage(rawText, isSettled = false) {
     const parsedMemory = parseMemoryWrite("", attrs);
     if (parsedMemory) {
       result.memoryWrites.push(parsedMemory);
+    }
+  }
+
+  const selfClosingDiffRegex = /<BDS:diff_request\s+([^>]*)\/>/gi;
+  while ((match = selfClosingDiffRegex.exec(text)) !== null) {
+    const attrs = parseTagAttributes(match[1] || "");
+    if (attrs.file_a && attrs.file_b) {
+      result.renderableBlocks.push({ name: "diff_request", attrs, content: "" });
     }
   }
 

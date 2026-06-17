@@ -119,6 +119,8 @@
       "ragChunks8": "8 个片段（约 1600 词）",
       "ragChunks10": "10 个片段（约 2000 词）",
       "ragHint": "自动从项目文件中检索相关片段。",
+      "crossPlatformInjection": "跨平台注入",
+      "crossPlatformHint": "仅注入系统提示词与 RAG 文件内容；BDS 工具标签仅在 DeepSeek 生效。",
       "projectInstructions": "项目指令",
       "projectInstructionsPlaceholder": "此项目启用时追加到全局系统提示词的自定义指令…",
       "autoSaved": "已自动保存",
@@ -265,6 +267,7 @@
       "fileTooLarge": "“{{name}}” 过大（{{size}} KB）",
       "fileUnreadable": "无法读取“{{name}}”",
       "fileEmpty": "“{{name}}” 为空",
+      "pdfTruncated": "“{{name}}”PDF 文本超过 200 KB，已截断处理。",
       "storageError": "存储错误：{{msg}}",
       "folderPickFailed": "选择文件夹失败。",
       "folderRequiresNewer": "上传文件夹需要更新版本的应用。",
@@ -281,7 +284,8 @@
     "projectsCard": {
       "title": "项目",
       "manage": "管理",
-      "description": "可在聊天输入框下方选择项目和文件。"
+      "description": "可在聊天输入框下方选择项目和文件。",
+      "activeFilesCount": "跨项目共 {{count}} 个活跃文件"
     },
     "selectionOverlay": {
       "selected": "已选中",
@@ -339,6 +343,7 @@
       "projectLabel": "项目",
       "noProject": "无",
       "projectHint": "所选项目的指令仅应用于首条消息。",
+      "multiProjectHint": "最多同时选择 5 个项目，指令和文件将合并注入。",
       "deselectAll": "取消全选",
       "selectAll": "全选",
       "file": "文件",
@@ -514,7 +519,16 @@
       "webFetchRequested": "正在抓取网页",
       "githubFetchRequested": "正在抓取 GitHub 仓库",
       "searchRequested": "正在调用 DuckDuckGo 搜索…",
-      "memoryStored": "已存储记忆（{{count}} 条）。"
+      "memoryStored": "已存储记忆（{{count}} 条）。",
+      "proposeLocalScript": "本地脚本建议",
+      "copyToClipboard": "复制",
+      "copied": "已复制！",
+      "saveAsFile": "保存为文件",
+      "workflowSteps": "工作流步骤",
+      "workflowStepsInvalid": "工作流步骤 JSON 无效。",
+      "diffRequest": "文件对比",
+      "diffMissingFile": "在关联项目中找不到 {{file_a}} 或 {{file_b}}。",
+      "diffEmpty": "没有差异。"
     },
     "savedItems": {
       "title": "已保存项目",

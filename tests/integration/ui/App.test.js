@@ -8,6 +8,7 @@ const bridgeMocks = vi.hoisted(() => ({
 
 const projectManagerMocks = vi.hoisted(() => ({
   getActiveProject: vi.fn(() => null),
+  getActiveProjects: vi.fn(() => []),
   updateProject: vi.fn(),
   createProject: vi.fn(),
   deleteProject: vi.fn(),

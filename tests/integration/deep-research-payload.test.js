@@ -11,7 +11,7 @@ function makeInjectedState() {
       skills: [],
       memories: [],
       activeCharacter: null,
-      activeProject: null,
+      activeProjects: [],
       projectRagEnabled: false,
       deepResearch: {
         enabled: true,

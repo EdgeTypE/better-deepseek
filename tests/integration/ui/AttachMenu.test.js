@@ -32,11 +32,16 @@ const projectFileBuilderMocks = vi.hoisted(() => ({
 
 const projectManagerMocks = vi.hoisted(() => ({
   getFilesForProject: vi.fn(),
-  setActiveProject: vi.fn(),
+  getActiveProjects: vi.fn(),
+  toggleActiveProject: vi.fn(),
+  setActiveProjects: vi.fn(),
   clearActiveProject: vi.fn(),
   tickFile: vi.fn(),
   untickFile: vi.fn(),
   clearActiveFiles: vi.fn(),
+  isProjectActive: vi.fn(),
+  isFileTicked: vi.fn(),
+  MAX_ACTIVE_PROJECTS: 5,
 }));
 
 const bridgeMocks = vi.hoisted(() => ({
@@ -78,13 +83,22 @@ describe("AttachMenu integration", () => {
       ui: { showToast: vi.fn() },
     });
     state.projects = [{ id: "p1", name: "Project One" }];
-    state.activeProjectId = "p1";
-    state.activeFileIds = ["f1"];
+    state.activeProjectIds = ["p1"];
+    state.activeFileIdsByProject = { p1: ["f1"] };
     projectManagerMocks.getFilesForProject.mockReset();
     projectManagerMocks.getFilesForProject.mockReturnValue([
       { id: "f1", name: "README.md", content: "# Demo" },
     ]);
-    projectManagerMocks.setActiveProject.mockReset();
+    projectManagerMocks.getActiveProjects.mockReset();
+    projectManagerMocks.getActiveProjects.mockReturnValue([
+      { id: "p1", name: "Project One" },
+    ]);
+    projectManagerMocks.isProjectActive.mockReset();
+    projectManagerMocks.isProjectActive.mockReturnValue(true);
+    projectManagerMocks.isFileTicked.mockReset();
+    projectManagerMocks.isFileTicked.mockReturnValue(true);
+    projectManagerMocks.toggleActiveProject.mockReset();
+    projectManagerMocks.setActiveProjects.mockReset();
     projectManagerMocks.clearActiveProject.mockReset();
     projectManagerMocks.tickFile.mockReset();
     projectManagerMocks.untickFile.mockReset();

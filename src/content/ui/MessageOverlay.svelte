@@ -13,6 +13,9 @@
   import DeepResearchPlanCard from "./DeepResearchPlanCard.svelte";
   import DeepResearchStatusCard from "./DeepResearchStatusCard.svelte";
   import DeepResearchReportCard from "./DeepResearchReportCard.svelte";
+  import ProposeScriptCard from "./ProposeScriptCard.svelte";
+  import DiffCard from "./DiffCard.svelte";
+  import WorkflowStepsCard from "./WorkflowStepsCard.svelte";
   import LoadingIndicator from "./LoadingIndicator.svelte";
   import { t } from "../../lib/i18n.svelte.js";
   import { parseLooseJson } from "../parser/json-repair.js";
@@ -340,6 +343,12 @@
             <div class="bds-question-title">{t('messageOverlay.memoryStored', { count: block.attrs.count })}</div>
           </div>
         </div>
+      {:else if block.name === 'propose_local_script'}
+        <ProposeScriptCard content={block.content} language={block.attrs.lang || block.attrs.language} />
+      {:else if block.name === 'diff_request'}
+        <DiffCard attrs={block.attrs} />
+      {:else if block.name === 'workflow_steps'}
+        <WorkflowStepsCard content={block.content} />
       {:else}
         <ToolCard name={block.name} content={block.content} />
       {/if}
