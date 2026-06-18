@@ -149,6 +149,53 @@
     return Boolean(editableParent && editableParent.getAttribute("contenteditable") !== "false");
   }
 
+  function stopNativeEvent(event) {
+    event?.stopPropagation?.();
+    event?.stopImmediatePropagation?.();
+  }
+
+  function focusInputInContainer(container) {
+    const input = container?.querySelector?.("input");
+    if (input) setTimeout(() => input.focus(), 0);
+  }
+
+  function stopPanelPointerEvents(node) {
+    const events = ["pointerdown", "mousedown"];
+    events.forEach((eventName) => node.addEventListener(eventName, stopNativeEvent));
+
+    return {
+      destroy() {
+        events.forEach((eventName) => node.removeEventListener(eventName, stopNativeEvent));
+      },
+    };
+  }
+
+  function focusContainerInputAction(node, options = {}) {
+    const handlePointerDown = (event) => {
+      stopNativeEvent(event);
+      if (event?.target?.closest?.("input, button")) return;
+      focusInputInContainer(node);
+    };
+    const handleClick = (event) => {
+      if (event?.target?.closest?.("button")) return;
+      stopNativeEvent(event);
+      focusInputInContainer(node);
+      if (options.selectOther) selectSingleOption("Other");
+    };
+
+    node.addEventListener("pointerdown", handlePointerDown);
+    node.addEventListener("mousedown", stopNativeEvent);
+    node.addEventListener("click", handleClick);
+
+    return {
+      destroy() {
+        node.removeEventListener("pointerdown", handlePointerDown);
+        node.removeEventListener("mousedown", stopNativeEvent);
+        node.removeEventListener("click", handleClick);
+      },
+    };
+  }
+
   function prevQuestion() {
     if (currentQuestionIndex > 0) {
       currentQuestionIndex--;
@@ -310,7 +357,11 @@
   {@const q = questions[currentQuestionIndex]}
   {@const key = q.id || `q_${currentQuestionIndex}`}
   
-  <div class="bds-question-panel" bind:this={panelElement}>
+  <div
+    class="bds-question-panel"
+    bind:this={panelElement}
+    use:stopPanelPointerEvents
+  >
     <div class="bds-question-header">
       <h3>{q.question}</h3>
       <div class="bds-header-controls">
@@ -348,11 +399,7 @@
               class="bds-option-item custom-item {answers[key] === 'Other' ? 'selected' : ''} {focusedOptionIndex === (q.options?.length || 0) ? 'focused' : ''}"
               role="button"
               tabindex="0"
-              onclick={(e) => {
-                const input = e.currentTarget.querySelector('input');
-                if (input) input.focus();
-                selectSingleOption("Other");
-              }}
+              use:focusContainerInputAction={{ selectOther: true }}
               onkeydown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
@@ -375,10 +422,11 @@
                 placeholder={t('questionPanel.somethingElse')} 
                 bind:value={customAnswers[key]}
                 oninput={() => answers[key] = "Other"}
-                onmousedown={(e) => e.stopPropagation()}
-                onclick={(e) => e.stopPropagation()}
+                onpointerdown={stopNativeEvent}
+                onmousedown={stopNativeEvent}
+                onclick={stopNativeEvent}
                 onkeydown={(e) => {
-                  e.stopPropagation();
+                  stopNativeEvent(e);
                   if (e.key === 'Enter') {
                     e.preventDefault();
                     if (customAnswers[key].trim()) {
@@ -387,7 +435,7 @@
                     }
                   }
                 }}
-                onkeyup={(e) => e.stopPropagation()}
+                onkeyup={stopNativeEvent}
               />
               {#if answers[key] === "Other" && customAnswers[key].trim()}
                 <button class="bds-custom-confirm" onclick={() => { answers[key] = "Other"; nextOrSubmit(); }}>→</button>
@@ -414,10 +462,7 @@
               class="bds-option-item custom-item {focusedOptionIndex === (q.options?.length || 0) ? 'focused' : ''}"
               role="button"
               tabindex="0"
-              onclick={(e) => {
-                const input = e.currentTarget.querySelector('input');
-                if (input) input.focus();
-              }}
+              use:focusContainerInputAction
               onkeydown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
@@ -438,39 +483,38 @@
                 class="bds-custom-text-input" 
                 placeholder={t('questionPanel.somethingElse')} 
                 bind:value={customAnswers[key]}
-                onmousedown={(e) => e.stopPropagation()}
-                onclick={(e) => e.stopPropagation()}
-                onkeydown={(e) => e.stopPropagation()}
-                onkeyup={(e) => e.stopPropagation()}
+                onpointerdown={stopNativeEvent}
+                onmousedown={stopNativeEvent}
+                onclick={stopNativeEvent}
+                onkeydown={stopNativeEvent}
+                onkeyup={stopNativeEvent}
               />
             </div>
           {/if}
         </div>
 
       {:else}
-        <div 
+        <div
           class="bds-free-input-wrapper"
-          onclick={(e) => {
-            const input = e.currentTarget.querySelector('input');
-            if (input) input.focus();
-          }}
+          use:focusContainerInputAction
         >
           <input 
             type="text" 
             use:focusOnMount
             class="bds-text-input" 
-            placeholder={t('questionPanel.typeAnswer')} 
-            bind:value={customAnswers[key]} 
-            onmousedown={(e) => e.stopPropagation()}
-            onclick={(e) => e.stopPropagation()}
+            placeholder={t('questionPanel.typeAnswer')}
+            bind:value={customAnswers[key]}
+            onpointerdown={stopNativeEvent}
+            onmousedown={stopNativeEvent}
+            onclick={stopNativeEvent}
             onkeydown={(e) => {
-              e.stopPropagation();
+              stopNativeEvent(e);
               if (e.key === 'Enter') {
                 e.preventDefault();
                 nextOrSubmit();
               }
             }}
-            onkeyup={(e) => e.stopPropagation()}
+            onkeyup={stopNativeEvent}
             autofocus
           />
         </div>
@@ -696,6 +740,8 @@
     color: var(--bds-text-primary, #ececec);
     font-size: 14px;
     flex-grow: 1;
+    width: 100%;
+    min-width: 0;
     outline: none;
     padding: 0;
     font-family: inherit;
@@ -721,6 +767,7 @@
     border: 1px solid var(--bds-border, #3a3b3f);
     border-radius: var(--bds-radius, 14px);
     padding: 12px;
+    cursor: text;
   }
 
   .bds-text-input {
@@ -729,6 +776,7 @@
     color: var(--bds-text-primary, #ececec);
     font-size: 14px;
     width: 100%;
+    min-width: 0;
     outline: none;
     font-family: inherit;
   }
