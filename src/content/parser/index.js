@@ -79,6 +79,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
       plans: [],
       statuses: [],
       reports: [],
+      stepDone: [],
     },
     autoRequests: {
       webFetch: [],
@@ -219,6 +220,19 @@ export function parseBdsMessage(rawText, isSettled = false) {
       const runId = attrs.runId || attrs.runid || "";
       // Report is markdown, preserve as-is
       result.deepResearch.reports.push({ runId, markdown: content });
+    }
+
+    if (name === "deep_research_step_done") {
+      const runId = attrs.runId || attrs.runid || "";
+      const stepId = attrs.stepId || attrs.stepid || "";
+      const parsedJson = parseLooseJson(content);
+      result.deepResearch.stepDone.push({
+        runId,
+        stepId,
+        analysis: parsedJson.value,
+        raw: parsedJson.value ? "" : content,
+        error: parsedJson.error,
+      });
     }
   }
 

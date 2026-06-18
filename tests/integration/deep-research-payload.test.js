@@ -42,7 +42,7 @@ describe("Deep Research payload mutation", () => {
     const content = result.payload.messages[0].content;
 
     expect(result.changed).toBe(true);
-    expect(content).toContain("[BDS:DEEP_RESEARCH] Deep Research mode is enabled");
+    expect(content).toContain("The DeepResearch toggle is enabled");
     expect(content).toContain('<BDS:DEEP_RESEARCH_PLAN runId="run_laptops">');
     expect(content).toContain("Research gaming laptop listings under $1500.");
     expect(content).toContain('"sourceType"');

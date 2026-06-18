@@ -8,8 +8,11 @@
 
 import { BRIDGE_EVENTS, STORAGE_KEYS } from "../lib/constants.js";
 import { makeId } from "../lib/utils/helpers.js";
+import { normalizeHttpUrl } from "../lib/utils/url-normalizer.js";
 import state from "./state.js";
 import { clearRunSearchHistory, injectPureTextAndSend } from "./auto.js";
+import { fetchAndConvertWebPage } from "./files/web-reader.js";
+import { searchWeb } from "./files/search-reader.js";
 
 /** Valid statuses for a deep research run */
 export const RESEARCH_STATUSES = [
@@ -49,6 +52,17 @@ export function createRun(conversationId, id = makeId()) {
     sourceLedger: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    /** Managed execution state — when true, BDS drives step-by-step */
+    execution: {
+      managed: false,
+      /** Normalized steps from the approved plan */
+      steps: [],
+      currentStepIndex: -1,
+      /** The step ID we are waiting for analysis on */
+      awaitingAnalysisStepId: null,
+      /** Whether the final report prompt has been sent */
+      reportRequested: false,
+    },
   };
 }
 
@@ -206,12 +220,29 @@ function isRunInteractive(run) {
 
 function emitRunState(run) {
   if (!run) return;
+  const exec = run.execution;
+  const managed = Boolean(exec && exec.managed);
+  const steps = exec ? exec.steps : [];
   window.dispatchEvent(new CustomEvent("bds:deep-research-run-state", {
     detail: {
       runId: run.id,
       status: run.status,
       enabled: state.deepResearch.enabled,
       interactive: isRunInteractive(run),
+      managed,
+      currentStepIndex: exec ? exec.currentStepIndex : -1,
+      totalSteps: steps.length,
+      awaitingStepId: exec ? exec.awaitingAnalysisStepId : null,
+      reportRequested: exec ? exec.reportRequested : false,
+      steps: managed ? steps.map((s) => ({
+        id: s.id,
+        action: s.action,
+        query: s.query,
+        purpose: s.purpose,
+        sourceType: s.sourceType,
+        status: s.status,
+        error: s.error,
+      })) : [],
     },
   }));
 }
@@ -220,6 +251,10 @@ function emitRunState(run) {
  * Serialize a run for storage (strips large fields).
  */
 function serializeRun(run) {
+  const exec = run.execution;
+  const serializedSteps = (exec && Array.isArray(exec.steps))
+    ? exec.steps.map(serializeStep)
+    : [];
   return {
     id: run.id,
     conversationId: run.conversationId,
@@ -228,6 +263,30 @@ function serializeRun(run) {
     sourceLedger: run.sourceLedger,
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
+    execution: exec ? {
+      managed: Boolean(exec.managed),
+      steps: serializedSteps,
+      currentStepIndex: Number(exec.currentStepIndex ?? -1),
+      awaitingAnalysisStepId: exec.awaitingAnalysisStepId || null,
+      reportRequested: Boolean(exec.reportRequested),
+    } : undefined,
+  };
+}
+
+/**
+ * Serialize a single execution step for storage.
+ * Strips fetched file contents — only metadata is persisted.
+ */
+function serializeStep(step) {
+  return {
+    id: step.id,
+    action: step.action,
+    query: step.query,
+    purpose: step.purpose,
+    sourceType: step.sourceType || "",
+    status: step.status || "pending",
+    outcome: step.outcome || null,
+    error: step.error || null,
   };
 }
 
@@ -235,6 +294,10 @@ function serializeRun(run) {
  * Deserialize a run from storage.
  */
 function deserializeRun(raw) {
+  const rawExec = raw.execution;
+  const steps = (rawExec && Array.isArray(rawExec.steps))
+    ? rawExec.steps.map(deserializeStep)
+    : [];
   return {
     id: String(raw.id || makeId()),
     conversationId: String(raw.conversationId || ""),
@@ -243,6 +306,35 @@ function deserializeRun(raw) {
     sourceLedger: Array.isArray(raw.sourceLedger) ? raw.sourceLedger : [],
     createdAt: Number(raw.createdAt) || Date.now(),
     updatedAt: Number(raw.updatedAt) || Date.now(),
+    execution: rawExec ? {
+      managed: Boolean(rawExec.managed),
+      steps,
+      currentStepIndex: Number(rawExec.currentStepIndex ?? -1),
+      awaitingAnalysisStepId: rawExec.awaitingAnalysisStepId || null,
+      reportRequested: Boolean(rawExec.reportRequested),
+    } : {
+      managed: false,
+      steps: [],
+      currentStepIndex: -1,
+      awaitingAnalysisStepId: null,
+      reportRequested: false,
+    },
+  };
+}
+
+/**
+ * Deserialize a single execution step from storage.
+ */
+function deserializeStep(raw) {
+  return {
+    id: raw.id,
+    action: raw.action || "search",
+    query: raw.query || "",
+    purpose: raw.purpose || "",
+    sourceType: raw.sourceType || "",
+    status: raw.status || "pending",
+    outcome: raw.outcome || null,
+    error: raw.error || null,
   };
 }
 
@@ -295,11 +387,12 @@ export function buildRevisionMessage(run, feedback) {
 export function buildPlanningPrompt(runId, userQuery) {
   return [
     `<BetterDeepSeek>`,
-    `[BDS:DEEP_RESEARCH] Deep Research mode is enabled. The user has submitted a research request.`,
+    `[BDS:DEEP_RESEARCH] The DeepResearch toggle is enabled. Treat this exactly as the user asking: "Perform Deep Research on the following request."`,
     `Run ID: ${runId}`,
     ``,
-    `IMPORTANT: In this phase, you must ONLY produce a research plan. Do NOT browse or search yet.`,
-    `Output your plan using: <BDS:DEEP_RESEARCH_PLAN runId="${runId}">JSON</BDS:DEEP_RESEARCH_PLAN>`,
+    `CRITICAL: In this first turn, you must ONLY produce a research plan. Do NOT browse or search. Do NOT produce an ordinary answer. Do NOT produce a direct report.`,
+    `Output ONLY a plan using: <BDS:DEEP_RESEARCH_PLAN runId="${runId}">JSON</BDS:DEEP_RESEARCH_PLAN>`,
+    `After this turn, BDS will execute steps one-by-one. After each step result is provided, analyze it before continuing. Do NOT skip ahead to the final report until BDS tells you all steps are complete.`,
     ``,
     `The JSON plan must include:`,
     `- "title": A short descriptive title for the research`,
@@ -315,6 +408,330 @@ export function buildPlanningPrompt(runId, userQuery) {
     `User research question: ${userQuery}`,
     `</BetterDeepSeek>`,
   ].join("\n");
+}
+
+/**
+ * Normalize plan steps into execution-ready step objects.
+ * @param {Array} planSteps - Raw plan steps from model
+ * @returns {Array} Normalized execution steps
+ */
+function normalizeStepsFromPlan(planSteps) {
+  if (!Array.isArray(planSteps)) return [];
+  return planSteps.map((s, i) => ({
+    id: String(s.id || i + 1),
+    action: s.action === "fetch" ? "fetch" : "search",
+    query: String(s.query || "").trim(),
+    purpose: String(s.purpose || "").trim(),
+    sourceType: String(s.sourceType || "general").trim(),
+    status: "pending",
+    outcome: null,
+    error: null,
+  }));
+}
+
+/**
+ * Initialize managed execution from an approved plan.
+ * @param {object} run
+ */
+function initManagedExecution(run) {
+  if (!run || !run.plan || !Array.isArray(run.plan.steps)) return;
+  run.execution.managed = true;
+  run.execution.steps = normalizeStepsFromPlan(run.plan.steps);
+  run.execution.currentStepIndex = 0;
+  run.execution.awaitingAnalysisStepId = null;
+  run.execution.reportRequested = false;
+}
+
+const DEEP_FETCH_DEFAULT = 3;
+const MAX_DEEP_FETCH = 5;
+
+function clampDeepFetch(value) {
+  const num = parseInt(value, 10);
+  if (isNaN(num) || num < 0) return DEEP_FETCH_DEFAULT;
+  return Math.min(num, MAX_DEEP_FETCH);
+}
+
+/**
+ * Execute the current step of a managed deep research run.
+ * Returns false if no step to run, true otherwise.
+ * @param {object} run
+ * @returns {Promise<boolean>}
+ */
+async function runCurrentStep(run) {
+  if (!run || !run.execution.managed) return false;
+  const steps = run.execution.steps;
+  const idx = run.execution.currentStepIndex;
+  if (idx < 0 || idx >= steps.length) return false;
+
+  const step = steps[idx];
+  step.status = "tool_running";
+
+  try {
+    if (step.action === "fetch") {
+      let url = step.query;
+      try { url = normalizeHttpUrl(url); } catch { /* use raw */ }
+      const file = await fetchAndConvertWebPage(url, (status) => {
+        console.log(`[BDS:DEEP_RESEARCH] Fetch status for step ${step.id}: ${status}`);
+      });
+      if (file) {
+        const text = await file.text();
+        step.outcome = JSON.stringify({ url, length: text.length, content: text });
+        step.error = null;
+      } else {
+        throw new Error("Fetch returned no file");
+      }
+    } else {
+      // Search step
+      const deepFetch = clampDeepFetch(DEEP_FETCH_DEFAULT);
+      const result = await searchWeb(step.query, deepFetch, (status) => {
+        console.log(`[BDS:DEEP_RESEARCH] Search status for step ${step.id}: ${status}`);
+      }, {
+        purpose: step.purpose,
+        sourceType: step.sourceType,
+      });
+      if (result && result.results) {
+        step.outcome = JSON.stringify({
+          query: result.query || step.query,
+          count: result.results.length,
+          results: result.results,
+          provider: result.provider || "",
+          effectiveQuery: result.effectiveQuery || "",
+          purpose: step.purpose,
+          sourceType: step.sourceType,
+        });
+        step.error = null;
+      } else {
+        throw new Error("Search returned no results");
+      }
+    }
+  } catch (err) {
+    console.error(`[BDS:DEEP_RESEARCH] Step ${step.id} failed:`, err);
+    step.error = String(err.message || err);
+    step.outcome = null;
+  }
+
+  step.status = "awaiting_analysis";
+  run.execution.awaitingAnalysisStepId = step.id;
+  run.updatedAt = Date.now();
+  emitRunState(run);
+  void persistRuns(state.deepResearch.runs);
+  return true;
+}
+
+/**
+ * Build the prompt sent to DeepSeek with a completed step's result.
+ * @param {object} run
+ * @param {object} step
+ * @returns {string}
+ */
+function buildStepResultPrompt(run, step) {
+  const runId = run.id;
+  const stepId = step.id;
+  const action = step.action;
+  const query = step.query;
+  const purpose = step.purpose;
+
+  let resultBlock = "";
+  if (step.error) {
+    resultBlock = `[Step ${stepId} FAILED with error: ${step.error}]`;
+  } else if (step.outcome) {
+    try {
+      const parsed = JSON.parse(step.outcome);
+      const preview = step.action === "fetch"
+        ? `Fetched ${parsed.url} (${parsed.length} chars)`
+        : `Search "${parsed.query}" returned ${parsed.count} results`;
+      resultBlock = [
+        `[Step ${stepId} result — ${preview}]`,
+        "```json",
+        step.outcome,
+        "```",
+      ].join("\n");
+    } catch {
+      resultBlock = `[Step ${stepId} result]\n${step.outcome}`;
+    }
+  } else {
+    resultBlock = `[Step ${stepId} — no output (empty result)]`;
+  }
+
+  return [
+    `<BetterDeepSeek>`,
+    `[BDS:DEEP_RESEARCH] Step ${stepId} of your research plan is complete.`,
+    `Run ID: ${runId}`,
+    `Action: ${action}`,
+    `Query: ${query}`,
+    `Purpose: ${purpose}`,
+    ``,
+    resultBlock,
+    ``,
+    `Analyze this result. Update your source ledger mentally. Then finish your analysis with:`,
+    `<BDS:DEEP_RESEARCH_STEP_DONE runId="${runId}" stepId="${stepId}">JSON</BDS:DEEP_RESEARCH_STEP_DONE>`,
+    ``,
+    `The JSON inside must be: {"stepId":"${stepId}","analysis":"short summary of findings","newInsights":["insight1","insight2"]}`,
+    ``,
+    `Do NOT produce the final report yet. Only analyze this step.`,
+    `</BetterDeepSeek>`,
+  ].join("\n");
+}
+
+/**
+ * Build the final report prompt after all steps are complete.
+ * @param {object} run
+ * @returns {string}
+ */
+function buildFinalReportPrompt(run) {
+  const runId = run.id;
+
+  const stepSummaries = run.execution.steps.map((s) => {
+    const header = `Step ${s.id}: ${s.action} "${s.query}" (${s.purpose})`;
+    if (s.error) return `${header} — FAILED: ${s.error}`;
+    return `${header} — complete`;
+  }).join("\n");
+
+  return [
+    `<BetterDeepSeek>`,
+    `[BDS:DEEP_RESEARCH] All research steps are complete.`,
+    `Run ID: ${runId}`,
+    ``,
+    `Completed steps:`,
+    stepSummaries,
+    ``,
+    `Now produce the final research report.`,
+    `Wrap the report as: <BDS:DEEP_RESEARCH_REPORT runId="${runId}">markdown</BDS:DEEP_RESEARCH_REPORT>`,
+    `Do NOT wrap the report Markdown in a code fence.`,
+    `</BetterDeepSeek>`,
+  ].join("\n");
+}
+
+/**
+ * Advance to the next step after step-done is received.
+ * If all steps complete, sends the final report prompt.
+ * @param {object} run
+ * @returns {boolean} true if advanced, false if all steps done
+ */
+function advanceToNextStep(run) {
+  run.execution.awaitingAnalysisStepId = null;
+  run.execution.currentStepIndex += 1;
+
+  if (run.execution.currentStepIndex >= run.execution.steps.length) {
+    // All steps done — request final report
+    run.execution.reportRequested = true;
+    setStatus(run, "reporting");
+    emitRunState(run);
+    void persistRuns(state.deepResearch.runs);
+
+    injectPureTextAndSend(buildFinalReportPrompt(run), "Deep Research final report request");
+    return false;
+  }
+
+  // Advance to next step
+  void persistRuns(state.deepResearch.runs);
+  void runCurrentStep(run).then((ran) => {
+    if (ran) {
+      const step = run.execution.steps[run.execution.currentStepIndex];
+      injectPureTextAndSend(
+        buildStepResultPrompt(run, step),
+        `Deep Research step ${step.id} result`,
+      );
+    }
+  });
+  return true;
+}
+
+/**
+ * Handle a received DEEP_RESEARCH_STEP_DONE tag.
+ * Only advances if the runId and stepId match the expected values.
+ * @param {object} run
+ * @param {string} stepId
+ * @param {object} analysisJson
+ * @returns {boolean} true if the step was handled
+ */
+export function handleStepDone(run, stepId, analysisJson) {
+  if (!run || !run.execution.managed) return false;
+  if (run.execution.awaitingAnalysisStepId !== String(stepId)) return false;
+
+  const idx = run.execution.currentStepIndex;
+  if (idx < 0 || idx >= run.execution.steps.length) return false;
+
+  const step = run.execution.steps[idx];
+  if (String(step.id) !== String(stepId)) return false;
+
+  step.status = "complete";
+  if (analysisJson && typeof analysisJson === "object") {
+    step.outcome = JSON.stringify({
+      ...(step.outcome ? JSON.parse(step.outcome) : {}),
+      analysis: analysisJson.analysis || "",
+      insights: analysisJson.newInsights || [],
+    });
+  }
+  run.updatedAt = Date.now();
+
+  advanceToNextStep(run);
+  return true;
+}
+
+/**
+ * Handle a received DEEP_RESEARCH_REPORT or synthesize one from visible markdown.
+ * @param {object} run
+ * @param {string} markdown
+ */
+export function handleManagedReport(run, markdown) {
+  if (!run || !run.execution.managed) return false;
+  if (!run.execution.reportRequested) return false;
+
+  setStatus(run, "complete");
+  run.updatedAt = Date.now();
+  upsertRun(run);
+  state.deepResearch.enabled = false;
+  state.deepResearch.pendingRun = null;
+  clearRunSearchHistory(run.id);
+  emitConfigState();
+  emitToggleState();
+  emitRunState(run);
+  void persistRuns(state.deepResearch.runs);
+
+  // Dispatch report event so UI renders the card
+  window.dispatchEvent(new CustomEvent("bds:deep-research-report-received", {
+    detail: {
+      conversationId: run.conversationId,
+      runId: run.id,
+      markdown: markdown || "",
+      synthesized: !markdown,
+    },
+  }));
+
+  return true;
+}
+
+/**
+ * Check if a managed run is in the reporting phase and the latest settled
+ * assistant message has no report tag — if so, synthesize a report.
+ * Called from message-processor when a message settles during reporting phase.
+ * @param {object} run
+ * @param {string} visibleText - The sanitized visible text from the message
+ * @returns {boolean} true if synthesis was triggered
+ */
+export function trySynthesizeReport(run, visibleText) {
+  if (!run || !run.execution.managed) return false;
+  if (!run.execution.reportRequested) return false;
+  if (run.status !== "reporting") return false;
+
+  const text = String(visibleText || "").trim();
+  if (!text) return false;
+
+  return handleManagedReport(run, text);
+}
+
+/**
+ * Check whether a managed deep research run is active.
+ * Used to suppress AUTO tags during managed runs.
+ * @param {string} runId
+ * @returns {boolean}
+ */
+export function isManagedRunActive(runId) {
+  if (!runId) return false;
+  const run = findRunById(runId);
+  return Boolean(run && run.execution && run.execution.managed &&
+    run.status !== "complete" && run.status !== "cancelled");
 }
 
 let runtimeInitialized = false;
@@ -391,17 +808,29 @@ export function initDeepResearchRuntime() {
     const detail = normalizeEventDetail(event.detail);
     const run = ensureRun(detail.runId, detail.conversationId);
     run.plan = detail.plan || run.plan;
-    const sent = injectPureTextAndSend(buildApprovalMessage(run), "Deep Research approval");
-    if (sent === false) {
-      state.ui?.showToast?.("Could not submit Deep Research approval.");
-      emitRunState(run);
-      return;
-    }
+
+    // Initialize managed execution from the approved plan
+    initManagedExecution(run);
     setStatus(run, "approved");
     setStatus(run, "running");
     upsertRun(run);
     emitRunState(run);
     void persistRuns(state.deepResearch.runs);
+
+    // Run step 1 immediately
+    void runCurrentStep(run).then((ran) => {
+      if (ran) {
+        const step = run.execution.steps[0];
+        const sent = injectPureTextAndSend(
+          buildStepResultPrompt(run, step),
+          `Deep Research step ${step.id} result`,
+        );
+        if (sent === false) {
+          state.ui?.showToast?.("Could not start Deep Research execution.");
+          emitRunState(run);
+        }
+      }
+    });
   });
 
   window.addEventListener("bds:deep-research-revise", (event) => {
@@ -427,6 +856,7 @@ export function initDeepResearchRuntime() {
     const detail = normalizeEventDetail(event.detail);
     const run = ensureRun(detail.runId, detail.conversationId);
     setStatus(run, "cancelled");
+    run.execution.managed = false;
     upsertRun(run);
     state.deepResearch.enabled = false;
     state.deepResearch.pendingRun = null;
@@ -437,6 +867,20 @@ export function initDeepResearchRuntime() {
     void persistRuns(state.deepResearch.runs);
     if (state.ui) {
       state.ui.showToast("Deep Research cancelled.");
+    }
+  });
+
+  window.addEventListener("bds:deep-research-step-done", (event) => {
+    const detail = normalizeEventDetail(event.detail);
+    const run = findRunById(detail.runId);
+    if (!run) return;
+    const handled = handleStepDone(run, detail.stepId, detail.analysis || {});
+    if (!handled) {
+      console.warn("[BDS:DEEP_RESEARCH] Step-done received but not handled:", {
+        runId: detail.runId,
+        stepId: detail.stepId,
+        expected: run.execution?.awaitingAnalysisStepId,
+      });
     }
   });
 }

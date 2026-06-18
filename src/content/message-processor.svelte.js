@@ -21,6 +21,7 @@ import { collectLongWorkFiles, finalizeLongWork, emitZipForFiles } from "./files
 import { emitStandaloneFiles } from "./files/standalone.js";
 import { getOrCreateHost } from "./dom/host.js";
 import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun } from "./auto.js";
+import { isManagedRunActive, trySynthesizeReport } from "./deep-research.js";
 
 import { mount, unmount } from "svelte";
 import MessageOverlay from "./ui/MessageOverlay.svelte";
@@ -246,7 +247,17 @@ export function processMessageNode(node) {
       if (!stateData.autoYouTubeFetchesHandled) stateData.autoYouTubeFetchesHandled = new Set();
       if (!stateData.autoSearchQueriesHandled) stateData.autoSearchQueriesHandled = new Set();
 
+      // --- SUPPRESS AUTO tags during managed Deep Research runs ---
+      // During managed execution, BDS controls search/fetch. The model may
+      // accidentally emit AUTO tags — ignore them so BDS step logic is not disrupted.
+      const activeManagedRun = state.deepResearch.runs.find(
+        (r) => r.execution && r.execution.managed &&
+          r.status !== "complete" && r.status !== "cancelled",
+      );
+      const suppressManagedAuto = Boolean(activeManagedRun);
+
       for (const url of parsed.autoRequests.webFetch) {
+        if (suppressManagedAuto) continue;
         if (!stateData.autoWebFetchesHandled.has(url)) {
           stateData.autoWebFetchesHandled.add(url);
           handleAutoWebFetch(url);
@@ -254,6 +265,7 @@ export function processMessageNode(node) {
       }
 
       for (const repoUrl of parsed.autoRequests.githubFetch) {
+        if (suppressManagedAuto) continue;
         if (!stateData.autoGitHubFetchesHandled.has(repoUrl)) {
           stateData.autoGitHubFetchesHandled.add(repoUrl);
           handleAutoGitHubFetch(repoUrl);
@@ -261,6 +273,7 @@ export function processMessageNode(node) {
       }
 
       for (const tweetUrl of parsed.autoRequests.twitterFetch) {
+        if (suppressManagedAuto) continue;
         if (!stateData.autoTwitterFetchesHandled.has(tweetUrl)) {
           stateData.autoTwitterFetchesHandled.add(tweetUrl);
           handleAutoTwitterFetch(tweetUrl);
@@ -268,6 +281,7 @@ export function processMessageNode(node) {
       }
 
       for (const videoUrl of parsed.autoRequests.youtubeFetch) {
+        if (suppressManagedAuto) continue;
         if (!stateData.autoYouTubeFetchesHandled.has(videoUrl)) {
           stateData.autoYouTubeFetchesHandled.add(videoUrl);
           handleAutoYouTubeFetch(videoUrl);
@@ -275,6 +289,7 @@ export function processMessageNode(node) {
       }
 
       for (const { query, deepFetch, runId, purpose, sourceType } of parsed.autoRequests.searchQueries) {
+        if (suppressManagedAuto) continue;
         const searchKey = getSearchRequestKey(query, runId, purpose, sourceType);
         if (!stateData.autoSearchQueriesHandled.has(searchKey)) {
           stateData.autoSearchQueriesHandled.add(searchKey);
@@ -304,7 +319,33 @@ export function processMessageNode(node) {
   const hasActionableFiles = parsed.createFiles.length > 0;
 
   dispatchDeepResearchEvents(parsed, stateData);
-  
+
+  // --- SYNTHESIZE REPORT for managed deep research ---
+  // If we are in the reporting phase and the latest settled assistant message
+  // has no report tag, synthesize a report from visible markdown.
+  if (isLatestAssistant && isSettled && role === "assistant") {
+    const drRuns = state.deepResearch.runs;
+    for (const run of drRuns) {
+      if (run.execution && run.execution.managed &&
+          run.execution.reportRequested &&
+          run.status === "reporting") {
+        const hasReportTag = parsed.deepResearch.reports.length > 0;
+        if (!hasReportTag && parsed.visibleText && parsed.visibleText.trim()) {
+          const synthesized = trySynthesizeReport(run, parsed.visibleText);
+          if (synthesized) {
+            // Inject a synthetic renderable block so the UI renders DeepResearchReportCard
+            parsed.renderableBlocks.push({
+              name: "deep_research_report",
+              attrs: { runId: run.id },
+              content: parsed.visibleText,
+            });
+            parsed.containsControlTags = true;
+          }
+        }
+      }
+    }
+  }
+
   // IMMEDIATELY activate longWork state if tag is seen in latest assistant message
   if (isLatestAssistant && (parsed.longWorkOpen || (parsed.isStreamingTool && parsed.streamingTagName === 'long_work'))) {
     if (!state.longWork.active) {
@@ -503,7 +544,8 @@ function dispatchDeepResearchEvents(parsed, stateData) {
   const hasDeepResearch =
     data.plans.length > 0 ||
     data.statuses.length > 0 ||
-    data.reports.length > 0;
+    data.reports.length > 0 ||
+    data.stepDone.length > 0;
   if (!hasDeepResearch) return;
 
   const signature = simpleHash(JSON.stringify(data));
@@ -542,6 +584,19 @@ function dispatchDeepResearchEvents(parsed, stateData) {
         conversationId,
         runId: item.runId,
         markdown: item.markdown,
+      },
+    }));
+  }
+
+  for (const item of data.stepDone) {
+    window.dispatchEvent(new CustomEvent("bds:deep-research-step-done", {
+      detail: {
+        conversationId,
+        runId: item.runId,
+        stepId: item.stepId,
+        analysis: item.analysis,
+        raw: item.raw || "",
+        error: item.error || "",
       },
     }));
   }

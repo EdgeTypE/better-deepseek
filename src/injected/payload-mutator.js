@@ -417,11 +417,12 @@ function buildDeepResearchPlanningBlock(userPrompt, conversationId, state) {
 
   return [
     `<BetterDeepSeek>`,
-    `[BDS:DEEP_RESEARCH] Deep Research mode is enabled. The user has submitted a research request.`,
+    `[BDS:DEEP_RESEARCH] The DeepResearch toggle is enabled. Treat this exactly as the user asking: "Perform Deep Research on the following request."`,
     `Run ID: ${config.runId}`,
     ``,
-    `IMPORTANT: In this phase, you must ONLY produce a research plan. Do NOT browse or search yet.`,
-    `Output your plan using: <BDS:DEEP_RESEARCH_PLAN runId="${config.runId}">JSON</BDS:DEEP_RESEARCH_PLAN>`,
+    `CRITICAL: In this first turn, you must ONLY produce a research plan. Do NOT browse or search. Do NOT produce an ordinary answer. Do NOT produce a direct report.`,
+    `Output ONLY a plan using: <BDS:DEEP_RESEARCH_PLAN runId="${config.runId}">JSON</BDS:DEEP_RESEARCH_PLAN>`,
+    `After this turn, BDS will execute steps one-by-one. After each step result is provided, analyze it before continuing. Do NOT skip ahead to the final report until BDS tells you all steps are complete.`,
     ``,
     `The JSON plan must include:`,
     `- "title": A short descriptive title for the research`,

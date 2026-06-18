@@ -143,6 +143,47 @@ Findings.</BDS:DEEP_RESEARCH_REPORT>`;
     });
   });
 
+  describe("DEEP_RESEARCH_STEP_DONE", () => {
+    it("parses step-done tag with valid JSON", () => {
+      const text = `<BDS:DEEP_RESEARCH_STEP_DONE runId="run1" stepId="1">{"stepId":"1","analysis":"found good results","newInsights":["insight A","insight B"]}</BDS:DEEP_RESEARCH_STEP_DONE>`;
+      const result = parseBdsMessage(text);
+
+      expect(result.deepResearch.stepDone).toHaveLength(1);
+      expect(result.deepResearch.stepDone[0].runId).toBe("run1");
+      expect(result.deepResearch.stepDone[0].stepId).toBe("1");
+      expect(result.deepResearch.stepDone[0].analysis.stepId).toBe("1");
+      expect(result.deepResearch.stepDone[0].analysis.analysis).toBe("found good results");
+      expect(result.deepResearch.stepDone[0].analysis.newInsights).toEqual(["insight A", "insight B"]);
+    });
+
+    it("handles malformed step-done JSON", () => {
+      const text = `<BDS:DEEP_RESEARCH_STEP_DONE runId="run1" stepId="2">{broken json</BDS:DEEP_RESEARCH_STEP_DONE>`;
+      const result = parseBdsMessage(text);
+
+      expect(result.deepResearch.stepDone).toHaveLength(1);
+      expect(result.deepResearch.stepDone[0].runId).toBe("run1");
+      expect(result.deepResearch.stepDone[0].stepId).toBe("2");
+      expect(result.deepResearch.stepDone[0].analysis).toBeNull();
+      expect(result.deepResearch.stepDone[0].raw).toBe("{broken json");
+      expect(result.deepResearch.stepDone[0].error).toBeTruthy();
+    });
+
+    it("handles empty step-done", () => {
+      const text = `<BDS:DEEP_RESEARCH_STEP_DONE runId="run1" stepId="3"></BDS:DEEP_RESEARCH_STEP_DONE>`;
+      const result = parseBdsMessage(text);
+
+      expect(result.deepResearch.stepDone).toHaveLength(1);
+    });
+
+    it("parses stepDone with runid (case-insensitive)", () => {
+      const text = `<BDS:DEEP_RESEARCH_STEP_DONE runid="runX" stepId="1">{"stepId":"1","analysis":"ok","newInsights":[]}</BDS:DEEP_RESEARCH_STEP_DONE>`;
+      const result = parseBdsMessage(text);
+
+      expect(result.deepResearch.stepDone).toHaveLength(1);
+      expect(result.deepResearch.stepDone[0].runId).toBe("runX");
+    });
+  });
+
   describe("Multiple deep research tags in one message", () => {
     it("parses plan + status in same message", () => {
       const text = [
@@ -153,6 +194,19 @@ Findings.</BDS:DEEP_RESEARCH_REPORT>`;
 
       expect(result.deepResearch.plans).toHaveLength(1);
       expect(result.deepResearch.statuses).toHaveLength(1);
+    });
+
+    it("parses plan + step-done + report in same message", () => {
+      const text = [
+        `<BDS:DEEP_RESEARCH_STATUS runId="m2">{"completedSteps":1,"totalSteps":2}</BDS:DEEP_RESEARCH_STATUS>`,
+        `<BDS:DEEP_RESEARCH_STEP_DONE runId="m2" stepId="2">{"stepId":"2","analysis":"done"}</BDS:DEEP_RESEARCH_STEP_DONE>`,
+        `<BDS:DEEP_RESEARCH_REPORT runId="m2"># Final</BDS:DEEP_RESEARCH_REPORT>`,
+      ].join("\n");
+      const result = parseBdsMessage(text);
+
+      expect(result.deepResearch.statuses).toHaveLength(1);
+      expect(result.deepResearch.stepDone).toHaveLength(1);
+      expect(result.deepResearch.reports).toHaveLength(1);
     });
   });
 
