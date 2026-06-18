@@ -250,11 +250,16 @@ export function processMessageNode(node) {
       // --- SUPPRESS AUTO tags during managed Deep Research runs ---
       // During managed execution, BDS controls search/fetch. The model may
       // accidentally emit AUTO tags — ignore them so BDS step logic is not disrupted.
+      const currentConversationId = getCurrentConversationIdInline();
       const activeManagedRun = state.deepResearch.runs.find(
-        (r) => r.execution && r.execution.managed &&
+        (r) => r.conversationId === currentConversationId &&
+          r.execution && r.execution.managed &&
           r.status !== "complete" && r.status !== "cancelled",
       );
-      const suppressManagedAuto = Boolean(activeManagedRun);
+      const managedSearchRunRequested = parsed.autoRequests.searchQueries.some(
+        ({ runId }) => runId && isManagedRunActive(runId),
+      );
+      const suppressManagedAuto = Boolean(activeManagedRun || managedSearchRunRequested);
 
       for (const url of parsed.autoRequests.webFetch) {
         if (suppressManagedAuto) continue;
@@ -319,6 +324,7 @@ export function processMessageNode(node) {
   const hasActionableFiles = parsed.createFiles.length > 0;
 
   dispatchDeepResearchEvents(parsed, stateData);
+  gateManagedDeepResearchReports(parsed);
 
   // --- SYNTHESIZE REPORT for managed deep research ---
   // If we are in the reporting phase and the latest settled assistant message
@@ -327,6 +333,7 @@ export function processMessageNode(node) {
     const drRuns = state.deepResearch.runs;
     for (const run of drRuns) {
       if (run.execution && run.execution.managed &&
+          run.conversationId === getCurrentConversationIdInline() &&
           run.execution.reportRequested &&
           run.status === "reporting") {
         const hasReportTag = parsed.deepResearch.reports.length > 0;
@@ -512,6 +519,23 @@ export function processMessageNode(node) {
       }
     }
   }
+}
+
+function gateManagedDeepResearchReports(parsed) {
+  if (!parsed?.renderableBlocks?.length) return;
+
+  parsed.renderableBlocks = parsed.renderableBlocks.filter((block) => {
+    if (block.name !== "deep_research_report") return true;
+
+    const runId = block.attrs?.runId || block.attrs?.runid || "";
+    const run = state.deepResearch.runs.find((item) => item.id === runId);
+    if (!run?.execution?.managed) return true;
+    if (run.status === "complete") return true;
+
+    const steps = run.execution.steps || [];
+    const stepsComplete = steps.every((step) => step.status === "complete");
+    return Boolean(run.execution.reportRequested && stepsComplete);
+  });
 }
 
 /**

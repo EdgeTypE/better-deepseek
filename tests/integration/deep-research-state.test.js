@@ -7,6 +7,7 @@ import state from "../../src/content/state.js";
 const autoMocks = vi.hoisted(() => ({
   clearRunSearchHistory: vi.fn(),
   injectPureTextAndSend: vi.fn(() => true),
+  sendFileWithMessage: vi.fn(() => Promise.resolve(true)),
 }));
 
 vi.mock("../../src/content/auto.js", () => autoMocks);
@@ -44,6 +45,9 @@ describe("Deep Research state machine", () => {
     state.deepResearch.enabled = false;
     state.deepResearch.pendingRun = null;
     state.deepResearch.runs = [];
+    autoMocks.clearRunSearchHistory.mockClear();
+    autoMocks.injectPureTextAndSend.mockClear();
+    autoMocks.sendFileWithMessage.mockClear();
   });
 
   describe("createRun", () => {
@@ -305,7 +309,8 @@ describe("Deep Research state machine", () => {
         action: s.action === "fetch" ? "fetch" : "search",
         query: String(s.query || "").trim(),
         purpose: String(s.purpose || "").trim(),
-        sourceType: String(s.sourceType || "general").trim(),
+        sourceType: s.action === "fetch" ? "" : String(s.sourceType || "general").trim(),
+        deepFetch: s.action === "fetch" ? 0 : 3,
         status: "pending",
         outcome: null,
         error: null,
@@ -319,9 +324,11 @@ describe("Deep Research state machine", () => {
       expect(run.execution.steps[0].action).toBe("search");
       expect(run.execution.steps[0].status).toBe("pending");
       expect(run.execution.steps[0].sourceType).toBe("general");
+      expect(run.execution.steps[0].deepFetch).toBe(3);
       expect(run.execution.steps[1].id).toBe("2");
       expect(run.execution.steps[1].action).toBe("fetch");
-      expect(run.execution.steps[1].sourceType).toBe("general");
+      expect(run.execution.steps[1].sourceType).toBe("");
+      expect(run.execution.steps[1].deepFetch).toBe(0);
       expect(run.execution.currentStepIndex).toBe(0);
     });
 
@@ -351,7 +358,6 @@ describe("Deep Research state machine", () => {
       run.execution.managed = true;
       run.execution.steps = [
         { id: "1", action: "search", query: "q1", purpose: "p1", sourceType: "general", status: "awaiting_analysis", outcome: null, error: null },
-        { id: "2", action: "search", query: "q2", purpose: "p2", sourceType: "news", status: "pending", outcome: null, error: null },
       ];
       run.execution.currentStepIndex = 0;
       run.execution.awaitingAnalysisStepId = "1";
@@ -370,27 +376,26 @@ describe("Deep Research state machine", () => {
       // Outcome should include analysis
       const outcome = JSON.parse(run.execution.steps[0].outcome);
       expect(outcome.analysis).toBe("found info");
+      expect(run.execution.reportRequested).toBe(true);
     });
 
-    it("handleManagedReport completes run and dispatches event", () => {
+    it("handleManagedReport completes run after all managed steps are complete", () => {
       state.deepResearch.runs = [];
       state.deepResearch.enabled = true;
 
       const run = createRun("conv1", "run-report");
       run.execution.managed = true;
       run.execution.reportRequested = true;
+      run.execution.steps = [
+        { id: "1", action: "search", query: "q1", purpose: "p1", sourceType: "general", status: "complete", outcome: "{}", error: null },
+      ];
       run.status = "reporting";
       state.deepResearch.runs.push(run);
-
-      const listener = vi.fn();
-      window.addEventListener("bds:deep-research-report-received", listener);
 
       const result = handleManagedReport(run, "# Final Report\n\nContent here.");
       expect(result).toBe(true);
       expect(run.status).toBe("complete");
       expect(state.deepResearch.enabled).toBe(false);
-      expect(listener).toHaveBeenCalledOnce();
-      expect(listener.mock.calls[0][0].detail.markdown).toBe("# Final Report\n\nContent here.");
     });
 
     it("handleManagedReport rejects when reportRequested is false", () => {
@@ -401,6 +406,20 @@ describe("Deep Research state machine", () => {
 
       const result = handleManagedReport(run, "some text");
       expect(result).toBe(false);
+    });
+
+    it("handleManagedReport rejects before all managed steps complete", () => {
+      const run = createRun("conv1", "run-early-report");
+      run.execution.managed = true;
+      run.execution.reportRequested = true;
+      run.execution.steps = [
+        { id: "1", action: "search", query: "q1", purpose: "p1", sourceType: "general", status: "awaiting_analysis", outcome: "{}", error: null },
+      ];
+      run.status = "reporting";
+
+      const result = handleManagedReport(run, "# Early Report");
+      expect(result).toBe(false);
+      expect(run.status).toBe("reporting");
     });
 
     it("planning prompt includes stronger toggle intent text", () => {

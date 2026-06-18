@@ -23,11 +23,19 @@
   let progress = $derived(totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0);
 
   // Reactive managed execution state — initialized from props, updated via events
-  let liveManaged = $state(managed);
-  let liveSteps = $state(steps && Array.isArray(steps) ? steps : []);
-  let liveCurrentStepIndex = $state(currentStepIndex);
-  let liveAwaitingStepId = $state(awaitingStepId);
-  let liveReportRequested = $state(reportRequested);
+  let liveManaged = $state(false);
+  let liveSteps = $state([]);
+  let liveCurrentStepIndex = $state(-1);
+  let liveAwaitingStepId = $state(null);
+  let liveReportRequested = $state(false);
+
+  $effect(() => {
+    liveManaged = Boolean(managed);
+    liveSteps = steps && Array.isArray(steps) ? steps : [];
+    liveCurrentStepIndex = currentStepIndex;
+    liveAwaitingStepId = awaitingStepId;
+    liveReportRequested = Boolean(reportRequested);
+  });
 
   onMount(() => {
     const handler = (event) => {
@@ -50,11 +58,6 @@
   let managedTotal = $derived(managedSteps.length);
   let managedComplete = $derived(managedSteps.filter((s) => s.status === "complete").length);
   let managedProgress = $derived(managedTotal > 0 ? Math.round((managedComplete / managedTotal) * 100) : 0);
-  let currentStep = $derived(managedSteps.find((s) => s.id === liveAwaitingStepId) || null);
-  let currentStepLabel = $derived.by(() => {
-    if (!currentStep) return "";
-    return `Step ${currentStep.id}: ${currentStep.action} "${currentStep.query}"`;
-  });
 
   let phase = $derived.by(() => {
     if (liveReportRequested) return "preparing report";
@@ -63,7 +66,7 @@
     return "";
   });
 
-  let statusTitle = $derived(liveReportRequested ? "Deep Research — Preparing Report" : "Deep Research in Progress");
+  let statusTitle = $derived(liveReportRequested ? "Deep Research - Preparing Report" : "Deep Research in Progress");
 </script>
 
 <div class="bds-deep-research-status-card" data-testid="deep-research-status-card">
@@ -75,7 +78,7 @@
     {/if}
   </div>
 
-  {#if managed && managedTotal > 0}
+  {#if liveManaged && managedTotal > 0}
     <div class="bds-drs-progress">
       <div class="bds-drs-bar-bg">
         <div class="bds-drs-bar-fill" style="width: {managedProgress}%"></div>
@@ -87,7 +90,7 @@
     </div>
 
     {#each managedSteps as step}
-      <div class="bds-drs-step-row" class:active={step.id === awaitingStepId} class:complete={step.status === "complete"} class:error={step.status === "tool_running" && step.error}>
+      <div class="bds-drs-step-row" class:active={step.id === liveAwaitingStepId} class:complete={step.status === "complete"} class:error={step.status === "tool_running" && step.error}>
         <span class="bds-drs-step-num">
           {#if step.status === "complete"}
             ✓

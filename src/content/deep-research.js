@@ -10,7 +10,7 @@ import { BRIDGE_EVENTS, STORAGE_KEYS } from "../lib/constants.js";
 import { makeId } from "../lib/utils/helpers.js";
 import { normalizeHttpUrl } from "../lib/utils/url-normalizer.js";
 import state from "./state.js";
-import { clearRunSearchHistory, injectPureTextAndSend } from "./auto.js";
+import { clearRunSearchHistory, injectPureTextAndSend, sendFileWithMessage } from "./auto.js";
 import { fetchAndConvertWebPage } from "./files/web-reader.js";
 import { searchWeb } from "./files/search-reader.js";
 
@@ -164,6 +164,15 @@ function normalizeEventDetail(detail) {
   return detail && typeof detail === "object" ? detail : {};
 }
 
+const DEEP_FETCH_DEFAULT = 3;
+const MAX_DEEP_FETCH = 5;
+
+function clampDeepFetch(value) {
+  const num = parseInt(value, 10);
+  if (isNaN(num) || num < 0) return DEEP_FETCH_DEFAULT;
+  return Math.min(num, MAX_DEEP_FETCH);
+}
+
 function findRunById(runId) {
   return state.deepResearch.runs.find((run) => run.id === runId) || null;
 }
@@ -240,6 +249,7 @@ function emitRunState(run) {
         query: s.query,
         purpose: s.purpose,
         sourceType: s.sourceType,
+        deepFetch: s.deepFetch,
         status: s.status,
         error: s.error,
       })) : [],
@@ -284,6 +294,7 @@ function serializeStep(step) {
     query: step.query,
     purpose: step.purpose,
     sourceType: step.sourceType || "",
+    deepFetch: Number(step.deepFetch) || 0,
     status: step.status || "pending",
     outcome: step.outcome || null,
     error: step.error || null,
@@ -332,6 +343,7 @@ function deserializeStep(raw) {
     query: raw.query || "",
     purpose: raw.purpose || "",
     sourceType: raw.sourceType || "",
+    deepFetch: Number(raw.deepFetch) || 0,
     status: raw.status || "pending",
     outcome: raw.outcome || null,
     error: raw.error || null,
@@ -417,16 +429,21 @@ export function buildPlanningPrompt(runId, userQuery) {
  */
 function normalizeStepsFromPlan(planSteps) {
   if (!Array.isArray(planSteps)) return [];
-  return planSteps.map((s, i) => ({
-    id: String(s.id || i + 1),
-    action: s.action === "fetch" ? "fetch" : "search",
-    query: String(s.query || "").trim(),
-    purpose: String(s.purpose || "").trim(),
-    sourceType: String(s.sourceType || "general").trim(),
-    status: "pending",
-    outcome: null,
-    error: null,
-  }));
+  return planSteps.map((s, i) => {
+    const action = s.action === "fetch" ? "fetch" : "search";
+    return {
+      id: String(s.id || i + 1),
+      action,
+      query: String(s.query || "").trim(),
+      purpose: String(s.purpose || "").trim(),
+      sourceType: action === "search" ? String(s.sourceType || "general").trim() : "",
+      deepFetch: action === "search" ? clampDeepFetch(s.deepFetch ?? DEEP_FETCH_DEFAULT) : 0,
+      status: "pending",
+      outcome: null,
+      error: null,
+      resultFile: null,
+    };
+  });
 }
 
 /**
@@ -440,15 +457,6 @@ function initManagedExecution(run) {
   run.execution.currentStepIndex = 0;
   run.execution.awaitingAnalysisStepId = null;
   run.execution.reportRequested = false;
-}
-
-const DEEP_FETCH_DEFAULT = 3;
-const MAX_DEEP_FETCH = 5;
-
-function clampDeepFetch(value) {
-  const num = parseInt(value, 10);
-  if (isNaN(num) || num < 0) return DEEP_FETCH_DEFAULT;
-  return Math.min(num, MAX_DEEP_FETCH);
 }
 
 /**
@@ -465,37 +473,53 @@ async function runCurrentStep(run) {
 
   const step = steps[idx];
   step.status = "tool_running";
+  step.outcome = null;
+  step.error = null;
+  step.resultFile = null;
+  run.updatedAt = Date.now();
+  emitRunState(run);
+  void persistRuns(state.deepResearch.runs);
 
   try {
     if (step.action === "fetch") {
-      let url = step.query;
-      try { url = normalizeHttpUrl(url); } catch { /* use raw */ }
+      const url = normalizeHttpUrl(step.query);
       const file = await fetchAndConvertWebPage(url, (status) => {
         console.log(`[BDS:DEEP_RESEARCH] Fetch status for step ${step.id}: ${status}`);
       });
       if (file) {
-        const text = await file.text();
-        step.outcome = JSON.stringify({ url, length: text.length, content: text });
+        const text = await readFileText(file);
+        step.resultFile = file;
+        step.outcome = JSON.stringify({
+          url,
+          fileName: file.name,
+          length: text.length,
+        });
         step.error = null;
       } else {
         throw new Error("Fetch returned no file");
       }
     } else {
       // Search step
-      const deepFetch = clampDeepFetch(DEEP_FETCH_DEFAULT);
+      const deepFetch = clampDeepFetch(step.deepFetch ?? DEEP_FETCH_DEFAULT);
       const result = await searchWeb(step.query, deepFetch, (status) => {
         console.log(`[BDS:DEEP_RESEARCH] Search status for step ${step.id}: ${status}`);
       }, {
         purpose: step.purpose,
         sourceType: step.sourceType,
       });
-      if (result && result.results) {
+      if (result && result.file && result.results) {
+        const text = await readFileText(result.file);
+        step.resultFile = result.file;
         step.outcome = JSON.stringify({
           query: result.query || step.query,
+          deepFetch: result.deepFetch ?? deepFetch,
           count: result.results.length,
           results: result.results,
           provider: result.provider || "",
           effectiveQuery: result.effectiveQuery || "",
+          rawResultCount: result.rawResultCount || result.results.length,
+          fileName: result.file.name,
+          length: text.length,
           purpose: step.purpose,
           sourceType: step.sourceType,
         });
@@ -508,6 +532,7 @@ async function runCurrentStep(run) {
     console.error(`[BDS:DEEP_RESEARCH] Step ${step.id} failed:`, err);
     step.error = String(err.message || err);
     step.outcome = null;
+    step.resultFile = createStepErrorFile(run, step, step.error);
   }
 
   step.status = "awaiting_analysis";
@@ -518,52 +543,95 @@ async function runCurrentStep(run) {
   return true;
 }
 
-/**
- * Build the prompt sent to DeepSeek with a completed step's result.
- * @param {object} run
- * @param {object} step
- * @returns {string}
- */
-function buildStepResultPrompt(run, step) {
+function createStepErrorFile(run, step, message) {
+  const safeRunId = String(run.id || "run").replace(/[^a-z0-9_-]/gi, "_");
+  const safeStepId = String(step.id || "step").replace(/[^a-z0-9_-]/gi, "_");
+  const content = [
+    `Deep Research step failed`,
+    ``,
+    `Run ID: ${run.id}`,
+    `Step ID: ${step.id}`,
+    `Action: ${step.action}`,
+    `Query: ${step.query}`,
+    `Purpose: ${step.purpose || ""}`,
+    ``,
+    `Error: ${message || "Unknown error"}`,
+  ].join("\n");
+  return new File(
+    [content],
+    `deep-research-${safeRunId}-step-${safeStepId}-error.txt`,
+    { type: "text/plain" },
+  );
+}
+
+async function readFileText(file) {
+  if (!file) return "";
+
+  if (typeof file.text === "function") {
+    return await file.text();
+  }
+
+  if (typeof file.arrayBuffer === "function") {
+    const buffer = await file.arrayBuffer();
+    return new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+  }
+
+  if (typeof FileReader !== "undefined") {
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(file);
+    });
+  }
+
+  return "";
+}
+
+function buildManagedStepResultPrompt(run, step) {
   const runId = run.id;
   const stepId = step.id;
-  const action = step.action;
-  const query = step.query;
-  const purpose = step.purpose;
+  const metadata = step.outcome || "{}";
+  let resultSummary = "";
 
-  let resultBlock = "";
   if (step.error) {
-    resultBlock = `[Step ${stepId} FAILED with error: ${step.error}]`;
-  } else if (step.outcome) {
-    try {
-      const parsed = JSON.parse(step.outcome);
-      const preview = step.action === "fetch"
-        ? `Fetched ${parsed.url} (${parsed.length} chars)`
-        : `Search "${parsed.query}" returned ${parsed.count} results`;
-      resultBlock = [
-        `[Step ${stepId} result — ${preview}]`,
-        "```json",
-        step.outcome,
-        "```",
-      ].join("\n");
-    } catch {
-      resultBlock = `[Step ${stepId} result]\n${step.outcome}`;
-    }
+    resultSummary = [
+      `[Step ${stepId} failed.]`,
+      `Error: ${step.error}`,
+      step.resultFile ? `Read the attached error file: ${step.resultFile.name}` : "",
+    ].filter(Boolean).join("\n");
   } else {
-    resultBlock = `[Step ${stepId} — no output (empty result)]`;
+    let preview = "Step result is ready";
+    try {
+      const parsed = JSON.parse(metadata);
+      preview = step.action === "fetch"
+        ? `Fetched ${parsed.url || step.query} (${parsed.length || 0} chars)`
+        : `Search "${parsed.query || step.query}" returned ${parsed.count || 0} results`;
+    } catch {
+      // Keep the generic preview.
+    }
+
+    resultSummary = [
+      `[Step ${stepId} result - ${preview}]`,
+      step.resultFile ? `Read the attached evidence file before analyzing: ${step.resultFile.name}` : "",
+      "Metadata:",
+      "```json",
+      metadata,
+      "```",
+    ].filter(Boolean).join("\n");
   }
 
   return [
     `<BetterDeepSeek>`,
     `[BDS:DEEP_RESEARCH] Step ${stepId} of your research plan is complete.`,
     `Run ID: ${runId}`,
-    `Action: ${action}`,
-    `Query: ${query}`,
-    `Purpose: ${purpose}`,
+    `Action: ${step.action}`,
+    `Query: ${step.query}`,
+    `Purpose: ${step.purpose || ""}`,
     ``,
-    resultBlock,
+    resultSummary,
     ``,
-    `Analyze this result. Update your source ledger mentally. Then finish your analysis with:`,
+    `Analyze this step result after reading the attached file when present. Update your source ledger mentally. Then finish your analysis with:`,
     `<BDS:DEEP_RESEARCH_STEP_DONE runId="${runId}" stepId="${stepId}">JSON</BDS:DEEP_RESEARCH_STEP_DONE>`,
     ``,
     `The JSON inside must be: {"stepId":"${stepId}","analysis":"short summary of findings","newInsights":["insight1","insight2"]}`,
@@ -571,6 +639,17 @@ function buildStepResultPrompt(run, step) {
     `Do NOT produce the final report yet. Only analyze this step.`,
     `</BetterDeepSeek>`,
   ].join("\n");
+}
+
+async function sendStepResult(run, step) {
+  const label = `Deep Research step ${step.id} result`;
+  const prompt = buildManagedStepResultPrompt(run, step);
+
+  if (step.resultFile) {
+    return await sendFileWithMessage(step.resultFile, prompt, label);
+  }
+
+  return injectPureTextAndSend(prompt, label);
 }
 
 /**
@@ -613,13 +692,7 @@ function advanceToNextStep(run) {
   run.execution.currentStepIndex += 1;
 
   if (run.execution.currentStepIndex >= run.execution.steps.length) {
-    // All steps done — request final report
-    run.execution.reportRequested = true;
-    setStatus(run, "reporting");
-    emitRunState(run);
-    void persistRuns(state.deepResearch.runs);
-
-    injectPureTextAndSend(buildFinalReportPrompt(run), "Deep Research final report request");
+    requestFinalReport(run);
     return false;
   }
 
@@ -628,13 +701,21 @@ function advanceToNextStep(run) {
   void runCurrentStep(run).then((ran) => {
     if (ran) {
       const step = run.execution.steps[run.execution.currentStepIndex];
-      injectPureTextAndSend(
-        buildStepResultPrompt(run, step),
-        `Deep Research step ${step.id} result`,
-      );
+      void sendStepResult(run, step);
     }
   });
   return true;
+}
+
+function requestFinalReport(run) {
+  run.execution.awaitingAnalysisStepId = null;
+  run.execution.reportRequested = true;
+  setStatus(run, "reporting");
+  upsertRun(run);
+  emitRunState(run);
+  void persistRuns(state.deepResearch.runs);
+
+  injectPureTextAndSend(buildFinalReportPrompt(run), "Deep Research final report request");
 }
 
 /**
@@ -657,8 +738,16 @@ export function handleStepDone(run, stepId, analysisJson) {
 
   step.status = "complete";
   if (analysisJson && typeof analysisJson === "object") {
+    let existingOutcome = {};
+    if (step.outcome) {
+      try {
+        existingOutcome = JSON.parse(step.outcome);
+      } catch {
+        existingOutcome = {};
+      }
+    }
     step.outcome = JSON.stringify({
-      ...(step.outcome ? JSON.parse(step.outcome) : {}),
+      ...existingOutcome,
       analysis: analysisJson.analysis || "",
       insights: analysisJson.newInsights || [],
     });
@@ -677,6 +766,7 @@ export function handleStepDone(run, stepId, analysisJson) {
 export function handleManagedReport(run, markdown) {
   if (!run || !run.execution.managed) return false;
   if (!run.execution.reportRequested) return false;
+  if (!areManagedStepsComplete(run)) return false;
 
   setStatus(run, "complete");
   run.updatedAt = Date.now();
@@ -689,17 +779,12 @@ export function handleManagedReport(run, markdown) {
   emitRunState(run);
   void persistRuns(state.deepResearch.runs);
 
-  // Dispatch report event so UI renders the card
-  window.dispatchEvent(new CustomEvent("bds:deep-research-report-received", {
-    detail: {
-      conversationId: run.conversationId,
-      runId: run.id,
-      markdown: markdown || "",
-      synthesized: !markdown,
-    },
-  }));
-
   return true;
+}
+
+function areManagedStepsComplete(run) {
+  const steps = run?.execution?.steps || [];
+  return steps.every((step) => step.status === "complete");
 }
 
 /**
@@ -792,6 +877,18 @@ export function initDeepResearchRuntime() {
   window.addEventListener("bds:deep-research-report-received", (event) => {
     const detail = normalizeEventDetail(event.detail);
     const run = ensureRun(detail.runId, detail.conversationId);
+    if (run.execution?.managed) {
+      const handled = handleManagedReport(run, detail.markdown || "");
+      if (!handled) {
+        console.warn("[BDS:DEEP_RESEARCH] Ignored managed report before report gate opened:", {
+          runId: run.id,
+          status: run.status,
+          reportRequested: run.execution.reportRequested,
+        });
+      }
+      return;
+    }
+
     setStatus(run, "complete");
     run.updatedAt = Date.now();
     upsertRun(run);
@@ -817,18 +914,21 @@ export function initDeepResearchRuntime() {
     emitRunState(run);
     void persistRuns(state.deepResearch.runs);
 
+    if (run.execution.steps.length === 0) {
+      requestFinalReport(run);
+      return;
+    }
+
     // Run step 1 immediately
     void runCurrentStep(run).then((ran) => {
       if (ran) {
         const step = run.execution.steps[0];
-        const sent = injectPureTextAndSend(
-          buildStepResultPrompt(run, step),
-          `Deep Research step ${step.id} result`,
-        );
-        if (sent === false) {
-          state.ui?.showToast?.("Could not start Deep Research execution.");
-          emitRunState(run);
-        }
+        void sendStepResult(run, step).then((sent) => {
+          if (sent === false) {
+            state.ui?.showToast?.("Could not start Deep Research execution.");
+            emitRunState(run);
+          }
+        });
       }
     });
   });

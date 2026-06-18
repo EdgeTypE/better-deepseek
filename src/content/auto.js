@@ -352,6 +352,30 @@ export function injectPureTextAndSend(autoMessage, logLabel = "Text prompt") {
   return true;
 }
 
+async function readFileText(file) {
+  if (!file) return "";
+
+  if (typeof file.text === "function") {
+    return await file.text();
+  }
+
+  if (typeof file.arrayBuffer === "function") {
+    const buffer = await file.arrayBuffer();
+    return new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+  }
+
+  if (typeof FileReader !== "undefined") {
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(file);
+    });
+  }
+
+  return "";
+}
+
 function findChatEditor() {
   const selectors = [
     "textarea#chat-input",
@@ -571,14 +595,14 @@ function sendCurrentChatInput(logLabel = "Auto message") {
 }
 
 
-async function injectFileAndSend(file, autoMessage = "") {
+export async function sendFileWithMessage(file, autoMessage = "", logLabel = "Auto file message") {
   const nativeInput = document.querySelector('input[type="file"][multiple]');
 
   // // FALLBACK: inject file and send message directly if no file input is found
   if (!nativeInput) {
     let fileContent;
     try {
-      fileContent = await file.text();
+      fileContent = await readFileText(file);
     } catch (err) {
       fileContent = `(Error reading file content: ${err.message})`;
     }
@@ -588,8 +612,7 @@ async function injectFileAndSend(file, autoMessage = "") {
     const langHint = LANG_HINTS[ext] || 'text';
 
     const fullMessage = `${autoMessage}\n\`\`\`${langHint}\n${fileContent}\n\`\`\``;
-    injectPureTextAndSend(fullMessage);
-    return;
+    return injectPureTextAndSend(fullMessage, logLabel);
   }
 
   // normal path: file input exists, load the file
@@ -610,5 +633,10 @@ async function injectFileAndSend(file, autoMessage = "") {
     setChatInputText(autoMessage);
   }
 
-  sendCurrentChatInput("Auto file message");
+  sendCurrentChatInput(logLabel);
+  return true;
+}
+
+async function injectFileAndSend(file, autoMessage = "") {
+  return sendFileWithMessage(file, autoMessage);
 }

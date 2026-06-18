@@ -25,6 +25,9 @@ const mocks = vi.hoisted(() => ({
   handleAutoYouTubeFetch: vi.fn(),
   handleAutoSearch: vi.fn(),
   handleAutoSearchForRun: vi.fn(),
+  clearRunSearchHistory: vi.fn(),
+  injectPureTextAndSend: vi.fn(() => true),
+  sendFileWithMessage: vi.fn(() => Promise.resolve(true)),
   mount: vi.fn((component, { target, props }) => {
     const marker = document.createElement("div");
     marker.className = "mock-overlay";
@@ -74,6 +77,9 @@ vi.mock("../../src/content/auto.js", () => ({
   handleAutoYouTubeFetch: mocks.handleAutoYouTubeFetch,
   handleAutoSearch: mocks.handleAutoSearch,
   handleAutoSearchForRun: mocks.handleAutoSearchForRun,
+  clearRunSearchHistory: mocks.clearRunSearchHistory,
+  injectPureTextAndSend: mocks.injectPureTextAndSend,
+  sendFileWithMessage: mocks.sendFileWithMessage,
 }));
 vi.mock("svelte", async () => {
   const actual = await vi.importActual("svelte");
@@ -251,6 +257,88 @@ describe("message processor integration", () => {
       { purpose: "compare thermals", sourceType: "reviews" },
     );
     expect(mocks.handleAutoSearch).not.toHaveBeenCalled();
+  });
+
+  it("suppresses AUTO tags only for managed Deep Research runs in the current conversation", () => {
+    state.deepResearch.runs = [{
+      id: "managed-other",
+      conversationId: "other-conversation",
+      status: "running",
+      execution: { managed: true, steps: [], currentStepIndex: 0, awaitingAnalysisStepId: null, reportRequested: false },
+    }];
+    const node = createMessageNode(
+      "<BDS:AUTO:REQUEST_WEB_FETCH>https://example.com</BDS:AUTO:REQUEST_WEB_FETCH>",
+    );
+
+    processMessageNode(node);
+    vi.advanceTimersByTime(3000);
+    processMessageNode(node);
+
+    expect(mocks.handleAutoWebFetch).toHaveBeenCalledWith("https://example.com/");
+  });
+
+  it("suppresses AUTO tags for managed Deep Research runs in the current conversation", () => {
+    state.deepResearch.runs = [{
+      id: "managed-current",
+      conversationId: "default",
+      status: "running",
+      execution: { managed: true, steps: [], currentStepIndex: 0, awaitingAnalysisStepId: null, reportRequested: false },
+    }];
+    const node = createMessageNode(
+      "<BDS:AUTO:REQUEST_WEB_FETCH>https://example.com</BDS:AUTO:REQUEST_WEB_FETCH>",
+    );
+
+    processMessageNode(node);
+    vi.advanceTimersByTime(3000);
+    processMessageNode(node);
+
+    expect(mocks.handleAutoWebFetch).not.toHaveBeenCalled();
+  });
+
+  it("does not render early managed Deep Research reports before the report gate opens", () => {
+    state.deepResearch.runs = [{
+      id: "run-early-report",
+      conversationId: "default",
+      status: "running",
+      execution: {
+        managed: true,
+        steps: [{ id: "1", status: "awaiting_analysis" }],
+        currentStepIndex: 0,
+        awaitingAnalysisStepId: "1",
+        reportRequested: false,
+      },
+    }];
+    const node = createMessageNode(
+      '<BDS:DEEP_RESEARCH_REPORT runId="run-early-report"># Early Report</BDS:DEEP_RESEARCH_REPORT>',
+    );
+
+    processMessageNode(node);
+
+    expect(mocks.mount).toHaveBeenCalledOnce();
+    expect(mocks.mount.mock.calls[0][1].props.blocks).toEqual([]);
+  });
+
+  it("renders managed Deep Research reports after all steps complete and reporting is requested", () => {
+    state.deepResearch.runs = [{
+      id: "run-final-report",
+      conversationId: "default",
+      status: "reporting",
+      execution: {
+        managed: true,
+        steps: [{ id: "1", status: "complete" }],
+        currentStepIndex: 1,
+        awaitingAnalysisStepId: null,
+        reportRequested: true,
+      },
+    }];
+    const node = createMessageNode(
+      '<BDS:DEEP_RESEARCH_REPORT runId="run-final-report"># Final Report</BDS:DEEP_RESEARCH_REPORT>',
+    );
+
+    processMessageNode(node);
+
+    expect(mocks.mount).toHaveBeenCalledOnce();
+    expect(mocks.mount.mock.calls[0][1].props.blocks[0].name).toBe("deep_research_report");
   });
 
   it("dispatches clarifying questions and stores them on state", () => {
