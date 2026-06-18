@@ -186,7 +186,8 @@ describe("Deep Research state machine", () => {
       expect(msg).toContain(run.id);
       expect(msg).toContain("Plan approved");
       expect(msg).toContain("BDS:AUTO:SEARCH");
-      expect(msg).toContain('sourceType="general|docs|news|reviews|academic|commerce"');
+      expect(msg).toContain('sourceType="reviews"');
+      expect(msg).toContain("choosing sourceType from general, docs, news, reviews, academic, or commerce");
       expect(msg).toContain("BDS:DEEP_RESEARCH_REPORT");
     });
 

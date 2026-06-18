@@ -81,4 +81,22 @@ describe("search-quality helpers", () => {
     expect(ranked.results).toHaveLength(1);
     expect(ranked.results[0].url).toBe("https://deepseek.com/docs/");
   });
+
+  it("does not treat negative terms as substrings inside unrelated words", () => {
+    const ranked = rankSearchResults("python news -ai", [
+      {
+        title: "Daily Python release roundup",
+        url: "https://example.com/daily-python",
+        snippet: "Python news and release notes.",
+      },
+      {
+        title: "Python AI tooling news",
+        url: "https://example.com/python-ai",
+        snippet: "AI tooling updates for Python.",
+      },
+    ]);
+
+    expect(ranked.results).toHaveLength(1);
+    expect(ranked.results[0].title).toBe("Daily Python release roundup");
+  });
 });

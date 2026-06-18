@@ -257,7 +257,7 @@ export function buildApprovalMessage(run) {
     `[BDS:DEEP_RESEARCH] Plan approved for run ${run.id}. Execute the following research plan:`,
     JSON.stringify(run.plan, null, 2),
     `For each search step, use a narrow query with named entities, concrete constraints, dates or locations, product or version names, and explicit source intent.`,
-    `Emit searches as <BDS:AUTO:SEARCH runId="${run.id}" deepFetch="3" purpose="why this search matters" sourceType="general|docs|news|reviews|academic|commerce">specific query</BDS:AUTO:SEARCH> and use <BDS:AUTO:REQUEST_WEB_FETCH> for specific URLs.`,
+    `Emit searches as <BDS:AUTO:SEARCH runId="${run.id}" deepFetch="3" purpose="why this search matters" sourceType="reviews">specific query</BDS:AUTO:SEARCH>, choosing sourceType from general, docs, news, reviews, academic, or commerce. Use <BDS:AUTO:REQUEST_WEB_FETCH> for specific URLs.`,
     `After each search/fetch result is injected, read it, update the source ledger mentally, and continue with the next step until the plan is complete.`,
     `After completing all research steps, your final answer MUST be a proper Markdown report wrapped exactly as: <BDS:DEEP_RESEARCH_REPORT runId="${run.id}">markdown</BDS:DEEP_RESEARCH_REPORT>.`,
     `Do not wrap the report Markdown in a code fence. Do not finish with ordinary prose outside the report tag.`,

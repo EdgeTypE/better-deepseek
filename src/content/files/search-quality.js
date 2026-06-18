@@ -174,12 +174,25 @@ function matchesSite(domain, sites) {
 }
 
 function containsAny(haystack, terms) {
-  return terms.some((term) => haystack.includes(term));
+  return terms.some((term) => containsTerm(haystack, term));
 }
 
 function sourceTypeScore(sourceType, haystack) {
   const hints = SOURCE_TYPE_HINTS[sourceType] || [];
-  return hints.some((hint) => haystack.includes(hint)) ? 8 : 0;
+  return hints.some((hint) => containsTerm(haystack, hint)) ? 8 : 0;
+}
+
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function containsTerm(haystack, term) {
+  const needle = cleanText(term).toLowerCase();
+  if (!needle) return false;
+  if (/^[a-z0-9]+$/.test(needle)) {
+    return new RegExp(`(^|[^a-z0-9])${escapeRegExp(needle)}($|[^a-z0-9])`, "i").test(haystack);
+  }
+  return haystack.includes(needle);
 }
 
 export function rankSearchResults(query, results, options = {}) {
@@ -217,9 +230,9 @@ export function rankSearchResults(query, results, options = {}) {
 
     let score = Math.max(0, 10 - index);
     for (const token of signals.importantTokens) {
-      if (titleLower.includes(token)) score += 5;
-      if (snippetLower.includes(token)) score += 2;
-      if (urlLower.includes(token) || domainLower.includes(token)) score += 3;
+      if (containsTerm(titleLower, token)) score += 5;
+      if (containsTerm(snippetLower, token)) score += 2;
+      if (containsTerm(urlLower, token) || containsTerm(domainLower, token)) score += 3;
     }
     for (const phrase of signals.quotedPhrases) {
       const phraseLower = phrase.toLowerCase();
