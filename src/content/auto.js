@@ -549,6 +549,20 @@ function hasKnownSendIconPath(button) {
   );
 }
 
+function hasHighConfidenceSendIconPath(button) {
+  const d = getSvgPathData(button);
+  const compact = d.replace(/[,\s]/g, "");
+
+  return (
+    d.includes("M8.3125") ||
+    d.includes("M8.312") ||
+    d.includes("M13.12 19.98") ||
+    compact.includes("M1219V5") ||
+    compact.includes("M1219V6") ||
+    compact.includes("M1018V6")
+  );
+}
+
 function hasExplicitSendLabel(button, label) {
   return (
     button.title === "Send message" ||
@@ -674,6 +688,9 @@ function findSendButton() {
     if (hasExplicitSendLabel(button, label)) {
       return !editor || isAfterNode(editor, button);
     }
+    if (hasHighConfidenceSendIconPath(button)) {
+      return !editor || isAfterNode(editor, button);
+    }
     if (!isComposerSendRegion(button, editor, roots)) return false;
     return button.querySelector(".ds-icon-send") || hasKnownSendIconPath(button);
   });
@@ -695,7 +712,10 @@ function findSendButton() {
 function isSendButtonDisabled(sendBtn) {
   return (
     sendBtn.getAttribute("aria-disabled") === "true" ||
+    sendBtn.hasAttribute("disabled") ||
+    sendBtn.classList.contains("ds-button--disabled") ||
     sendBtn.classList.contains("ds-icon-button--disabled") ||
+    Array.from(sendBtn.classList).some((className) => className.endsWith("--disabled")) ||
     sendBtn.disabled === true
   );
 }

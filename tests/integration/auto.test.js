@@ -122,6 +122,99 @@ describe("auto integration", () => {
     await expect(sendResult).resolves.toBe(true);
   });
 
+  it("waits for DeepSeek role-button send controls while ds-button--disabled is present", async () => {
+    document.body.innerHTML = `
+      <div id="composer">
+        <textarea id="chat-input"></textarea>
+        <input type="file" multiple />
+        <div
+          role="button"
+          id="send-arrow"
+          class="ds-button ds-button--primary ds-button--filled ds-button--circle ds-button--disabled"
+          style="--dsl-button-height: 34px;"
+        >
+          <div class="ds-button__background"></div>
+          <div class="ds-button__icon ds-button__icon--last-child">
+            <svg width="16" height="16" viewBox="0 0 16 16">
+              <path d="M8.3125 0.981587C8.66767 1.0545 8.97902 1.20558 9.2627 1.43374C9.48724 1.61438 9.73029 1.85933 9.97949 2.10854L14.707 6.83608L13.293 8.25014L9 3.95717V15.0431H7V3.95717L2.70703 8.25014L1.29297 6.83608L6.02051 2.10854C6.26971 1.85933 6.51277 1.61438 6.7373 1.43374C6.97662 1.24126 7.28445 1.04542 7.6875 0.981587C7.8973 0.94841 8.1031 0.956564 8.3125 0.981587Z"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+    `;
+    const input = document.querySelector('input[type="file"]');
+    Object.defineProperty(input, "files", {
+      configurable: true,
+      writable: true,
+      value: [],
+    });
+    const send = document.querySelector("#send-arrow");
+    send.click = vi.fn();
+
+    const { sendFileWithMessage } = await importAutoModule();
+    const sendResult = sendFileWithMessage(
+      new File(["# Evidence"], "evidence.md", { type: "text/markdown" }),
+      "<BetterDeepSeek>\n[BDS:DEEP_RESEARCH] Step result\n</BetterDeepSeek>",
+      "Deep Research step result",
+    );
+
+    await vi.advanceTimersByTimeAsync(11_000);
+    expect(send.click).not.toHaveBeenCalled();
+
+    send.classList.remove("ds-button--disabled");
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(send.click).toHaveBeenCalledOnce();
+    await expect(sendResult).resolves.toBe(true);
+  });
+
+  it("finds the DeepSeek send arrow after the editor even when mobile nesting exceeds composer-root depth", async () => {
+    const deepEditor = Array.from({ length: 12 }, (_, index) => `<div class="editor-depth-${index}">`).join("");
+    const closeDeepEditor = "</div>".repeat(12);
+    document.body.innerHTML = `
+      <div id="mobile-composer">
+        <section id="editor-region">
+          ${deepEditor}
+            <textarea id="chat-input"></textarea>
+            <input type="file" multiple />
+          ${closeDeepEditor}
+        </section>
+        <section id="action-region">
+          <button type="button" aria-label="Search"><svg><path d="M3 3h2v2"></path></svg></button>
+          <div role="button" id="send-arrow" class="ds-button ds-button--primary ds-button--filled ds-button--circle">
+            <div class="ds-button__icon">
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <path d="M8.3125 0.981587C8.66767 1.0545 8.97902 1.20558 9.2627 1.43374L14.707 6.83608L13.293 8.25014L9 3.95717V15.0431H7V3.95717L2.70703 8.25014L1.29297 6.83608L6.02051 2.10854C6.26971 1.85933 6.51277 1.61438 6.7373 1.43374C6.97662 1.24126 7.28445 1.04542 7.6875 0.981587C7.8973 0.94841 8.1031 0.956564 8.3125 0.981587Z"></path>
+              </svg>
+            </div>
+          </div>
+        </section>
+      </div>
+    `;
+    const input = document.querySelector('input[type="file"]');
+    Object.defineProperty(input, "files", {
+      configurable: true,
+      writable: true,
+      value: [],
+    });
+    const search = document.querySelector('[aria-label="Search"]');
+    const send = document.querySelector("#send-arrow");
+    search.click = vi.fn();
+    send.click = vi.fn();
+
+    const { sendFileWithMessage } = await importAutoModule();
+    const sendResult = sendFileWithMessage(
+      new File(["# Evidence"], "evidence.md", { type: "text/markdown" }),
+      "<BetterDeepSeek>\n[BDS:DEEP_RESEARCH] Step result\n</BetterDeepSeek>",
+      "Deep Research step result",
+    );
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(search.click).not.toHaveBeenCalled();
+    expect(send.click).toHaveBeenCalledOnce();
+    await expect(sendResult).resolves.toBe(true);
+  });
+
   it("finds an icon-only composer send button when DeepSeek omits send labels", async () => {
     document.body.innerHTML = `
       <div class="composer-shell">
