@@ -80,6 +80,11 @@ const state = {
     pendingRun: null,
     runs: [],
   },
+  /** Per-conversation context budget tracking for Deep Research 128K guard */
+  contextBudget: {
+    /** @type {Map<string, {estimate: number, serverTokens: number, lastServerUpdate: number}>} conversationId -> budget */
+    conversations: new Map(),
+  },
   /** Remote config object (deep-merged with built-in defaults). Populated by RemoteConfigManager. */
   remoteConfig: DEFAULT_REMOTE_CONFIG,
 };

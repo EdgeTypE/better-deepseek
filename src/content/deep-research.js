@@ -13,6 +13,14 @@ import state from "./state.js";
 import { clearRunSearchHistory, injectPureTextAndSend, sendFileWithMessage } from "./auto.js";
 import { fetchAndConvertWebPage } from "./files/web-reader.js";
 import { searchWeb } from "./files/search-reader.js";
+import {
+  estimateDeepSeekTokens,
+  recordOutgoingContext,
+  wouldCrossDeepResearchBudget,
+  applyBudgetStop,
+  isBudgetStopped,
+  clearConversationBudget,
+} from "./context-budget.js";
 
 /** Valid statuses for a deep research run */
 export const RESEARCH_STATUSES = [
@@ -64,6 +72,10 @@ export function createRun(conversationId, id = makeId()) {
       reportRequested: false,
       /** Monotonic counter for generating adaptive step IDs (a1, a2, ...) */
       adaptiveStepCounter: 0,
+      /** Why the budget guard stopped execution (empty string if not stopped) */
+      budgetStopReason: "",
+      /** Snapshot of context budget state at stop time */
+      contextBudgetSnapshot: null,
     },
   };
 }
@@ -103,6 +115,7 @@ export function setDeepResearchEnabled(enabled, conversationId = getCurrentConve
       setStatus(activeRun, "cancelled");
       upsertRun(activeRun);
       clearRunSearchHistory(activeRun.id);
+      clearConversationBudget(activeRun.conversationId);
       emitRunState(activeRun);
       void persistRuns(state.deepResearch.runs);
     }
@@ -350,6 +363,7 @@ function emitRunState(run) {
       totalSteps: steps.length,
       awaitingStepId: exec ? exec.awaitingAnalysisStepId : null,
       reportRequested: exec ? exec.reportRequested : false,
+      budgetStopReason: exec ? exec.budgetStopReason || "" : "",
       steps: managed ? steps.map((s) => ({
         id: s.id,
         action: s.action,
@@ -389,6 +403,8 @@ function serializeRun(run) {
       awaitingAnalysisStepId: exec.awaitingAnalysisStepId || null,
       reportRequested: Boolean(exec.reportRequested),
       adaptiveStepCounter: Number(exec.adaptiveStepCounter ?? 0),
+      budgetStopReason: exec.budgetStopReason || "",
+      contextBudgetSnapshot: exec.contextBudgetSnapshot || null,
     } : undefined,
   };
 }
@@ -405,6 +421,7 @@ function serializeStep(step) {
     purpose: step.purpose,
     sourceType: step.sourceType || "",
     deepFetch: Number(step.deepFetch) || 0,
+    // Include skipped_budget as a valid persisted status (alongside pending, tool_running, etc.)
     status: step.status || "pending",
     outcome: step.outcome || null,
     error: step.error || null,
@@ -436,6 +453,8 @@ function deserializeRun(raw) {
       awaitingAnalysisStepId: rawExec.awaitingAnalysisStepId || null,
       reportRequested: Boolean(rawExec.reportRequested),
       adaptiveStepCounter: Number(rawExec.adaptiveStepCounter ?? 0),
+      budgetStopReason: rawExec.budgetStopReason || "",
+      contextBudgetSnapshot: rawExec.contextBudgetSnapshot || null,
     } : {
       managed: false,
       steps: [],
@@ -443,6 +462,8 @@ function deserializeRun(raw) {
       awaitingAnalysisStepId: null,
       reportRequested: false,
       adaptiveStepCounter: 0,
+      budgetStopReason: "",
+      contextBudgetSnapshot: null,
     },
   };
 }
@@ -944,6 +965,35 @@ function markStepSendFailed(run, step) {
 }
 
 async function sendStepForAnalysis(run, step) {
+  // Check context budget before sending — if the outgoing prompt would cross
+  // the threshold, stop here and request a compact final report instead.
+  if (!isBudgetStopped(run)) {
+    const promptText = buildManagedStepResultPrompt(run, step);
+    const outgoingTokens = estimateDeepSeekTokens(promptText);
+    const evidenceText = step.resultFile ? await readFileText(step.resultFile).catch(() => "") : "";
+    const totalOutgoing = outgoingTokens + estimateDeepSeekTokens(evidenceText);
+
+    const { wouldCross } = wouldCrossDeepResearchBudget(run, totalOutgoing);
+    if (wouldCross) {
+      applyBudgetStop(run);
+      run.updatedAt = Date.now();
+      emitRunState(run);
+      void persistRuns(state.deepResearch.runs);
+
+      // Request a compact budget-stopped final report immediately
+      void requestFinalReport(run, { budgetStopped: true });
+      return false;
+    }
+
+    // Record outgoing context for budget tracking
+    recordOutgoingContext({
+      conversationId: run.conversationId,
+      text: promptText,
+      fileText: evidenceText || undefined,
+      label: `Deep Research step ${step.id} result`,
+    });
+  }
+
   const sent = await sendStepResult(run, step);
   if (sent === false) {
     markStepSendFailed(run, step);
@@ -985,6 +1035,63 @@ function buildFinalReportPrompt(run) {
 }
 
 /**
+ * Build compact final report prompt for budget-stopped runs.
+ * Includes completed steps, skipped steps, and the budget-stop reason.
+ * Kept compact to avoid consuming unnecessary context.
+ * @param {object} run
+ * @returns {string}
+ */
+export function buildBudgetStoppedFinalReportPrompt(run) {
+  const runId = run.id;
+  const exec = run.execution;
+
+  const completedSteps = [];
+  const skippedSteps = [];
+  const failedSteps = [];
+
+  for (const s of exec.steps) {
+    if (s.status === "complete") {
+      const suffix = s.error ? ` — FAILED: ${s.error}` : " — complete";
+      completedSteps.push(`Step ${s.id}: ${s.action} "${s.query}"${suffix}`);
+    } else if (s.status === "skipped_budget") {
+      skippedSteps.push(`Step ${s.id}: ${s.action} "${s.query}" — skipped (budget)`);
+    } else if (s.error) {
+      failedSteps.push(`Step ${s.id}: ${s.action} "${s.query}" — FAILED: ${s.error}`);
+    }
+  }
+
+  const lines = [
+    `<BetterDeepSeek>`,
+    `[BDS:DEEP_RESEARCH] Research finalized early — context budget threshold reached.`,
+    `Run ID: ${runId}`,
+    `Reason: ${exec.budgetStopReason || "Context budget threshold reached"}`,
+  ];
+
+  if (completedSteps.length > 0) {
+    lines.push(``);
+    lines.push(`Completed (${completedSteps.length}):`);
+    lines.push(...completedSteps);
+  }
+  if (skippedSteps.length > 0) {
+    lines.push(``);
+    lines.push(`Skipped due to budget (${skippedSteps.length}):`);
+    lines.push(...skippedSteps);
+  }
+  if (failedSteps.length > 0) {
+    lines.push(``);
+    lines.push(`Failed:`, ...failedSteps);
+  }
+
+  lines.push(``);
+  lines.push(`Synthesize a final report from completed steps only. Briefly name skipped gaps so the user knows what was left uncovered.`);
+  lines.push(`Wrap the report as: <BDS:DEEP_RESEARCH_REPORT runId="${runId}">markdown</BDS:DEEP_RESEARCH_REPORT>`);
+  lines.push(`Do NOT wrap the report in a code fence. Keep the report focused on what was found.`);
+  lines.push(`</BetterDeepSeek>`);
+
+  return lines.join("\n");
+}
+
+/**
  * Advance to the next step after step-done is received.
  * If all steps complete, sends the final report prompt.
  * @param {object} run
@@ -995,7 +1102,20 @@ function advanceToNextStep(run) {
   run.execution.currentStepIndex += 1;
 
   if (run.execution.currentStepIndex >= run.execution.steps.length) {
-    void requestFinalReport(run);
+    void requestFinalReport(run, { budgetStopped: isBudgetStopped(run) });
+    return false;
+  }
+
+  // Defense in depth: if budget was already stopped, do not execute more steps
+  if (isBudgetStopped(run)) {
+    // Mark remaining pending steps as skipped
+    for (let i = run.execution.currentStepIndex; i < run.execution.steps.length; i++) {
+      if (run.execution.steps[i].status === "pending") {
+        run.execution.steps[i].status = "skipped_budget";
+      }
+    }
+    run.execution.currentStepIndex = run.execution.steps.length;
+    void requestFinalReport(run, { budgetStopped: true });
     return false;
   }
 
@@ -1010,12 +1130,35 @@ function advanceToNextStep(run) {
   return true;
 }
 
-async function requestFinalReport(run) {
+async function requestFinalReport(run, options = {}) {
   run.execution.awaitingAnalysisStepId = null;
   emitRunState(run);
 
+  const budgetStopped = Boolean(options.budgetStopped);
+  const promptText = budgetStopped
+    ? buildBudgetStoppedFinalReportPrompt(run)
+    : buildFinalReportPrompt(run);
+  const label = budgetStopped
+    ? "Deep Research budget-stopped final report request"
+    : "Deep Research final report request";
+
+  // Record outgoing context for budget tracking
+  if (budgetStopped) {
+    recordOutgoingContext({
+      conversationId: run.conversationId,
+      text: promptText,
+      label: "Budget-stopped final report prompt",
+    });
+  } else {
+    recordOutgoingContext({
+      conversationId: run.conversationId,
+      text: promptText,
+      label: "Final report prompt",
+    });
+  }
+
   const sent = await Promise.resolve(
-    injectPureTextAndSend(buildFinalReportPrompt(run), "Deep Research final report request"),
+    injectPureTextAndSend(promptText, label),
   );
   if (sent === false) {
     state.ui?.showToast?.("Could not request the Deep Research final report.");
@@ -1042,6 +1185,10 @@ async function requestFinalReport(run) {
  */
 function processAdaptiveSteps(run, nextSteps, parentStepId) {
   if (!Array.isArray(nextSteps) || nextSteps.length === 0) return;
+
+  // Never insert adaptive steps after budget guard has stopped the run
+  if (isBudgetStopped(run)) return;
+
   const exec = run.execution;
 
   // Enforce total step cap
@@ -1098,6 +1245,8 @@ function processAdaptiveSteps(run, nextSteps, parentStepId) {
  */
 export function handleStepDone(run, stepId, analysisJson) {
   if (!run || !run.execution.managed) return false;
+  // If budget already stopped, do not process further step-done events
+  if (isBudgetStopped(run)) return false;
   if (run.execution.awaitingAnalysisStepId !== String(stepId)) return false;
 
   const idx = run.execution.currentStepIndex;
@@ -1148,6 +1297,7 @@ function summarizeFallbackAnalysis(text) {
 export function handleManagedAutoContinuation(run, visibleAnalysisText = "") {
   if (!run || !run.execution?.managed) return false;
   if (run.status === "complete" || run.status === "cancelled") return false;
+  if (isBudgetStopped(run)) return false;
 
   const stepId = String(run.execution.awaitingAnalysisStepId || "");
   if (!stepId) return false;
@@ -1180,6 +1330,7 @@ export function handleManagedReport(run, markdown) {
   state.deepResearch.enabled = false;
   state.deepResearch.pendingRun = null;
   clearRunSearchHistory(run.id);
+  clearConversationBudget(run.conversationId);
   emitConfigState();
   emitToggleState();
   emitRunState(run);
@@ -1190,7 +1341,9 @@ export function handleManagedReport(run, markdown) {
 
 function areManagedStepsComplete(run) {
   const steps = run?.execution?.steps || [];
-  return steps.every((step) => step.status === "complete");
+  // Consider steps "complete" if they are either actually complete or skipped
+  // due to budget — in both cases the run has finished all possible work.
+  return steps.every((step) => step.status === "complete" || step.status === "skipped_budget");
 }
 
 /**
@@ -1320,6 +1473,13 @@ export function initDeepResearchRuntime() {
     emitRunState(run);
     void persistRuns(state.deepResearch.runs);
 
+    // Record the approval message for context budget tracking
+    recordOutgoingContext({
+      conversationId: run.conversationId,
+      text: buildApprovalMessage(run),
+      label: "Deep Research plan approval",
+    });
+
     if (run.execution.steps.length === 0) {
       void requestFinalReport(run);
       return;
@@ -1342,10 +1502,17 @@ export function initDeepResearchRuntime() {
     const detail = normalizeEventDetail(event.detail);
     const run = ensureRun(detail.runId, detail.conversationId);
     run.plan = detail.plan || run.plan;
+    const revisionMessage = buildRevisionMessage(run, String(detail.feedback || ""));
     const sent = injectPureTextAndSend(
-      buildRevisionMessage(run, String(detail.feedback || "")),
+      revisionMessage,
       "Deep Research revision request",
     );
+    // Record revision prompt for budget tracking
+    recordOutgoingContext({
+      conversationId: run.conversationId,
+      text: revisionMessage,
+      label: "Deep Research revision request",
+    });
     if (sent === false) {
       state.ui?.showToast?.("Could not submit Deep Research feedback.");
       emitRunState(run);
@@ -1366,6 +1533,7 @@ export function initDeepResearchRuntime() {
     state.deepResearch.enabled = false;
     state.deepResearch.pendingRun = null;
     clearRunSearchHistory(run.id);
+    clearConversationBudget(run.conversationId);
     emitConfigState();
     emitToggleState();
     emitRunState(run);

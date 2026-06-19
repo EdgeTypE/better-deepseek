@@ -701,6 +701,10 @@ export const DEFAULT_SETTINGS = {
   customCSS: "",
   systemPromptMultiMode: false,
   systemPromptEntries: [],
+  // Deep Research context guard — prevent context window overflow during managed runs
+  deepResearchContextGuardEnabled: true,
+  deepResearchContextLimitTokens: 128000,
+  deepResearchContextStopPercent: 70,
 };
 
 // ── Default Remote Config (built-in fallback) ──

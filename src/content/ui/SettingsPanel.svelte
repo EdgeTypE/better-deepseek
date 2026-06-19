@@ -69,6 +69,9 @@
   let processGitignoreOnUpload = $state(Boolean(appState.settings.processGitignoreOnUpload));
   let injectSystemDateTime = $state(Boolean(appState.settings.injectSystemDateTime));
   let skipDeletionConfirmation = $state(Boolean(appState.settings.skipDeletionConfirmation));
+  let deepResearchContextGuardEnabled = $state(Boolean(appState.settings.deepResearchContextGuardEnabled));
+  let deepResearchContextLimitTokens = $state(Number(appState.settings.deepResearchContextLimitTokens) || 128000);
+  let deepResearchContextStopPercent = $state(Number(appState.settings.deepResearchContextStopPercent) || 70);
   let locale = $state(appState.settings.locale || availableLocaleCodes[0] || "en");
   let syncLocale = $state(Boolean(appState.settings.syncLocale));
   let customCSS = $state(appState.settings.customCSS || "");
@@ -640,6 +643,9 @@
     appState.settings.processGitignoreOnUpload = processGitignoreOnUpload;
     appState.settings.injectSystemDateTime = injectSystemDateTime;
     appState.settings.skipDeletionConfirmation = skipDeletionConfirmation;
+    appState.settings.deepResearchContextGuardEnabled = deepResearchContextGuardEnabled;
+    appState.settings.deepResearchContextLimitTokens = Math.max(16000, Math.min(1000000, Math.round(Number(deepResearchContextLimitTokens) || 128000)));
+    appState.settings.deepResearchContextStopPercent = Math.max(50, Math.min(95, Math.round(Number(deepResearchContextStopPercent) || 70)));
     appState.settings.locale = locale;
     appState.settings.syncLocale = syncLocale;
     appState.settings.customCSS = customCSS;
@@ -1258,6 +1264,66 @@
         <span class="bds-switch-track"></span>
       </label>
     </div>
+
+    <!-- Deep Research Context Guard -->
+    <div style="padding: 10px 0 6px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--bds-border);">
+      <span style="font-size: 13px; font-weight: 600; color: var(--bds-text-primary);">{t('settings.deepResearchContextGuard')}</span>
+    </div>
+
+    <div class="bds-toggle-row">
+      <span class="bds-toggle-label">{t('settings.contextGuardEnabled')}</span>
+      <label class="bds-switch">
+        <input
+          id="bds-context-guard-enabled"
+          type="checkbox"
+          bind:checked={deepResearchContextGuardEnabled}
+        />
+        <span class="bds-switch-track"></span>
+      </label>
+    </div>
+    <p style="font-size: 10px; opacity: 0.5; margin: -8px 0 8px; padding-left: 0;">
+      {t('settings.contextGuardEnabledHint')}
+    </p>
+
+    {#if deepResearchContextGuardEnabled}
+      <div
+        class="bds-toggle-row"
+        style="flex-direction: column; align-items: flex-start; gap: 6px;"
+      >
+        <span class="bds-toggle-label">{t('settings.contextGuardLimit')}</span>
+        <input
+          id="bds-context-guard-limit"
+          type="number"
+          min="16000"
+          max="1000000"
+          step="1000"
+          class="bds-input"
+          style="width: 140px; box-sizing: border-box;"
+          bind:value={deepResearchContextLimitTokens}
+        />
+        <p style="font-size: 10px; opacity: 0.5; margin: 0;">
+          {t('settings.contextGuardLimitHint')}
+        </p>
+      </div>
+
+      <div class="bds-toggle-row">
+        <span class="bds-toggle-label">{t('settings.contextGuardStopPercent')}</span>
+        <div class="bds-slider-group">
+          <input
+            type="range"
+            min="50"
+            max="95"
+            step="1"
+            bind:value={deepResearchContextStopPercent}
+            class="bds-slider"
+          />
+          <span class="bds-slider-value">{deepResearchContextStopPercent}%</span>
+        </div>
+      </div>
+      <p style="font-size: 10px; opacity: 0.5; margin: -4px 0 8px; padding-left: 0;">
+        {t('settings.contextGuardStopPercentHint', { threshold: Math.floor(deepResearchContextLimitTokens * deepResearchContextStopPercent / 100).toLocaleString() })}
+      </p>
+    {/if}
 
     <div class="bds-toggle-row">
       <span class="bds-toggle-label">{t('settings.injectionFrequency')}</span>

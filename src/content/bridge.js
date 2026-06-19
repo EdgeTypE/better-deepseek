@@ -9,6 +9,16 @@ import { finalizeLongWork } from "./files/long-work.js";
 import { getActiveProject, getActiveFiles, getFilesForProject } from "./project-manager.js";
 import { getDirectoryFiles } from "../lib/local-directory-source.js";
 import { discoverTags } from "./tags/tag-manager.js";
+import { recordServerUsage } from "./context-budget.js";
+
+/**
+ * Extract the current conversation ID from the URL for budget tracking.
+ * Mirrors deep-research.js getCurrentConversationId() to avoid circular imports.
+ */
+function getCurrentConversationIdForBudget() {
+  const match = String(location.href || "").match(/\/chat\/s\/([^/?#]+)/);
+  return match ? match[1] : null;
+}
 
 /**
  * Set up listeners for bridge events from the injected script.
@@ -46,6 +56,19 @@ export function setupBridgeEvents() {
     }
     if (data && data.modelName) {
       state.pricing.modelName = data.modelName;
+    }
+    // Feed server-reported usage into the context budget tracker for the
+    // active Deep Research conversation (if any guard is enabled).
+    if (data && state.settings.deepResearchContextGuardEnabled) {
+      const conversationId = getCurrentConversationIdForBudget();
+      if (conversationId) {
+        recordServerUsage({
+          conversationId,
+          inputTokens: Number(data.inputTokens) || 0,
+          outputTokens: Number(data.outputTokens) || 0,
+          modelName: data.modelName || null,
+        });
+      }
     }
   });
 
