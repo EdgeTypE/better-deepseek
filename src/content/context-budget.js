@@ -66,12 +66,12 @@ export function recordServerUsage({ conversationId, inputTokens, outputTokens, m
   }
 
   const total = (Number(inputTokens) || 0) + (Number(outputTokens) || 0);
-  convo.serverTokens += total;
+  convo.serverTokens = Math.max(convo.serverTokens, total);
   convo.lastServerUpdate = Date.now();
 
   // Server report is authoritative — use max of estimate and server count
-  // so we never underestimate. Add 5% buffer for hidden extension context
-  // that the server doesn't count (e.g., injected BDS blocks).
+  // Keep the local estimate if it is larger because it may include readable
+  // attachment text or an outgoing prompt recorded before usage returns.
   convo.estimate = Math.max(convo.estimate, Math.ceil(convo.serverTokens * 1.05));
 }
 
@@ -126,28 +126,32 @@ export function wouldCrossDeepResearchBudget(run, outgoingEstimateTokens) {
  * @param {object} run - The deep research run object
  * @returns {object} snapshot of the budget state
  */
-export function applyBudgetStop(run) {
+export function applyBudgetStop(run, budgetCheck = null) {
   const config = getContextBudgetConfig();
   const conversationId = run?.conversationId || "";
   const currentEstimate = getConversationContextEstimate(conversationId);
+  const projectedTotal = Number(budgetCheck?.projectedTotal) || currentEstimate;
+  const thresholdTokens = Number(budgetCheck?.thresholdTokens) || config.thresholdTokens;
 
   const snapshot = {
     estimatedTokens: currentEstimate,
+    projectedTokens: projectedTotal,
     limitTokens: config.limitTokens,
     stopPercent: config.stopPercent,
-    thresholdTokens: config.thresholdTokens,
+    thresholdTokens,
     stoppedAt: Date.now(),
   };
 
   if (run?.execution) {
-    run.execution.budgetStopReason = `Context budget threshold reached: ~${currentEstimate} of ${config.thresholdTokens} tokens (${config.stopPercent}% of ${config.limitTokens})`;
+    run.execution.budgetStopReason = `Context budget threshold reached: projected ~${projectedTotal} of ${thresholdTokens} tokens (${config.stopPercent}% of ${config.limitTokens})`;
     run.execution.contextBudgetSnapshot = snapshot;
 
-    // Mark all remaining pending steps as skipped_budget
+    // Mark the current unsent step and all remaining unfinished steps terminal.
+    // Budget stops usually happen while the current step is ready_to_send.
     const steps = run.execution.steps || [];
     const currentIdx = Math.max(0, run.execution.currentStepIndex ?? 0);
     for (let i = currentIdx; i < steps.length; i++) {
-      if (steps[i] && steps[i].status === "pending") {
+      if (steps[i] && steps[i].status !== "complete") {
         steps[i].status = "skipped_budget";
       }
     }

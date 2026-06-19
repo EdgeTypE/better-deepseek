@@ -9,7 +9,7 @@ import { finalizeLongWork } from "./files/long-work.js";
 import { getActiveProject, getActiveFiles, getFilesForProject } from "./project-manager.js";
 import { getDirectoryFiles } from "../lib/local-directory-source.js";
 import { discoverTags } from "./tags/tag-manager.js";
-import { recordServerUsage } from "./context-budget.js";
+import { recordOutgoingContext, recordServerUsage } from "./context-budget.js";
 
 /**
  * Extract the current conversation ID from the URL for budget tracking.
@@ -82,6 +82,13 @@ export function setupBridgeEvents() {
         injectedText: data.injectedText || "",
         userPrompt: data.userPrompt
       });
+      if (state.settings.deepResearchContextGuardEnabled && data.injectedText) {
+        recordOutgoingContext({
+          conversationId: data.conversationId,
+          text: [data.injectedText, data.userPrompt || ""].filter(Boolean).join("\n\n"),
+          label: "Hidden prompt injection",
+        });
+      }
     }
   });
 

@@ -120,6 +120,18 @@ describe("Context Budget Module", () => {
       // Estimate (1000) is larger than server (157), keep estimate
       expect(budgetModule.getConversationContextEstimate(conversationId)).toBe(1000);
     });
+
+    it("does not sum full-context server snapshots across turns", () => {
+      const conversationId = "conv-server-snapshots";
+
+      budgetModule.recordServerUsage({ conversationId, inputTokens: 900, outputTokens: 100 });
+      expect(budgetModule.getConversationContextEstimate(conversationId)).toBe(1050);
+
+      budgetModule.recordServerUsage({ conversationId, inputTokens: 1000, outputTokens: 200 });
+
+      // The second request snapshot is 1200 tokens, not 1000 + 1200.
+      expect(budgetModule.getConversationContextEstimate(conversationId)).toBe(1260);
+    });
   });
 
   describe("getContextBudgetConfig", () => {
@@ -243,7 +255,7 @@ describe("Context Budget Module", () => {
       expect(run.execution.steps[3].status).toBe("skipped_budget");
     });
 
-    it("only marks pending steps (not already complete/failed)", () => {
+    it("marks unfinished current and future steps but preserves completed steps", () => {
       const run = {
         conversationId: "conv-mixed",
         execution: {
@@ -258,8 +270,26 @@ describe("Context Budget Module", () => {
 
       budgetModule.applyBudgetStop(run);
       expect(run.execution.steps[0].status).toBe("complete"); // unchanged
-      expect(run.execution.steps[1].status).toBe("tool_running"); // unchanged (not pending)
+      expect(run.execution.steps[1].status).toBe("skipped_budget"); // unfinished current step -> skipped
       expect(run.execution.steps[2].status).toBe("skipped_budget"); // pending -> skipped
+    });
+
+    it("marks a ready_to_send current step as skipped_budget", () => {
+      const run = {
+        conversationId: "conv-ready",
+        execution: {
+          steps: [
+            { id: "1", status: "ready_to_send", action: "search", query: "q1" },
+            { id: "2", status: "pending", action: "search", query: "q2" },
+          ],
+          currentStepIndex: 0,
+        },
+      };
+
+      budgetModule.applyBudgetStop(run);
+
+      expect(run.execution.steps[0].status).toBe("skipped_budget");
+      expect(run.execution.steps[1].status).toBe("skipped_budget");
     });
   });
 

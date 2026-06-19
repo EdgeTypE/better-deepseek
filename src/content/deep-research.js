@@ -595,6 +595,8 @@ function initManagedExecution(run) {
   run.execution.awaitingAnalysisStepId = null;
   run.execution.reportRequested = false;
   run.execution.adaptiveStepCounter = 0;
+  run.execution.budgetStopReason = "";
+  run.execution.contextBudgetSnapshot = null;
 }
 
 /**
@@ -973,16 +975,16 @@ async function sendStepForAnalysis(run, step) {
     const evidenceText = step.resultFile ? await readFileText(step.resultFile).catch(() => "") : "";
     const totalOutgoing = outgoingTokens + estimateDeepSeekTokens(evidenceText);
 
-    const { wouldCross } = wouldCrossDeepResearchBudget(run, totalOutgoing);
-    if (wouldCross) {
-      applyBudgetStop(run);
+    const budgetCheck = wouldCrossDeepResearchBudget(run, totalOutgoing);
+    if (budgetCheck.wouldCross) {
+      applyBudgetStop(run, budgetCheck);
       run.updatedAt = Date.now();
       emitRunState(run);
       void persistRuns(state.deepResearch.runs);
 
       // Request a compact budget-stopped final report immediately
       void requestFinalReport(run, { budgetStopped: true });
-      return false;
+      return true;
     }
 
     // Record outgoing context for budget tracking

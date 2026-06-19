@@ -18,6 +18,7 @@ import {
   handleNetworkState,
   injectHookScript,
   pushConfigToPage,
+  setupBridgeEvents,
 } from "../../src/content/bridge.js";
 import state from "../../src/content/state.js";
 import { BRIDGE_EVENTS } from "../../src/lib/constants.js";
@@ -111,6 +112,26 @@ describe("bridge integration", () => {
     expect(state.longWork.files.size).toBe(0);
     expect(state.ui.showLongWorkOverlay).toHaveBeenCalledWith(false);
     expect(state.ui.showToast).toHaveBeenCalled();
+  });
+
+  it("records hidden injected prompts in the context budget", async () => {
+    const { clearConversationBudget, getConversationContextEstimate } =
+      await import("../../src/content/context-budget.js");
+    const conversationId = "conv-hidden-injection";
+    clearConversationBudget(conversationId);
+    state.settings.deepResearchContextGuardEnabled = true;
+
+    setupBridgeEvents();
+
+    window.dispatchEvent(new CustomEvent("bds:mutation-applied", {
+      detail: JSON.stringify({
+        conversationId,
+        injectedText: "<BetterDeepSeek>\nHidden Deep Research plan prompt\n</BetterDeepSeek>",
+        userPrompt: "Visible user query",
+      }),
+    }));
+
+    expect(getConversationContextEstimate(conversationId)).toBeGreaterThan(0);
   });
 
   it("injects the hook script once and removes it after load", () => {
