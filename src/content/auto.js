@@ -525,6 +525,8 @@ const SEND_INITIAL_DELAY_MS = 500;
 const SEND_RETRY_DELAY_MS = 200;
 const SEND_MAX_WAIT_MS = 120_000;
 const SEND_ENTER_FALLBACK_AFTER_MS = 1_200;
+const SEND_POST_CLICK_LIMIT_CHECK_MS = 50;
+const OVER_LIMIT_RE = /over\s+limit\s+by|content\s+is\s+too\s+long|please\s+shorten\s+it/i;
 
 function getButtonLabel(button) {
   return `${button.title || ""} ${button.ariaLabel || ""} ${button.getAttribute("aria-label") || ""} ${button.textContent || ""}`
@@ -646,6 +648,52 @@ function getComposerRootCandidates(editor) {
   return roots;
 }
 
+function isUsableComposerElement(element) {
+  if (!element || isBdsOwnedElement(element)) {
+    return false;
+  }
+
+  for (let node = element; node && node !== document.body; node = node.parentElement) {
+    const style = window.getComputedStyle?.(node);
+    if (
+      node.hidden ||
+      node.getAttribute("aria-hidden") === "true" ||
+      style?.display === "none" ||
+      style?.visibility === "hidden"
+    ) {
+      return false;
+    }
+  }
+
+  const rect = element.getBoundingClientRect?.();
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+  if (
+    rect &&
+    viewportWidth > 0 &&
+    viewportHeight > 0 &&
+    (rect.width > 0 || rect.height > 0)
+  ) {
+    return (
+      rect.right >= 0 &&
+      rect.bottom >= 0 &&
+      rect.left <= viewportWidth &&
+      rect.top <= viewportHeight
+    );
+  }
+
+  return true;
+}
+
+function findNativeFileInput() {
+  const inputs = Array.from(document.querySelectorAll('input[type="file"][multiple]'))
+    .filter((input) => !isBdsOwnedElement(input));
+
+  return inputs.find((input) =>
+    isUsableComposerElement(input.parentElement || input)
+  ) || null;
+}
+
 function isAfterNode(reference, candidate) {
   if (!reference || !candidate || reference === candidate) {
     return true;
@@ -676,6 +724,26 @@ function isComposerSendRegion(button, editor, roots) {
   if (!editor) return true;
   if (!roots.length) return isAfterNode(editor, button);
   return roots.some((root) => root.contains(button)) && isAfterNode(editor, button);
+}
+
+function hasOverLimitText(element) {
+  return OVER_LIMIT_RE.test(element?.textContent || "");
+}
+
+function hasOverLimitIndicator(editor = findChatEditor()) {
+  const roots = getComposerRootCandidates(editor);
+  for (const root of roots) {
+    if (hasOverLimitText(root)) return true;
+  }
+
+  const indicatorCandidates = Array.from(document.querySelectorAll(
+    'span, div[role="alert"], div[role="status"], [class*="toast"], [class*="tooltip"], [class*="limit"]',
+  ));
+  return indicatorCandidates.some((candidate) =>
+    !isBdsOwnedElement(candidate) &&
+    !candidate.closest(".ds-message") &&
+    hasOverLimitText(candidate)
+  );
 }
 
 function findSendButton() {
@@ -720,22 +788,44 @@ function isSendButtonDisabled(sendBtn) {
   );
 }
 
-function sendCurrentChatInput(logLabel = "Auto message") {
+function sendCurrentChatInputResult(logLabel = "Auto message") {
   return new Promise((resolve) => {
     let attempts = 0;
     const startedAt = Date.now();
     let enterFallbackSent = false;
+    let settled = false;
+
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
 
     const attemptSend = () => {
       attempts++;
       const elapsed = Date.now() - startedAt;
+      const editor = findChatEditor();
+
+      if (hasOverLimitIndicator(editor)) {
+        console.error(`[BDS:AUTO] Failed to send ${logLabel}: message is over the composer limit.`);
+        finish({ ok: false, reason: "over_limit", attempts });
+        return;
+      }
+
       const sendBtn = findSendButton();
 
       if (sendBtn) {
         if (!isSendButtonDisabled(sendBtn)) {
           sendBtn.click();
-          console.log(`[BDS:AUTO] ${logLabel} sent successfully after ${attempts} attempts.`);
-          resolve(true);
+          setTimeout(() => {
+            if (hasOverLimitIndicator(editor)) {
+              console.error(`[BDS:AUTO] Failed to send ${logLabel}: message is over the composer limit.`);
+              finish({ ok: false, reason: "over_limit", attempts });
+              return;
+            }
+            console.log(`[BDS:AUTO] ${logLabel} sent successfully after ${attempts} attempts.`);
+            finish({ ok: true, reason: "", attempts });
+          }, SEND_POST_CLICK_LIMIT_CHECK_MS);
           return;
         }
       }
@@ -754,11 +844,10 @@ function sendCurrentChatInput(logLabel = "Auto message") {
         setTimeout(attemptSend, SEND_RETRY_DELAY_MS);
       } else {
         console.error(`[BDS:AUTO] Failed to send ${logLabel}: button stayed disabled or was not found.`);
-        const editor = findChatEditor();
         if (editor) {
           editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
         }
-        resolve(false);
+        finish({ ok: false, reason: "not_found_or_disabled", attempts });
       }
     };
 
@@ -766,12 +855,51 @@ function sendCurrentChatInput(logLabel = "Auto message") {
   });
 }
 
+function sendCurrentChatInput(logLabel = "Auto message") {
+  return sendCurrentChatInputResult(logLabel).then((result) => result.ok);
+}
 
-export async function sendFileWithMessage(file, autoMessage = "", logLabel = "Auto file message") {
-  const nativeInput = document.querySelector('input[type="file"][multiple]');
+async function sendTextWithOverLimitFallbacks(textAttempts, logLabel) {
+  const attempts = textAttempts
+    .map((text) => String(text || ""))
+    .filter((text, index, arr) => text && arr.indexOf(text) === index);
+
+  if (attempts.length === 0) {
+    return sendCurrentChatInput(logLabel);
+  }
+
+  for (let i = 0; i < attempts.length; i++) {
+    if (!setChatInputText(attempts[i])) {
+      console.error(`[BDS:AUTO] Failed to send ${logLabel}: chat input was not found or could not be updated.`);
+      return false;
+    }
+
+    const result = await sendCurrentChatInputResult(
+      i === 0 ? logLabel : `${logLabel} retry ${i}`,
+    );
+    if (result.ok) return true;
+    if (result.reason !== "over_limit") return false;
+  }
+
+  return false;
+}
+
+export async function sendFileWithMessage(file, autoMessage = "", logLabel = "Auto file message", options = {}) {
+  const nativeInput = findNativeFileInput();
+  const fallbackTexts = [
+    options.overLimitFallbackText,
+    options.overLimitEmergencyText,
+  ];
 
   // // FALLBACK: inject file and send message directly if no file input is found
   if (!nativeInput) {
+    if (options.inlineText) {
+      return sendTextWithOverLimitFallbacks([
+        options.inlineText,
+        ...fallbackTexts,
+      ], logLabel);
+    }
+
     let fileContent;
     try {
       fileContent = await readFileText(file);
@@ -784,7 +912,10 @@ export async function sendFileWithMessage(file, autoMessage = "", logLabel = "Au
     const langHint = LANG_HINTS[ext] || 'text';
 
     const fullMessage = `${autoMessage}\n\`\`\`${langHint}\n${fileContent}\n\`\`\``;
-    return injectPureTextAndSend(fullMessage, logLabel);
+    return sendTextWithOverLimitFallbacks([
+      fullMessage,
+      ...fallbackTexts,
+    ], logLabel);
   }
 
   // normal path: file input exists, load the file
@@ -801,11 +932,10 @@ export async function sendFileWithMessage(file, autoMessage = "", logLabel = "Au
   nativeInput.dispatchEvent(new Event("change", { bubbles: true }));
 
   // Phase 1: Inject text and file
-  if (autoMessage) {
-    setChatInputText(autoMessage);
-  }
-
-  return sendCurrentChatInput(logLabel);
+  return sendTextWithOverLimitFallbacks([
+    autoMessage,
+    ...fallbackTexts,
+  ], logLabel);
 }
 
 async function injectFileAndSend(file, autoMessage = "") {

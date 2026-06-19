@@ -101,6 +101,128 @@ describe("auto integration", () => {
     await expect(sendResult).resolves.toBe(true);
   });
 
+  it("uses inline text instead of full file content when no native file input exists", async () => {
+    document.body.innerHTML = `
+      <div id="composer">
+        <textarea id="chat-input"></textarea>
+        <button title="Send message"></button>
+      </div>
+    `;
+    const sendButton = document.querySelector("button");
+    sendButton.click = vi.fn();
+
+    const { sendFileWithMessage } = await importAutoModule();
+    const sendResult = sendFileWithMessage(
+      new File(["FULL FILE CONTENT SHOULD NOT BE INLINED"], "evidence.md", { type: "text/markdown" }),
+      "attachment prompt",
+      "Deep Research inline step result",
+      { inlineText: "BOUNDED INLINE DIGEST" },
+    );
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(document.querySelector("#chat-input").value).toBe("BOUNDED INLINE DIGEST");
+    expect(document.querySelector("#chat-input").value).not.toContain("FULL FILE CONTENT");
+    expect(sendButton.click).toHaveBeenCalledOnce();
+    await expect(sendResult).resolves.toBe(true);
+  });
+
+  it("retries no-attachment sends with fallback text when DeepSeek reports over-limit", async () => {
+    document.body.innerHTML = `
+      <div id="composer">
+        <textarea id="chat-input"></textarea>
+        <span>Over limit by 35%</span>
+        <button title="Send message"></button>
+      </div>
+    `;
+    const editor = document.querySelector("#chat-input");
+    const indicator = document.querySelector("span");
+    editor.addEventListener("input", () => {
+      if (editor.value === "FALLBACK DIGEST") indicator.remove();
+    });
+    const sendButton = document.querySelector("button");
+    sendButton.click = vi.fn();
+
+    const { sendFileWithMessage } = await importAutoModule();
+    const sendResult = sendFileWithMessage(
+      new File(["FULL FILE CONTENT SHOULD NOT BE INLINED"], "evidence.md", { type: "text/markdown" }),
+      "attachment prompt",
+      "Deep Research inline step result",
+      {
+        inlineText: "OVERSIZED DIGEST",
+        overLimitFallbackText: "FALLBACK DIGEST",
+        overLimitEmergencyText: "EMERGENCY DIGEST",
+      },
+    );
+    await vi.advanceTimersByTimeAsync(1_400);
+
+    expect(editor.value).toBe("FALLBACK DIGEST");
+    expect(sendButton.click).toHaveBeenCalledOnce();
+    await expect(sendResult).resolves.toBe(true);
+  });
+
+  it("retries no-attachment sends with emergency text after repeated over-limit reports", async () => {
+    document.body.innerHTML = `
+      <div id="composer">
+        <textarea id="chat-input"></textarea>
+        <span>Content is too long. Please shorten it and try again.</span>
+        <button title="Send message"></button>
+      </div>
+    `;
+    const editor = document.querySelector("#chat-input");
+    const indicator = document.querySelector("span");
+    editor.addEventListener("input", () => {
+      if (editor.value === "EMERGENCY DIGEST") indicator.remove();
+    });
+    const sendButton = document.querySelector("button");
+    sendButton.click = vi.fn();
+
+    const { sendFileWithMessage } = await importAutoModule();
+    const sendResult = sendFileWithMessage(
+      new File(["FULL FILE CONTENT SHOULD NOT BE INLINED"], "evidence.md", { type: "text/markdown" }),
+      "attachment prompt",
+      "Deep Research inline step result",
+      {
+        inlineText: "OVERSIZED DIGEST",
+        overLimitFallbackText: "STILL OVERSIZED DIGEST",
+        overLimitEmergencyText: "EMERGENCY DIGEST",
+      },
+    );
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    expect(editor.value).toBe("EMERGENCY DIGEST");
+    expect(sendButton.click).toHaveBeenCalledOnce();
+    await expect(sendResult).resolves.toBe(true);
+  });
+
+  it("returns false when all no-attachment over-limit retries are exhausted", async () => {
+    document.body.innerHTML = `
+      <div id="composer">
+        <textarea id="chat-input"></textarea>
+        <span>Over limit by 10%</span>
+        <button title="Send message"></button>
+      </div>
+    `;
+    const sendButton = document.querySelector("button");
+    sendButton.click = vi.fn();
+
+    const { sendFileWithMessage } = await importAutoModule();
+    const sendResult = sendFileWithMessage(
+      new File(["FULL FILE CONTENT SHOULD NOT BE INLINED"], "evidence.md", { type: "text/markdown" }),
+      "attachment prompt",
+      "Deep Research inline step result",
+      {
+        inlineText: "OVERSIZED DIGEST",
+        overLimitFallbackText: "STILL OVERSIZED DIGEST",
+        overLimitEmergencyText: "EMERGENCY DIGEST",
+      },
+    );
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    expect(document.querySelector("#chat-input").value).toBe("EMERGENCY DIGEST");
+    expect(sendButton.click).not.toHaveBeenCalled();
+    await expect(sendResult).resolves.toBe(false);
+  });
+
   it("keeps retrying file-backed transition sends after attachment readiness is delayed", async () => {
     const sendButton = document.querySelector("button");
     sendButton.setAttribute("aria-disabled", "true");

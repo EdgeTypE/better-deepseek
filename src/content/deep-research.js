@@ -166,11 +166,34 @@ function normalizeEventDetail(detail) {
 
 const DEEP_FETCH_DEFAULT = 3;
 const MAX_DEEP_FETCH = 5;
+const TEXT_ONLY_STEP_PROMPT_CHARS = 9_000;
+const TEXT_ONLY_FALLBACK_CHARS = 4_500;
+const TEXT_ONLY_EMERGENCY_CHARS = 2_000;
+
+const PROMPT_DETAIL = {
+  full: { sources: 6, snippetChars: 260, excerptChars: 900, queryChars: 700, purposeChars: 400 },
+  fallback: { sources: 4, snippetChars: 140, excerptChars: 420, queryChars: 420, purposeChars: 240 },
+  emergency: { sources: 2, snippetChars: 70, excerptChars: 160, queryChars: 180, purposeChars: 120 },
+};
 
 function clampDeepFetch(value) {
   const num = parseInt(value, 10);
   if (isNaN(num) || num < 0) return DEEP_FETCH_DEFAULT;
   return Math.min(num, MAX_DEEP_FETCH);
+}
+
+function limitText(value, maxChars) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!maxChars || text.length <= maxChars) return text;
+  return `${text.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
+}
+
+function parseStepOutcome(step) {
+  try {
+    return step?.outcome ? JSON.parse(step.outcome) : {};
+  } catch {
+    return {};
+  }
 }
 
 function findRunById(runId) {
@@ -588,56 +611,190 @@ async function readFileText(file) {
   return "";
 }
 
-function buildManagedStepResultPrompt(run, step) {
-  const runId = run.id;
-  const stepId = step.id;
-  const metadata = step.outcome || "{}";
-  let resultSummary = "";
+function buildSourceDigest(results, detail, { includeSnippets = false } = {}) {
+  if (!Array.isArray(results) || results.length === 0) return [];
 
-  if (step.error) {
-    resultSummary = [
-      `[Step ${stepId} failed.]`,
-      `Error: ${step.error}`,
-      step.resultFile ? `Read the attached error file: ${step.resultFile.name}` : "",
-    ].filter(Boolean).join("\n");
-  } else {
-    let preview = "Step result is ready";
-    try {
-      const parsed = JSON.parse(metadata);
-      preview = step.action === "fetch"
-        ? `Fetched ${parsed.url || step.query} (${parsed.length || 0} chars)`
-        : `Search "${parsed.query || step.query}" returned ${parsed.count || 0} results`;
-    } catch {
-      // Keep the generic preview.
+  const config = PROMPT_DETAIL[detail] || PROMPT_DETAIL.full;
+  const lines = ["Top sources:"];
+  results.slice(0, config.sources).forEach((result, index) => {
+    const title = limitText(result.title || "Untitled source", 180);
+    const url = limitText(result.url || "", 260);
+    lines.push(`${index + 1}. ${title}`);
+    if (url) lines.push(`   URL: ${url}`);
+    if (includeSnippets && result.snippet) {
+      lines.push(`   Snippet: ${limitText(result.snippet, config.snippetChars)}`);
     }
+  });
+  return lines;
+}
 
-    resultSummary = [
-      `[Step ${stepId} result - ${preview}]`,
-      step.resultFile ? `Read the attached evidence file before analyzing: ${step.resultFile.name}` : "",
-      "Metadata:",
-      "```json",
-      metadata,
-      "```",
-    ].filter(Boolean).join("\n");
+function cleanEvidenceExcerpt(value) {
+  return String(value || "")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/={8,}/g, " ")
+    .replace(/-{3,}/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractDeepFetchExcerpts(evidenceText, detail, maxChars) {
+  const text = String(evidenceText || "");
+  if (!text.trim() || maxChars <= 0) return [];
+  const config = PROMPT_DETAIL[detail] || PROMPT_DETAIL.full;
+
+  const sections = [];
+  const sectionRegex = /## Page Content:\s*([^\n]+)\n\*\*Source:\*\*\s*([^\n]+)\n([\s\S]*?)(?=\n={8,}\n## Page Content:|$)/g;
+  let match;
+  while ((match = sectionRegex.exec(text)) !== null) {
+    sections.push({
+      title: cleanEvidenceExcerpt(match[1]),
+      url: cleanEvidenceExcerpt(match[2]),
+      body: cleanEvidenceExcerpt(match[3]),
+    });
   }
 
+  if (sections.length === 0) {
+    return [`Evidence excerpt: ${limitText(cleanEvidenceExcerpt(text), Math.min(maxChars, config.excerptChars))}`];
+  }
+
+  const lines = ["Deep-fetched excerpts:"];
+  const perSection = Math.max(
+    120,
+    Math.min(config.excerptChars, Math.floor(maxChars / Math.min(sections.length, 3))),
+  );
+  for (const section of sections.slice(0, 3)) {
+    lines.push(`- ${limitText(section.title, 140)} (${limitText(section.url, 180)}): ${limitText(section.body, perSection)}`);
+  }
+  return lines;
+}
+
+function fitLinesToBudget(lines, maxChars) {
+  if (!Number.isFinite(maxChars)) return lines;
+
+  const fitted = [];
+  let used = 0;
+  for (const line of lines) {
+    const value = String(line || "");
+    const nextUsed = used + value.length + 1;
+    if (nextUsed <= maxChars) {
+      fitted.push(value);
+      used = nextUsed;
+      continue;
+    }
+
+    const remaining = maxChars - used - 1;
+    if (remaining > 20) {
+      fitted.push(limitText(value, remaining));
+    }
+    break;
+  }
+  return fitted;
+}
+
+function buildStepPromptFooter(runId, stepId) {
   return [
-    `<BetterDeepSeek>`,
-    `[BDS:DEEP_RESEARCH] Step ${stepId} of your research plan is complete.`,
-    `Run ID: ${runId}`,
-    `Action: ${step.action}`,
-    `Query: ${step.query}`,
-    `Purpose: ${step.purpose || ""}`,
-    ``,
-    resultSummary,
-    ``,
-    `Analyze this step result after reading the attached file when present. Update your source ledger mentally. Then finish your analysis with:`,
+    `Analyze this step result after reading the provided evidence. Update your source ledger mentally. Then finish your analysis with:`,
     `<BDS:DEEP_RESEARCH_STEP_DONE runId="${runId}" stepId="${stepId}">JSON</BDS:DEEP_RESEARCH_STEP_DONE>`,
     ``,
     `The JSON inside must be: {"stepId":"${stepId}","analysis":"short summary of findings","newInsights":["insight1","insight2"]}`,
     ``,
     `Do NOT produce the final report yet. Only analyze this step.`,
     `</BetterDeepSeek>`,
+  ];
+}
+
+function buildStepMetadataLines(run, step, outcome, detail) {
+  const config = PROMPT_DETAIL[detail] || PROMPT_DETAIL.full;
+  const lines = [
+    `<BetterDeepSeek>`,
+    `[BDS:DEEP_RESEARCH] Step ${step.id} of your research plan is complete.`,
+    `Run ID: ${run.id}`,
+    `Action: ${step.action}`,
+    `Query: ${limitText(step.query, config.queryChars)}`,
+    `Purpose: ${limitText(step.purpose || "", config.purposeChars)}`,
+  ];
+
+  if (step.error) {
+    lines.push(`Step failed: ${limitText(step.error, 600)}`);
+    if (step.resultFile) lines.push(`Error file: ${step.resultFile.name}`);
+    return lines;
+  }
+
+  if (step.action === "fetch") {
+    lines.push(`Fetched URL: ${limitText(outcome.url || step.query, 600)}`);
+    if (outcome.length) lines.push(`Fetched length: ${outcome.length} chars`);
+  } else {
+    lines.push(`Provider: ${outcome.provider || "unknown"}`);
+    lines.push(`Results: ${outcome.count ?? 0}${outcome.rawResultCount ? ` of ${outcome.rawResultCount} raw` : ""}`);
+    lines.push(`Deep fetch: ${outcome.deepFetch ?? step.deepFetch ?? 0}`);
+    if (outcome.effectiveQuery && outcome.effectiveQuery !== outcome.query) {
+      lines.push(`Effective query: ${limitText(outcome.effectiveQuery, config.queryChars)}`);
+    }
+  }
+
+  if (outcome.fileName || step.resultFile?.name) {
+    lines.push(`Evidence file: ${outcome.fileName || step.resultFile.name}`);
+  }
+
+  return lines;
+}
+
+function buildInlineEvidenceDigest(step, outcome, evidenceText, detail, maxChars) {
+  if (step.error) {
+    return [`Error evidence: ${limitText(evidenceText || step.error, maxChars)}`];
+  }
+
+  const lines = [];
+  lines.push(`Evidence digest:`);
+  lines.push(...buildSourceDigest(outcome.results, detail, { includeSnippets: true }));
+
+  const used = lines.join("\n").length;
+  const remaining = Math.max(0, maxChars - used - 40);
+  if (remaining > 80) {
+    lines.push(...extractDeepFetchExcerpts(evidenceText, detail, remaining));
+  }
+
+  return fitLinesToBudget(lines, maxChars);
+}
+
+function buildAttachmentEvidenceSummary(step, outcome, detail) {
+  const lines = [];
+  if (step.error) {
+    if (step.resultFile) {
+      lines.push(`Read the attached error file: ${step.resultFile.name}`);
+    }
+    return lines;
+  }
+
+  if (step.resultFile) {
+    lines.push(`Read the attached evidence file before analyzing: ${step.resultFile.name}`);
+  }
+  lines.push(...buildSourceDigest(outcome.results, detail, { includeSnippets: false }));
+  return lines;
+}
+
+function buildManagedStepResultPrompt(run, step, options = {}) {
+  const runId = run.id;
+  const stepId = step.id;
+  const detail = options.detail || "full";
+  const outcome = parseStepOutcome(step);
+  const prefix = buildStepMetadataLines(run, step, outcome, detail);
+  const footer = buildStepPromptFooter(runId, stepId);
+  const maxChars = Number(options.maxChars) || Infinity;
+  const evidenceBudget = Math.max(
+    0,
+    maxChars - prefix.join("\n").length - footer.join("\n").length - 8,
+  );
+  const evidenceLines = options.inlineEvidenceText != null
+    ? buildInlineEvidenceDigest(step, outcome, options.inlineEvidenceText, detail, evidenceBudget)
+    : buildAttachmentEvidenceSummary(step, outcome, detail);
+
+  return [
+    ...prefix,
+    ``,
+    ...evidenceLines,
+    ``,
+    ...footer,
   ].join("\n");
 }
 
@@ -646,7 +803,24 @@ async function sendStepResult(run, step) {
   const prompt = buildManagedStepResultPrompt(run, step);
 
   if (step.resultFile) {
-    return await sendFileWithMessage(step.resultFile, prompt, label);
+    const evidenceText = await readFileText(step.resultFile);
+    return await sendFileWithMessage(step.resultFile, prompt, label, {
+      inlineText: buildManagedStepResultPrompt(run, step, {
+        inlineEvidenceText: evidenceText,
+        maxChars: TEXT_ONLY_STEP_PROMPT_CHARS,
+        detail: "full",
+      }),
+      overLimitFallbackText: buildManagedStepResultPrompt(run, step, {
+        inlineEvidenceText: evidenceText,
+        maxChars: TEXT_ONLY_FALLBACK_CHARS,
+        detail: "fallback",
+      }),
+      overLimitEmergencyText: buildManagedStepResultPrompt(run, step, {
+        inlineEvidenceText: evidenceText,
+        maxChars: TEXT_ONLY_EMERGENCY_CHARS,
+        detail: "emergency",
+      }),
+    });
   }
 
   return await Promise.resolve(injectPureTextAndSend(prompt, label));
