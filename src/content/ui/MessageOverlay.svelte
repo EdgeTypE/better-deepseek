@@ -13,6 +13,7 @@
   import DeepResearchPlanCard from "./DeepResearchPlanCard.svelte";
   import DeepResearchStatusCard from "./DeepResearchStatusCard.svelte";
   import DeepResearchReportCard from "./DeepResearchReportCard.svelte";
+  import DeepResearchStepDoneCard from "./DeepResearchStepDoneCard.svelte";
   import LoadingIndicator from "./LoadingIndicator.svelte";
   import { t } from "../../lib/i18n.svelte.js";
   import { parseLooseJson } from "../parser/json-repair.js";
@@ -323,6 +324,15 @@
         />
       {:else if block.name === 'deep_research_report'}
         <DeepResearchReportCard runId={getRunId(block)} markdown={block.content} />
+      {:else if block.name === 'deep_research_step_done'}
+        {@const parsedStep = parseJsonBlock(block.content)}
+        <DeepResearchStepDoneCard
+          runId={getRunId(block)}
+          stepId={block.attrs.stepId || block.attrs.stepid || ""}
+          analysis={parsedStep.value}
+          raw={parsedStep.value ? "" : block.content}
+          error={parsedStep.error}
+        />
       {:else if block.name === 'memory_write'}
         <div class="bds-question-info-card bds-memory-card">
           <div class="bds-question-icon bds-memory-icon">
