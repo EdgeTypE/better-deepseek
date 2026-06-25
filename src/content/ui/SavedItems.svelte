@@ -43,6 +43,11 @@
     return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   }
 
+  function getCommandForSnippet(id) {
+    const mappings = appState.commands?.customMappings || {}
+    return Object.entries(mappings).find(([, v]) => v === id)?.[0] || null
+  }
+
   async function deleteItem(id) {
     if (!appState.settings?.skipDeletionConfirmation) {
       if (!(await appState.ui.showConfirm(`Delete saved item?`))) return;
@@ -50,6 +55,15 @@
     appState.savedItems = appState.savedItems.filter(i => i.id !== id);
     await chrome.storage.local.set({ [STORAGE_KEYS.savedItems]: appState.savedItems });
     items = [...appState.savedItems];
+
+    const mappings = { ...(appState.commands?.customMappings || {}) }
+    const oldKey = Object.entries(mappings).find(([, v]) => v === id)?.[0]
+    if (oldKey) {
+      delete mappings[oldKey]
+      appState.commands.customMappings = mappings
+      await chrome.storage.local.set({ [STORAGE_KEYS.commandMappings]: mappings })
+    }
+
     if (appState.ui) appState.ui.showToast(t('savedItems.deleted'));
   }
 
@@ -64,6 +78,7 @@
   }
 
   async function saveSnippet(item) {
+    let snippetId = editingItem ? editingItem.id : null
     if (editingItem) {
       const existing = appState.savedItems.find(i => i.id === editingItem.id);
       if (existing) {
@@ -72,8 +87,9 @@
         existing.updatedAt = Date.now();
       }
     } else {
+      snippetId = makeId()
       appState.savedItems.push({
-        id: makeId(),
+        id: snippetId,
         type: "snippet",
         title: item.title,
         content: item.content,
@@ -87,6 +103,18 @@
     }
     await chrome.storage.local.set({ [STORAGE_KEYS.savedItems]: appState.savedItems });
     items = [...appState.savedItems];
+
+    const mappings = { ...(appState.commands?.customMappings || {}) }
+    const oldKey = Object.entries(mappings).find(([, v]) => v === snippetId)?.[0]
+    if (oldKey) delete mappings[oldKey]
+
+    if (item.command) {
+      mappings[item.command] = snippetId
+    }
+
+    appState.commands.customMappings = mappings
+    await chrome.storage.local.set({ [STORAGE_KEYS.commandMappings]: mappings })
+
     showSnippetDialog = false;
     editingItem = null;
   }
@@ -215,7 +243,12 @@
             </div>
           {/if}
           <div class="bds-saved-item-body">
-            <div class="bds-saved-item-title" title={item.title}>{truncate(item.title, 60)}</div>
+            <div class="bds-saved-item-title" title={item.title}>
+              {truncate(item.title, 60)}
+              {#if item.type === "snippet" && getCommandForSnippet(item.id)}
+                <span class="bds-saved-cmd-badge">/{getCommandForSnippet(item.id)}</span>
+              {/if}
+            </div>
             <div class="bds-saved-item-preview">{truncate(item.content.replace(/\n/g, " "), 80)}</div>
             <div class="bds-saved-item-meta">
               {#if item.type === "bookmark" && item.conversationTitle}

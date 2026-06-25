@@ -5,7 +5,7 @@
 import state, { withObserverPaused } from "./state.js";
 import { LONG_WORK_STALE_MS } from "../lib/constants.js";
 import { processMessageNode } from "./message-processor.svelte.js";
-import { mount } from "svelte";
+import { mount, unmount } from "svelte";
 import AttachMenu from "./ui/AttachMenu.svelte";
 import ExpandToggle from "./ui/ExpandToggle.svelte";
 import RagPreview from "./ui/RagPreview.svelte";
@@ -14,6 +14,10 @@ import { injectSearchInput } from "./ui/SidebarSearch.js";
 import { checkPendingExport } from "./tools/pending-export.js";
 import { hideTagsInSidebar, hideTagsInHeader } from "./tags/tag-hider.js";
 import { setDeepResearchEnabled } from "./deep-research.js";
+import { tryExecuteRawInput } from "./commands/executor.js";
+import { checkPendingHandoff } from "./commands/context-handoff.js";
+import Autocomplete from "./commands/Autocomplete.svelte";
+import CommandsHelp from "./commands/CommandsHelp.svelte";
 
 /**
  * Collect all message nodes from the chat DOM.
@@ -367,7 +371,7 @@ function findNativePromptActionRow() {
 
 function findComposerEditor() {
   return document.querySelector(
-    "textarea#chat-input, textarea[placeholder], [contenteditable='true']",
+    "textarea#chat-input, .ds-textarea textarea, textarea[placeholder], [role='textbox'], [contenteditable='true']",
   );
 }
 
@@ -622,6 +626,22 @@ export function startUrlWatcher() {
 
   state.urlWatchTimer = window.setInterval(() => {
     if (location.href === state.lastUrl) {
+      if (autocompleteInstance && currentEditor && !document.contains(currentEditor)) {
+        console.log("[BDS:Cmd] Editor detached — re-initializing")
+        if (currentKeydownHandler) {
+          currentEditor.removeEventListener("keydown", currentKeydownHandler)
+          currentKeydownHandler = null
+        }
+        currentEditor = null
+        unmount(autocompleteInstance)
+        autocompleteInstance = null
+        document.querySelector(".bds-cmd-autocomplete")?.remove()
+        document.querySelector(".bds-cmd-help-mount")?.remove()
+        if (cmdSetupTimer) { clearInterval(cmdSetupTimer); cmdSetupTimer = 0 }
+        scheduleScan()
+        setupCommandListener()
+        checkPendingExport()
+      }
       return;
     }
     const oldUrl = state.lastUrl;
@@ -657,7 +677,19 @@ export function startUrlWatcher() {
     }
     const oldTotal = document.querySelector(".bds-session-total");
     if (oldTotal) oldTotal.remove();
+    if (autocompleteInstance || commandsHelpInstance || document.querySelector(".bds-cmd-autocomplete")) console.log("[BDS:Cmd] URL change cleanup")
+    if (currentEditor && currentKeydownHandler) {
+      currentEditor.removeEventListener("keydown", currentKeydownHandler)
+      currentKeydownHandler = null
+      currentEditor = null
+    }
+    if (autocompleteInstance) { unmount(autocompleteInstance); autocompleteInstance = null }
+    if (commandsHelpInstance) { unmount(commandsHelpInstance); commandsHelpInstance = null }
+    document.querySelector(".bds-cmd-autocomplete")?.remove()
+    document.querySelector(".bds-cmd-help-mount")?.remove()
+    if (cmdSetupTimer) { clearInterval(cmdSetupTimer); cmdSetupTimer = 0 }
     scheduleScan();
+    setupCommandListener();
     checkPendingExport();
   }, 1000);
 
@@ -675,5 +707,91 @@ export function startUrlWatcher() {
   window.addEventListener("bds:settingsChanged", () => {
     scheduleScan();
   });
+
+  setupCommandListener();
+  checkPendingHandoff();
+}
+
+let autocompleteInstance = null
+let commandsHelpInstance = null
+let cmdSetupTimer = 0
+let currentEditor = null
+let currentKeydownHandler = null
+
+function retrySetupCommandListener() {
+  console.log("[BDS:Cmd] retrySetupCommandListener start, autoInst=", !!autocompleteInstance, "timer=", !!cmdSetupTimer)
+  if (autocompleteInstance || cmdSetupTimer) {
+    console.log("[BDS:Cmd] retrySetupCommandListener skipped")
+    return
+  }
+  let pollCount = 0
+  cmdSetupTimer = window.setInterval(() => {
+    pollCount++
+    if (autocompleteInstance) { clearInterval(cmdSetupTimer); cmdSetupTimer = 0; console.log("[BDS:Cmd] poll#" + pollCount + " cancelled (autoInst set)"); return }
+    const ed = findComposerEditor()
+    console.log("[BDS:Cmd] poll#" + pollCount + " editor=", !!ed, "tag=", ed?.tagName, "id=", ed?.id)
+    if (ed) { clearInterval(cmdSetupTimer); cmdSetupTimer = 0; setupCommandListener(ed) }
+  }, 500)
+  setTimeout(() => { if (cmdSetupTimer) { clearInterval(cmdSetupTimer); cmdSetupTimer = 0; console.log("[BDS:Cmd] poll TIMEOUT after 15s") } }, 15000)
+}
+
+function setupCommandListener(editor) {
+  console.log("[BDS:Cmd] setupCommandListener called, editor=", !!editor, "autoInst=", !!autocompleteInstance, "tag=", editor?.tagName, "id=", editor?.id)
+  if (autocompleteInstance) {
+    console.log("[BDS:Cmd] setupCommandListener skipped (already mounted)")
+    return
+  }
+  if (!editor) { retrySetupCommandListener(); return }
+
+  if (currentEditor && currentKeydownHandler) {
+    currentEditor.removeEventListener("keydown", currentKeydownHandler)
+  }
+
+  const handler = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      if (!document.contains(editor)) { console.log("[BDS:Cmd] Enter ignored — editor detached"); return }
+      const dropdown = document.querySelector(".bds-cmd-dropdown")
+      if (dropdown) { console.log("[BDS:Cmd] Enter ignored — dropdown open"); return }
+      const text = (() => { const t = (editor.tagName || "").toLowerCase(); return t === "textarea" || t === "input" ? editor.value : (editor.textContent || "") })()
+      console.log("[BDS:Cmd] Enter pressed, text=" + text.substring(0, 80).replace(/\n/g, "\\n"))
+      if (text.startsWith("/")) {
+        const hasSpaceAfterCmd = /^\/[a-z0-9_]+\s/.test(text)
+        if (hasSpaceAfterCmd || /^\/[a-z0-9_]+$/.test(text)) {
+          e.preventDefault()
+          const ok = tryExecuteRawInput(text)
+          console.log("[BDS:Cmd] Enter execute cmd result=", ok)
+          if (ok) {
+            const t = (editor.tagName || "").toLowerCase()
+            if (t === "textarea" || t === "input") editor.value = ""
+            else editor.textContent = ""
+            editor.dispatchEvent(new Event("input", { bubbles: true }))
+          }
+        }
+      }
+    }
+  }
+  editor.addEventListener("keydown", handler)
+  currentEditor = editor
+  currentKeydownHandler = handler
+
+  document.querySelector(".bds-cmd-autocomplete")?.remove()
+  const mountPoint = document.createElement("div")
+  mountPoint.className = "bds-cmd-autocomplete"
+  document.body.appendChild(mountPoint)
+
+  console.log("[BDS:Cmd] Mounting Autocomplete component, editor=", editor?.tagName, "#" + (editor?.id || ""))
+  autocompleteInstance = mount(Autocomplete, {
+    target: mountPoint,
+    props: { editor },
+  })
+
+  editor.dispatchEvent(new Event("input", { bubbles: true }))
+
+  document.querySelector(".bds-cmd-help-mount")?.remove()
+  const helpMountPoint = document.createElement("div")
+  helpMountPoint.className = "bds-cmd-help-mount"
+  document.body.appendChild(helpMountPoint)
+
+  commandsHelpInstance = mount(CommandsHelp, { target: helpMountPoint })
 }
 

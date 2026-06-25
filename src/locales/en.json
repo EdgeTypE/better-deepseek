@@ -572,6 +572,28 @@
       "dateMinAgo": "{{count}}m ago",
       "dateHourAgo": "{{count}}h ago"
     },
+    "commands": {
+      "title": "Commands",
+      "manage": "Manage",
+      "helpTitle": "Commands",
+      "search": "Search commands...",
+      "all": "All",
+      "noCommands": "No commands found",
+      "addCommand": "Add command",
+      "remove": "Remove",
+      "noCustomCommands": "No custom commands yet. Map a snippet above.",
+      "builtinCommands": "Built-in Commands",
+      "unknownCommand": "Unknown command: /{{cmd}}. Type /help for available commands.",
+      "cmdRequired": "Command is required",
+      "cmdInvalidChars": "Only lowercase letters, numbers, and underscores allowed",
+      "cmdConflictBuiltin": "Conflicts with a built-in command",
+      "cmdConflictSnippet": "Command already in use by another snippet",
+      "cmdPlaceholder": "command (optional)",
+      "cmdOk": "OK",
+      "selectSnippet": "Select snippet...",
+      "compress": "Summarize the conversation and start a new session with full context",
+      "summarize": "Generate a handoff summary of the conversation"
+    },
     "sidebarSearch": {
       "placeholder": "Search history... (#tag)"
     },

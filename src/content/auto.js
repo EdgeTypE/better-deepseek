@@ -307,7 +307,7 @@ export async function handleAutoCodeRunnerResult(language, status, output) {
   ].join("\n");
 
   console.log(`[BDS:AUTO] Sending code runner result (${status})...`);
-  injectPureTextAndSend(autoMessage);
+  await injectPureTextAndSend(autoMessage);
 }
 
 /**
@@ -339,10 +339,10 @@ export async function handleAutoErrorReport(toolName, error, originalCode) {
   console.log(`[BDS:AUTO] Sending error report for ${toolName}...`);
 
   // We use injectFileAndSend without a file for pure text injection
-  injectPureTextAndSend(autoMessage);
+  await injectPureTextAndSend(autoMessage);
 }
 
-export function injectPureTextAndSend(autoMessage, logLabel = "Text prompt") {
+export async function injectPureTextAndSend(autoMessage, logLabel = "Text prompt") {
   if (!setChatInputText(autoMessage)) {
     console.error(`[BDS:AUTO] Failed to send ${logLabel}: chat input was not found or could not be updated.`);
     return false;
@@ -375,7 +375,7 @@ async function readFileText(file) {
   return "";
 }
 
-function findChatEditor() {
+export function findChatEditor() {
   const selectors = [
     "textarea#chat-input",
     ".ds-textarea textarea",

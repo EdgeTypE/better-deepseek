@@ -6,6 +6,7 @@
   import ProjectsManager from "./ProjectsManager.svelte";
   import ProjectsCard from "./ProjectsCard.svelte";
   import SavedItems from "./SavedItems.svelte";
+  import CommandManager from "../commands/CommandManager.svelte";
   import appState from "../state.js";
   import { t } from "../../lib/i18n.svelte.js";
 
@@ -22,6 +23,7 @@
   let memoryRef = $state(null);
   let projectsManagerRef = $state(null);
   let savedItemsRef = $state(null);
+  let showCmdManager = $state(false);
 
   let showProjectsManager = $state(false);
 
@@ -103,6 +105,23 @@
     <hr />
 
     <SavedItems bind:this={savedItemsRef} />
+
+    <hr />
+
+    <div class="bds-section-title">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="bds-icon-inline">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </span>
+        <span>Commands</span>
+      </div>
+      <button type="button" class="bds-btn-outlined" style="font-size:11px;padding:3px 7px;" onclick={() => showCmdManager = !showCmdManager}>
+        {showCmdManager ? "Done" : "Manage"}
+      </button>
+    </div>
+    {#if showCmdManager}
+      <CommandManager onclose={() => showCmdManager = false} />
+    {/if}
 
     <div class="bds-drawer-footer">
       <a href="https://github.com/EdgeTypE/better-deepseek" target="_blank" rel="noopener noreferrer" class="bds-github-link">

@@ -341,10 +341,9 @@
     visible = false;
   }
 
-  function injectTextIntoDeepSeek(text) {
-    if (!injectPureTextAndSend(text, "Question panel answer")) {
-      if (appState.ui) appState.ui.showToast(t('questionPanel.noInputField'));
-    }
+  async function injectTextIntoDeepSeek(text) {
+    const sent = await injectPureTextAndSend(text, "Question panel answer")
+    if (!sent && appState.ui) appState.ui.showToast(t('questionPanel.noInputField'));
   }
 
   function dismiss() {

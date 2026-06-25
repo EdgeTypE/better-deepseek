@@ -91,6 +91,15 @@
       "svgPaths": ["M8.3125", "M8.312", "M13.12 19.98"],
       "disabledClass": "ds-icon-button--disabled"
     },
+    "stopButton": {
+      "selectors": [
+        ".ds-icon-stop-circle",
+        ".ds-icon-stop",
+        "div[role=\"button\"] svg path[d*=\"M3 3h10v10H3z\"]",
+        "div[role=\"button\"] svg path[d*=\"M6 6h12v12H6z\"]",
+        "div[role=\"button\"] svg path[d*=\"M2 4.88\"]"
+      ]
+    },
     "logo": { "svgViewBox": "0 0 143 23", "newChatPath": "M8 0.599609" },
     "textExtraction": {
       "thinkContent": ".ds-think-content",

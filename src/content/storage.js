@@ -35,6 +35,7 @@ export async function loadStateFromStorage() {
     STORAGE_KEYS.dismissedAnnouncements,
     STORAGE_KEYS.cssSnippets,
     "bds_locale_updates",
+    STORAGE_KEYS.commandMappings,
   ]);
 
   if (values.bds_locale_updates) {
@@ -118,6 +119,7 @@ export async function loadStateFromStorage() {
   state.whatsNewPending = !!values[STORAGE_KEYS.whatsNewPending];
   state.chatTags = normalizeChatTags(values[STORAGE_KEYS.chatTags]);
   state.savedItems = normalizeSavedItems(values[STORAGE_KEYS.savedItems]);
+  state.commands.customMappings = normalizeCommandMappings(values[STORAGE_KEYS.commandMappings]);
   state.remoteAnnouncements = Array.isArray(values[STORAGE_KEYS.remoteAnnouncement]) ? values[STORAGE_KEYS.remoteAnnouncement] : [];
   state.dismissedAnnouncements = Array.isArray(values[STORAGE_KEYS.dismissedAnnouncements]) ? values[STORAGE_KEYS.dismissedAnnouncements] : [];
 
@@ -364,6 +366,16 @@ export function normalizeSavedItems(raw) {
     }));
 }
 
+export function normalizeCommandMappings(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {}
+  const result = {}
+  for (const [key, snippetId] of Object.entries(raw)) {
+    const cleanKey = String(key || "").toLowerCase().replace(/[^a-z0-9_]/g, "")
+    if (cleanKey && snippetId) result[cleanKey] = String(snippetId)
+  }
+  return result
+}
+
 export function normalizeCssSnippets(raw) {
   const defaultPresets = [
     {
@@ -513,6 +525,10 @@ export function bindStorageChangeListener() {
     if (changes[STORAGE_KEYS.savedItems]) {
       state.savedItems = normalizeSavedItems(changes[STORAGE_KEYS.savedItems].newValue);
       if (state.ui) state.ui.refreshSavedItems();
+    }
+
+    if (changes[STORAGE_KEYS.commandMappings]) {
+      state.commands.customMappings = normalizeCommandMappings(changes[STORAGE_KEYS.commandMappings].newValue);
     }
 
     if (changes[STORAGE_KEYS.cssSnippets]) {

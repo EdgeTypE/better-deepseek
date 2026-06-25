@@ -28,6 +28,7 @@ import { handleManagedAutoContinuation, isManagedRunActive, trySynthesizeReport 
 import { mount, unmount } from "svelte";
 import MessageOverlay from "./ui/MessageOverlay.svelte";
 import { i18n } from "../lib/i18n.svelte.js";
+import { remoteConfig } from "../lib/remote-config.svelte.js";
 import { makeId } from "../lib/utils/helpers.js";
 import { STORAGE_KEYS } from "../lib/constants.js";
 
@@ -702,15 +703,16 @@ function dispatchDeepResearchEvents(parsed, stateData) {
  * Checks if DeepSeek is currently generating ANY response on the page.
  * Uses the presence of the 'Stop Generation' button as a global indicator.
  */
-function isSystemGenerating() {
-  // DeepSeek's Stop button usually has a square icon.
-  const stopButton = document.querySelector(
-    '.ds-icon-stop-circle, ' +
-    '.ds-icon-stop, ' +
-    'div[role="button"] svg path[d*="M3 3h10v10H3z"], ' +
-    'div[role="button"] svg path[d*="M6 6h12v12H6z"]'
-  );
-  return !!stopButton;
+export function isSystemGenerating() {
+  const selectors = remoteConfig.getConfig("selectors.stopButton.selectors") || [
+    ".ds-icon-stop-circle",
+    ".ds-icon-stop",
+    'div[role="button"] svg path[d*="M3 3h10v10H3z"]',
+    'div[role="button"] svg path[d*="M6 6h12v12H6z"]',
+    'div[role="button"] svg path[d*="M2 4.88"]',
+  ]
+  const selectorStr = (Array.isArray(selectors) ? selectors : [selectors]).join(", ")
+  return !!document.querySelector(selectorStr)
 }
 
 /**

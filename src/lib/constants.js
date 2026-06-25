@@ -22,6 +22,7 @@ export const STORAGE_KEYS = {
   apiPlaygroundHistory: "bds_api_playground_history",
   apiPlaygroundSaved: "bds_api_playground_saved",
   deepResearchRuns: "bds_deep_research_runs",
+  commandMappings: "bds_command_mappings",
 };
 
 
@@ -792,6 +793,15 @@ export const DEFAULT_REMOTE_CONFIG = {
       selectors: ['div[role="button"]', "button"],
       svgPaths: ["M8.3125", "M8.312", "M13.12 19.98"],
       disabledClass: "ds-icon-button--disabled",
+    },
+    stopButton: {
+      selectors: [
+        ".ds-icon-stop-circle",
+        ".ds-icon-stop",
+        'div[role="button"] svg path[d*="M3 3h10v10H3z"]',
+        'div[role="button"] svg path[d*="M6 6h12v12H6z"]',
+        'div[role="button"] svg path[d*="M2 4.88"]',
+      ],
     },
     textExtraction: {
       thinkContent: ".ds-think-content",

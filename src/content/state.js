@@ -67,6 +67,9 @@ const state = {
   chatTags: {},
   cssSnippets: [],
   savedItems: [],
+  commands: {
+    customMappings: {},
+  },
   /** @type {{indicator: 'none'|'minor'|'major'|'critical', description: string, lastChecked: number}} */
   serverStatus: {
     indicator: 'none',
