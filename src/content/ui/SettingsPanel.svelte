@@ -85,6 +85,15 @@
   let newSnippetName = $state("");
   let saveSnippetError = $state("");
   let advancedOpen = $state(false);
+  let subLanguageOpen = $state(false);
+  let subChatOpen = $state(false);
+  let subProjectsOpen = $state(false);
+  let subInjectionOpen = $state(false);
+  let subResearchOpen = $state(false);
+  let subVoiceOpen = $state(false);
+  let subIntegrationsOpen = $state(false);
+  let subUtilitiesOpen = $state(false);
+  let subCSSOpen = $state(false);
   let lastCheckedDate = $state("");
   let updatingLanguages = $state(false);
 
@@ -1107,528 +1116,460 @@
 
 <div class="bds-advanced-content" class:open={advancedOpen}>
   <div class="bds-advanced-inner">
-    <!-- Language Settings -->
-    <!-- <div style="padding: 10px 0 6px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--bds-border);">
-      <span style="font-size: 13px; font-weight: 600; color: var(--bds-text-primary);">{t('settings.languageSettings')}</span>
-    </div> -->
-    
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.syncLocale')}</span>
-      <label class="bds-switch">
-        <input type="checkbox" bind:checked={syncLocale} />
-        <span class="bds-switch-track"></span>
-      </label>
-    </div>
-
-    {#if !syncLocale}
-      <div class="bds-toggle-row">
-        <span class="bds-toggle-label">{t('settings.selectLanguage')}</span>
-        <select class="bds-select" bind:value={locale} style="width: 140px;">
-          {#each availableLocaleCodes as code}
-            <option value={code}>{i18n.getNativeName(code)}</option>
-          {/each}
-        </select>
-      </div>
-    {/if}
-
-    <div class="bds-toggle-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
-      <div style="display: flex; gap: 8px; width: 100%;">
-        <button 
-          type="button" 
-          class="bds-btn-outlined" 
-          style="flex: 1; font-size: 11px; padding: 6px 12px;" 
-          onclick={checkLanguageUpdates} 
-          disabled={updatingLanguages}
-        >
-          {updatingLanguages ? t('common.working') : t('settings.checkUpdates')}
-        </button>
-        <button 
-          type="button" 
-          class="bds-btn-outlined" 
-          style="flex: 1; font-size: 11px; padding: 6px 12px; border-color: rgba(239, 68, 68, 0.3); color: rgba(239, 68, 68, 0.8);" 
-          onclick={resetLanguageFactory}
-        >
-          {t('settings.resetFactory')}
-        </button>
-      </div>
-      {#if lastCheckedDate}
-        <span style="font-size: 10px; opacity: 0.5; text-align: center; display: block; margin-top: 2px;">
-          {t('settings.lastChecked').replace('{{date}}', lastCheckedDate)}
-        </span>
-      {/if}
-    </div>
-
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.collapseLongUserMessages')}</span>
-      <label class="bds-switch">
-        <input id="bds-collapse-user-messages" type="checkbox" bind:checked={collapseLongUserMessages} />
-        <span class="bds-switch-track"></span>
-      </label>
-    </div>
-    <!-- <p style="font-size: 10px; opacity: 0.5; margin: -8px 0 8px; padding-left: 0;">
-      {t('settings.collapseLongUserMessagesHint')}
-    </p> -->
-
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.loadAllHistoryOnSession')}</span>
-      <label class="bds-switch">
-        <input id="bds-load-all-history" type="checkbox" bind:checked={loadAllHistoryOnSession} />
-        <span class="bds-switch-track"></span>
-      </label>
-    </div>
-    <p style="font-size: 10px; opacity: 0.5; margin: -8px 0 8px; padding-left: 0;">
-      {t('settings.loadAllHistoryHint')}
-    </p>
-
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.projectAutoContext')}</span>
-      <label class="bds-switch">
-        <input
-          id="bds-project-rag"
-          type="checkbox"
-          bind:checked={projectRagEnabled}
-        />
-        <span class="bds-switch-track"></span>
-      </label>
-    </div>
-
-    {#if projectRagEnabled}
-      <div
-        class="bds-toggle-row"
-        style="flex-direction: column; align-items: flex-start; gap: 6px; padding-left: 12px; border-left: 2px solid rgba(255, 255, 255, 0.1); margin-left: 4px;"
-      >
-        <span class="bds-toggle-label">{t('settings.ragChunks')}</span>
-        <select class="bds-select" bind:value={projectRagLimit}>
-          <option value={3}>{t('settings.ragChunks3')}</option>
-          <option value={5}>{t('settings.ragChunks5')}</option>
-          <option value={8}>{t('settings.ragChunks8')}</option>
-          <option value={10}>{t('settings.ragChunks10')}</option>
-        </select>
-        <p style="font-size: 10px; opacity: 0.5; margin: 0;">
-          {t('settings.ragHint')}
-        </p>
-      </div>
-    {/if}
-
-    <div class="bds-toggle-row" style="flex-wrap: wrap;">
-      <span class="bds-toggle-label">{t('settings.processGitignore')}</span>
-      <label class="bds-switch">
-        <input
-          id="bds-gitignore-upload"
-          type="checkbox"
-          bind:checked={processGitignoreOnUpload}
-        />
-        <span class="bds-switch-track"></span>
-      </label>
-    </div>
-
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.autoDownloadFiles')}</span>
-      <label class="bds-switch">
-        <input id="bds-auto-files" type="checkbox" bind:checked={autoFiles} />
-        <span class="bds-switch-track"></span>
-      </label>
-    </div>
-
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.disableSystemPrompt')}</span>
-      <label class="bds-switch">
-        <input
-          id="bds-disable-prompt"
-          type="checkbox"
-          bind:checked={disableSystemPrompt}
-        />
-        <span class="bds-switch-track"></span>
-      </label>
-    </div>
-
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.disableMemory')}</span>
-      <label class="bds-switch">
-        <input
-          id="bds-disable-memory"
-          type="checkbox"
-          bind:checked={disableMemory}
-        />
-        <span class="bds-switch-track"></span>
-      </label>
-    </div>
-
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.injectSystemDateTime')}</span>
-      <label class="bds-switch">
-        <input
-          id="bds-inject-datetime"
-          type="checkbox"
-          bind:checked={injectSystemDateTime}
-        />
-        <span class="bds-switch-track"></span>
-      </label>
-    </div>
-
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.skipDeletionConfirmation')}</span>
-      <label class="bds-switch">
-        <input
-          id="bds-skip-deletion-confirm"
-          type="checkbox"
-          bind:checked={skipDeletionConfirmation}
-        />
-        <span class="bds-switch-track"></span>
-      </label>
-    </div>
-
-    <!-- Deep Research Context Guard -->
-    <div style="padding: 10px 0 6px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--bds-border);">
-      <span style="font-size: 13px; font-weight: 600; color: var(--bds-text-primary);">{t('settings.deepResearchContextGuard')}</span>
-    </div>
-
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.contextGuardEnabled')}</span>
-      <label class="bds-switch">
-        <input
-          id="bds-context-guard-enabled"
-          type="checkbox"
-          bind:checked={deepResearchContextGuardEnabled}
-        />
-        <span class="bds-switch-track"></span>
-      </label>
-    </div>
-    <p style="font-size: 10px; opacity: 0.5; margin: -8px 0 8px; padding-left: 0;">
-      {t('settings.contextGuardEnabledHint')}
-    </p>
-
-    {#if deepResearchContextGuardEnabled}
-      <div
-        class="bds-toggle-row"
-        style="flex-direction: column; align-items: flex-start; gap: 6px;"
-      >
-        <span class="bds-toggle-label">{t('settings.contextGuardLimit')}</span>
-        <input
-          id="bds-context-guard-limit"
-          type="number"
-          min="16000"
-          max="1000000"
-          step="1000"
-          class="bds-input"
-          style="width: 140px; box-sizing: border-box;"
-          bind:value={deepResearchContextLimitTokens}
-        />
-        <p style="font-size: 10px; opacity: 0.5; margin: 0;">
-          {t('settings.contextGuardLimitHint')}
-        </p>
-      </div>
-
-      <div class="bds-toggle-row">
-        <span class="bds-toggle-label">{t('settings.contextGuardStopPercent')}</span>
-        <div class="bds-slider-group">
-          <input
-            type="range"
-            min="50"
-            max="95"
-            step="1"
-            bind:value={deepResearchContextStopPercent}
-            class="bds-slider"
-          />
-          <span class="bds-slider-value">{deepResearchContextStopPercent}%</span>
+    <!-- subLanguage -->
+    <button type="button" class="bds-sub-toggle" class:open={subLanguageOpen} onclick={() => subLanguageOpen = !subLanguageOpen} aria-expanded={subLanguageOpen}>
+      {t('settings.subLanguage')}
+      <span class="bds-chevron">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+    </button>
+    <div class="bds-sub-content" class:open={subLanguageOpen}>
+      <div class="bds-sub-inner">
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.syncLocale')}</span>
+          <label class="bds-switch">
+            <input type="checkbox" bind:checked={syncLocale} />
+            <span class="bds-switch-track"></span>
+          </label>
         </div>
-      </div>
-      <p style="font-size: 10px; opacity: 0.5; margin: -4px 0 8px; padding-left: 0;">
-        {t('settings.contextGuardStopPercentHint', { threshold: Math.floor(deepResearchContextLimitTokens * deepResearchContextStopPercent / 100).toLocaleString() })}
-      </p>
-    {/if}
 
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.injectionFrequency')}</span>
-      <select class="bds-select" bind:value={systemPromptInjectionFrequency}>
-        <option value="first">{t('settings.firstMessage')}</option>
-        <option value="always">{t('settings.everyMessage')}</option>
-        <option value="every_x">{t('settings.everyNMessages')}</option>
-      </select>
-    </div>
+        {#if !syncLocale}
+          <div class="bds-toggle-row">
+            <span class="bds-toggle-label">{t('settings.selectLanguage')}</span>
+            <select class="bds-select" bind:value={locale} style="width: 140px;">
+              {#each availableLocaleCodes as code}
+                <option value={code}>{i18n.getNativeName(code)}</option>
+              {/each}
+            </select>
+          </div>
+        {/if}
 
-    {#if systemPromptInjectionFrequency === "every_x"}
-      <div
-        class="bds-toggle-row"
-        style="flex-direction: column; align-items: flex-start; gap: 6px; padding-left: 12px; border-left: 2px solid rgba(255, 255, 255, 0.1); margin-left: 4px;"
-      >
-        <span class="bds-toggle-label">{t('settings.injectionInterval')}</span>
-        <input
-          id="bds-injection-interval"
-          type="number"
-          min="2"
-          class="bds-input"
-          style="width: 100px; box-sizing: border-box;"
-          bind:value={systemPromptInjectionInterval}
-        />
-        <p style="font-size: 10px; opacity: 0.5; margin: 0;">
-          {t('settings.injectEveryN', { n: systemPromptInjectionInterval })}
-        </p>
-      </div>
-    {/if}
-
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.voiceMode')}</span>
-      <label class="bds-switch">
-        <input id="bds-voice-mode" type="checkbox" bind:checked={voiceMode} />
-        <span class="bds-switch-track"></span>
-      </label>
-    </div>
-
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.autoSubmitVoice')}</span>
-      <label class="bds-switch">
-        <input
-          id="bds-voice-autosubmit"
-          type="checkbox"
-          bind:checked={autoSubmitVoice}
-        />
-        <span class="bds-switch-track"></span>
-      </label>
-    </div>
-
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.speechLanguage')}</span>
-      <select class="bds-select" bind:value={voiceLanguage}>
-        <option value="en-US">English (US)</option>
-        <option value="en-GB">English (UK)</option>
-        <option value="tr-TR">Türkçe (TR)</option>
-        <option value="de-DE">Deutsch (DE)</option>
-        <option value="ru-RU">Русский (RU)</option>
-        <option value="fr-FR">Français (FR)</option>
-        <option value="es-ES">Español (ES)</option>
-        <option value="it-IT">Italiano (IT)</option>
-        <option value="zh-CN">简体中文 (CN)</option>
-        <option value="ja-JP">日本語 (JP)</option>
-      </select>
-    </div>
-
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.vadSilenceTimeout')}</span>
-      <div class="bds-slider-group">
-        <input
-          type="range"
-          min="500"
-          max="3000"
-          step="100"
-          bind:value={vadSilenceTimeout}
-          class="bds-slider"
-        />
-        <span class="bds-slider-value">{(vadSilenceTimeout / 1000).toFixed(1)}s</span>
-      </div>
-    </div>
-
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.autoDownloadZip')}</span>
-      <label class="bds-switch">
-        <input id="bds-auto-zip" type="checkbox" bind:checked={autoZip} />
-        <span class="bds-switch-track"></span>
-      </label>
-    </div>
-
-    <div
-      class="bds-toggle-row"
-      style="flex-direction: column; align-items: flex-start; gap: 6px;"
-    >
-      <span class="bds-toggle-label">{t('settings.preferredLang')}</span>
-      <input
-        id="bds-preferred-lang"
-        type="text"
-        class="bds-input"
-        style="width: 100%; box-sizing: border-box;"
-        placeholder={t('settings.preferredLangPlaceholder')}
-        bind:value={preferredLang}
-      />
-      <p style="font-size: 10px; opacity: 0.5; margin: 0;">
-        {t('settings.preferredLangHint')}
-      </p>
-    </div>
-
-    <div
-      class="bds-toggle-row"
-      style="flex-direction: column; align-items: flex-start; gap: 6px;"
-    >
-      <span class="bds-toggle-label">{t('settings.markdownMaxDepth')}</span>
-      <input
-        id="bds-html-md-depth"
-        type="number"
-        min="10"
-        step="10"
-        class="bds-input"
-        style="width: 120px; box-sizing: border-box;"
-        bind:value={htmlToMarkdownMaxDepth}
-      />
-      <p style="font-size: 10px; opacity: 0.5; margin: 0;">
-        {t('settings.markdownMaxDepthHint')}
-      </p>
-    </div>
-
-    <div
-      class="bds-toggle-row"
-      style="flex-direction: column; align-items: flex-start; gap: 6px;"
-    >
-      <span class="bds-toggle-label">{t('settings.chatSessionCap')}</span>
-      <input
-        id="bds-max-chat-sessions"
-        type="number"
-        min="10"
-        step="50"
-        class="bds-input"
-        style="width: 120px; box-sizing: border-box;"
-        bind:value={maxChatSessions}
-      />
-      <p style="font-size: 10px; opacity: 0.5; margin: 0;">
-        {t('settings.chatSessionCapHint')}
-      </p>
-    </div>
-
-    <div
-      class="bds-toggle-row"
-      style="flex-direction: column; align-items: flex-start; gap: 8px;"
-    >
-      <span class="bds-toggle-label">{t('settings.githubToken')}</span>
-      <div class="bds-token-field">
-        <input
-          id="bds-github-token"
-          type="text"
-          class="bds-input bds-token-text"
-          style="width: 100%; box-sizing: border-box;"
-          placeholder={t('settings.githubTokenPlaceholder')}
-          value={getGithubTokenDisplayValue()}
-          readonly={!showGithubToken}
-          oninput={(e) => {
-            if (showGithubToken) {
-              githubToken = e.currentTarget.value;
-            }
-          }}
-          autocomplete="off"
-          autocapitalize="off"
-          spellcheck="false"
-        />
-        <div class="bds-token-actions">
-          <button
-            type="button"
-            class="bds-btn-outlined bds-token-btn"
-            onclick={() => (showGithubToken = !showGithubToken)}
-          >
-            {showGithubToken ? t('settings.githubTokenHide') : t('settings.githubTokenShow')}
-          </button>
-          <button
-            type="button"
-            class="bds-btn-outlined bds-token-btn"
-            onclick={() => {
-              githubToken = "";
-              showGithubToken = true;
-            }}
-            disabled={!githubToken}
-          >
-            {t('settings.githubTokenClear')}
-          </button>
-        </div>
-      </div>
-      <p class="bds-token-help">
-        {t('settings.githubTokenHelp')}
-      </p>
-    </div>
-    <div class="bds-toggle-row">
-      <span class="bds-toggle-label">{t('settings.tokenPriceEstimation')}</span>
-      <label class="bds-switch">
-        <input id="bds-token-price" type="checkbox" bind:checked={tokenPriceDisplay} />
-        <span class="bds-switch-track"></span>
-      </label>
-    </div>
-    <p style="font-size: 10px; opacity: 0.5; margin: -8px 0 8px; padding-left: 0;">
-      {t('settings.tokenPriceHint')}
-    </p>
-
-    <div class="bds-toggle-row" style="flex-direction: column; align-items: stretch; gap: 0;">
-      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
-        <span class="bds-toggle-label">{t('settings.customCSS')}</span>
-        {#if editingSnippetId}
-          {@const activeSnippet = appState.cssSnippets.find(s => s.id === editingSnippetId)}
-          {#if activeSnippet}
-            {@const displayName = activeSnippet.name.startsWith('preset') ? t('settings.' + activeSnippet.name) : activeSnippet.name}
-            <div class="bds-editing-badge">
-              <span>{t('settings.editingSnippet', { name: displayName })}</span>
-              <button type="button" class="bds-exit-edit-btn" onclick={cancelEditSnippet}>
-                {t('settings.exitEditMode')} ×
-              </button>
-            </div>
+        <div class="bds-toggle-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+          <div style="display: flex; gap: 8px; width: 100%;">
+            <button type="button" class="bds-btn-outlined" style="flex: 1; font-size: 11px; padding: 6px 12px;" onclick={checkLanguageUpdates} disabled={updatingLanguages}>
+              {updatingLanguages ? t('common.working') : t('settings.checkUpdates')}
+            </button>
+            <button type="button" class="bds-btn-outlined" style="flex: 1; font-size: 11px; padding: 6px 12px; border-color: rgba(239, 68, 68, 0.3); color: rgba(239, 68, 68, 0.8);" onclick={resetLanguageFactory}>
+              {t('settings.resetFactory')}
+            </button>
+          </div>
+          {#if lastCheckedDate}
+            <span style="font-size: 10px; opacity: 0.5; text-align: center; display: block; margin-top: 2px;">
+              {t('settings.lastChecked').replace('{{date}}', lastCheckedDate)}
+            </span>
           {/if}
+        </div>
+
+        <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+          <span class="bds-toggle-label">{t('settings.preferredLang')}</span>
+          <input id="bds-preferred-lang" type="text" class="bds-input" style="width: 100%; box-sizing: border-box;" placeholder={t('settings.preferredLangPlaceholder')} bind:value={preferredLang} />
+          <p style="font-size: 10px; opacity: 0.5; margin: 0;">
+            {t('settings.preferredLangHint')}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- subChat -->
+    <button type="button" class="bds-sub-toggle" class:open={subChatOpen} onclick={() => subChatOpen = !subChatOpen} aria-expanded={subChatOpen}>
+      {t('settings.subChat')}
+      <span class="bds-chevron">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+    </button>
+    <div class="bds-sub-content" class:open={subChatOpen}>
+      <div class="bds-sub-inner">
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.collapseLongUserMessages')}</span>
+          <label class="bds-switch">
+            <input id="bds-collapse-user-messages" type="checkbox" bind:checked={collapseLongUserMessages} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+
+        <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 12px;">
+            <span class="bds-toggle-label">{t('settings.loadAllHistoryOnSession')}</span>
+            <label class="bds-switch">
+              <input id="bds-load-all-history" type="checkbox" bind:checked={loadAllHistoryOnSession} />
+              <span class="bds-switch-track"></span>
+            </label>
+          </div>
+          <p style="font-size: 10px; opacity: 0.5; margin: 0;">
+            {t('settings.loadAllHistoryHint')}
+          </p>
+        </div>
+
+        <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+          <span class="bds-toggle-label">{t('settings.chatSessionCap')}</span>
+          <input id="bds-max-chat-sessions" type="number" min="10" step="50" class="bds-input" style="width: 120px; box-sizing: border-box;" bind:value={maxChatSessions} />
+          <p style="font-size: 10px; opacity: 0.5; margin: 0;">
+            {t('settings.chatSessionCapHint')}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- subProjects -->
+    <button type="button" class="bds-sub-toggle" class:open={subProjectsOpen} onclick={() => subProjectsOpen = !subProjectsOpen} aria-expanded={subProjectsOpen}>
+      {t('settings.subProjects')}
+      <span class="bds-chevron">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+    </button>
+    <div class="bds-sub-content" class:open={subProjectsOpen}>
+      <div class="bds-sub-inner">
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.projectAutoContext')}</span>
+          <label class="bds-switch">
+            <input id="bds-project-rag" type="checkbox" bind:checked={projectRagEnabled} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+
+        {#if projectRagEnabled}
+          <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px; padding-left: 12px; border-left: 2px solid rgba(255, 255, 255, 0.1); margin-left: 4px;">
+            <span class="bds-toggle-label">{t('settings.ragChunks')}</span>
+            <select class="bds-select" bind:value={projectRagLimit}>
+              <option value={3}>{t('settings.ragChunks3')}</option>
+              <option value={5}>{t('settings.ragChunks5')}</option>
+              <option value={8}>{t('settings.ragChunks8')}</option>
+              <option value={10}>{t('settings.ragChunks10')}</option>
+            </select>
+            <p style="font-size: 10px; opacity: 0.5; margin: 0;">
+              {t('settings.ragHint')}
+            </p>
+          </div>
+        {/if}
+
+        <div class="bds-toggle-row" style="flex-wrap: wrap;">
+          <span class="bds-toggle-label">{t('settings.processGitignore')}</span>
+          <label class="bds-switch">
+            <input id="bds-gitignore-upload" type="checkbox" bind:checked={processGitignoreOnUpload} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.autoDownloadFiles')}</span>
+          <label class="bds-switch">
+            <input id="bds-auto-files" type="checkbox" bind:checked={autoFiles} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.autoDownloadZip')}</span>
+          <label class="bds-switch">
+            <input id="bds-auto-zip" type="checkbox" bind:checked={autoZip} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- subInjection -->
+    <button type="button" class="bds-sub-toggle" class:open={subInjectionOpen} onclick={() => subInjectionOpen = !subInjectionOpen} aria-expanded={subInjectionOpen}>
+      {t('settings.subInjection')}
+      <span class="bds-chevron">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+    </button>
+    <div class="bds-sub-content" class:open={subInjectionOpen}>
+      <div class="bds-sub-inner">
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.disableSystemPrompt')}</span>
+          <label class="bds-switch">
+            <input id="bds-disable-prompt" type="checkbox" bind:checked={disableSystemPrompt} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.disableMemory')}</span>
+          <label class="bds-switch">
+            <input id="bds-disable-memory" type="checkbox" bind:checked={disableMemory} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.injectSystemDateTime')}</span>
+          <label class="bds-switch">
+            <input id="bds-inject-datetime" type="checkbox" bind:checked={injectSystemDateTime} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.skipDeletionConfirmation')}</span>
+          <label class="bds-switch">
+            <input id="bds-skip-deletion-confirm" type="checkbox" bind:checked={skipDeletionConfirmation} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.injectionFrequency')}</span>
+          <select class="bds-select" bind:value={systemPromptInjectionFrequency}>
+            <option value="first">{t('settings.firstMessage')}</option>
+            <option value="always">{t('settings.everyMessage')}</option>
+            <option value="every_x">{t('settings.everyNMessages')}</option>
+          </select>
+        </div>
+
+        {#if systemPromptInjectionFrequency === "every_x"}
+          <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px; padding-left: 12px; border-left: 2px solid rgba(255, 255, 255, 0.1); margin-left: 4px;">
+            <span class="bds-toggle-label">{t('settings.injectionInterval')}</span>
+            <input id="bds-injection-interval" type="number" min="2" class="bds-input" style="width: 100px; box-sizing: border-box;" bind:value={systemPromptInjectionInterval} />
+            <p style="font-size: 10px; opacity: 0.5; margin: 0;">
+              {t('settings.injectEveryN', { n: systemPromptInjectionInterval })}
+            </p>
+          </div>
         {/if}
       </div>
-      <textarea
-        class="bds-input bds-css-editor"
-        spellcheck="false"
-        bind:value={customCSS}
-        placeholder={t('settings.customCSSPlaceholder')}
-      ></textarea>
-      <div class="bds-css-toolbar" class:open={isSnippetsOpen}>
-        <button
-          type="button"
-          class="bds-css-toggle-btn"
-          class:active={isSnippetsOpen}
-          onclick={() => isSnippetsOpen = !isSnippetsOpen}
-        >
-          <svg class="bds-snippets-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-          </svg>
-          <span>{t('settings.manageSnippets')}</span>
-          {#if activeSnippetsCount > 0}
-            <span class="bds-snippets-badge">{activeSnippetsCount}</span>
-          {/if}
-          <svg
-            class="bds-chevron {isSnippetsOpen ? 'bds-chevron-rotated' : ''}"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <polyline points="6 9 12 15 18 9"></polyline>
-          </svg>
-        </button>
+    </div>
 
-        <button
-          type="button"
-          class="bds-btn-outlined bds-save-snippet-btn"
-          disabled={!customCSS || !customCSS.trim()}
-          onclick={editingSnippetId ? updateSnippet : saveAsSnippet}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-            <polyline points="17 21 17 13 7 13 7 21"/>
-            <polyline points="7 3 7 8 15 8"/>
-          </svg>
-          {editingSnippetId ? t('settings.updateSnippet') : t('settings.saveAsSnippet')}
-        </button>
+    <!-- subResearch -->
+    <button type="button" class="bds-sub-toggle" class:open={subResearchOpen} onclick={() => subResearchOpen = !subResearchOpen} aria-expanded={subResearchOpen}>
+      {t('settings.subResearch')}
+      <span class="bds-chevron">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+    </button>
+    <div class="bds-sub-content" class:open={subResearchOpen}>
+      <div class="bds-sub-inner">
+        <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 12px;">
+            <span class="bds-toggle-label">{t('settings.contextGuardEnabled')}</span>
+            <label class="bds-switch">
+              <input id="bds-context-guard-enabled" type="checkbox" bind:checked={deepResearchContextGuardEnabled} />
+              <span class="bds-switch-track"></span>
+            </label>
+          </div>
+          <p style="font-size: 10px; opacity: 0.5; margin: 0;">
+            {t('settings.contextGuardEnabledHint')}
+          </p>
+        </div>
+
+        {#if deepResearchContextGuardEnabled}
+          <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+            <span class="bds-toggle-label">{t('settings.contextGuardLimit')}</span>
+            <input id="bds-context-guard-limit" type="number" min="16000" max="1000000" step="1000" class="bds-input" style="width: 140px; box-sizing: border-box;" bind:value={deepResearchContextLimitTokens} />
+            <p style="font-size: 10px; opacity: 0.5; margin: 0;">
+              {t('settings.contextGuardLimitHint')}
+            </p>
+          </div>
+
+          <div class="bds-toggle-row">
+            <span class="bds-toggle-label">{t('settings.contextGuardStopPercent')}</span>
+            <div class="bds-slider-group">
+              <input type="range" min="50" max="95" step="1" bind:value={deepResearchContextStopPercent} class="bds-slider" />
+              <span class="bds-slider-value">{deepResearchContextStopPercent}%</span>
+            </div>
+          </div>
+          <p style="font-size: 10px; opacity: 0.5; margin: -4px 0 8px; padding-left: 0;">
+            {t('settings.contextGuardStopPercentHint', { threshold: Math.floor(deepResearchContextLimitTokens * deepResearchContextStopPercent / 100).toLocaleString() })}
+          </p>
+        {/if}
       </div>
-      <SnippetList bind:this={snippetListRef} bind:isOpen={isSnippetsOpen} onedit={editSnippet} />
     </div>
 
-    <div
-      class="bds-toggle-row"
-      role="button"
-      tabindex="0"
-      onclick={onapiplayground}
-      onkeydown={(e) => e.key === 'Enter' && onapiplayground?.()}
-      style="cursor: pointer;"
-    >
-      <span class="bds-toggle-label">API Playground</span>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+    <!-- subVoice -->
+    <button type="button" class="bds-sub-toggle" class:open={subVoiceOpen} onclick={() => subVoiceOpen = !subVoiceOpen} aria-expanded={subVoiceOpen}>
+      {t('settings.subVoice')}
+      <span class="bds-chevron">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+    </button>
+    <div class="bds-sub-content" class:open={subVoiceOpen}>
+      <div class="bds-sub-inner">
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.voiceMode')}</span>
+          <label class="bds-switch">
+            <input id="bds-voice-mode" type="checkbox" bind:checked={voiceMode} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.autoSubmitVoice')}</span>
+          <label class="bds-switch">
+            <input id="bds-voice-autosubmit" type="checkbox" bind:checked={autoSubmitVoice} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.speechLanguage')}</span>
+          <select class="bds-select" bind:value={voiceLanguage}>
+            <option value="en-US">English (US)</option>
+            <option value="en-GB">English (UK)</option>
+            <option value="tr-TR">Türkçe (TR)</option>
+            <option value="de-DE">Deutsch (DE)</option>
+            <option value="ru-RU">Русский (RU)</option>
+            <option value="fr-FR">Français (FR)</option>
+            <option value="es-ES">Español (ES)</option>
+            <option value="it-IT">Italiano (IT)</option>
+            <option value="zh-CN">简体中文 (CN)</option>
+            <option value="ja-JP">日本語 (JP)</option>
+          </select>
+        </div>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.vadSilenceTimeout')}</span>
+          <div class="bds-slider-group">
+            <input type="range" min="500" max="3000" step="100" bind:value={vadSilenceTimeout} class="bds-slider" />
+            <span class="bds-slider-value">{(vadSilenceTimeout / 1000).toFixed(1)}s</span>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="bds-export-section">
-      <span>{t('drawer.exportAll')} / {t('drawer.importAll')}</span>
-      <div class="bds-export-buttons">
-        <button type="button" class="bds-btn-outlined" onclick={openExportAllModal}>
-          {t('drawer.exportAll')}
-        </button>
-        <button type="button" class="bds-btn-outlined" onclick={triggerImportAll}>
-          {t('drawer.importAll')}
-        </button>
-      <input type="file" accept=".json" style="display: none;" bind:this={importAllFileInput} onchange={handleImportAll} />
+    <!-- subIntegrations -->
+    <button type="button" class="bds-sub-toggle" class:open={subIntegrationsOpen} onclick={() => subIntegrationsOpen = !subIntegrationsOpen} aria-expanded={subIntegrationsOpen}>
+      {t('settings.subIntegrations')}
+      <span class="bds-chevron">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+    </button>
+    <div class="bds-sub-content" class:open={subIntegrationsOpen}>
+      <div class="bds-sub-inner">
+        <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+          <span class="bds-toggle-label">{t('settings.markdownMaxDepth')}</span>
+          <input id="bds-html-md-depth" type="number" min="10" step="10" class="bds-input" style="width: 120px; box-sizing: border-box;" bind:value={htmlToMarkdownMaxDepth} />
+          <p style="font-size: 10px; opacity: 0.5; margin: 0;">
+            {t('settings.markdownMaxDepthHint')}
+          </p>
+        </div>
+
+        <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+          <span class="bds-toggle-label">{t('settings.githubToken')}</span>
+          <div class="bds-token-field">
+            <input id="bds-github-token" type="text" class="bds-input bds-token-text" style="width: 100%; box-sizing: border-box;" placeholder={t('settings.githubTokenPlaceholder')} value={getGithubTokenDisplayValue()} readonly={!showGithubToken} oninput={(e) => { if (showGithubToken) { githubToken = e.currentTarget.value; } }} autocomplete="off" autocapitalize="off" spellcheck="false" />
+            <div class="bds-token-actions">
+              <button type="button" class="bds-btn-outlined bds-token-btn" onclick={() => (showGithubToken = !showGithubToken)}>
+                {showGithubToken ? t('settings.githubTokenHide') : t('settings.githubTokenShow')}
+              </button>
+              <button type="button" class="bds-btn-outlined bds-token-btn" onclick={() => { githubToken = ""; showGithubToken = true; }} disabled={!githubToken}>
+                {t('settings.githubTokenClear')}
+              </button>
+            </div>
+          </div>
+          <p class="bds-token-help">
+            {t('settings.githubTokenHelp')}
+          </p>
+        </div>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.tokenPriceEstimation')}</span>
+          <label class="bds-switch">
+            <input id="bds-token-price" type="checkbox" bind:checked={tokenPriceDisplay} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+        <p style="font-size: 10px; opacity: 0.5; margin: -8px 0 8px; padding-left: 0;">
+          {t('settings.tokenPriceHint')}
+        </p>
+      </div>
+    </div>
+
+    <!-- subCSS -->
+    <button type="button" class="bds-sub-toggle" class:open={subCSSOpen} onclick={() => subCSSOpen = !subCSSOpen} aria-expanded={subCSSOpen}>
+      {t('settings.subCSS')}
+      <span class="bds-chevron">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+    </button>
+    <div class="bds-sub-content" class:open={subCSSOpen}>
+      <div class="bds-sub-inner">
+        <div class="bds-toggle-row" style="flex-direction: column; align-items: stretch; gap: 0;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px;">
+            {#if editingSnippetId}
+              {@const activeSnippet = appState.cssSnippets.find(s => s.id === editingSnippetId)}
+              {#if activeSnippet}
+                {@const displayName = activeSnippet.name.startsWith('preset') ? t('settings.' + activeSnippet.name) : activeSnippet.name}
+                <div class="bds-editing-badge">
+                  <span>{t('settings.editingSnippet', { name: displayName })}</span>
+                  <button type="button" class="bds-exit-edit-btn" onclick={cancelEditSnippet}>
+                    {t('settings.exitEditMode')} ×
+                  </button>
+                </div>
+              {/if}
+            {/if}
+          </div>
+          <textarea class="bds-input bds-css-editor" spellcheck="false" bind:value={customCSS} placeholder={t('settings.customCSSPlaceholder')}></textarea>
+          <div class="bds-css-toolbar" class:open={isSnippetsOpen}>
+            <button type="button" class="bds-css-toggle-btn" class:active={isSnippetsOpen} onclick={() => isSnippetsOpen = !isSnippetsOpen}>
+              <svg class="bds-snippets-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+              </svg>
+              <span>{t('settings.manageSnippets')}</span>
+              {#if activeSnippetsCount > 0}
+                <span class="bds-snippets-badge">{activeSnippetsCount}</span>
+              {/if}
+              <svg class="bds-chevron {isSnippetsOpen ? 'bds-chevron-rotated' : ''}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <button type="button" class="bds-btn-outlined bds-save-snippet-btn" disabled={!customCSS || !customCSS.trim()} onclick={editingSnippetId ? updateSnippet : saveAsSnippet}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/>
+                <polyline points="7 3 7 8 15 8"/>
+              </svg>
+              {editingSnippetId ? t('settings.updateSnippet') : t('settings.saveAsSnippet')}
+            </button>
+          </div>
+          <SnippetList bind:this={snippetListRef} bind:isOpen={isSnippetsOpen} onedit={editSnippet} />
+        </div>
+      </div>
+    </div>
+
+    <!-- subUtilities -->
+    <button type="button" class="bds-sub-toggle" class:open={subUtilitiesOpen} onclick={() => subUtilitiesOpen = !subUtilitiesOpen} aria-expanded={subUtilitiesOpen}>
+      {t('settings.subUtilities')}
+      <span class="bds-chevron">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+    </button>
+    <div class="bds-sub-content" class:open={subUtilitiesOpen}>
+      <div class="bds-sub-inner">
+        <div class="bds-toggle-row" role="button" tabindex="0" onclick={onapiplayground} onkeydown={(e) => e.key === 'Enter' && onapiplayground?.()} style="cursor: pointer;">
+          <span class="bds-toggle-label">API Playground</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+
+        <div class="bds-export-section">
+          <span>{t('drawer.exportAll')} / {t('drawer.importAll')}</span>
+          <div class="bds-export-buttons">
+            <button type="button" class="bds-btn-outlined" onclick={openExportAllModal}>
+              {t('drawer.exportAll')}
+            </button>
+            <button type="button" class="bds-btn-outlined" onclick={triggerImportAll}>
+              {t('drawer.importAll')}
+            </button>
+            <input type="file" accept=".json" style="display: none;" bind:this={importAllFileInput} onchange={handleImportAll} />
+          </div>
+        </div>
       </div>
     </div>
   </div>

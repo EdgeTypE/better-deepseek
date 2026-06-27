@@ -411,6 +411,56 @@ textarea.bds-input,
   min-height: 0;
 }
 
+/* ── Sub-Accordion (nested groups inside Advanced) ── */
+.bds-sub-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 0 10px 4px;
+  margin-top: 4px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--bds-border);
+  color: var(--bds-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--bds-transition);
+}
+
+.bds-sub-toggle:hover {
+  color: var(--bds-accent);
+}
+
+.bds-sub-toggle .bds-chevron {
+  transition: transform var(--bds-transition);
+  color: var(--bds-text-tertiary);
+}
+
+.bds-sub-toggle.open .bds-chevron {
+  transform: rotate(180deg);
+}
+
+.bds-sub-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--bds-transition);
+  overflow: hidden;
+}
+
+.bds-sub-content.open {
+  grid-template-rows: 1fr;
+}
+
+.bds-sub-inner {
+  min-height: 0;
+}
+
+.bds-sub-content .bds-toggle-row {
+  padding: 8px 0;
+}
+
 .bds-toggle-label {
   font-size: 13px;
   color: var(--bds-text-primary);
