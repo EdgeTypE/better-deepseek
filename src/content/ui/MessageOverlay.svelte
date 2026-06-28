@@ -797,10 +797,14 @@
     margin-top: 4px;
   }
 
-  .bds-sanitized-text :global(ul),
-  .bds-sanitized-text :global(ol) {
+  .bds-sanitized-text :global(ul) {
     margin: 16px 0;
     padding-left: 18px;
+  }
+
+  .bds-sanitized-text :global(ol) {
+    margin: 16px 0;
+    padding-left: 28px;
   }
 
   .bds-sanitized-text :global(li:not(:first-child)) {

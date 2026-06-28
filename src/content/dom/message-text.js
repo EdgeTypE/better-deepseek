@@ -51,16 +51,16 @@ function parseNodeWithBestTextSource(node) {
     return "";
   }
 
-  const tagCandidates = candidates.filter((value) =>
-    /<BDS:|<BetterDeepSeek>/i.test(value)
+  const tagCandidates = candidates.filter((c) =>
+    /<BDS:|<BetterDeepSeek>/i.test(c.value)
   );
   const pool = tagCandidates.length ? tagCandidates : candidates;
 
   const selected =
     pool.sort(
       (a, b) => scoreRawTextCandidate(b) - scoreRawTextCandidate(a)
-    )[0] || "";
-  return selected;
+    )[0];
+  return selected ? selected.value : "";
 }
 
 function getNodeTextCandidates(node) {
@@ -129,8 +129,12 @@ function getNodeTextCandidates(node) {
   const textContent = String(clone.textContent || "");
   const markdownReconstructed = extractMessageMarkdown(clone);
 
-  return [htmlDecoded, textContent, markdownReconstructed].filter(
-    (value) => value && value.trim()
+  return [
+    { type: "htmlDecoded", value: htmlDecoded },
+    { type: "textContent", value: textContent },
+    { type: "markdownReconstructed", value: markdownReconstructed }
+  ].filter(
+    (c) => c.value && c.value.trim()
   );
 }
 
@@ -144,16 +148,19 @@ function decodeNodeHtmlText(html) {
   return String(doc.body.textContent || "");
 }
 
-function scoreRawTextCandidate(value) {
-  const text = String(value || "");
+function scoreRawTextCandidate(candidate) {
+  const text = String(candidate.value || "");
   const lineBreakCount = (text.match(/\n/g) || []).length;
   const tagCount = (text.match(/<BDS:|<BetterDeepSeek>/gi) || []).length;
 
   // Bonus points for structured markdown syntax to ensure markdownReconstructed wins
-  // matches headings (# ), bullets (- , * , 1. ), and table pipes (|...|)
-  const mdBonus = (text.match(/(?:^|\n)(?:#+ |\* |- |\d+\. |\|.*\|)/g) || []).length * 100;
+  // matches headings (# ), bullets (- , * , 1. ), and table pipes (|...|), blockquotes (> ), horizontal rules (---)
+  const mdBonus = (text.match(/(?:^|\n)(?:#+ |\* |- |\d+\. |\|.*\||> |---)/g) || []).length * 100;
 
-  return tagCount * 10000 + mdBonus + lineBreakCount * 50 + text.length;
+  // Reconstructed markdown is much higher fidelity than raw browser text/decoded html
+  const typeBonus = candidate.type === "markdownReconstructed" ? 15000 : 0;
+
+  return tagCount * 10000 + mdBonus + typeBonus + lineBreakCount * 50 + text.length;
 }
 
 /**
@@ -240,12 +247,26 @@ function htmlToMarkdown(element, depth = 0) {
         case "p": markdown += `\n${content}\n`; break;
         case "ul": markdown += `\n${content}\n`; break;
         case "ol": markdown += `\n${content}\n`; break;
-        case "li":
-          const isOrdered = child.parentElement?.tagName.toLowerCase() === "ol";
-          const prefix = isOrdered ? "1. " : "- ";
-          markdown += `\n${prefix}${content.trim()}`;
+        case "li": {
+          const parent = child.parentElement;
+          const isOrdered = parent?.tagName.toLowerCase() === "ol";
+          if (isOrdered) {
+            const siblings = Array.from(parent.children);
+            const index = siblings.indexOf(child);
+            const startAttr = parseInt(parent.getAttribute("start"), 10) || 1;
+            const itemNumber = startAttr + index;
+            markdown += `\n${itemNumber}. ${content.trim()}`;
+          } else {
+            markdown += `\n- ${content.trim()}`;
+          }
           break;
-        case "blockquote": markdown += `\n> ${content.trim()}\n`; break;
+        }
+        case "blockquote": {
+          const lines = content.trim().split("\n").map(line => `> ${line}`).join("\n");
+          markdown += `\n${lines}\n`;
+          break;
+        }
+        case "hr": markdown += `\n---\n`; break;
         case "a": markdown += `[${content}](${child.getAttribute("href") || "#"})`; break;
         case "br": markdown += `\n`; break;
         case "table": markdown += `\n\n${content}\n`; break;
