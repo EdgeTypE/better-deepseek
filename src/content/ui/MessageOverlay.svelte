@@ -180,7 +180,7 @@
   {#each interleave(text, blocks) as segment}
     {#if segment.type === 'text'}
       {#if segment.content?.trim()}
-        <div class="bds-sanitized-text">
+        <div class="ds-markdown bds-sanitized-text">
           {@html marked.parse(segment.content)}
         </div>
       {/if}
@@ -673,49 +673,9 @@
   }
 
   .bds-sanitized-text {
-    font-size: inherit;
-    line-height: inherit;
-    color: inherit;
+    font: var(--dsw-font-markdown-base, inherit);
+    color: var(--dsw-alias-label-primary, var(--bds-text-primary, currentColor));
     background: transparent;
-  }
-
-  .bds-sanitized-text :global(p) {
-    margin-bottom: 1em;
-  }
-
-  .bds-sanitized-text :global(p:last-child) {
-    margin-bottom: 0;
-  }
-
-  .bds-sanitized-text :global(pre) {
-    background: var(--bds-bg-panel, #1e1f23);
-    padding: 12px;
-    border-radius: 8px;
-    overflow-x: auto;
-    margin: 12px 0;
-    border: 1px solid var(--bds-border, #3a3b3f);
-  }
-
-  .bds-sanitized-text :global(code) {
-    font-family: inherit;
-    font-size: inherit;
-    background: var(--bds-bg-hover, rgba(255, 255, 255, 0.08));
-    padding: 0.2em 0.4em;
-    border-radius: 4px;
-  }
-
-  .bds-sanitized-text :global(pre code) {
-    background: transparent;
-    padding: 0;
-  }
-
-  .bds-sanitized-text :global(ul), .bds-sanitized-text :global(ol) {
-    margin-bottom: 1em;
-    padding-left: 1.5em;
-  }
-
-  .bds-sanitized-text :global(li) {
-    margin-bottom: 0.4em;
   }
 
   .bds-sanitized-text :global(strong) {
@@ -726,48 +686,257 @@
     font-style: italic;
   }
 
-  /* Tables */
-  .bds-sanitized-text :global(table) {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 16px 0;
-    font-size: 13px;
-    border: 1px solid var(--bds-border, #3a3b3f);
+  .bds-sanitized-text :global(img) {
+    max-width: 100%;
   }
 
-  .bds-sanitized-text :global(th), .bds-sanitized-text :global(td) {
-    padding: 8px 12px;
-    border: 1px solid var(--bds-border, #3a3b3f);
-    text-align: left;
+  .bds-sanitized-text :global(h1) {
+    font: var(--dsw-font-markdown-h1, 600 1.75em/1.3 inherit);
+  }
+
+  .bds-sanitized-text :global(h2) {
+    font: var(--dsw-font-markdown-h2, 600 1.5em/1.3 inherit);
+  }
+
+  .bds-sanitized-text :global(h3) {
+    font: var(--dsw-font-markdown-h3, 600 1.25em/1.3 inherit);
+  }
+
+  .bds-sanitized-text :global(h4) {
+    font: var(--dsw-font-markdown-h4, 600 1.1em/1.3 inherit);
+  }
+
+  .bds-sanitized-text :global(h5),
+  .bds-sanitized-text :global(h6) {
+    font: var(--dsw-font-markdown-base-strong, 600 1em/1.3 inherit);
+  }
+
+  .bds-sanitized-text :global(h1 strong),
+  .bds-sanitized-text :global(h2 strong),
+  .bds-sanitized-text :global(h3 strong),
+  .bds-sanitized-text :global(h4 strong),
+  .bds-sanitized-text :global(h5 strong),
+  .bds-sanitized-text :global(h6 strong) {
+    font-weight: inherit;
+  }
+
+  .bds-sanitized-text :global(h1),
+  .bds-sanitized-text :global(h2),
+  .bds-sanitized-text :global(h3) {
+    margin: 32px 0 16px;
+  }
+
+  .bds-sanitized-text :global(h4),
+  .bds-sanitized-text :global(h5),
+  .bds-sanitized-text :global(h6),
+  .bds-sanitized-text :global(p) {
+    margin: 16px 0;
+  }
+
+  .bds-sanitized-text :global(h4+ul),
+  .bds-sanitized-text :global(h5+ul),
+  .bds-sanitized-text :global(h6+ul),
+  .bds-sanitized-text :global(h4+ol),
+  .bds-sanitized-text :global(h5+ol),
+  .bds-sanitized-text :global(h6+ol) {
+    margin-top: 8px;
+  }
+
+  .bds-sanitized-text :global(h4:has(+ul)),
+  .bds-sanitized-text :global(h5:has(+ul)),
+  .bds-sanitized-text :global(h6:has(+ul)),
+  .bds-sanitized-text :global(h4:has(+ol)),
+  .bds-sanitized-text :global(h5:has(+ol)),
+  .bds-sanitized-text :global(h6:has(+ol)) {
+    margin-bottom: 8px;
+  }
+
+  .bds-sanitized-text :global(h1 .header-anchor),
+  .bds-sanitized-text :global(h2 .header-anchor),
+  .bds-sanitized-text :global(h3 .header-anchor),
+  .bds-sanitized-text :global(h4 .header-anchor),
+  .bds-sanitized-text :global(h5 .header-anchor),
+  .bds-sanitized-text :global(h6 .header-anchor) {
+    opacity: 0;
+    margin-left: 4px;
+  }
+
+  .bds-sanitized-text :global(h1:hover .header-anchor),
+  .bds-sanitized-text :global(h2:hover .header-anchor),
+  .bds-sanitized-text :global(h3:hover .header-anchor),
+  .bds-sanitized-text :global(h4:hover .header-anchor),
+  .bds-sanitized-text :global(h5:hover .header-anchor),
+  .bds-sanitized-text :global(h6:hover .header-anchor) {
+    opacity: 1;
+  }
+
+  .bds-sanitized-text :global(a:not(.ds-a)) {
+    color: var(--dsw-alias-brand-text, var(--bds-accent, #5b7bff));
+    transition: box-shadow var(--ds-transition-duration) var(--ds-ease-in-out);
+    border: 2px solid rgba(255,255,255,0);
+    border-width: 2px 3px;
+    margin-left: -3px;
+    margin-right: -3px;
+    text-decoration: none;
+    position: relative;
+  }
+
+  .bds-sanitized-text :global(a:not(.ds-a):hover),
+  .bds-sanitized-text :global(a:not(.ds-a):focus) {
+    -webkit-text-decoration: underline var(--dsw-alias-brand-text, var(--bds-accent, #5b7bff));
+    text-decoration: underline var(--dsw-alias-brand-text, var(--bds-accent, #5b7bff));
+    outline: none;
+  }
+
+  .bds-sanitized-text :global(a:not(.ds-a):focus-visible) {
+    box-shadow: 0 0 0 2px var(--dsw-alias-brand-text, var(--bds-accent, #5b7bff));
+  }
+
+  .bds-sanitized-text :global(li>ul),
+  .bds-sanitized-text :global(li>ol) {
+    margin-top: 4px;
+  }
+
+  .bds-sanitized-text :global(ul),
+  .bds-sanitized-text :global(ol) {
+    margin: 16px 0;
+    padding-left: 18px;
+  }
+
+  .bds-sanitized-text :global(li:not(:first-child)) {
+    margin-top: 6px;
+  }
+
+  .bds-sanitized-text :global(li::marker) {
+    color: var(--dsw-alias-label-secondary, var(--bds-text-secondary, #8e8ea0));
+    line-height: 28px;
+  }
+
+  .bds-sanitized-text :global(ul ol),
+  .bds-sanitized-text :global(ol ol) {
+    padding-left: 0;
+    list-style-position: inside;
+  }
+
+  .bds-sanitized-text :global(ul ol li p),
+  .bds-sanitized-text :global(ol ol li p) {
+    display: inline;
+  }
+
+  .bds-sanitized-text :global(hr) {
+    background: var(--dsw-alias-border-l2, var(--bds-border, #3a3b3f));
+    border: none;
+    height: 1px;
+    margin: 32px 0;
+    display: block;
+  }
+
+  .bds-sanitized-text :global(blockquote) {
+    border-left: 2px solid var(--dsw-alias-label-caption, var(--bds-text-tertiary, #6b6b7b));
+    margin: 16px 0;
+    padding-left: 14px;
+  }
+
+  .bds-sanitized-text :global(table) {
+    border-collapse: collapse;
+    width: 100%;
+    max-width: 100%;
+    margin: 16px 0;
+    display: block;
+    overflow-x: auto;
   }
 
   .bds-sanitized-text :global(th) {
-    background: var(--bds-bg-hover, rgba(255, 255, 255, 0.08));
-    font-weight: 600;
+    border-bottom: 1px solid var(--dsw-alias-border-l3, var(--bds-border, #4a4b50));
+    font: var(--dsw-font-markdown-table-head, 600 1em inherit);
+    max-width: min(30vw,320px);
+    border-top: none;
+    min-width: 100px;
+    padding: 10px 16px;
   }
 
-  .bds-sanitized-text :global(tr:nth-child(even)) {
-    background: rgba(255, 255, 255, 0.02);
+  .bds-sanitized-text :global(th:not(:is(:lang(ae),:lang(ar),:lang(arc),:lang(bcc),:lang(bqi),:lang(ckb),:lang(dv),:lang(fa),:lang(glk),:lang(he),:lang(ku),:lang(mzn),:lang(nqo),:lang(pnb),:lang(ps),:lang(sd),:lang(ug),:lang(ur),:lang(yi)))) {
+    text-align: left;
   }
 
-  /* Blockquotes */
-  .bds-sanitized-text :global(blockquote) {
+  .bds-sanitized-text :global(th:is(:lang(ae),:lang(ar),:lang(arc),:lang(bcc),:lang(bqi),:lang(ckb),:lang(dv),:lang(fa),:lang(glk),:lang(he),:lang(ku),:lang(mzn),:lang(nqo),:lang(pnb),:lang(ps),:lang(sd),:lang(ug),:lang(ur),:lang(yi))) {
+    text-align: right;
+  }
+
+  .bds-sanitized-text :global(th:first-child) {
+    padding-left: 0;
+  }
+
+  .bds-sanitized-text :global(td) {
+    border-bottom: 1px solid var(--dsw-alias-border-l2, var(--bds-border, #3a3b3f));
+    font: var(--dsw-font-markdown-table, 1em inherit);
+    min-width: 100px;
+    max-width: min(30vw,320px);
+    padding: 10px 16px;
+  }
+
+  .bds-sanitized-text :global(td:first-child) {
+    padding-left: 0;
+  }
+
+  .bds-sanitized-text :global(td:last-child) {
+    padding-right: 0;
+  }
+
+  .bds-sanitized-text :global(pre) {
+    font-family: var(--ds-font-family-code);
     margin: 16px 0;
-    padding-left: 16px;
-    border-left: 4px solid var(--bds-accent, #5b7bff);
-    color: var(--bds-text-secondary, #8e8ea0);
-    font-style: italic;
+    overflow-x: auto;
+    background: var(--bds-bg-code, rgba(0, 0, 0, 0.2));
+    padding: 1em;
+    border-radius: 8px;
+    border: 1px solid var(--bds-border, rgba(255, 255, 255, 0.1));
   }
 
-  /* Headers */
-  .bds-sanitized-text :global(h1), .bds-sanitized-text :global(h2), .bds-sanitized-text :global(h3) {
-    margin: 20px 0 12px 0;
-    font-weight: 600;
-    line-height: 1.3;
+  .bds-sanitized-text :global(code) {
+    box-sizing: border-box;
+    font: var(--dsw-font-markdown-code, 0.9em monospace);
+    font-family: var(--ds-font-family-code);
+    background-color: var(--dsw-alias-markdown-inline-code, rgba(255, 255, 255, 0.08));
+    border-radius: 6px;
+    align-items: center;
+    padding: 0 5px;
+    display: inline-flex;
+    font-size: .875em;
   }
 
-  .bds-sanitized-text :global(h1) { font-size: 1.5em; }
-  .bds-sanitized-text :global(h2) { font-size: 1.3em; }
-  .bds-sanitized-text :global(h3) { font-size: 1.1em; }
+  .bds-sanitized-text :global(h1 code),
+  .bds-sanitized-text :global(h2 code),
+  .bds-sanitized-text :global(h3 code),
+  .bds-sanitized-text :global(h4 code),
+  .bds-sanitized-text :global(h5 code),
+  .bds-sanitized-text :global(h6 code) {
+    font: inherit;
+    font-family: var(--ds-font-family-code);
+  }
+
+  .bds-sanitized-text :global(table code) {
+    font-size: 13px;
+  }
+
+  .bds-sanitized-text :global(li>p) {
+    margin: 8px 0;
+  }
+
+  .bds-sanitized-text :global(li>:first-child) {
+    margin-top: 0;
+  }
+
+  .bds-sanitized-text :global(li>:last-child:not(.md-code-block)) {
+    margin-bottom: 0;
+  }
+
+  .bds-sanitized-text :global(>:first-child) {
+    margin-top: 0!important;
+  }
+
+  .bds-sanitized-text :global(>:last-child) {
+    margin-bottom: 0!important;
+  }
 
 </style>
