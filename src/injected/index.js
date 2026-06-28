@@ -67,6 +67,46 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
     } catch { /* ignore */ }
   }
 
+  function findAuthTokenInStorage() {
+    try {
+      // 1. Check localStorage keys
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+        if (/token|auth|session/i.test(key)) {
+          const val = localStorage.getItem(key);
+          if (!val) continue;
+          if (val.trim().startsWith("{")) {
+            try {
+              const parsed = JSON.parse(val);
+              const token = parsed.token || parsed.accessToken || parsed.access_token || parsed.user_token || parsed.user?.token;
+              if (token && typeof token === "string") return token;
+            } catch {}
+          } else if (typeof val === "string" && val.length > 20) {
+            let tokenStr = val;
+            if (tokenStr.startsWith("Bearer ")) {
+              tokenStr = tokenStr.substring(7);
+            }
+            if (tokenStr.startsWith('"') && tokenStr.endsWith('"')) {
+              tokenStr = tokenStr.slice(1, -1);
+            }
+            return tokenStr;
+          }
+        }
+      }
+
+      // 2. Check cookies
+      const cookieToken = document.cookie
+        .split("; ")
+        .find(row => row.startsWith("user_token=") || row.startsWith("token="))
+        ?.split("=")[1];
+      if (cookieToken) return decodeURIComponent(cookieToken);
+    } catch (e) {
+      console.warn("[BDS] Failed to search auth token in storage:", e);
+    }
+    return null;
+  }
+
   const state = {
     config: {
       systemPrompt: "",
@@ -85,7 +125,7 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
     activeCompletionRequests: 0,
     isNextVoiceMessage: false,
     /** @type {string|null} Bearer token captured from API requests */
-    authToken: null,
+    authToken: findAuthTokenInStorage(),
     /** @type {function(string): void} Store the Authorization header value */
     setAuthToken: function(token) {
       if (token && token !== this.authToken) {

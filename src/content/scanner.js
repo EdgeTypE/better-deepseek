@@ -156,9 +156,10 @@ function scanPage() {
     }
 
     const nodes = collectMessageNodes();
-    for (const node of nodes) {
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
       try {
-        processMessageNode(node);
+        processMessageNode(node, i, nodes);
       } catch (err) {
         console.error("[BDS] Error processing message node:", err, node);
       }

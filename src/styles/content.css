@@ -1061,6 +1061,24 @@ textarea.bds-input,
   opacity: 1;
 }
 
+/* ── Message Timestamps ── */
+.bds-message-timestamp {
+  font-family: inherit;
+  white-space: nowrap;
+  opacity: 0.85;
+  transition: opacity var(--bds-transition);
+  user-select: none;
+  font-size: 11px;
+  color: var(--bds-text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+}
+
+.bds-message-timestamp:hover {
+  opacity: 1;
+}
+
 .bds-price-label {
   color: var(--bds-text-tertiary);
 }

@@ -754,6 +754,7 @@ export const DEFAULT_SETTINGS = {
   deepResearchContextStopPercent: 70,
   // Load all history — scroll to top on session open to trigger lazy-load
   loadAllHistoryOnSession: false,
+  showTimestamps: true,
 };
 
 // ── Default Remote Config (built-in fallback) ──

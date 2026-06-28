@@ -130,6 +130,8 @@
       "collapseLongUserMessagesHint": "Automatically hide very long user messages behind a read-more toggle.",
       "loadAllHistoryOnSession": "Load all history when opening a session",
       "loadAllHistoryHint": "Scrolls to the top of the conversation to trigger DeepSeek's lazy-load, ensuring all messages are available for export and price calculation. May be slow for long conversations. Disabled by default.",
+      "showTimestamps": "Show message timestamps",
+      "showTimestampsHint": "Display the exact time each message was sent or received in the chat.",
       "save": "Save Settings",
       "ragChunks": "Max RAG Chunks to Inject",
       "ragChunks3": "3 chunks (~600 words)",

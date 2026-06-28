@@ -127,13 +127,13 @@ async function init() {
   }).catch(() => {});
 
   // Auto-trigger loadAllHistory when navigating to a session page
-  if (state.settings.loadAllHistoryOnSession && location.href.includes("/chat/s/")) {
+  if ((state.settings.loadAllHistoryOnSession || state.settings.showTimestamps) && location.href.includes("/chat/s/")) {
     // Delay slightly so the DOM has a chance to render the first batch of messages
     setTimeout(() => loadAllHistory(), 500);
   }
 
   window.addEventListener("bds:urlChanged", () => {
-    if (state.settings.loadAllHistoryOnSession && location.href.includes("/chat/s/")) {
+    if ((state.settings.loadAllHistoryOnSession || state.settings.showTimestamps) && location.href.includes("/chat/s/")) {
       loadAllHistory();
     }
   });

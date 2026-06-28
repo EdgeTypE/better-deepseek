@@ -4,7 +4,7 @@
 
 import state from "./state.js";
 import { BRIDGE_EVENTS, DEFAULT_SYSTEM_PROMPT } from "../lib/constants.js";
-import { findLatestAssistantMessageNode, collectMessageNodes } from "./scanner.js";
+import { findLatestAssistantMessageNode, collectMessageNodes, scheduleScan } from "./scanner.js";
 import { finalizeLongWork } from "./files/long-work.js";
 import { getActiveProject, getActiveFiles, getFilesForProject } from "./project-manager.js";
 import { getDirectoryFiles } from "../lib/local-directory-source.js";
@@ -192,6 +192,9 @@ function handleHistoryMessages(data) {
       detail: JSON.stringify({ sessionId, count: existing.length })
     }));
   }
+
+  // Trigger page rescan to inject precise timestamps from API
+  scheduleScan();
 }
 
 /**

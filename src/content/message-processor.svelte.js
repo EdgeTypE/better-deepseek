@@ -64,9 +64,15 @@ function getNodeState(node) {
 /**
  * Process a single message node — the main per-node logic.
  */
-export function processMessageNode(node) {
+export function processMessageNode(node, nodeIndex = -1, nodes = null) {
   if (!node || node.closest("#bds-root")) {
     return;
+  }
+
+  if (nodeIndex === -1 || !nodes) {
+    const collected = collectMessageNodes();
+    nodeIndex = collected.indexOf(node);
+    nodes = collected;
   }
 
   // Inject Run buttons into any Python/JS/Lua/Ruby code blocks in this message
@@ -83,6 +89,7 @@ export function processMessageNode(node) {
   }
 
   const role = detectMessageRole(node);
+  processMessageTimestamp(node, role, nodeIndex, nodes);
   const stateData = getNodeState(node);
 
   // --- USER MESSAGE: strip <BetterDeepSeek> system prompt from view ---
@@ -970,7 +977,107 @@ function getCurrentConversationIdInline() {
   const match = location.href.match(/\/chat\/s\/([^\/]+)/);
   return match ? match[1] : "default";
 }
+const nodeTimeMap = new WeakMap();
 
+function getMessageTimestamp(node, role, nodeIndex, messages) {
+  if (nodeTimeMap.has(node)) {
+    return nodeTimeMap.get(node);
+  }
+  if (messages && nodeIndex >= 0 && messages[nodeIndex]) {
+    const apiMsg = messages[nodeIndex];
+    const apiRole = String(apiMsg.role || "").toLowerCase();
+    if (apiRole === role) {
+      let ts = apiMsg.inserted_at || apiMsg.created_at || apiMsg.updated_at;
+      if (ts) {
+        if (ts < 1e11) {
+          ts = ts * 1000;
+        }
+        nodeTimeMap.set(node, ts);
+        return ts;
+      }
+    }
+  }
+  return Date.now();
+}
+
+function formatTimestamp(ts) {
+  const date = new Date(ts);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  
+  if (isToday) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } else {
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + 
+           date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+}
+
+function processMessageTimestamp(node, role, nodeIndex, nodes) {
+  const container = (role === "assistant") 
+    ? (node.closest("._4f9bf79._43c05b5") || node.parentElement || node)
+    : (node.parentElement || node);
+    
+  const existingEl = container.querySelector(".bds-message-timestamp");
+  
+  if (!state.settings.showTimestamps) {
+    if (existingEl) {
+      existingEl.remove();
+    }
+    return;
+  }
+  
+  const sessionId = getCurrentConversationIdInline();
+  const messages = state.chatMessagesBySession.get(sessionId) || [];
+  const ts = getMessageTimestamp(node, role, nodeIndex, messages);
+  const formatted = formatTimestamp(ts);
+  
+  if (existingEl) {
+    // If it's already there, check if we need to update it from a fallback to an API timestamp
+    const isFallback = existingEl.getAttribute("data-bds-ts-type") === "fallback";
+    const hasRealTs = nodeTimeMap.has(node);
+    if (isFallback && hasRealTs) {
+      existingEl.textContent = formatted;
+      existingEl.title = new Date(ts).toLocaleString();
+      existingEl.setAttribute("data-bds-ts-type", "api");
+    }
+    return;
+  }
+  
+  let target;
+  if (role === "user") {
+    target = container.querySelector("._11d6b3a .ds-flex") ||
+      container.querySelector(".ds-flex._78e0558") || container.querySelector("[class*='_78e0558']");
+  } else {
+    const modelBadge = container.querySelector("._46a12ab")?.parentElement;
+    if (modelBadge) {
+      target = modelBadge;
+    } else {
+      target = container.querySelector("._0a3d93b") || container.querySelector(".ds-flex._0a3d93b");
+      if (!target) {
+        const bars = container.querySelectorAll(".ds-flex");
+        for (const bar of bars) {
+          if (bar.querySelector(".ds-icon-button") || bar.querySelector("[role='button']")) {
+            target = bar;
+            break;
+          }
+        }
+      }
+    }
+  }
+  
+  if (!target) return;
+  
+  const el = document.createElement("span");
+  el.className = "bds-message-timestamp";
+  el.textContent = formatted;
+  el.title = new Date(ts).toLocaleString();
+  
+  const hasRealTs = nodeTimeMap.has(node);
+  el.setAttribute("data-bds-ts-type", hasRealTs ? "api" : "fallback");
+  
+  target.appendChild(el);
+}
 
 function injectPriceUser(node, tokens, cost) {
   const container = node.parentElement || node;

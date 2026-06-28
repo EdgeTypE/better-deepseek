@@ -123,6 +123,8 @@
       "collapseLongUserMessagesHint": "自动折叠过长的用户消息，点击“查看更多”展开。",
       "loadAllHistoryOnSession": "打开会话时加载全部历史记录",
       "loadAllHistoryHint": "滚动到对话顶部触发 DeepSeek 的懒加载，确保所有消息可用于导出和费用计算。长对话可能较慢。默认关闭。",
+      "showTimestamps": "显示消息时间戳",
+      "showTimestampsHint": "在聊天中显示每条消息发送或接收的精确时间。",
       "save": "保存设置",
       "ragChunks": "RAG 最大注入片段数",
       "ragChunks3": "3 个片段（约 600 词）",

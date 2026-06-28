@@ -123,6 +123,8 @@
       "collapseLongUserMessagesHint": "Çok uzun kullanıcı mesajlarını otomatik olarak daraltarak bir buton aracılığıyla tamamının açılmasını sağlar.",
       "loadAllHistoryOnSession": "Oturum açılırken tüm geçmişi yükle",
       "loadAllHistoryHint": "DeepSeek'in tembel yüklemesini tetiklemek için konuşmanın en üstüne kaydırır, böylece tüm mesajlar dışa aktarma ve fiyat hesaplaması için kullanılabilir olur. Uzun konuşmalarda yavaş olabilir. Varsayılan olarak kapalıdır.",
+      "showTimestamps": "Mesaj zaman damgalarını göster",
+      "showTimestampsHint": "Sohbetteki her mesajın gönderilme veya alınma saatini gösterir.",
       "save": "Ayarları Kaydet",
       "ragChunks": "Enjekte Edilecek Maks. RAG Parçası",
       "ragChunks3": "3 parça (~600 kelime)",

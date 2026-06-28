@@ -63,6 +63,7 @@
     Number(appState.settings.maxChatSessions) || 500,
   );
   let tokenPriceDisplay = $state(Boolean(appState.settings.tokenPriceDisplay));
+  let showTimestamps = $state(Boolean(appState.settings.showTimestamps));
   let collapseLongUserMessages = $state(Boolean(appState.settings.collapseLongUserMessages));
   let loadAllHistoryOnSession = $state(Boolean(appState.settings.loadAllHistoryOnSession));
   let projectRagEnabled = $state(Boolean(appState.settings.projectRagEnabled));
@@ -138,7 +139,7 @@
       systemPromptMultiMode, systemPromptEntries,
       systemPromptInjectionFrequency, systemPromptInjectionInterval,
       disableMemory, htmlToMarkdownMaxDepth, maxChatSessions,
-      tokenPriceDisplay, projectRagEnabled, projectRagLimit,
+      tokenPriceDisplay, showTimestamps, projectRagEnabled, projectRagLimit,
       processGitignoreOnUpload, injectSystemDateTime, skipDeletionConfirmation, locale, syncLocale, collapseLongUserMessages,
       loadAllHistoryOnSession, customCSS
     });
@@ -421,6 +422,7 @@
       Number(appState.settings.htmlToMarkdownMaxDepth) || 200;
     maxChatSessions = Number(appState.settings.maxChatSessions) || 500;
     tokenPriceDisplay = Boolean(appState.settings.tokenPriceDisplay);
+    showTimestamps = Boolean(appState.settings.showTimestamps);
     collapseLongUserMessages = Boolean(appState.settings.collapseLongUserMessages);
     loadAllHistoryOnSession = Boolean(appState.settings.loadAllHistoryOnSession);
     projectRagEnabled = Boolean(appState.settings.projectRagEnabled);
@@ -648,6 +650,7 @@
       Math.floor(Number(maxChatSessions) || 500),
     );
     appState.settings.tokenPriceDisplay = tokenPriceDisplay;
+    appState.settings.showTimestamps = showTimestamps;
     appState.settings.collapseLongUserMessages = collapseLongUserMessages;
     appState.settings.loadAllHistoryOnSession = loadAllHistoryOnSession;
     appState.settings.projectRagEnabled = projectRagEnabled;
@@ -1484,6 +1487,17 @@
         </div>
         <p style="font-size: 10px; opacity: 0.5; margin: -8px 0 8px; padding-left: 0;">
           {t('settings.tokenPriceHint')}
+        </p>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.showTimestamps')}</span>
+          <label class="bds-switch">
+            <input id="bds-show-timestamps" type="checkbox" bind:checked={showTimestamps} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+        <p style="font-size: 10px; opacity: 0.5; margin: -8px 0 8px; padding-left: 0;">
+          {t('settings.showTimestampsHint')}
         </p>
       </div>
     </div>
