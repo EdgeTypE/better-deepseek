@@ -51,6 +51,12 @@ async function importAutoModule() {
   return await import("../../src/content/auto.js");
 }
 
+async function flushMicrotasks() {
+  for (let i = 0; i < 5; i++) {
+    await Promise.resolve();
+  }
+}
+
 describe("auto integration", () => {
   beforeEach(() => {
     resetAppState();
@@ -813,5 +819,101 @@ describe("auto integration", () => {
 
     const input = document.querySelector('input[type="file"]');
     expect(input.files[0].name).toContain("search_error_bad_query");
+  });
+
+  it("removes dedupe key when global search fails, allowing retry", async () => {
+    readerMocks.searchWeb
+      .mockRejectedValueOnce(new Error("search error"))
+      .mockResolvedValueOnce({
+        file: new File(["results"], "q.md", { type: "text/markdown" }),
+        results: [{ title: "R1", url: "https://a.com", snippet: "s" }],
+        query: "retry query",
+        deepFetch: 0,
+      });
+    const { handleAutoSearch } = await importAutoModule();
+
+    await handleAutoSearch("retry query");
+    await vi.advanceTimersByTimeAsync(600);
+
+    await handleAutoSearch("retry query");
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(readerMocks.searchWeb).toHaveBeenCalledTimes(2);
+  });
+
+  it("removes dedupe key when run-scoped search fails, allowing retry", async () => {
+    readerMocks.searchWeb
+      .mockRejectedValueOnce(new Error("search error"))
+      .mockResolvedValueOnce({
+        file: new File(["results"], "q.md", { type: "text/markdown" }),
+        results: [{ title: "R1", url: "https://a.com", snippet: "s" }],
+        query: "run query",
+        deepFetch: 0,
+      });
+    const { handleAutoSearchForRun, getRunSearchQueries } = await importAutoModule();
+
+    await handleAutoSearchForRun("run query", 0, "run-1");
+    await vi.advanceTimersByTimeAsync(600);
+
+    await handleAutoSearchForRun("run query", 0, "run-1");
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(readerMocks.searchWeb).toHaveBeenCalledTimes(2);
+    const runQueries = getRunSearchQueries("run-1");
+    expect(runQueries?.size).toBe(1);
+  });
+
+  it("removes global dedupe key when search result injection fails, allowing retry", async () => {
+    document.body.innerHTML = `<input type="file" multiple />`;
+    const input = document.querySelector('input[type="file"]');
+    Object.defineProperty(input, "files", {
+      configurable: true,
+      writable: true,
+      value: [],
+    });
+    readerMocks.searchWeb.mockResolvedValue({
+      file: new File(["results"], "q.md", { type: "text/markdown" }),
+      results: [{ title: "R1", url: "https://a.com", snippet: "s" }],
+      query: "injection retry",
+      deepFetch: 0,
+    });
+    const { handleAutoSearch } = await importAutoModule();
+
+    await handleAutoSearch("injection retry");
+    await flushMicrotasks();
+
+    setupAutoDom();
+    await handleAutoSearch("injection retry");
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(readerMocks.searchWeb).toHaveBeenCalledTimes(2);
+  });
+
+  it("removes run-scoped dedupe key when search result injection fails, allowing retry", async () => {
+    document.body.innerHTML = `<input type="file" multiple />`;
+    const input = document.querySelector('input[type="file"]');
+    Object.defineProperty(input, "files", {
+      configurable: true,
+      writable: true,
+      value: [],
+    });
+    readerMocks.searchWeb.mockResolvedValue({
+      file: new File(["results"], "q.md", { type: "text/markdown" }),
+      results: [{ title: "R1", url: "https://a.com", snippet: "s" }],
+      query: "run injection retry",
+      deepFetch: 0,
+    });
+    const { handleAutoSearchForRun, getRunSearchQueries } = await importAutoModule();
+
+    await handleAutoSearchForRun("run injection retry", 0, "run-injection");
+    await flushMicrotasks();
+
+    setupAutoDom();
+    await handleAutoSearchForRun("run injection retry", 0, "run-injection");
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(readerMocks.searchWeb).toHaveBeenCalledTimes(2);
+    const runQueries = getRunSearchQueries("run-injection");
+    expect(runQueries?.size).toBe(1);
   });
 });

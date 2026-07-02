@@ -6,16 +6,35 @@
  */
 
 import { fetchAndConvertWebPage } from "./web-reader.js";
-import { buildEffectiveSearchQuery, rankSearchResults } from "./search-quality.js";
+import { buildEffectiveSearchQuery, rankSearchResults, extractSearchSignals } from "./search-quality.js";
 
 const DUCKDUCKGO_SEARCH_URL = "https://lite.duckduckgo.com/lite/?q=";
+const DUCKDUCKGO_HTML_SEARCH_URL = "https://html.duckduckgo.com/html/?q=";
 const BING_SEARCH_URL = "https://www.bing.com/search?q=";
 const MAX_DEEP_FETCH = 5;
+
+const SEARCH_FETCH_OPTIONS = {
+  method: "GET",
+  headers: {
+    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache, no-store",
+    Pragma: "no-cache",
+  },
+  cache: "no-store",
+  credentials: "omit",
+  redirect: "follow",
+};
 
 const SEARCH_PROVIDERS = [
   {
     name: "DuckDuckGo",
     url: (query) => DUCKDUCKGO_SEARCH_URL + encodeURIComponent(query),
+    parse: parseDuckDuckGoSearchResults,
+  },
+  {
+    name: "DuckDuckGo",
+    url: (query) => DUCKDUCKGO_HTML_SEARCH_URL + encodeURIComponent(query),
     parse: parseDuckDuckGoSearchResults,
   },
   {
@@ -45,7 +64,12 @@ function isHttpUrl(value) {
 function extractUrlFromDdgLink(href) {
   if (!href) return "";
   try {
-    const url = new URL(href.startsWith("//") ? "https:" + href : href);
+    const normalizedHref = href.startsWith("//")
+      ? "https:" + href
+      : href.startsWith("/")
+        ? "https://duckduckgo.com" + href
+        : href;
+    const url = new URL(normalizedHref);
     const uddg = url.searchParams.get("uddg");
     return uddg ? decodeURIComponent(uddg) : href;
   } catch {
@@ -304,13 +328,24 @@ export async function searchWeb(query, deepFetch = 0, onStatus = () => {}, optio
   const { normalizedQuery, effectiveQuery } = buildEffectiveSearchQuery(trimmedQuery, options);
   const providerQuery = effectiveQuery || normalizedQuery;
 
+  // Detect positive site: constraints for provider reorder and error messaging
+  const signals = extractSearchSignals(providerQuery);
+  const hasSiteConstraint = signals.includeSites.length > 0;
+  const siteDomains = hasSiteConstraint ? signals.includeSites.join(", ") : "";
+
+  // Reorder providers: Bing handles site: queries better, DDG is the default for general queries
+  const activeProviders = hasSiteConstraint
+    ? SEARCH_PROVIDERS.filter((p) => p.name === "Bing")
+        .concat(SEARCH_PROVIDERS.filter((p) => p.name !== "Bing"))
+    : SEARCH_PROVIDERS;
+
   let providerName = "";
   let results = [];
   let rawResultCount = 0;
   const errors = [];
   let bestWeakResult = null;
 
-  for (const provider of SEARCH_PROVIDERS) {
+  for (const provider of activeProviders) {
     onStatus(`Searching ${provider.name}...`);
 
     let response;
@@ -318,6 +353,7 @@ export async function searchWeb(query, deepFetch = 0, onStatus = () => {}, optio
       response = await chrome.runtime.sendMessage({
         type: "bds-fetch-url",
         url: provider.url(providerQuery),
+        options: SEARCH_FETCH_OPTIONS,
       });
     } catch (err) {
       errors.push(`${provider.name}: ${err.message}`);
@@ -385,6 +421,9 @@ export async function searchWeb(query, deepFetch = 0, onStatus = () => {}, optio
       errors.length > 0 &&
       errors.every((error) => /: no (results|qualifying results)$/.test(error));
     if (onlyNoResults) {
+      if (hasSiteConstraint) {
+        throw new Error(`No search results found for site: ${siteDomains}.`);
+      }
       throw new Error("No search results found for query: " + trimmedQuery);
     }
     throw new Error(searchFailureMessage(errors));

@@ -44,6 +44,26 @@ function getSearchDedupeKey(query, options = {}) {
   return [baseKey, purpose, sourceType].join("\n");
 }
 
+function releaseSearchDedupeOnSendFailure(sendPromise, releaseDedupe, label) {
+  Promise.resolve(sendPromise)
+    .then((sent) => {
+      if (sent === false) releaseDedupe();
+    })
+    .catch((err) => {
+      console.error(`[BDS:AUTO] ${label} injection failed:`, err);
+      releaseDedupe();
+    });
+}
+
+function releaseRunSearchDedupe(runId, dedupeKey) {
+  const runSet = processedRunSearchQueries.get(runId);
+  if (!runSet) return;
+  runSet.delete(dedupeKey);
+  if (runSet.size === 0) {
+    processedRunSearchQueries.delete(runId);
+  }
+}
+
 export async function handleAutoWebFetch(url) {
   let targetUrl;
   try {
@@ -178,30 +198,37 @@ export async function handleAutoSearch(query, deepFetch = 0, options = {}) {
       devLog("Auto", `Search Status: ${status}`);
     }, options);
 
-    if (result.file) {
-      const payload = JSON.stringify({
-        query: result.query,
-        deepFetch: result.deepFetch,
-        count: result.results.length,
-        results: result.results,
-        provider: result.provider,
-        effectiveQuery: result.effectiveQuery,
-        rawResultCount: result.rawResultCount,
-        purpose: options.purpose,
-        sourceType: options.sourceType,
-      });
-      const autoMessage = [
-        `<BetterDeepSeek>`,
-        `[BDS:AUTO] Search Result for: ${result.query}`,
-        `[BDS:AUTO_SEARCH_RESULT]`,
-        payload,
-        `[/BDS:AUTO_SEARCH_RESULT]`,
-        `</BetterDeepSeek>`
-      ].join("\n");
-      injectFileAndSend(result.file, autoMessage);
+    if (!result?.file) {
+      throw new Error("Search returned no file.");
     }
+
+    const payload = JSON.stringify({
+      query: result.query,
+      deepFetch: result.deepFetch,
+      count: result.results.length,
+      results: result.results,
+      provider: result.provider,
+      effectiveQuery: result.effectiveQuery,
+      rawResultCount: result.rawResultCount,
+      purpose: options.purpose,
+      sourceType: options.sourceType,
+    });
+    const autoMessage = [
+      `<BetterDeepSeek>`,
+      `[BDS:AUTO] Search Result for: ${result.query}`,
+      `[BDS:AUTO_SEARCH_RESULT]`,
+      payload,
+      `[/BDS:AUTO_SEARCH_RESULT]`,
+      `</BetterDeepSeek>`
+    ].join("\n");
+    releaseSearchDedupeOnSendFailure(
+      injectFileAndSend(result.file, autoMessage),
+      () => processedSearchQueries.delete(dedupeKey),
+      "Search result",
+    );
   } catch (err) {
     console.error("[BDS:AUTO] Search Failed:", err);
+    processedSearchQueries.delete(dedupeKey);
     const errorBlob = new Blob([`Failed to search "${q}":\n\n${err.message}`], { type: "text/plain" });
     const errorFile = new File([errorBlob], `search_error_${q.replace(/[^a-zA-Z0-9]/g, "_")}.txt`, { type: "text/plain" });
     injectFileAndSend(errorFile, `<BetterDeepSeek>\n[BDS:AUTO] Search failed for: ${q}\n</BetterDeepSeek>`);
@@ -238,31 +265,38 @@ export async function handleAutoSearchForRun(query, deepFetch = 0, runId = "", o
       devLog("Auto", `Search Status: ${status}`);
     }, options);
 
-    if (result.file) {
-      const payload = JSON.stringify({
-        query: result.query,
-        deepFetch: result.deepFetch,
-        count: result.results.length,
-        results: result.results,
-        provider: result.provider,
-        effectiveQuery: result.effectiveQuery,
-        rawResultCount: result.rawResultCount,
-        purpose: options.purpose,
-        sourceType: options.sourceType,
-        runId,
-      });
-      const autoMessage = [
-        `<BetterDeepSeek>`,
-        `[BDS:AUTO] Search Result for: ${result.query} (runId=${runId})`,
-        `[BDS:AUTO_SEARCH_RESULT]`,
-        payload,
-        `[/BDS:AUTO_SEARCH_RESULT]`,
-        `</BetterDeepSeek>`
-      ].join("\n");
-      injectFileAndSend(result.file, autoMessage);
+    if (!result?.file) {
+      throw new Error("Search returned no file.");
     }
+
+    const payload = JSON.stringify({
+      query: result.query,
+      deepFetch: result.deepFetch,
+      count: result.results.length,
+      results: result.results,
+      provider: result.provider,
+      effectiveQuery: result.effectiveQuery,
+      rawResultCount: result.rawResultCount,
+      purpose: options.purpose,
+      sourceType: options.sourceType,
+      runId,
+    });
+    const autoMessage = [
+      `<BetterDeepSeek>`,
+      `[BDS:AUTO] Search Result for: ${result.query} (runId=${runId})`,
+      `[BDS:AUTO_SEARCH_RESULT]`,
+      payload,
+      `[/BDS:AUTO_SEARCH_RESULT]`,
+      `</BetterDeepSeek>`
+    ].join("\n");
+    releaseSearchDedupeOnSendFailure(
+      injectFileAndSend(result.file, autoMessage),
+      () => releaseRunSearchDedupe(runId, dedupeKey),
+      "Run-scoped search result",
+    );
   } catch (err) {
     console.error("[BDS:AUTO] Run-scoped Search Failed:", err);
+    releaseRunSearchDedupe(runId, dedupeKey);
     const errorBlob = new Blob([`Failed to search "${q}":\n\n${err.message}`], { type: "text/plain" });
     const errorFile = new File([errorBlob], `search_error_${q.replace(/[^a-zA-Z0-9]/g, "_")}.txt`, { type: "text/plain" });
     injectFileAndSend(errorFile, `<BetterDeepSeek>\n[BDS:AUTO] Search failed for: ${q} (runId=${runId})\n</BetterDeepSeek>`);

@@ -417,7 +417,7 @@ class WebViewBridge(
      * Single entry point for sendMessage-shaped payloads. The JS polyfill calls this with the
      * JSON-encoded message and parses the JSON response.
      *
-     * Supported types: bds-fetch-url -> { ok, html } bds-fetch-github-zip -> { ok, base64,
+     * Supported types: bds-fetch-url -> { ok, status, html } bds-fetch-github-zip -> { ok, base64,
      * status?, authRejected? } bds-fetch-github-commits -> { ok, commits, status?,
      * authRejected?, rateLimited? } bds-get-youtube-transcript -> { ok: false, error: "..." }
      *

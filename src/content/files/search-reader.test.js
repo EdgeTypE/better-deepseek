@@ -37,6 +37,10 @@ function ddgHref(realUrl) {
   return `//duckduckgo.com/l/?uddg=${encodeURIComponent(realUrl)}&rut=test`;
 }
 
+function ddgRelativeHref(realUrl) {
+  return `/l/?uddg=${encodeURIComponent(realUrl)}&rut=test`;
+}
+
 function makeResultHtml(results) {
   const rows = [];
   results.forEach((r, index) => {
@@ -59,6 +63,16 @@ function makeResultHtml(results) {
     rows.push("<tr><td>&nbsp;</td><td>&nbsp;</td></tr>");
   });
   return `<html><body><table border="0">${rows.join("\n")}</table></body></html>`;
+}
+
+function makeDdgHtmlResultHtml(results) {
+  const blocks = results
+    .map((r) => `<div class="result">
+      <a class="result__a" href="${ddgRelativeHref(r.url || "")}">${r.title}</a>
+      <a class="result__snippet">${r.snippet || ""}</a>
+    </div>`)
+    .join("\n");
+  return `<html><body>${blocks}</body></html>`;
 }
 
 function toBase64Url(value) {
@@ -168,6 +182,26 @@ describe("parseSearchResults", () => {
     ]);
   });
 
+  it("parses DuckDuckGo HTML result blocks with relative redirect URLs", () => {
+    const html = makeDdgHtmlResultHtml([
+      {
+        title: "DuckDuckGo HTML Result",
+        url: "https://example.com/ddg-html",
+        snippet: "A result from the HTML endpoint.",
+      },
+    ]);
+
+    const results = parseSearchResults(html);
+
+    expect(results).toEqual([
+      {
+        title: "DuckDuckGo HTML Result",
+        url: "https://example.com/ddg-html",
+        snippet: "A result from the HTML endpoint.",
+      },
+    ]);
+  });
+
   it("handles entirely malformed HTML without crashing", () => {
     expect(parseSearchResults("not even html")).toEqual([]);
     expect(parseSearchResults("")).toEqual([]);
@@ -228,6 +262,11 @@ describe("extractUrlFromDdgLink", () => {
   it("handles absolute DDG URLs", () => {
     const href = "https://duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com&rut=abc";
     expect(extractUrlFromDdgLink(href)).toBe("https://example.com");
+  });
+
+  it("handles relative DDG HTML redirect URLs", () => {
+    const href = "/l/?uddg=https%3A%2F%2Fexample.com%2Fhtml&rut=abc";
+    expect(extractUrlFromDdgLink(href)).toBe("https://example.com/html");
   });
 
   it("handles malformed input without crashing", () => {
@@ -320,6 +359,7 @@ describe("searchWeb", () => {
   it("falls back to Bing when DuckDuckGo returns the Android anomaly page", async () => {
     chromeSendMessageMock
       .mockResolvedValueOnce({ ok: true, status: 202, html: makeDdgChallengeHtml() })
+      .mockResolvedValueOnce({ ok: true, status: 202, html: makeDdgChallengeHtml() })
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -335,9 +375,10 @@ describe("searchWeb", () => {
     const result = await searchWeb("top dog breeds Philippines pet owners", 0, ON_STATUS);
     const text = await readFileAsText(result.file);
 
-    expect(chromeSendMessageMock).toHaveBeenCalledTimes(2);
+    expect(chromeSendMessageMock).toHaveBeenCalledTimes(3);
     expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("lite.duckduckgo.com");
-    expect(chromeSendMessageMock.mock.calls[1][0].url).toContain("www.bing.com/search");
+    expect(chromeSendMessageMock.mock.calls[1][0].url).toContain("html.duckduckgo.com");
+    expect(chromeSendMessageMock.mock.calls[2][0].url).toContain("www.bing.com/search");
     expect(result.provider).toBe("Bing");
     expect(result.results).toEqual([
       {
@@ -377,6 +418,17 @@ describe("searchWeb", () => {
             title: "Developer tools overview",
             url: "https://example.com/dev-tools",
             snippet: "A general overview of developer tools.",
+          },
+        ]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        html: makeResultHtml([
+          {
+            title: "DDG HTML tools overview",
+            url: "https://example.com/html-tools",
+            snippet: "Still a weak match for the real query.",
           },
         ]),
       })
@@ -566,5 +618,127 @@ describe("searchWeb", () => {
 
     const result = await searchWeb("Hello World! @#$", 0, ON_STATUS);
     expect(result.file.name).toBe("hello-world------search.md");
+  });
+
+  it("sends search request with safe fetch options and headers", async () => {
+    const html = makeResultHtml([{ title: "T", url: "https://t.com", snippet: "s" }]);
+    chromeSendMessageMock.mockResolvedValue({ ok: true, status: 200, html });
+    await searchWeb("test", 0, ON_STATUS);
+
+    const sentMessage = chromeSendMessageMock.mock.calls[0][0];
+    expect(sentMessage.type).toBe("bds-fetch-url");
+    expect(sentMessage.options).toBeDefined();
+    expect(sentMessage.options.method).toBe("GET");
+    expect(sentMessage.options.headers).toBeDefined();
+    expect(sentMessage.options.headers.Accept).toContain("text/html");
+    expect(sentMessage.options.headers).not.toHaveProperty("User-Agent");
+    expect(sentMessage.options.cache).toBe("no-store");
+    expect(sentMessage.options.credentials).toBe("omit");
+    expect(sentMessage.options.redirect).toBe("follow");
+  });
+
+  it("uses DuckDuckGo HTML when Lite returns challenge", async () => {
+    chromeSendMessageMock
+      .mockResolvedValueOnce({ ok: true, status: 202, html: makeDdgChallengeHtml() })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        html: makeDdgHtmlResultHtml([
+          { title: "test result one", url: "https://html-result.com/one", snippet: "test content about tests" },
+          { title: "test result two", url: "https://html-result.com/two", snippet: "more test content" },
+          { title: "test result three", url: "https://html-result.com/three", snippet: "third test result" },
+        ]),
+      });
+
+    const result = await searchWeb("test", 0, ON_STATUS);
+
+    expect(chromeSendMessageMock).toHaveBeenCalledTimes(2);
+    expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("lite.duckduckgo.com");
+    expect(chromeSendMessageMock.mock.calls[1][0].url).toContain("html.duckduckgo.com");
+    expect(result.provider).toBe("DuckDuckGo");
+    expect(result.results[0].url).toBe("https://html-result.com/one");
+  });
+
+  it("falls back from DuckDuckGo Lite to DuckDuckGo HTML to Bing", async () => {
+    chromeSendMessageMock
+      .mockResolvedValueOnce({ ok: true, status: 202, html: makeDdgChallengeHtml() })
+      .mockResolvedValueOnce({ ok: true, status: 202, html: makeDdgChallengeHtml() })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        html: makeBingResultHtml([
+          { title: "Bing Result", url: "https://bing-result.com", snippet: "fallback worked" },
+        ]),
+      });
+
+    const result = await searchWeb("test", 0, ON_STATUS);
+
+    expect(chromeSendMessageMock).toHaveBeenCalledTimes(3);
+    expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("lite.duckduckgo.com");
+    expect(chromeSendMessageMock.mock.calls[1][0].url).toContain("html.duckduckgo.com");
+    expect(chromeSendMessageMock.mock.calls[2][0].url).toContain("www.bing.com/search");
+    expect(result.provider).toBe("Bing");
+  });
+
+  it("uses Bing first when query has positive site: constraint", async () => {
+    chromeSendMessageMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        html: makeBingResultHtml([
+          { title: "API Docs overview", url: "https://api-docs.deepseek.com/overview", snippet: "DeepSeek API documentation overview" },
+          { title: "Chat Completions API", url: "https://api-docs.deepseek.com/api/chat-completions", snippet: "DeepSeek API chat completions reference" },
+          { title: "API Reference Guide", url: "https://api-docs.deepseek.com/reference", snippet: "Complete DeepSeek API reference" },
+        ]),
+      });
+
+    const result = await searchWeb("site:api-docs.deepseek.com chat completions DeepSeek API", 0, ON_STATUS);
+
+    expect(chromeSendMessageMock).toHaveBeenCalledTimes(1);
+    expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("www.bing.com/search");
+    expect(result.provider).toBe("Bing");
+    expect(result.results[0].url).toContain("api-docs.deepseek.com");
+  });
+
+  it("falls back to DuckDuckGo when Bing fails for site: query", async () => {
+    chromeSendMessageMock
+      .mockResolvedValueOnce({ ok: true, status: 202, html: makeDdgChallengeHtml() })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        html: makeDdgHtmlResultHtml([
+          { title: "GitHub issue", url: "https://github.com/EdgeTypE/better-deepseek/issues/81", snippet: "GitHub issue 81 details for EdgeTypE better-deepseek" },
+        ]),
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, html: "<html><body>no results</body></html>" });
+
+    const result = await searchWeb("site:github.com EdgeTypE better-deepseek issue 81", 0, ON_STATUS);
+
+    expect(chromeSendMessageMock).toHaveBeenCalledTimes(3);
+    expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("www.bing.com/search");
+    expect(chromeSendMessageMock.mock.calls[1][0].url).toContain("lite.duckduckgo.com");
+    expect(chromeSendMessageMock.mock.calls[2][0].url).toContain("html.duckduckgo.com");
+    expect(result.provider).toBe("DuckDuckGo");
+    expect(result.results[0].url).toContain("github.com");
+  });
+
+  it("throws site-scoped error when all providers fail for site: query", async () => {
+    chromeSendMessageMock
+      .mockResolvedValue({ ok: true, status: 200, html: "<html><body><p>no results</p></body></html>" });
+
+    await expect(searchWeb("site:docs.example.com unknown topic", 0, ON_STATUS))
+      .rejects.toThrow(/site.*no.*result|no.*result.*site/i);
+  });
+
+  it("normal query still starts with DuckDuckGo Lite", async () => {
+    chromeSendMessageMock
+      .mockResolvedValueOnce({ ok: true, status: 200, html: makeResultHtml([
+        { title: "General", url: "https://example.com", snippet: "general result" },
+      ]) });
+
+    const result = await searchWeb("general query without site constraint", 0, ON_STATUS);
+
+    expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("lite.duckduckgo.com");
+    expect(result.provider).toBe("DuckDuckGo");
   });
 });

@@ -269,6 +269,63 @@ Findings.</BDS:DEEP_RESEARCH_REPORT>`;
     });
   });
 
+  describe("AUTO:SEARCH markdown link stripping", () => {
+    it("site: operator with markdown-link mangled domain", () => {
+      const text = '<BDS:AUTO:SEARCH>site:[nasa.gov](http://nasa.gov) exoplanets</BDS:AUTO:SEARCH>';
+      const result = parseBdsMessage(text);
+
+      expect(result.autoRequests.searchQueries).toHaveLength(1);
+      expect(result.autoRequests.searchQueries[0].query).toBe("site:nasa.gov exoplanets");
+    });
+
+    it("multiple markdown links in one query", () => {
+      const text = '<BDS:AUTO:SEARCH>site:[a.com](http://a.com) OR site:[b.org](http://b.org)</BDS:AUTO:SEARCH>';
+      const result = parseBdsMessage(text);
+
+      expect(result.autoRequests.searchQueries).toHaveLength(1);
+      expect(result.autoRequests.searchQueries[0].query).toBe("site:a.com OR site:b.org");
+    });
+
+    it("markdown link without site: operator", () => {
+      const text = '<BDS:AUTO:SEARCH>best laptops [reddit.com](http://reddit.com)</BDS:AUTO:SEARCH>';
+      const result = parseBdsMessage(text);
+
+      expect(result.autoRequests.searchQueries).toHaveLength(1);
+      expect(result.autoRequests.searchQueries[0].query).toBe("best laptops reddit.com");
+    });
+
+    it("plain query without markdown links", () => {
+      const text = '<BDS:AUTO:SEARCH>gaming laptop reviews</BDS:AUTO:SEARCH>';
+      const result = parseBdsMessage(text);
+
+      expect(result.autoRequests.searchQueries).toHaveLength(1);
+      expect(result.autoRequests.searchQueries[0].query).toBe("gaming laptop reviews");
+    });
+
+    it("empty query", () => {
+      const text = '<BDS:AUTO:SEARCH></BDS:AUTO:SEARCH>';
+      const result = parseBdsMessage(text);
+
+      expect(result.autoRequests.searchQueries).toHaveLength(0);
+    });
+
+    it("link text matches URL hostname", () => {
+      const text = '<BDS:AUTO:SEARCH>[example.com](https://example.com/page)</BDS:AUTO:SEARCH>';
+      const result = parseBdsMessage(text);
+
+      expect(result.autoRequests.searchQueries).toHaveLength(1);
+      expect(result.autoRequests.searchQueries[0].query).toBe("example.com");
+    });
+
+    it("www-prefixed domain auto-link", () => {
+      const text = '<BDS:AUTO:SEARCH>site:[www.nasa.gov](http://www.nasa.gov) mars</BDS:AUTO:SEARCH>';
+      const result = parseBdsMessage(text);
+
+      expect(result.autoRequests.searchQueries).toHaveLength(1);
+      expect(result.autoRequests.searchQueries[0].query).toBe("site:www.nasa.gov mars");
+    });
+  });
+
   describe("AUTO URL normalization", () => {
     it("extracts the URL from markdown web fetch tags", () => {
       const text = `<BDS:AUTO:REQUEST_WEB_FETCH>[https://www.reddit.com/r/GamingLaptops/comments/16w0x23/ptm7950_for_laptop_gpu_cpu_how_much_do_i_need/](https://www.reddit.com/r/GamingLaptops/comments/16w0x23/ptm7950_for_laptop_gpu_cpu_how_much_do_i_need/)</BDS:AUTO:REQUEST_WEB_FETCH>`;

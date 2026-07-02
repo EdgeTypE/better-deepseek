@@ -6,6 +6,7 @@ vi.mock("youtube-transcript", () => ({
 import {
   fetchGithubCommits,
   normalizeGithubCommitCount,
+  fetchPageContent,
 } from "../../src/background/index.js";
 
 function createJsonResponse(body, init = {}) {
@@ -103,5 +104,72 @@ describe("background GitHub commits fetch", () => {
   it("normalizes background commit counts to the supported range", () => {
     expect(normalizeGithubCommitCount(0)).toBe(1);
     expect(normalizeGithubCommitCount(600)).toBe(600);
+  });
+});
+
+describe("background bds-fetch-url", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    globalThis.fetch = vi.fn();
+  });
+
+  it("returns html and status on success", async () => {
+    globalThis.fetch.mockResolvedValue(
+      new Response("<html>ok</html>", {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      }),
+    );
+
+    const result = await fetchPageContent("https://example.com");
+    expect(result.html).toBe("<html>ok</html>");
+    expect(result.status).toBe(200);
+  });
+
+  it("includes status on HTTP error", async () => {
+    globalThis.fetch.mockResolvedValue(
+      new Response("Server Error", {
+        status: 503,
+        statusText: "Service Unavailable",
+      }),
+    );
+
+    let caught;
+    try {
+      await fetchPageContent("https://example.com/error");
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeDefined();
+    expect(caught.message).toContain("503");
+    expect(caught.status).toBe(503);
+  });
+
+  it("passes credentials and redirect options to fetch", async () => {
+    globalThis.fetch.mockResolvedValue(
+      new Response("<html>ok</html>", {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      }),
+    );
+
+    await fetchPageContent("https://example.com", {
+      method: "GET",
+      headers: { Accept: "text/html" },
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "follow",
+    });
+
+    const fetchArgs = globalThis.fetch.mock.calls[0];
+    expect(fetchArgs[1].cache).toBe("no-store");
+    expect(fetchArgs[1].credentials).toBe("omit");
+    expect(fetchArgs[1].redirect).toBe("follow");
+    expect(fetchArgs[1].method).toBe("GET");
+    expect(fetchArgs[1].headers.Accept).toBe("text/html");
+  });
+
+  it("throws on missing url", async () => {
+    await expect(fetchPageContent("")).rejects.toThrow("No URL provided");
   });
 });

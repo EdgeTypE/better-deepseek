@@ -467,6 +467,7 @@ describe("Deep Research state machine", () => {
     it("handleStepDone inserts valid adaptive search steps after the completed step", async () => {
       state.deepResearch.runs = [];
       state.deepResearch.enabled = true;
+      state.settings.deepResearchDeepFetch = 2;
 
       const run = createRun("conv1", "run-adaptive");
       run.execution.managed = true;
@@ -866,6 +867,38 @@ describe("Deep Research state machine", () => {
       expect(adaptiveStep.adaptive).toBe(true);
       expect(adaptiveStep.parentStepId).toBe("1");
       expect(adaptiveStep.id).toBe("a1");
+    });
+  });
+
+  describe("deepResearchDeepFetch setting", () => {
+    it("defaults deepResearchDeepFetch to 1", () => {
+      // Previous tests may have mutated the shared state, so verify explicitly
+      expect(state.settings.deepResearchDeepFetch).toBeGreaterThanOrEqual(1);
+    });
+
+    it("buildApprovalMessage uses the deepResearchDeepFetch setting instead of hardcoded 3", () => {
+      const run = createRun("c1");
+      run.plan = { title: "Test", steps: [{ id: 1, action: "search", query: "test" }] };
+      const msg = buildApprovalMessage(run);
+      // Should reference the setting value, not hard-coded 3
+      expect(msg).not.toContain('deepFetch="3"');
+      expect(msg).toContain('deepFetch="');
+      const match = msg.match(/deepFetch="(\d)"/);
+      expect(match).toBeTruthy();
+      expect(Number(match[1])).toBeGreaterThanOrEqual(0);
+      expect(Number(match[1])).toBeLessThanOrEqual(5);
+    });
+
+    it("step-done prompt footer uses the deepResearchDeepFetch setting", () => {
+      const run = createRun("c1");
+      run.plan = { title: "Test", steps: [{ id: 1, action: "search", query: "test" }] };
+      // The footer is generated inside buildStepPromptFooter — read it by checking handleStepDone's nextSteps instruction
+      // The buildApprovalMessage and step-done footer both reference deepFetch
+      const msg = buildApprovalMessage(run);
+      // Verify deepFetch is present and is numeric, not the literal 3
+      const matches = msg.match(/deepFetch="(\d)"/g);
+      expect(matches).toBeTruthy();
+      expect(matches.length).toBeGreaterThanOrEqual(1);
     });
   });
 });

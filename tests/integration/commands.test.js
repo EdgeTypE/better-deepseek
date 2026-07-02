@@ -60,12 +60,12 @@ describe("tryExecuteRawInput", () => {
     const result = tryExecuteRawInput("/search test fallback")
     expect(result).toBe(true)
     expect(readerMocks.searchWeb).toHaveBeenCalledWith("test fallback", 0, expect.any(Function))
-    // Yield to microtask queue so async executeBuiltin completes
-    await new Promise(resolve => setTimeout(resolve, 10))
-    expect(readerMocks.injectPureTextAndSend).toHaveBeenCalledWith(
-      "# Search Results\n\n- Result 1",
-      "/search result: test fallback",
-    )
+    await vi.waitFor(() => {
+      expect(readerMocks.injectPureTextAndSend).toHaveBeenCalledWith(
+        "# Search Results\n\n- Result 1",
+        "/search result: test fallback",
+      )
+    })
   })
 
   it("shows validation error for invalid args", async () => {

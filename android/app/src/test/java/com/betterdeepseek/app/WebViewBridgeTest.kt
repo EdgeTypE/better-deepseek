@@ -174,6 +174,52 @@ class WebViewBridgeTest {
     }
 
     @Test
+    fun `fetch forwards search options headers in the request`() {
+        server.enqueue(MockResponse().setBody("<html>ok</html>").setResponseCode(200))
+
+        val payload = JSONObject().apply {
+            put("type", "bds-fetch-url")
+            put("url", server.url("/headers").toString())
+            put("options", JSONObject().apply {
+                put("method", "GET")
+                put("headers", JSONObject().apply {
+                    put("Accept", "text/html,application/xhtml+xml")
+                    put("Accept-Language", "en-US,en;q=0.9")
+                })
+            })
+        }
+        val response = JSONObject(bridge.fetch(payload.toString()))
+
+        assertTrue(response.getBoolean("ok"))
+        assertEquals(200, response.getInt("status"))
+
+        val request = server.takeRequest()
+        assertEquals("text/html,application/xhtml+xml", request.getHeader("Accept"))
+        assertEquals("en-US,en;q=0.9", request.getHeader("Accept-Language"))
+    }
+
+    @Test
+    fun `fetch is tolerant of browser-only options like redirect and credentials`() {
+        server.enqueue(MockResponse().setBody("<html>ok</html>").setResponseCode(200))
+
+        val payload = JSONObject().apply {
+            put("type", "bds-fetch-url")
+            put("url", server.url("/tolerant").toString())
+            put("options", JSONObject().apply {
+                put("method", "GET")
+                put("cache", "no-store")
+                put("credentials", "omit")
+                put("redirect", "follow")
+            })
+        }
+        val response = JSONObject(bridge.fetch(payload.toString()))
+
+        assertTrue(response.getBoolean("ok"))
+        assertEquals(200, response.getInt("status"))
+        assertEquals("<html>ok</html>", response.getString("html"))
+    }
+
+    @Test
     fun `fetch returns ok=false when URL has no http scheme`() {
         val payload = JSONObject().apply {
             put("type", "bds-fetch-url")
