@@ -31,6 +31,12 @@ function normalizeAutoTextTarget(value) {
   return linkedUrl || input;
 }
 
+const MARKDOWN_LINK_RE = /\[([^\]]*)\]\(\s*https?:\/\/[^)\s]+\s*\)/gi;
+
+function stripMarkdownLinks(text) {
+  return String(text || "").replace(MARKDOWN_LINK_RE, (_, linkText) => linkText);
+}
+
 /**
  * Parse a raw message text for all BDS tags.
  */
@@ -272,7 +278,8 @@ export function parseBdsMessage(rawText, isSettled = false) {
 
   const autoSearchRegex = /<BDS:AUTO:SEARCH([^>]*)>([\s\S]*?)<\/BDS:AUTO:SEARCH>/gi;
   while ((match = autoSearchRegex.exec(text)) !== null) {
-     const query = String(match[2] || "").trim();
+     const rawQuery = String(match[2] || "").trim();
+     const query = stripMarkdownLinks(rawQuery);
      if (!query) continue;
      const attrs = parseTagAttributes(match[1] || "");
      const deepFetch = Math.max(0, parseInt(attrs.deepFetch, 10) || 0);
