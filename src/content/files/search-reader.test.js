@@ -679,4 +679,66 @@ describe("searchWeb", () => {
     expect(chromeSendMessageMock.mock.calls[2][0].url).toContain("www.bing.com/search");
     expect(result.provider).toBe("Bing");
   });
+
+  it("uses Bing first when query has positive site: constraint", async () => {
+    chromeSendMessageMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        html: makeBingResultHtml([
+          { title: "API Docs overview", url: "https://api-docs.deepseek.com/overview", snippet: "DeepSeek API documentation overview" },
+          { title: "Chat Completions API", url: "https://api-docs.deepseek.com/api/chat-completions", snippet: "DeepSeek API chat completions reference" },
+          { title: "API Reference Guide", url: "https://api-docs.deepseek.com/reference", snippet: "Complete DeepSeek API reference" },
+        ]),
+      });
+
+    const result = await searchWeb("site:api-docs.deepseek.com chat completions DeepSeek API", 0, ON_STATUS);
+
+    expect(chromeSendMessageMock).toHaveBeenCalledTimes(1);
+    expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("www.bing.com/search");
+    expect(result.provider).toBe("Bing");
+    expect(result.results[0].url).toContain("api-docs.deepseek.com");
+  });
+
+  it("falls back to DuckDuckGo when Bing fails for site: query", async () => {
+    chromeSendMessageMock
+      .mockResolvedValueOnce({ ok: true, status: 202, html: makeDdgChallengeHtml() })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        html: makeDdgHtmlResultHtml([
+          { title: "GitHub issue", url: "https://github.com/EdgeTypE/better-deepseek/issues/81", snippet: "GitHub issue 81 details for EdgeTypE better-deepseek" },
+        ]),
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, html: "<html><body>no results</body></html>" });
+
+    const result = await searchWeb("site:github.com EdgeTypE better-deepseek issue 81", 0, ON_STATUS);
+
+    expect(chromeSendMessageMock).toHaveBeenCalledTimes(3);
+    expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("www.bing.com/search");
+    expect(chromeSendMessageMock.mock.calls[1][0].url).toContain("lite.duckduckgo.com");
+    expect(chromeSendMessageMock.mock.calls[2][0].url).toContain("html.duckduckgo.com");
+    expect(result.provider).toBe("DuckDuckGo");
+    expect(result.results[0].url).toContain("github.com");
+  });
+
+  it("throws site-scoped error when all providers fail for site: query", async () => {
+    chromeSendMessageMock
+      .mockResolvedValue({ ok: true, status: 200, html: "<html><body><p>no results</p></body></html>" });
+
+    await expect(searchWeb("site:docs.example.com unknown topic", 0, ON_STATUS))
+      .rejects.toThrow(/site.*no.*result|no.*result.*site/i);
+  });
+
+  it("normal query still starts with DuckDuckGo Lite", async () => {
+    chromeSendMessageMock
+      .mockResolvedValueOnce({ ok: true, status: 200, html: makeResultHtml([
+        { title: "General", url: "https://example.com", snippet: "general result" },
+      ]) });
+
+    const result = await searchWeb("general query without site constraint", 0, ON_STATUS);
+
+    expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("lite.duckduckgo.com");
+    expect(result.provider).toBe("DuckDuckGo");
+  });
 });

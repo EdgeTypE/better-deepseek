@@ -6,7 +6,7 @@
  */
 
 import { fetchAndConvertWebPage } from "./web-reader.js";
-import { buildEffectiveSearchQuery, rankSearchResults } from "./search-quality.js";
+import { buildEffectiveSearchQuery, rankSearchResults, extractSearchSignals } from "./search-quality.js";
 
 const DUCKDUCKGO_SEARCH_URL = "https://lite.duckduckgo.com/lite/?q=";
 const DUCKDUCKGO_HTML_SEARCH_URL = "https://html.duckduckgo.com/html/?q=";
@@ -328,13 +328,24 @@ export async function searchWeb(query, deepFetch = 0, onStatus = () => {}, optio
   const { normalizedQuery, effectiveQuery } = buildEffectiveSearchQuery(trimmedQuery, options);
   const providerQuery = effectiveQuery || normalizedQuery;
 
+  // Detect positive site: constraints for provider reorder and error messaging
+  const signals = extractSearchSignals(providerQuery);
+  const hasSiteConstraint = signals.includeSites.length > 0;
+  const siteDomains = hasSiteConstraint ? signals.includeSites.join(", ") : "";
+
+  // Reorder providers: Bing handles site: queries better, DDG is the default for general queries
+  const activeProviders = hasSiteConstraint
+    ? SEARCH_PROVIDERS.filter((p) => p.name === "Bing")
+        .concat(SEARCH_PROVIDERS.filter((p) => p.name !== "Bing"))
+    : SEARCH_PROVIDERS;
+
   let providerName = "";
   let results = [];
   let rawResultCount = 0;
   const errors = [];
   let bestWeakResult = null;
 
-  for (const provider of SEARCH_PROVIDERS) {
+  for (const provider of activeProviders) {
     onStatus(`Searching ${provider.name}...`);
 
     let response;
@@ -410,6 +421,9 @@ export async function searchWeb(query, deepFetch = 0, onStatus = () => {}, optio
       errors.length > 0 &&
       errors.every((error) => /: no (results|qualifying results)$/.test(error));
     if (onlyNoResults) {
+      if (hasSiteConstraint) {
+        throw new Error(`No search results found for site: ${siteDomains}.`);
+      }
       throw new Error("No search results found for query: " + trimmedQuery);
     }
     throw new Error(searchFailureMessage(errors));

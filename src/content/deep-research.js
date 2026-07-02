@@ -180,7 +180,6 @@ function normalizeEventDetail(detail) {
   return detail && typeof detail === "object" ? detail : {};
 }
 
-const DEEP_FETCH_DEFAULT = 3;
 const MAX_DEEP_FETCH = 5;
 const TEXT_ONLY_STEP_PROMPT_CHARS = 9_000;
 const TEXT_ONLY_FALLBACK_CHARS = 4_500;
@@ -198,10 +197,17 @@ const PROMPT_DETAIL = {
   emergency: { sources: 2, snippetChars: 70, excerptChars: 160, queryChars: 180, purposeChars: 120 },
 };
 
+function getDeepFetchSetting() {
+  const val = Number(state.settings?.deepResearchDeepFetch);
+  return Number.isFinite(val) ? Math.max(0, Math.min(MAX_DEEP_FETCH, val)) : 1;
+}
+
 function clampDeepFetch(value) {
-  const num = parseInt(value, 10);
-  if (isNaN(num) || num < 0) return DEEP_FETCH_DEFAULT;
-  return Math.min(num, MAX_DEEP_FETCH);
+  const setting = getDeepFetchSetting();
+  if (value === undefined || value === null || value === '') return setting;
+  const num = parseInt(String(value), 10);
+  if (isNaN(num) || num < 0) return setting;
+  return Math.min(num, setting);
 }
 
 function normalizeSourceType(raw) {
@@ -262,7 +268,7 @@ function validateAdaptiveStep(rawStep, existingSteps, adapterCounter) {
 
   const purpose = String(rawStep.purpose || "").trim();
   const sourceType = action === "search" ? normalizeSourceType(rawStep.sourceType) : "";
-  const deepFetch = action === "search" ? clampDeepFetch(rawStep.deepFetch ?? DEEP_FETCH_DEFAULT) : 0;
+  const deepFetch = action === "search" ? clampDeepFetch(rawStep.deepFetch) : 0;
 
   return {
     id: `a${adapterCounter + 1}`,
@@ -499,7 +505,7 @@ export function buildApprovalMessage(run) {
     `[BDS:DEEP_RESEARCH] Plan approved for run ${run.id}. Execute the following research plan:`,
     JSON.stringify(run.plan, null, 2),
     `For each search step, use a narrow query with named entities, concrete constraints, dates or locations, product or version names, and explicit source intent.`,
-    `Emit searches as <BDS:AUTO:SEARCH runId="${run.id}" deepFetch="3" purpose="why this search matters" sourceType="reviews">specific query</BDS:AUTO:SEARCH>, choosing sourceType from general, docs, news, reviews, academic, or commerce. Use <BDS:AUTO:REQUEST_WEB_FETCH> for specific URLs.`,
+    `Emit searches as <BDS:AUTO:SEARCH runId="${run.id}" deepFetch="${getDeepFetchSetting()}" purpose="why this search matters" sourceType="reviews">specific query</BDS:AUTO:SEARCH>, choosing sourceType from general, docs, news, reviews, academic, or commerce. Use <BDS:AUTO:REQUEST_WEB_FETCH> for specific URLs.`,
     `After each search/fetch result is injected, read it, update the source ledger mentally, and continue with the next step until the plan is complete.`,
     `After completing all research steps, your final answer MUST be a proper Markdown report wrapped exactly as: <BDS:DEEP_RESEARCH_REPORT runId="${run.id}">markdown</BDS:DEEP_RESEARCH_REPORT>.`,
     `Do not wrap the report Markdown in a code fence. Do not finish with ordinary prose outside the report tag.`,
@@ -575,7 +581,7 @@ function normalizeStepsFromPlan(planSteps) {
       query: String(s.query || "").trim(),
       purpose: String(s.purpose || "").trim(),
       sourceType: action === "search" ? String(s.sourceType || "general").trim() : "",
-      deepFetch: action === "search" ? clampDeepFetch(s.deepFetch ?? DEEP_FETCH_DEFAULT) : 0,
+      deepFetch: action === "search" ? clampDeepFetch(s.deepFetch) : 0,
       status: "pending",
       outcome: null,
       error: null,
@@ -641,7 +647,7 @@ async function runCurrentStep(run) {
       }
     } else {
       // Search step
-      const deepFetch = clampDeepFetch(step.deepFetch ?? DEEP_FETCH_DEFAULT);
+      const deepFetch = clampDeepFetch(step.deepFetch);
       const result = await searchWeb(step.query, deepFetch, (status) => {
         devLog("DeepResearch", `Search status for step ${step.id}: ${status}`);
       }, {
@@ -817,7 +823,7 @@ function buildStepPromptFooter(runId, stepId) {
     `The JSON inside must be: {"stepId":"${stepId}","analysis":"short summary of findings","newInsights":["insight1","insight2"]}`,
     ``,
     `If you discover material gaps, contradictions, newly discovered named entities, missing source classes, or need recency checks, add up to 3 focused follow-up steps via an optional "nextSteps" array:`,
-    `{"stepId":"${stepId}","analysis":"...","newInsights":["..."],"nextSteps":[{"action":"search","query":"specific follow-up query","purpose":"why this gap matters","sourceType":"academic","deepFetch":3}]}`,
+    `{"stepId":"${stepId}","analysis":"...","newInsights":["..."],"nextSteps":[{"action":"search","query":"specific follow-up query","purpose":"why this gap matters","sourceType":"academic","deepFetch":${getDeepFetchSetting()}}]}`,
     `nextStep actions: "search" or "fetch". Fetch queries must be HTTP(S) URLs. sourceType for searches: general, docs, news, reviews, academic, commerce (default: general). Only add nextSteps for material gaps — avoid unnecessary expansion.`,
     ``,
     `Do NOT produce the final report yet. Only analyze this step.`,

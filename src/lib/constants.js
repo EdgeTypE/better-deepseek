@@ -775,6 +775,8 @@ export const DEFAULT_SETTINGS = {
   deepResearchContextGuardEnabled: true,
   deepResearchContextLimitTokens: 128000,
   deepResearchContextStopPercent: 70,
+  // Deep Research per-search fetch depth — default 1, clamped 0-5
+  deepResearchDeepFetch: 1,
   // Load all history — scroll to top on session open to trigger lazy-load
   loadAllHistoryOnSession: false,
   showTimestamps: false,

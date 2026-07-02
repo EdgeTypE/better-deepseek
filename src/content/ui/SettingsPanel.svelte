@@ -71,6 +71,7 @@
   let processGitignoreOnUpload = $state(Boolean(appState.settings.processGitignoreOnUpload));
   let injectSystemDateTime = $state(Boolean(appState.settings.injectSystemDateTime));
   let skipDeletionConfirmation = $state(Boolean(appState.settings.skipDeletionConfirmation));
+  let deepResearchDeepFetch = $state(Number(appState.settings.deepResearchDeepFetch) ?? 1);
   let deepResearchContextGuardEnabled = $state(Boolean(appState.settings.deepResearchContextGuardEnabled));
   let deepResearchContextLimitTokens = $state(Number(appState.settings.deepResearchContextLimitTokens) || 128000);
   let deepResearchContextStopPercent = $state(Number(appState.settings.deepResearchContextStopPercent) || 70);
@@ -143,7 +144,9 @@
       systemPromptInjectionFrequency, systemPromptInjectionInterval,
       disableMemory, htmlToMarkdownMaxDepth, maxChatSessions,
       tokenPriceDisplay, showTimestamps, projectRagEnabled, projectRagLimit,
-      processGitignoreOnUpload, injectSystemDateTime, skipDeletionConfirmation, locale, syncLocale, collapseLongUserMessages,
+      processGitignoreOnUpload, injectSystemDateTime, skipDeletionConfirmation,
+      deepResearchDeepFetch,
+      locale, syncLocale, collapseLongUserMessages,
       loadAllHistoryOnSession, customCSS
     });
   }
@@ -414,6 +417,7 @@
       'settings.injectionFrequency',
     ]},
     { key: 'subResearch', labelKey: 'settings.subResearch', settingKeys: [
+      'settings.deepFetchPerSearch',
       'settings.contextGuardEnabled', 'settings.contextGuardLimit',
       'settings.contextGuardStopPercent',
     ]},
@@ -580,6 +584,7 @@
     loadAllHistoryOnSession = Boolean(appState.settings.loadAllHistoryOnSession);
     projectRagEnabled = Boolean(appState.settings.projectRagEnabled);
     projectRagLimit = Number(appState.settings.projectRagLimit) || 5;
+    deepResearchDeepFetch = Number(appState.settings.deepResearchDeepFetch) ?? 1;
     processGitignoreOnUpload = Boolean(appState.settings.processGitignoreOnUpload);
     injectSystemDateTime = Boolean(appState.settings.injectSystemDateTime);
     skipDeletionConfirmation = Boolean(appState.settings.skipDeletionConfirmation);
@@ -811,6 +816,7 @@
     appState.settings.processGitignoreOnUpload = processGitignoreOnUpload;
     appState.settings.injectSystemDateTime = injectSystemDateTime;
     appState.settings.skipDeletionConfirmation = skipDeletionConfirmation;
+    appState.settings.deepResearchDeepFetch = Math.max(0, Math.min(5, Math.round(Number(deepResearchDeepFetch) || 0)));
     appState.settings.deepResearchContextGuardEnabled = deepResearchContextGuardEnabled;
     appState.settings.deepResearchContextLimitTokens = Math.max(16000, Math.min(1000000, Math.round(Number(deepResearchContextLimitTokens) || 128000)));
     appState.settings.deepResearchContextStopPercent = Math.max(50, Math.min(95, Math.round(Number(deepResearchContextStopPercent) || 70)));
@@ -1547,6 +1553,14 @@
     </button>
     <div class="bds-sub-content" class:open={subResearchOpen}>
       <div class="bds-sub-inner">
+        <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+          <span class="bds-toggle-label">Deep Fetch per Search</span>
+          <input id="bds-deep-research-deep-fetch" type="number" min="0" max="5" step="1" class="bds-input" style="width: 80px; box-sizing: border-box;" bind:value={deepResearchDeepFetch} />
+          <p style="font-size: 10px; opacity: 0.5; margin: 0;">
+            How many top search results Deep Research opens and adds as page evidence for each search step. Higher values improve source detail but spend context fast and may stop long runs earlier. Use 0 for results only, 1 for long research, 3+ for short high-detail runs.
+          </p>
+        </div>
+
         <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
           <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 12px;">
             <span class="bds-toggle-label">{t('settings.contextGuardEnabled')}</span>

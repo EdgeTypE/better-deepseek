@@ -24,7 +24,7 @@ vi.mock("../../src/content/files/web-reader.js", () => ({
 }));
 
 describe("Deep Research runtime events", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetModules();
     autoMocks.clearRunSearchHistory.mockReset();
     autoMocks.injectPureTextAndSend.mockReset();
@@ -34,6 +34,9 @@ describe("Deep Research runtime events", () => {
     autoMocks.injectPureTextAndSend.mockReturnValue(true);
     autoMocks.sendFileWithMessage.mockResolvedValue(true);
     document.body.innerHTML = "";
+    // Default for existing tests that expect deepFetch=3 behavior
+    const st = await import("../../src/content/state.js").then(m => m.default);
+    st.settings.deepResearchDeepFetch = 3;
   });
 
   it("posts revision feedback back into the chat", async () => {
@@ -559,5 +562,92 @@ describe("Deep Research runtime events", () => {
     expect(run.execution.reportRequested).toBe(true);
     expect(run.execution.steps).toHaveLength(1);
     expect(run.execution.steps[0].status).toBe("complete");
+  });
+
+  it("caps model-emitted deepFetch=5 to deepResearchDeepFetch setting", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+    // Set a low deepFetch cap
+    state.settings.deepResearchDeepFetch = 2;
+
+    const evidenceFile = new File(["# Search"], "s.md", { type: "text/markdown" });
+    Object.defineProperty(evidenceFile, "text", {
+      value: vi.fn(() => Promise.resolve("# Search")),
+    });
+    readerMocks.searchWeb.mockResolvedValue({
+      query: "test",
+      deepFetch: 2,
+      results: [{ title: "R", url: "https://ex.com", snippet: "s" }],
+      provider: "mock",
+      rawResultCount: 1,
+      file: evidenceFile,
+    });
+    autoMocks.sendFileWithMessage.mockResolvedValue(true);
+
+    const { createRun, initDeepResearchRuntime } = await import("../../src/content/deep-research.js");
+
+    const plan = {
+      title: "Test",
+      steps: [{ id: 1, action: "search", query: "test query", purpose: "overview", sourceType: "general", deepFetch: 5 }],
+    };
+    const run = createRun("conv1", "run-cap");
+    run.plan = plan;
+    state.deepResearch.enabled = true;
+    state.deepResearch.runs = [run];
+
+    initDeepResearchRuntime();
+
+    window.dispatchEvent(new CustomEvent("bds:deep-research-approve", {
+      detail: { runId: "run-cap", plan },
+    }));
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // deepFetch=5 should be clamped to the setting value (2)
+    expect(run.execution.steps[0].deepFetch).toBe(2);
+  });
+
+  it("deepResearchDeepFetch=0 produces search-result-only steps", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+    state.settings.deepResearchDeepFetch = 0;
+
+    const evidenceFile = new File(["# Results"], "r.md", { type: "text/markdown" });
+    Object.defineProperty(evidenceFile, "text", {
+      value: vi.fn(() => Promise.resolve("# Results")),
+    });
+    readerMocks.searchWeb.mockResolvedValue({
+      query: "test",
+      deepFetch: 0,
+      results: [{ title: "R", url: "https://ex.com", snippet: "s" }],
+      provider: "mock",
+      rawResultCount: 1,
+      file: evidenceFile,
+    });
+    autoMocks.sendFileWithMessage.mockResolvedValue(true);
+
+    const { createRun, initDeepResearchRuntime } = await import("../../src/content/deep-research.js");
+
+    const plan = {
+      title: "Test Zero",
+      steps: [{ id: 1, action: "search", query: "test query", purpose: "overview", sourceType: "general" }],
+    };
+    const run = createRun("conv1", "run-zero");
+    run.plan = plan;
+    state.deepResearch.enabled = true;
+    state.deepResearch.runs = [run];
+
+    initDeepResearchRuntime();
+
+    window.dispatchEvent(new CustomEvent("bds:deep-research-approve", {
+      detail: { runId: "run-zero", plan },
+    }));
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // With setting=0, default deepFetch should be 0
+    expect(run.execution.steps[0].deepFetch).toBe(0);
   });
 });

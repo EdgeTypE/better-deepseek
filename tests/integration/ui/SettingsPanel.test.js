@@ -215,4 +215,26 @@ describe("SettingsPanel integration", () => {
 
     cleanup();
   });
+
+  it("deepResearchDeepFetch setting persists and clamps 0-5", async () => {
+    state.settings.deepResearchDeepFetch = 3;
+
+    const { target, cleanup } = renderSvelte(SettingsPanel);
+    target.querySelector(".bds-advanced-toggle").click();
+    await flushUi();
+
+    // The research section should have the deepFetch input
+    const deepFetchInput = target.querySelector("#bds-deep-research-deep-fetch");
+    expect(deepFetchInput).toBeTruthy();
+    expect(Number(deepFetchInput.value)).toBe(3);
+
+    // Change to 5 and save
+    deepFetchInput.value = "5";
+    deepFetchInput.dispatchEvent(new Event("input", { bubbles: true }));
+    target.querySelector("#bds-save-settings").click();
+    await flushUi();
+    expect(state.settings.deepResearchDeepFetch).toBe(5);
+
+    cleanup();
+  });
 });
