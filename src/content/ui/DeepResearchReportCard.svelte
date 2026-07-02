@@ -19,11 +19,15 @@
     collapsed = !collapsed;
   }
 
-  function buildReportFileName() {
+  let reportSlug = $derived.by(() => {
     const suffix = String(runId || Date.now())
       .slice(0, 36)
       .replace(/[^a-zA-Z0-9_-]/g, "_");
-    return `deep-research-${suffix || "report"}.md`;
+    return suffix || "report";
+  });
+
+  function buildReportFileName() {
+    return `deep-research-${reportSlug}.md`;
   }
 
   function downloadMarkdown(event) {
@@ -31,6 +35,134 @@
     event?.stopPropagation?.();
     const blob = new Blob([normalizedMarkdown], { type: "text/markdown" });
     triggerBlobDownload(blob, buildReportFileName());
+  }
+
+  function buildReportPdfFileName() {
+    return `deep-research-${reportSlug}.pdf`;
+  }
+
+  let printingPdf = false;
+
+  function downloadPdf(event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+
+    if (printingPdf) return;
+    if (!normalizedMarkdown.trim()) return;
+    printingPdf = true;
+
+    const dateStr = new Date().toLocaleDateString(undefined, {
+      year: "numeric", month: "long", day: "numeric",
+    });
+
+    const printDoc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Deep Research Report${runId ? ` (${runId.slice(0, 8)})` : ""}</title>
+  <style>
+    :root {
+      --bg: #ffffff; --text: #111827; --text-muted: #6b7280;
+      --border: #e5e7eb; --code-bg: #f3f4f6; --primary: #4f8cff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 12pt; line-height: 1.6; color: var(--text); background: var(--bg);
+      padding: 60px 80px;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    .report-header { margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid var(--primary); }
+    .report-header h1 { font-size: 24pt; font-weight: 700; margin-bottom: 8px; }
+    .report-header .meta { font-size: 10pt; color: var(--text-muted); }
+    .report-content h1 { font-size: 20pt; margin: 24px 0 12px; }
+    .report-content h2 { font-size: 16pt; margin: 20px 0 10px; }
+    .report-content h3 { font-size: 14pt; margin: 16px 0 8px; }
+    .report-content h4 { font-size: 12pt; margin: 14px 0 6px; }
+    .report-content p { margin: 0 0 12px; }
+    .report-content ul, .report-content ol { margin: 0 0 12px; padding-left: 24px; }
+    .report-content li { margin-bottom: 4px; }
+    .report-content pre {
+      background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: 16px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 10pt; line-height: 1.5; overflow-x: auto; margin: 16px 0;
+      page-break-inside: avoid;
+    }
+    .report-content code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.9em; background: var(--code-bg); padding: 2px 4px; border-radius: 3px;
+    }
+    .report-content pre code { background: none; padding: 0; font-size: inherit; }
+    .report-content blockquote {
+      border-left: 3px solid var(--primary); padding: 8px 16px; margin: 16px 0;
+      background: var(--code-bg); border-radius: 0 6px 6px 0;
+    }
+    .report-content table { border-collapse: collapse; width: 100%; margin: 16px 0; page-break-inside: auto; }
+    .report-content th, .report-content td {
+      border: 1px solid var(--border); padding: 8px 12px; text-align: left; font-size: 11pt;
+    }
+    .report-content th { background: var(--code-bg); font-weight: 600; }
+    .report-content a { color: var(--primary); text-decoration: underline; }
+    .report-content hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+    .report-content img { max-width: 100%; height: auto; }
+    @media print {
+      body { padding: 40px; }
+      h1, h2, h3, h4 { page-break-after: avoid; }
+      pre, table { page-break-inside: avoid; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <div class="report-header">
+    <h1>Deep Research Report</h1>
+    ${runId ? `<div class="meta">Run: ${runId.slice(0, 8)}</div>` : ""}
+    <div class="meta">${dateStr} &middot; Better DeepSeek</div>
+  </div>
+  <div class="report-content">${renderedHtml}</div>
+</body>
+</html>`;
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "none";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(printDoc);
+    doc.close();
+
+    iframe.contentWindow.focus();
+
+    let printed = false;
+
+    function cleanupPrintFrame() {
+      if (document.body.contains(iframe)) document.body.removeChild(iframe);
+    }
+
+    iframe.contentWindow.onafterprint = () => {
+      printed = true;
+      printingPdf = false;
+      cleanupPrintFrame();
+    };
+
+    // Fallback cleanup if afterprint never fires
+    setTimeout(() => {
+      if (!printed) {
+        printingPdf = false;
+        cleanupPrintFrame();
+      }
+    }, 15000);
+
+    // Wait for resources (fonts, images) to settle before printing
+    setTimeout(() => {
+      if (!printed) iframe.contentWindow.print();
+    }, 1500);
   }
 
   function stripLeadingBlankLines(content) {
@@ -47,6 +179,9 @@
     {/if}
     <button type="button" class="bds-drr-toggle" onclick={downloadMarkdown} data-testid="deep-research-download-btn">
       Download .md
+    </button>
+    <button type="button" class="bds-drr-toggle" onclick={downloadPdf} data-testid="deep-research-pdf-btn">
+      Download PDF
     </button>
     <button type="button" class="bds-drr-toggle" onclick={toggleCollapse}>
       {collapsed ? "Show" : "Hide"}

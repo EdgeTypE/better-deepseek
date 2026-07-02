@@ -331,6 +331,69 @@ describe("Deep Research UI components", () => {
       expect(click.mock.contexts[0].download).toBe("deep-research-run-download.md");
       cleanup();
     });
+
+    it("renders a Download PDF button", async () => {
+      const { target, cleanup } = renderSvelte(DeepResearchReportCard, {
+        runId: "rpt-pdf",
+        markdown: "# PDF Report\n\nContent",
+      });
+      await flushUi();
+
+      const pdfBtn = target.querySelector('[data-testid="deep-research-pdf-btn"]');
+      expect(pdfBtn).toBeTruthy();
+      expect(pdfBtn.textContent).toContain("PDF");
+      cleanup();
+    });
+
+    it("downloads the report as PDF via print", async () => {
+      const printFn = vi.fn();
+      const writeSpy = vi.fn();
+      const fakeIframe = {
+        contentWindow: {
+          document: { open: vi.fn(), write: writeSpy, close: vi.fn() },
+          focus: vi.fn(),
+          print: printFn,
+        },
+        style: {},
+      };
+      const origCreateElement = document.createElement.bind(document);
+      const createElementSpy = vi.spyOn(document, "createElement").mockImplementation((tag) => {
+        if (tag === "iframe") return fakeIframe;
+        return origCreateElement(tag);
+      });
+      const appendChildSpy = vi.spyOn(document.body, "appendChild").mockImplementation(() => {});
+      const containsSpy = vi.spyOn(document.body, "contains").mockReturnValue(false);
+
+      const { target, cleanup } = renderSvelte(DeepResearchReportCard, {
+        runId: "pdf-test",
+        markdown: "\n\n# PDF Report\n\nTest **bold**",
+      });
+      await flushUi();
+
+      target.querySelector('[data-testid="deep-research-pdf-btn"]').click();
+
+      expect(createElementSpy).toHaveBeenCalledWith("iframe");
+      expect(appendChildSpy).toHaveBeenCalled();
+      expect(fakeIframe.contentWindow.document.open).toHaveBeenCalled();
+      expect(fakeIframe.contentWindow.document.close).toHaveBeenCalled();
+
+      const writtenHtml = writeSpy.mock.calls[0][0];
+      expect(writtenHtml).toContain("Deep Research Report");
+      expect(writtenHtml).toContain("PDF Report");
+      expect(writtenHtml).toContain("<strong>bold</strong>");
+        expect(writtenHtml).toContain("pdf-test");
+      expect(writtenHtml).toContain("print-color-adjust: exact");
+
+      // print should be scheduled via setTimeout; not called synchronously
+      expect(printFn).not.toHaveBeenCalled();
+      // contentWindow.focus should have been called
+      expect(fakeIframe.contentWindow.focus).toHaveBeenCalled();
+
+      createElementSpy.mockRestore();
+      appendChildSpy.mockRestore();
+      containsSpy.mockRestore();
+      cleanup();
+    });
   });
 
   describe("DeepResearchToggle", () => {
