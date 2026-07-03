@@ -241,6 +241,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
   // --- RTL DETECTION ---
   const isRtl = isPredominantlyRtl(rawText);
   stateData.isRtl = isRtl;
+  applyRtlToNative(node, isRtl);
   // --- AUTO INTERFACES (instant trigger on completion) ---
   // Triggers immediately when the global stop button disappears,
   // which signals that DeepSeek's SSE stream has fired "event: close".
@@ -511,6 +512,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
         existing.props.blocks = newBlocks;
         existing.props.loading = isLoading;
         existing.props.loadingIndex = loadingIndex;
+        existing.props.isRtl = stateData.isRtl || false; 
       } else {
         const host = getOrCreateHost(node, "bds-overlay-host");
         removeStaleMessageOverlays(host);
@@ -822,6 +824,43 @@ function syncVisibilityState(node, isLatestAssistant, stateData, isSettled) {
     
     injectPriceAssistant(node, outputTokens, outputCost);
     refreshSessionTotalDisplayInline();
+  }
+}
+/**
+ * Apply RTL styling directly to the native message's markdown container
+ * for messages that don't trigger an overlay.
+ */
+/**
+ * Apply RTL styling directly to the native message's markdown container
+ * for messages that don't trigger an overlay.
+ */
+function applyRtlToNative(node, isRtl) {
+  if (!isRtl) return;
+
+  // Find all markdown containers inside this message node
+  const allMarkdown = node.querySelectorAll('.ds-markdown, [class*="markdown"]');
+  let target = null;
+
+  for (const el of allMarkdown) {
+    // Skip if inside a thinking block
+    if (el.closest('.ds-think-content, [class*="think"]')) continue;
+    // Skip if inside a cursor or other transient elements
+    if (el.closest('.ds-cursor')) continue;
+    // Take the first non-thinking markdown container
+    target = el;
+    break;
+  }
+
+  // Fallback: if nothing found, use the last markdown (often the main content)
+  if (!target) {
+    target = node.querySelector('.ds-markdown:last-child, [class*="markdown"]:last-child');
+  }
+
+  if (target) {
+    target.setAttribute('dir', 'rtl');
+    target.style.direction = 'rtl';
+    target.style.textAlign = 'right';
+    target.classList.add('bds-rtl-native');
   }
 }
 

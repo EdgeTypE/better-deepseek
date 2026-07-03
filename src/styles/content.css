@@ -4668,3 +4668,38 @@ textarea.bds-input,
   padding-right: 1em;
   padding-left: 0;
 }
+/* RTL styling for native DeepSeek messages (no overlay) */
+.bds-rtl-native {
+  direction: rtl;
+  text-align: right;
+  unicode-bidi: isolate;
+}
+
+/* Keep code blocks LTR even in RTL mode */
+.bds-rtl-native pre,
+.bds-rtl-native code,
+.bds-rtl-native .md-code-block {
+  direction: ltr !important;
+  text-align: left !important;
+  unicode-bidi: embed;
+}
+
+/* Adjust lists, blockquotes, etc. */
+.bds-rtl-native ul,
+.bds-rtl-native ol {
+  padding-right: 1.5em;
+  padding-left: 0;
+}
+
+.bds-rtl-native blockquote {
+  border-right: 2px solid var(--dsw-alias-label-caption, var(--bds-text-tertiary, #6b6b7b));
+  border-left: none;
+  padding-right: 14px;
+  padding-left: 0;
+}
+
+/* Override table alignment for RTL */
+.bds-rtl-native th,
+.bds-rtl-native td {
+  text-align: right;
+}
