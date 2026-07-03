@@ -31,6 +31,7 @@ import { i18n } from "../lib/i18n.svelte.js";
 import { remoteConfig } from "../lib/remote-config.svelte.js";
 import { makeId } from "../lib/utils/helpers.js";
 import { STORAGE_KEYS } from "../lib/constants.js";
+import { isPredominantlyRtl } from '../lib/utils/rtl-detector.js';
 
 const messageOverlays = new Map();
 const nodeStates = new WeakMap();
@@ -237,6 +238,9 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
   const parsed = parseBdsMessage(rawText, shouldForceCloseTags);
   const preGateBlocks = parsed.renderableBlocks;
 
+  // --- RTL DETECTION ---
+  const isRtl = isPredominantlyRtl(rawText);
+  stateData.isRtl = isRtl;
   // --- AUTO INTERFACES (instant trigger on completion) ---
   // Triggers immediately when the global stop button disappears,
   // which signals that DeepSeek's SSE stream has fired "event: close".
@@ -519,7 +523,8 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
           text: newText,
           blocks: newBlocks,
           loading: isLoading,
-          loadingIndex: loadingIndex
+          loadingIndex: loadingIndex,
+          isRtl: stateData.isRtl || false 
         });
 
         const component = mount(MessageOverlay, {

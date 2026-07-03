@@ -4642,3 +4642,29 @@ textarea.bds-input,
   justify-content: center;
   backdrop-filter: blur(2px);
 }
+/* RTL message support */
+.bds-message-rtl {
+  direction: rtl;
+  text-align: right;
+  unicode-bidi: isolate;
+}
+
+.bds-message-rtl code,
+.bds-message-rtl pre {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: embed;
+}
+
+.bds-message-rtl ul,
+.bds-message-rtl ol {
+  padding-right: 1.5em;
+  padding-left: 0;
+}
+
+.bds-message-rtl blockquote {
+  border-right: 3px solid var(--bds-accent);
+  border-left: none;
+  padding-right: 1em;
+  padding-left: 0;
+}
