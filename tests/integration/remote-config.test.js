@@ -389,7 +389,7 @@ describe("AttachMenu config integration (DOM model switching)", () => {
 
     defaultRadio = document.createElement("div");
     defaultRadio.setAttribute("role", "radio");
-    defaultRadio.setAttribute("data-model-type", "default");
+    defaultRadio.setAttribute("data-model-type", "instant");
     defaultRadio.setAttribute("aria-checked", "false");
     defaultRadio.textContent = "Instant";
 
@@ -502,15 +502,36 @@ describe("AttachMenu config integration (DOM model switching)", () => {
     expect(getFlag(`features.attachMenu.${modelKey}.showWeb`)).toBe(false);
   });
 
-  it("no radio group falls back to instant mode", () => {
+  it("returns null when neither switcher nor badge is present", () => {
     radioGroup?.remove();
-    expect(detectModelType()).toBe("instant");
+    expect(detectModelType()).toBeNull();
     const modelKey = getModelKey("instant");
     expect(getFlag(`features.attachMenu.${modelKey}.show`)).toBe(true);
   });
 
-  it("radio group with no checked radio returns instant", () => {
+  it("returns null when the switcher is present but nothing is checked", () => {
+    expect(detectModelType()).toBeNull();
+  });
+
+  it("returns null for an unknown data-model-type value", () => {
+    defaultRadio.setAttribute("data-model-type", "mystery-model");
+    defaultRadio.setAttribute("aria-checked", "true");
+    expect(detectModelType()).toBeNull();
+  });
+
+  it("maps chat data-model-type to instant", () => {
+    defaultRadio.setAttribute("data-model-type", "chat");
+    defaultRadio.setAttribute("aria-checked", "true");
     expect(detectModelType()).toBe("instant");
+  });
+
+  it("honors remote-config attrMap overrides", () => {
+    defaultRadio.setAttribute("data-model-type", "v-mode");
+    defaultRadio.setAttribute("aria-checked", "true");
+    remoteConfig.applyRemote({
+      modelDetection: { attrMap: { "v-mode": "vision" } },
+    });
+    expect(detectModelType()).toBe("vision");
   });
 
   describe("model badge detection fallback", () => {
@@ -544,6 +565,14 @@ describe("AttachMenu config integration (DOM model switching)", () => {
 
     it("detects vision from model badge text", () => {
       badge.textContent = "Vision";
+      expect(detectModelType()).toBe("vision");
+    });
+
+    it("badge exact-match rules still win over substring rules", () => {
+      badge.textContent = "Expert";
+      expect(detectModelType()).toBe("expert");
+
+      badge.textContent = "vision preview";
       expect(detectModelType()).toBe("vision");
     });
   });

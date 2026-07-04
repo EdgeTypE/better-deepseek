@@ -355,6 +355,16 @@
           return Array.from(input?.files || []).map((file) => file.name);
         }
 
+        function replaceFileInput() {
+          const old = document.querySelector("#native-file-input");
+          if (!old) return;
+          const fresh = document.createElement("input");
+          fresh.id = "native-file-input";
+          fresh.type = "file";
+          fresh.multiple = true;
+          old.replaceWith(fresh);
+        }
+
         function buildMenu(targetUrl) {
           removeMenus();
 
@@ -462,6 +472,7 @@
             },
             updateLastAssistantMessage,
             getAttachedFiles,
+            replaceFileInput,
             getSendCount() {
               return sendCount;
             },

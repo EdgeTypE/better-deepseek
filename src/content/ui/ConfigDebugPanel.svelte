@@ -19,7 +19,7 @@
   }
 
   function refresh() {
-    currentModel = detectModelType();
+    currentModel = detectModelType() || "unknown";
     configSnapshot = remoteConfig.raw;
   }
 
@@ -74,6 +74,7 @@
   function modelBadgeClass(m) {
     if (m === "expert") return "bds-cdbadge bds-cdbadge--expert";
     if (m === "deepthink") return "bds-cdbadge bds-cdbadge--deepthink";
+    if (m === "unknown") return "bds-cdbadge bds-cdbadge--unknown";
     return "bds-cdbadge bds-cdbadge--instant";
   }
 
@@ -325,6 +326,7 @@
   .bds-cdbadge--instant { background: #1a3a2e; color: #4ade80; }
   .bds-cdbadge--expert { background: #3a1a2e; color: #f87171; }
   .bds-cdbadge--deepthink { background: #2a1a4e; color: #a78bfa; }
+  .bds-cdbadge--unknown { background: #2a2a2a; color: #9ca3af; }
 
   .bds-cdpanel-tabs {
     display: flex;

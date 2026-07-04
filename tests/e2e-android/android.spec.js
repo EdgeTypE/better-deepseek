@@ -142,6 +142,40 @@ test("Upload File on Android uses native picker bridge and injects markdown", as
   expect(await page.evaluate(() => window.__mockDeepSeek.uploadInputClickedDirectly)).toBe(false);
 });
 
+test("upload works twice across a composer re-render on Android", async ({ page }) => {
+  await page.evaluate(() => {
+    window.__bdsNativeFilePicker = () => ({
+      files: [{ name: "android-notes.md", content: "# Android notes" }],
+    });
+  });
+
+  await page.locator(".bds-plus-btn").click({ force: true });
+  await page
+    .locator(".bds-attach-dropdown .bds-attach-item")
+    .filter({ hasText: "Upload File" })
+    .click({ force: true });
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.getAttachedFiles()))
+    .toEqual(["android-notes.md"]);
+
+  // DeepSeek swaps in a brand-new (empty) input node on re-render — the
+  // previous node's files become unreachable once detached. What matters is
+  // that the second attach lands on the input that is now actually live in
+  // the DOM, not silently on the stale detached one.
+  await page.evaluate(() => window.__mockDeepSeek.replaceFileInput());
+
+  await page.locator(".bds-plus-btn").click({ force: true });
+  await page
+    .locator(".bds-attach-dropdown .bds-attach-item")
+    .filter({ hasText: "Upload File" })
+    .click({ force: true });
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.getAttachedFiles()))
+    .toEqual(["android-notes.md"]);
+});
+
 test("Upload File on Android requests images in Vision mode", async ({ page }) => {
   await page.evaluate(() => {
     const switcher = document.createElement("div");

@@ -137,6 +137,14 @@ export function getConfig(path) {
 
 export const REMOTE_CONFIG_EVENT = EVENT_CONFIG_UPDATED;
 
+/**
+ * Detects the currently-active DeepSeek model mode from the page DOM.
+ *
+ * Returns null when detection is inconclusive (switcher/badge missing, or a
+ * checked radio's data-model-type isn't in the mapping table) — callers must
+ * not conflate "nothing detected" with "instant", since transient DOM states
+ * (composer re-render, picker roundtrip) can otherwise corrupt cached state.
+ */
 export function detectModelType() {
   const switcherSel = getConfig("selectors.modelSwitcher");
   if (switcherSel) {
@@ -144,11 +152,9 @@ export function detectModelType() {
     if (switcher) {
       const checked = switcher.querySelector('[aria-checked="true"]');
       if (checked) {
+        const attrMap = getConfig("modelDetection.attrMap") || {};
         const dt = checked.getAttribute("data-model-type");
-        if (dt === "vision") return "vision";
-        if (dt === "expert") return "expert";
-        if (dt === "deepthink") return "deepthink";
-        return "instant";
+        return Object.prototype.hasOwnProperty.call(attrMap, dt) ? attrMap[dt] : null;
       }
     }
   }
@@ -157,16 +163,14 @@ export function detectModelType() {
     const el = document.querySelector(badgeSel);
     if (el) {
       const text = (el.textContent || "").toLowerCase().trim();
-      if (text.includes("vision")) return "vision";
-      if (text === "expert" || text === "deepseek-reasoner") return "expert";
-      if (text === "instant" || text === "deepseek-chat") return "instant";
-      if (
-        text.includes("deepthink") ||
-        text.includes("deep think") ||
-        text.includes("reasoner") ||
-        text.includes("r1")
-      ) return "deepthink";
+      const badgeRules = getConfig("modelDetection.badgeRules") || [];
+      for (const [key, type] of badgeRules) {
+        if (text === key) return type;
+      }
+      for (const [key, type] of badgeRules) {
+        if (text.includes(key)) return type;
+      }
     }
   }
-  return "instant";
+  return null;
 }

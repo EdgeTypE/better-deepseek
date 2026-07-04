@@ -225,6 +225,55 @@ describe("AttachMenu integration", () => {
     cleanup();
   });
 
+  it("keeps the last detected model type when the switcher disappears", async () => {
+    document.body.insertAdjacentHTML("beforeend", `
+      <div role="radiogroup">
+        <div role="radio" data-model-type="instant" aria-checked="false">Instant</div>
+        <div role="radio" data-model-type="expert" aria-checked="true">Expert</div>
+      </div>
+    `);
+    const nativeInput = setupNativeInput();
+    const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+
+    await flushModelWatcher();
+    expect(target.querySelector(".bds-plus-btn")).toBeNull();
+
+    document.querySelector('[role="radiogroup"]').remove();
+    await flushModelWatcher();
+
+    expect(target.querySelector(".bds-plus-btn")).toBeNull();
+    cleanup();
+  });
+
+  it("re-detects after the switcher node is replaced", async () => {
+    installModelSwitcher("instant");
+    installAndroidBridgeMock(() => ({
+      files: [{ name: "a.md", content: "# A" }],
+      skipped: [],
+    }));
+    const nativeInput = setupNativeInput();
+    const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+
+    await flushModelWatcher();
+
+    document.querySelector('[role="radiogroup"]').remove();
+    document.body.insertAdjacentHTML("beforeend", `
+      <div role="radiogroup">
+        <div role="radio" data-model-type="instant" aria-checked="false">Instant</div>
+        <div role="radio" data-model-type="vision" aria-checked="true">Vision</div>
+      </div>
+    `);
+    await flushModelWatcher();
+
+    target.querySelector(".bds-plus-btn").click();
+    await flushUi();
+    getAttachItemByText("Upload File").click();
+    await flushNativePick();
+
+    expect(window.AndroidBridge.pickFiles).toHaveBeenCalledWith("files+images", expect.any(String));
+    cleanup();
+  });
+
   it("fetches a github repo and injects the resulting file", async () => {
     const nativeInput = setupNativeInput();
     const file = new File(["repo"], "repo.txt", { type: "text/plain" });
@@ -598,5 +647,72 @@ describe("AttachMenu integration", () => {
     expect(nativeInput.files).toHaveLength(0);
     expect(state.ui.showToast).not.toHaveBeenCalled();
     cleanup();
+  });
+
+  describe("stale native input resolution (F1)", () => {
+    it("re-resolves the native input when the mounted input is detached (Android)", async () => {
+      installAndroidBridgeMock(() => ({
+        files: [{ name: "a.md", content: "# A" }],
+        skipped: [],
+      }));
+      const inputA = setupNativeInput();
+      const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput: inputA });
+
+      inputA.remove();
+      const inputB = setupNativeInput();
+
+      target.querySelector(".bds-plus-btn").click();
+      await flushUi();
+      getAttachItemByText("Upload File").click();
+      await flushNativePick();
+
+      expect(Array.from(inputB.files, (file) => file.name)).toEqual(["a.md"]);
+      expect(inputA.files).toHaveLength(0);
+      cleanup();
+    });
+
+    it("second consecutive upload lands after DeepSeek swaps the input", async () => {
+      installAndroidBridgeMock(() => ({
+        files: [{ name: "a.md", content: "# A" }],
+        skipped: [],
+      }));
+      const inputA = setupNativeInput();
+      const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput: inputA });
+
+      target.querySelector(".bds-plus-btn").click();
+      await flushUi();
+      getAttachItemByText("Upload File").click();
+      await flushNativePick();
+      expect(Array.from(inputA.files, (file) => file.name)).toEqual(["a.md"]);
+
+      inputA.remove();
+      const inputB = setupNativeInput();
+
+      target.querySelector(".bds-plus-btn").click();
+      await flushUi();
+      getAttachItemByText("Upload File").click();
+      await flushNativePick();
+
+      expect(Array.from(inputB.files, (file) => file.name)).toEqual(["a.md"]);
+      cleanup();
+    });
+
+    it("web flow clicks a freshly resolved input when the original is detached", async () => {
+      const inputA = setupNativeInput();
+      const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput: inputA });
+
+      inputA.remove();
+      const inputB = setupNativeInput();
+      inputB.click = vi.fn();
+
+      target.querySelector(".bds-plus-btn").click();
+      await flushUi();
+      getAttachItemByText("Upload File").click();
+      await flushUi();
+
+      expect(inputB.click).toHaveBeenCalledOnce();
+      expect(inputA.click).not.toHaveBeenCalled();
+      cleanup();
+    });
   });
 });

@@ -884,6 +884,24 @@ export const DEFAULT_REMOTE_CONFIG = {
     renameInput: "input.ds-input__input",
     theme: { darkClass: "dark", lightClass: "light" },
   },
+  // Model-type detection tables, kept data-driven (rather than hardcoded in
+  // detectModelType) so a DeepSeek DOM change can be corrected via remote
+  // config (modelDetection.attrMap / modelDetection.badgeRules overrides)
+  // without shipping a new extension version.
+  modelDetection: {
+    attrMap: { vision: "vision", expert: "expert", deepthink: "deepthink", instant: "instant", chat: "instant" },
+    badgeRules: [
+      ["vision", "vision"],
+      ["expert", "expert"],
+      ["deepseek-reasoner", "expert"],
+      ["deepthink", "deepthink"],
+      ["deep think", "deepthink"],
+      ["reasoner", "deepthink"],
+      ["r1", "deepthink"],
+      ["instant", "instant"],
+      ["deepseek-chat", "instant"],
+    ],
+  },
   api: {
     chatCompletionPaths: ["/api/v0/chat/completion", "/api/v0/chat/edit_message"],
     sessionFetchPath: "/api/v0/chat_session/fetch_page",

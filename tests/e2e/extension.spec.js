@@ -149,6 +149,54 @@ test("imports a GitHub repository through the attach menu flow", async ({ page }
     .toEqual(["Hello-World_github.txt"]);
 });
 
+test("upload works twice across a composer re-render", async ({ page }) => {
+  await page.evaluate(() => {
+    const input = document.querySelector("#native-file-input");
+    window.__mockDeepSeek.clickedInputId = null;
+    input.addEventListener(
+      "click",
+      (event) => {
+        window.__mockDeepSeek.clickedInputId = "original";
+        event.preventDefault();
+      },
+      { once: true },
+    );
+  });
+
+  await page.locator(".bds-plus-btn").click();
+  await page
+    .locator(".bds-attach-dropdown .bds-attach-item")
+    .filter({ hasText: "Upload File" })
+    .click();
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.clickedInputId))
+    .toBe("original");
+
+  await page.evaluate(() => {
+    window.__mockDeepSeek.replaceFileInput();
+    const fresh = document.querySelector("#native-file-input");
+    fresh.addEventListener(
+      "click",
+      (event) => {
+        window.__mockDeepSeek.clickedInputId = "fresh";
+        event.preventDefault();
+      },
+      { once: true },
+    );
+  });
+
+  await page.locator(".bds-plus-btn").click();
+  await page
+    .locator(".bds-attach-dropdown .bds-attach-item")
+    .filter({ hasText: "Upload File" })
+    .click();
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.clickedInputId))
+    .toBe("fresh");
+});
+
 test("Upload File keeps multiple mode in the web flow", async ({ page }) => {
   await page.evaluate(() => {
     const input = document.querySelector("#native-file-input");

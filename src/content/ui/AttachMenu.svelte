@@ -31,9 +31,23 @@
   import { t } from "../../lib/i18n.svelte.js";
   import { getFlag, getConfig, REMOTE_CONFIG_EVENT, detectModelType } from "../../lib/remote-config.svelte.js";
   import { VADProcessor } from "../vad-processor.js";
+  import { findActiveFileInput } from "../scanner.js";
 
   // The native input[type="file"] reference passed from scanner
   let { nativeInput } = $props();
+
+  // Live-resolved native input. DeepSeek can replace its composer's file
+  // input node after the first successful upload (device layout re-renders);
+  // the original prop reference then points at a detached node. Every use
+  // site re-resolves through this instead of reading `nativeInput` directly.
+  let inputEl = $state(nativeInput);
+
+  function resolveNativeInput() {
+    if (inputEl?.isConnected) return inputEl;
+    const fresh = findActiveFileInput();
+    if (fresh) inputEl = fresh;
+    return fresh;
+  }
 
   let isOpen = $state(false);
   let menuRef;
@@ -96,12 +110,12 @@
 
   function detectModelTypeWithPricing() {
     const model = detectModelType();
-    if (model !== "instant") return model;
+    if (model) return model;
     const modelName = appState.pricing?.modelName || "";
     const lo = modelName.toLowerCase();
     if (lo.includes("pro") || lo.includes("reasoner") || lo === "expert") return "expert";
     if (lo.includes("deepthink")) return "deepthink";
-    return model;
+    return null;
   }
 
   let shouldShowAttach = $state(true);
@@ -134,29 +148,34 @@
   let modelObserver = $state(null);
 
   function recheckModelType() {
-    const prev = currentModelType;
-    currentModelType = detectModelTypeWithPricing();
-    if (currentModelType !== prev) updateVisibility();
+    const next = detectModelTypeWithPricing();
+    if (next && next !== currentModelType) {
+      currentModelType = next;
+      updateVisibility();
+    }
   }
 
   function startModelWatcher() {
-    const poll = () => {
-      const switcher = document.querySelector('[role="radiogroup"]');
-      if (switcher) {
+    // Observe document.body rather than the switcher node itself: DeepSeek
+    // can replace the whole switcher element (composer re-render, picker
+    // roundtrip), which would silently detach an observer scoped to it and
+    // freeze detection. A body-wide observer survives node replacement.
+    let rafId = 0;
+    const scheduleRecheck = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
         recheckModelType();
-        if (modelObserver) modelObserver.disconnect();
-        const obs = new MutationObserver(() => recheckModelType());
-        obs.observe(switcher, {
-          subtree: true,
-          attributes: true,
-          attributeFilter: ["aria-checked"],
-        });
-        modelObserver = obs;
-      } else {
-        requestAnimationFrame(poll);
-      }
+      });
     };
-    requestAnimationFrame(poll);
+    const obs = new MutationObserver(scheduleRecheck);
+    obs.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["aria-checked"],
+    });
+    modelObserver = obs;
   }
 
   function hasGithubToken() {
@@ -567,11 +586,12 @@
       return;
     }
 
-    if (nativeInput) {
+    const target = resolveNativeInput();
+    if (target) {
       // Native picker behavior is selected via a file-flow strategy. Android's
       // "Upload File" path prefers the single-file strategy so WebView asks the
       // platform chooser for one file even though DeepSeek's DOM input is `multiple`.
-      openNativeFilePicker(nativeInput, { preferSingle: isAndroidTarget });
+      openNativeFilePicker(target, { preferSingle: isAndroidTarget });
     }
   }
 
@@ -761,16 +781,20 @@
   }
 
   function injectFile(file) {
-    if (!nativeInput) return;
+    const target = resolveNativeInput();
+    if (!target) {
+      if (appState.ui) appState.ui.showToast(t('attachMenu.noInputField'));
+      return;
+    }
     const dt = new DataTransfer();
-    if (nativeInput.files) {
-      for (let i = 0; i < nativeInput.files.length; i++) {
-        dt.items.add(nativeInput.files[i]);
+    if (target.files) {
+      for (let i = 0; i < target.files.length; i++) {
+        dt.items.add(target.files[i]);
       }
     }
     dt.items.add(file);
-    nativeInput.files = dt.files;
-    nativeInput.dispatchEvent(new Event("change", { bubbles: true }));
+    target.files = dt.files;
+    target.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
   function formatSize(bytes) {

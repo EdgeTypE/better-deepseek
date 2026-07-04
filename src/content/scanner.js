@@ -298,7 +298,7 @@ export function scanInputArea() {
   markComposerControlsMounted(wrapper);
 }
 
-function findActiveFileInput() {
+export function findActiveFileInput() {
   const inputs = Array.from(document.querySelectorAll('input[type="file"][multiple]'))
     .filter((input) => !input.closest("#bds-root"));
 

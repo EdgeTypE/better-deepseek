@@ -111,7 +111,7 @@ async function init() {
         case "applyRemote":   remoteConfig.applyRemote(args?.[0]); result = remoteConfig.raw; break;
         case "replaceRemote": remoteConfig.replaceRemote(args?.[0]); result = remoteConfig.raw; break;
         case "resetToBuiltin": remoteConfig.resetToBuiltin(); result = remoteConfig.raw; break;
-        case "detectModel": result = detectModelType(); break;
+        case "detectModel": result = detectModelType() || "instant"; break;
         case "toggleDebugPanel":
           window.dispatchEvent(new CustomEvent("bds:toggle-debug-panel"));
           result = true;

@@ -73,14 +73,13 @@ class WebViewBridgePickerTest {
     }
 
     @Test
-    fun `classifyPickedFile skips images as image-requires-vision when images not accepted`() {
+    fun `classifyPickedFile skips images as image-requires-vision regardless of caller routing`() {
         val result =
                 classifyPickedFile(
                         "photo.png",
                         -1,
                         "not decoded as text",
                         requireKnownExtension = false,
-                        acceptImages = false,
                 )
 
         assertSkipped(result, "photo.png", "image-requires-vision")

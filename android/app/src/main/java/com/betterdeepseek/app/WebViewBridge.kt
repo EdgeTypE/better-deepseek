@@ -87,14 +87,9 @@ internal fun classifyPickedFile(
         byteSize: Long,
         content: String?,
         requireKnownExtension: Boolean,
-        acceptImages: Boolean = false,
 ): PickedItemResult {
     if (hasImageFileExtension(name)) {
-        return if (acceptImages) {
-            PickedItemResult.Skipped(name, "unreadable")
-        } else {
-            PickedItemResult.Skipped(name, "image-requires-vision")
-        }
+        return PickedItemResult.Skipped(name, "image-requires-vision")
     }
     if (byteSize > WebViewBridge.MAX_PICKED_FILE_SIZE) {
         return PickedItemResult.Skipped(name, "too-large")
@@ -485,7 +480,7 @@ class WebViewBridge(
                 } catch (t: Throwable) {
                     Log.w(TAG, "readDocumentFile failed for $relPath", t)
                     null
-        }
+                }
         return classifyPickedFile(relPath, length, content, requireKnownExtension = true)
     }
 
