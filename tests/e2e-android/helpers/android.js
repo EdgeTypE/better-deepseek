@@ -83,22 +83,43 @@ function buildAndroidBridgeBootstrap() {
         },
         pickFiles(mode, requestId) {
           const handler = window.__bdsNativeFilePicker;
+          const eventName = "__bds_native_files_picked_" + requestId;
+          function dispatch(detail) {
+            window.dispatchEvent(new CustomEvent(eventName, { detail }));
+          }
           setTimeout(function () {
-            let detail;
+            dispatch({ v: 2, kind: "status", phase: "opened" });
+          }, 0);
+          setTimeout(function () {
+            let payload;
             if (typeof handler === "function") {
               try {
-                detail = handler(mode);
+                payload = handler(mode);
               } catch (err) {
-                detail = { error: String(err), files: [] };
+                payload = { error: String(err), files: [] };
               }
             } else {
-              detail = { error: "cancelled", files: [] };
+              payload = { error: "cancelled", files: [] };
             }
-            window.dispatchEvent(
-              new CustomEvent("__bds_native_files_picked_" + requestId, {
-                detail,
-              }),
-            );
+            if (!payload || typeof payload !== "object") {
+              payload = { error: "cancelled", files: [] };
+            }
+            if (!payload.error && !Array.isArray(payload.skipped)) {
+              payload = Object.assign({}, payload, { skipped: [] });
+            }
+            dispatch({ v: 2, kind: "status", phase: "reading" });
+            const json = JSON.stringify(payload);
+            const chunkSize = window.__bdsPickChunkSize || 200000;
+            const total = Math.max(1, Math.ceil(json.length / chunkSize));
+            for (let seq = 0; seq < total; seq += 1) {
+              dispatch({
+                v: 2,
+                kind: "chunk",
+                seq,
+                total,
+                data: json.slice(seq * chunkSize, (seq + 1) * chunkSize),
+              });
+            }
           }, 10);
         },
       };

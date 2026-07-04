@@ -14,6 +14,7 @@
     buildFolderFileFromNative,
     isNativeFilePickerAvailable,
     nativePickFiles,
+    PICK_ERRORS,
   } from "../../platform/android-file-picker.js";
   import {
     getFilesForProject,
@@ -516,20 +517,39 @@
     }
   }
 
+  function pickErrorMessage(err, fallbackKey) {
+    const message = err?.message || "";
+    if (message === PICK_ERRORS.TIMEOUT || message === PICK_ERRORS.STALLED) {
+      return t("attachMenu.pickTimeout");
+    }
+    return message || t(fallbackKey);
+  }
+
   async function handleUploadFile() {
     closeMenu();
     if (isAndroidTarget && isNativeFilePickerAvailable()) {
       try {
         const result = await nativePickFiles("files");
-        if (!result.cancelled && result.files && result.files.length > 0) {
-          for (const file of result.files) {
+        if (result.cancelled) return;
+        const files = result.files || [];
+        const skipped = result.skipped || [];
+        if (files.length > 0) {
+          for (const file of files) {
             const blob = new Blob([file.content], { type: "text/plain" });
             injectFile(new File([blob], file.name, { type: "text/plain" }));
           }
+          if (skipped.length > 0 && appState.ui) {
+            appState.ui.showToast(t("attachMenu.someFilesSkipped", {
+              skipped: skipped.length,
+              total: skipped.length + files.length,
+            }));
+          }
+        } else if (appState.ui) {
+          appState.ui.showToast(t("attachMenu.noFilesPicked"));
         }
       } catch (err) {
         if (appState.ui) {
-          appState.ui.showToast(err?.message || t('attachMenu.filePickFailed'));
+          appState.ui.showToast(pickErrorMessage(err, "attachMenu.filePickFailed"));
         }
       }
       return;
@@ -550,16 +570,27 @@
       if (isNativeFilePickerAvailable()) {
         try {
           const result = await nativePickFiles("folder");
-          if (!result.cancelled && result.files && result.files.length > 0) {
+          if (result.cancelled) return;
+          const files = result.files || [];
+          const skipped = result.skipped || [];
+          if (files.length > 0) {
             const fakeFile = buildFolderFileFromNative(
-              result.files,
+              files,
               result.folderName,
             );
             if (fakeFile) injectFile(fakeFile);
+            if (skipped.length > 0 && appState.ui) {
+              appState.ui.showToast(t("attachMenu.someFilesSkipped", {
+                skipped: skipped.length,
+                total: skipped.length + files.length,
+              }));
+            }
+          } else if (appState.ui) {
+            appState.ui.showToast(t("attachMenu.folderNoTextFiles"));
           }
         } catch (err) {
           if (appState.ui) {
-            appState.ui.showToast(err?.message || t('attachMenu.folderPickFailed'));
+            appState.ui.showToast(pickErrorMessage(err, "attachMenu.folderPickFailed"));
           }
         }
       } else if (appState.ui) {

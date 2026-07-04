@@ -1,6 +1,7 @@
 package com.betterdeepseek.app
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
@@ -17,6 +18,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.MimeTypeMap
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
@@ -62,6 +64,67 @@ internal fun shouldOpenExternally(url: Uri, assetHost: String = "bds-asset.local
     return true
 }
 
+internal fun buildFileChooserIntent(acceptTypes: Array<String>?, allowMultiple: Boolean): Intent {
+    return Intent(Intent.ACTION_GET_CONTENT).apply {
+        addCategory(Intent.CATEGORY_OPENABLE)
+        type = "*/*"
+        if (allowMultiple) {
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        }
+
+        val mimeTypes = mapAcceptTypes(acceptTypes)
+        if (mimeTypes.isNotEmpty()) {
+            putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes.toTypedArray())
+        }
+    }
+}
+
+internal fun parseFileChooserResult(resultCode: Int, data: Intent?): Array<Uri>? {
+    if (resultCode != Activity.RESULT_OK) return null
+
+    val uris = linkedSetOf<Uri>()
+    val clipData = data?.clipData
+    if (clipData != null) {
+        for (i in 0 until clipData.itemCount) {
+            clipData.getItemAt(i).uri?.let { uris.add(it) }
+        }
+    } else {
+        data?.data?.let { uris.add(it) }
+    }
+
+    if (uris.isNotEmpty()) return uris.toTypedArray()
+    return runCatching { WebChromeClient.FileChooserParams.parseResult(resultCode, data) }
+            .getOrNull()
+            ?.takeIf { it.isNotEmpty() }
+}
+
+private fun mapAcceptTypes(acceptTypes: Array<String>?): List<String> {
+    val tokens =
+            acceptTypes
+                    ?.flatMap { it.split(',') }
+                    ?.map { it.trim() }
+                    ?.filter { it.isNotEmpty() }
+                    .orEmpty()
+    if (tokens.isEmpty()) return emptyList()
+
+    val mapped = linkedSetOf<String>()
+    for (token in tokens) {
+        val mimeType =
+                when {
+                    "/" in token -> token
+                    token.startsWith(".") ->
+                            MimeTypeMap.getSingleton()
+                                    .getMimeTypeFromExtension(
+                                            token.removePrefix(".").lowercase()
+                                    )
+                    else -> null
+                }
+        if (mimeType.isNullOrBlank()) return emptyList()
+        mapped.add(mimeType)
+    }
+    return mapped.toList()
+}
+
 /**
  * Single-activity host. Loads chat.deepseek.com inside a full-screen WebView and injects the BDS
  * extension scripts on every page finish.
@@ -83,12 +146,9 @@ class MainActivity : ComponentActivity() {
             registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
                 val callback = pendingFileChooser
                 pendingFileChooser = null
-                callback?.onReceiveValue(
-                        WebChromeClient.FileChooserParams.parseResult(
-                                result.resultCode,
-                                result.data
-                        )
-                )
+                // The WebView callback is not persistable across Activity recreation. If Android
+                // returns here after a reload, there is no live callback to complete.
+                callback?.onReceiveValue(parseFileChooserResult(result.resultCode, result.data))
             }
 
     @Volatile private var pendingPickFilesRequestId: String? = null
@@ -101,9 +161,23 @@ class MainActivity : ComponentActivity() {
                     bridge.deliverPickError(requestId, "cancelled")
                     return@registerForActivityResult
                 }
+                bridge.deliverPickStatus(requestId, "reading")
                 Thread {
-                    val files = uris.mapNotNull { uri -> bridge.readPickedContentUri(uri) }
-                    bridge.deliverPickedFiles(requestId, files, null)
+                    try {
+                        val files = mutableListOf<PickedFile>()
+                        val skipped = mutableListOf<SkippedFile>()
+                        for (uri in uris) {
+                            when (val result = bridge.readPickedContentUri(uri)) {
+                                is PickedItemResult.Ok -> files.add(result.file)
+                                is PickedItemResult.Skipped ->
+                                        skipped.add(SkippedFile(result.name, result.reason))
+                            }
+                        }
+                        bridge.deliverPickedFiles(requestId, files, skipped, null)
+                    } catch (t: Throwable) {
+                        Log.e(TAG, "Native file pick read failed", t)
+                        bridge.deliverPickError(requestId, "read-failed")
+                    }
                 }.start()
             }
 
@@ -115,9 +189,20 @@ class MainActivity : ComponentActivity() {
                     bridge.deliverPickError(requestId, "cancelled")
                     return@registerForActivityResult
                 }
+                bridge.deliverPickStatus(requestId, "reading")
                 Thread {
-                    val (files, folderName) = bridge.readPickedFolderTree(treeUri)
-                    bridge.deliverPickedFiles(requestId, files, folderName)
+                    try {
+                        val result = bridge.readPickedFolderTree(treeUri)
+                        bridge.deliverPickedFiles(
+                                requestId,
+                                result.files,
+                                result.skipped,
+                                result.folderName,
+                        )
+                    } catch (t: Throwable) {
+                        Log.e(TAG, "Native folder pick read failed", t)
+                        bridge.deliverPickError(requestId, "read-failed")
+                    }
                 }.start()
             }
 
@@ -139,13 +224,21 @@ class MainActivity : ComponentActivity() {
 
         bridge = WebViewBridge(applicationContext)
         cookieManager = CookieManager.getInstance()
+        pendingPickFilesRequestId = savedInstanceState?.getString(STATE_PENDING_PICK_REQUEST_ID)
 
         bridge.onPickFiles = { mode, requestId ->
-            pendingPickFilesRequestId = requestId
             runOnUiThread {
-                when (mode) {
-                    "folder" -> folderPickerLauncher.launch(null)
-                    else -> multiFileLauncher.launch(arrayOf("*/*"))
+                try {
+                    pendingPickFilesRequestId = requestId
+                    when (mode) {
+                        "folder" -> folderPickerLauncher.launch(null)
+                        else -> multiFileLauncher.launch(arrayOf("*/*"))
+                    }
+                    bridge.deliverPickStatus(requestId, "opened")
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Native file picker launch failed", t)
+                    pendingPickFilesRequestId = null
+                    bridge.deliverPickError(requestId, "picker-launch-failed")
                 }
             }
         }
@@ -273,6 +366,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        pendingPickFilesRequestId?.let { outState.putString(STATE_PENDING_PICK_REQUEST_ID, it) }
+    }
+
     override fun onDestroy() {
         bridge.onThemeChanged = null
         bridge.evaluateJs = null
@@ -353,19 +451,21 @@ class MainActivity : ComponentActivity() {
                         fileChooserParams: FileChooserParams?
                 ): Boolean {
                     pendingFileChooser?.onReceiveValue(null)
-                    pendingFileChooser = filePathCallback
+                    val callback = filePathCallback ?: return true
+                    pendingFileChooser = callback
+                    val allowMultiple =
+                            fileChooserParams?.mode ==
+                                    WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE
                     return try {
                         fileChooserLauncher.launch(
-                                fileChooserParams?.createIntent()
-                                        ?: Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                                            addCategory(Intent.CATEGORY_OPENABLE)
-                                            type = "*/*"
-                                        }
+                                buildFileChooserIntent(fileChooserParams?.acceptTypes, allowMultiple)
                         )
                         true
                     } catch (t: Throwable) {
+                        Log.e(TAG, "File chooser launch failed", t)
                         pendingFileChooser = null
-                        false
+                        callback.onReceiveValue(null)
+                        true
                     }
                 }
 
@@ -585,6 +685,9 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val BRIDGE_NAME = "AndroidBridge"
         private const val TAG = "BdsMainActivity"
+        // SAF picker result launchers can survive Activity recreation; the reloaded WebView may
+        // have no matching JS listener, but the JS-side timeout bounds any surviving wait.
+        private const val STATE_PENDING_PICK_REQUEST_ID = "bds_pending_pick_request_id"
 
         // Default WebView background colours used in the inset-padding area behind transparent
         // system bars. Approximates DeepSeek's own page backgrounds so the status/nav bar region

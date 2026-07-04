@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const projectManagerMocks = vi.hoisted(() => ({
   createProject: vi.fn(),
@@ -27,11 +27,34 @@ import ProjectsManager from "../../../src/content/ui/ProjectsManager.svelte";
 import state from "../../../src/content/state.js";
 import { resetAppState } from "../../helpers/app-state.js";
 import { renderSvelte, flushUi } from "../../helpers/svelte.js";
+import { dispatchPickResult } from "../../helpers/native-pick-protocol.js";
 
 function getButtonByText(target, text) {
   return Array.from(target.querySelectorAll("button")).find((button) =>
     button.textContent.includes(text),
   );
+}
+
+function installAndroidBridgeMock(handler = () => window.__testPickPayload) {
+  process.env.BDS_TARGET = "android";
+  window.AndroidBridge = {
+    pickFiles: vi.fn((mode, requestId) => {
+      setTimeout(() => {
+        const payload = handler(mode, requestId);
+        dispatchPickResult(requestId, payload);
+      }, 0);
+    }),
+  };
+}
+
+async function flushNativePick() {
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  await flushUi();
+}
+
+async function openProjectDetail(target) {
+  target.querySelector(".bds-skill-item").click();
+  await flushUi();
 }
 
 describe("ProjectsManager integration", () => {
@@ -65,6 +88,13 @@ describe("ProjectsManager integration", () => {
     bridgeMocks.pushConfigToPage.mockReset();
     folderMocks.pickFolderSelection.mockReset();
     document.body.innerHTML = "";
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    delete process.env.BDS_TARGET;
+    delete window.AndroidBridge;
+    delete window.__testPickPayload;
   });
 
   it("creates a new project from the list view", async () => {
@@ -153,6 +183,85 @@ describe("ProjectsManager integration", () => {
 
     expect(fileInput.click).toHaveBeenCalledOnce();
     expect(fileInput.multiple).toBe(true);
+    cleanup();
+  });
+
+  it("toasts when a native project file pick returns zero files", async () => {
+    state.ui = { showToast: vi.fn() };
+    installAndroidBridgeMock(() => ({
+      files: [],
+      skipped: [{ name: "photo.png", reason: "unsupported-type" }],
+    }));
+    const { target, cleanup } = renderSvelte(ProjectsManager, { onback: vi.fn() });
+    await openProjectDetail(target);
+
+    getButtonByText(target, "Upload File").click();
+    await flushNativePick();
+
+    expect(state.ui.showToast).toHaveBeenCalledWith(
+      "Nothing was attached - the selected file(s) are unsupported, too large (over 2 MB), or binary.",
+    );
+    expect(projectManagerMocks.addProjectFilesBatch).not.toHaveBeenCalled();
+    cleanup();
+  });
+
+  it("toasts a partial-skip summary for project file picks", async () => {
+    state.ui = { showToast: vi.fn() };
+    installAndroidBridgeMock(() => ({
+      files: [{ name: "a.md", content: "# A" }],
+      skipped: [{ name: "photo.png", reason: "unsupported-type" }],
+    }));
+    const { target, cleanup } = renderSvelte(ProjectsManager, { onback: vi.fn() });
+    await openProjectDetail(target);
+    Object.defineProperty(target.querySelector('input[type="file"][multiple]'), "files", {
+      configurable: true,
+      writable: true,
+      value: [],
+    });
+
+    getButtonByText(target, "Upload File").click();
+    await flushNativePick();
+
+    expect(state.ui.showToast).toHaveBeenCalledOnce();
+    expect(state.ui.showToast.mock.calls[0][0]).toContain("1");
+    expect(state.ui.showToast.mock.calls[0][0]).toContain("2");
+    cleanup();
+  });
+
+  it("surfaces folderNoTextFiles in fileError when a project folder pick yields nothing", async () => {
+    state.ui = { showToast: vi.fn() };
+    installAndroidBridgeMock(() => ({
+      files: [],
+      folderName: "repo",
+      skipped: [{ name: "photo.png", reason: "unsupported-type" }],
+    }));
+    const { target, cleanup } = renderSvelte(ProjectsManager, { onback: vi.fn() });
+    await openProjectDetail(target);
+
+    getButtonByText(target, "Upload Folder").click();
+    await flushNativePick();
+
+    expect(target.textContent).toContain(
+      "No supported text files were found in the selected folder.",
+    );
+    cleanup();
+  });
+
+  it("maps picker-timeout to the localized message", async () => {
+    vi.useFakeTimers();
+    state.ui = { showToast: vi.fn() };
+    process.env.BDS_TARGET = "android";
+    window.AndroidBridge = { pickFiles: vi.fn() };
+    const { target, cleanup } = renderSvelte(ProjectsManager, { onback: vi.fn() });
+    await openProjectDetail(target);
+
+    getButtonByText(target, "Upload File").click();
+    await vi.advanceTimersByTimeAsync(10000);
+    await flushUi();
+
+    expect(state.ui.showToast).toHaveBeenCalledWith(
+      "The file picker did not return a result. Please try again.",
+    );
     cleanup();
   });
 });

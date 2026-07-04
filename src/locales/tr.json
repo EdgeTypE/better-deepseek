@@ -113,6 +113,14 @@
       "chatSessionCapHint": "Kenar çubuğunda bellekte tutulacak maksimum sohbet oturumu sayısı. Sınırı aşan eski oturumlar silinir (FIFO). Düşük değerler uzun süreli sekmelerde bellek kullanımını azaltır. Varsayılan 500.",
       "githubToken": "GitHub Kişisel Erişim Tokenı (PAT)",
       "githubTokenPlaceholder": "ghp_...",
+      "deepResearchContextGuard": "Deep Research Bağlam Koruması",
+      "contextGuardEnabled": "Bağlam Korumasını etkinleştir",
+      "contextGuardEnabledHint": "Yönetilen Deep Research'ü sohbet bağlam penceresi tükenmeden durdurur. Gizli eklenti yönergelerini, kanıt özetlerini ve sunucunun bildirdiği kullanımı izler.",
+      "contextGuardLimit": "Bağlam Limiti (token)",
+      "contextGuardLimitHint": "DeepSeek web sohbeti bağlam penceresi boyutu. Varsayılan 128.000 token.",
+      "contextGuardStopPercent": "Durdurma Eşiği (%)",
+      "contextGuardStopPercentHint": "Tahmini bağlam {{threshold}} tokene ulaştığında Deep Research'ü durdurur. 50-95% aralığıyla sınırlandırılır.",
+      "enabled": "Etkin",
       "githubTokenHelp": "GitHub Ayarları -> Tokens altından repo yetkili klasik bir token oluşturun.",
       "githubTokenShow": "Göster",
       "githubTokenHide": "Gizle",
@@ -244,6 +252,10 @@
       "importError": "Lütfen önce AI yanıtını yapıştırın."
     },
     "projectsManager": {
+      "noFilesPicked": "Hiçbir şey eklenmedi - seçilen dosya(lar) desteklenmiyor, çok büyük (2 MB üzeri) veya ikili dosya.",
+      "someFilesSkipped": "Seçilen {{total}} dosyadan {{skipped}} tanesi eklenemedi (desteklenmiyor, çok büyük veya ikili).",
+      "folderNoTextFiles": "Seçilen klasörde desteklenen metin dosyası bulunamadı.",
+      "pickTimeout": "Dosya seçici sonuç döndürmedi. Lütfen tekrar deneyin.",
       "back": "Geri",
       "title": "Projeler",
       "manage": "Projeleri Yönet",
@@ -334,6 +346,10 @@
       "dismiss": "Kapat"
     },
     "attachMenu": {
+      "noFilesPicked": "Hiçbir şey eklenmedi - seçilen dosya(lar) desteklenmiyor, çok büyük (2 MB üzeri) veya ikili dosya.",
+      "someFilesSkipped": "Seçilen {{total}} dosyadan {{skipped}} tanesi eklenemedi (desteklenmiyor, çok büyük veya ikili).",
+      "folderNoTextFiles": "Seçilen klasörde desteklenen metin dosyası bulunamadı.",
+      "pickTimeout": "Dosya seçici sonuç döndürmedi. Lütfen tekrar deneyin.",
       "buttonTitle": "Gelişmiş Yükleme",
       "attachProject": "Projeyi Bağla",
       "voicePrompt": "Sesli Komut",

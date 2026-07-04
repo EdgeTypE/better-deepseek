@@ -17,6 +17,7 @@
   import {
     isNativeFilePickerAvailable,
     nativePickFiles,
+    PICK_ERRORS,
   } from "../../platform/android-file-picker.js";
   import {
     supportsLocalDirectoryLinking,
@@ -137,16 +138,30 @@
     goBack();
   }
 
+  function pickErrorMessage(err, fallbackKey) {
+    const message = err?.message || "";
+    if (message === PICK_ERRORS.TIMEOUT || message === PICK_ERRORS.STALLED) {
+      return t("projectsManager.pickTimeout");
+    }
+    return message || t(fallbackKey);
+  }
+
   async function triggerFileUpload() {
     if (isAndroidTarget && isNativeFilePickerAvailable()) {
       try {
         const result = await nativePickFiles("files");
-        if (result.cancelled || !result.files || result.files.length === 0) {
+        if (result.cancelled) {
+          return;
+        }
+        const files = result.files || [];
+        const skipped = result.skipped || [];
+        if (files.length === 0) {
+          if (appState.ui) appState.ui.showToast(t("projectsManager.noFilesPicked"));
           return;
         }
         if (!fileInput) return;
         const dataTransfer = new DataTransfer();
-        for (const file of result.files) {
+        for (const file of files) {
           const blob = new Blob([file.content], { type: "text/plain" });
           dataTransfer.items.add(
             new File([blob], file.name, { type: "text/plain" }),
@@ -154,9 +169,15 @@
         }
         fileInput.files = dataTransfer.files;
         fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+        if (skipped.length > 0 && appState.ui) {
+          appState.ui.showToast(t("projectsManager.someFilesSkipped", {
+            skipped: skipped.length,
+            total: skipped.length + files.length,
+          }));
+        }
       } catch (err) {
         if (appState.ui) {
-          appState.ui.showToast(err?.message || t('projectsManager.filePickFailed'));
+          appState.ui.showToast(pickErrorMessage(err, "projectsManager.filePickFailed"));
         }
       }
       return;
@@ -231,12 +252,17 @@
         fileError = "";
         try {
           const result = await nativePickFiles("folder");
-          if (!result.cancelled && result.files && result.files.length > 0) {
+          if (!result.cancelled) {
+            const files = result.files || [];
+            if (files.length === 0) {
+              fileError = t("projectsManager.folderNoTextFiles");
+              return;
+            }
             const MAX_SIZE = 500 * 1024;
             const filesToAdd = [];
-            let skippedCount = 0;
+            let skippedCount = (result.skipped || []).length;
 
-            for (const file of result.files) {
+            for (const file of files) {
               if (new TextEncoder().encode(file.content).length > MAX_SIZE) {
                 skippedCount++;
                 continue;
@@ -261,7 +287,7 @@
             }
           }
         } catch (err) {
-          fileError = err?.message || t('projectsManager.folderPickFailed');
+          fileError = pickErrorMessage(err, "projectsManager.folderPickFailed");
         } finally {
           uploading = false;
           projectFiles = getFilesForProject(selectedProject.id);

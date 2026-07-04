@@ -252,6 +252,10 @@
       "importError": "Please paste the AI response first."
     },
     "projectsManager": {
+      "noFilesPicked": "Nothing was attached - the selected file(s) are unsupported, too large (over 2 MB), or binary.",
+      "someFilesSkipped": "{{skipped}} of {{total}} selected file(s) could not be attached (unsupported, too large, or binary).",
+      "folderNoTextFiles": "No supported text files were found in the selected folder.",
+      "pickTimeout": "The file picker did not return a result. Please try again.",
       "back": "Back",
       "title": "Projects",
       "manage": "Manage Projects",
@@ -342,6 +346,10 @@
       "dismiss": "Dismiss"
     },
     "attachMenu": {
+      "noFilesPicked": "Nothing was attached - the selected file(s) are unsupported, too large (over 2 MB), or binary.",
+      "someFilesSkipped": "{{skipped}} of {{total}} selected file(s) could not be attached (unsupported, too large, or binary).",
+      "folderNoTextFiles": "No supported text files were found in the selected folder.",
+      "pickTimeout": "The file picker did not return a result. Please try again.",
       "buttonTitle": "Advanced Upload",
       "attachProject": "Attach Project",
       "voicePrompt": "Voice Prompt",

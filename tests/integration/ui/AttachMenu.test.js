@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const folderMocks = vi.hoisted(() => ({
   pickFolderAndConcatenate: vi.fn(),
@@ -56,6 +56,7 @@ import state from "../../../src/content/state.js";
 import { remoteConfig } from "../../../src/lib/remote-config.svelte.js";
 import { resetAppState } from "../../helpers/app-state.js";
 import { renderSvelte, flushUi } from "../../helpers/svelte.js";
+import { dispatchPickResult } from "../../helpers/native-pick-protocol.js";
 
 function setupNativeInput() {
   const nativeInput = document.createElement("input");
@@ -69,6 +70,29 @@ function setupNativeInput() {
   nativeInput.click = vi.fn();
   document.body.appendChild(nativeInput);
   return nativeInput;
+}
+
+function getAttachItemByText(text) {
+  return Array.from(document.querySelectorAll(".bds-attach-item")).find((item) =>
+    item.textContent.includes(text),
+  );
+}
+
+function installAndroidBridgeMock(handler = () => window.__testPickPayload) {
+  process.env.BDS_TARGET = "android";
+  window.AndroidBridge = {
+    pickFiles: vi.fn((mode, requestId) => {
+      setTimeout(() => {
+        const payload = handler(mode, requestId);
+        dispatchPickResult(requestId, payload);
+      }, 0);
+    }),
+  };
+}
+
+async function flushNativePick() {
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  await flushUi();
 }
 
 describe("AttachMenu integration", () => {
@@ -95,6 +119,13 @@ describe("AttachMenu integration", () => {
     projectFileBuilderMocks.projectFilesToFile.mockReset();
     bridgeMocks.pushConfigToPage.mockReset();
     document.body.innerHTML = '<textarea id="chat-input"></textarea><button title="Send message"></button>';
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    delete process.env.BDS_TARGET;
+    delete window.AndroidBridge;
+    delete window.__testPickPayload;
   });
 
   async function flushModelWatcher() {
@@ -318,6 +349,122 @@ describe("AttachMenu integration", () => {
     await flushUi();
 
     expect(document.querySelector("#chat-input").value).toBe("voice text");
+    cleanup();
+  });
+
+  it("attaches native-picked files via the DOM input on Android", async () => {
+    installAndroidBridgeMock(() => ({
+      files: [{ name: "a.md", content: "# A" }],
+      skipped: [],
+    }));
+    const nativeInput = setupNativeInput();
+    const changeHandler = vi.fn();
+    nativeInput.addEventListener("change", changeHandler);
+    const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+
+    target.querySelector(".bds-plus-btn").click();
+    await flushUi();
+    getAttachItemByText("Upload File").click();
+    await flushNativePick();
+
+    expect(window.AndroidBridge.pickFiles).toHaveBeenCalledWith("files", expect.any(String));
+    expect(Array.from(nativeInput.files, (file) => file.name)).toEqual(["a.md"]);
+    expect(changeHandler).toHaveBeenCalled();
+    expect(state.ui.showToast).not.toHaveBeenCalled();
+    cleanup();
+  });
+
+  it("toasts when the native pick returns zero files with skips", async () => {
+    installAndroidBridgeMock(() => ({
+      files: [],
+      skipped: [{ name: "photo.png", reason: "unsupported-type" }],
+    }));
+    const nativeInput = setupNativeInput();
+    const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+
+    target.querySelector(".bds-plus-btn").click();
+    await flushUi();
+    getAttachItemByText("Upload File").click();
+    await flushNativePick();
+
+    expect(nativeInput.files).toHaveLength(0);
+    expect(state.ui.showToast).toHaveBeenCalledWith(
+      "Nothing was attached - the selected file(s) are unsupported, too large (over 2 MB), or binary.",
+    );
+    cleanup();
+  });
+
+  it("toasts a partial-skip summary", async () => {
+    installAndroidBridgeMock(() => ({
+      files: [{ name: "a.md", content: "# A" }],
+      skipped: [{ name: "photo.png", reason: "unsupported-type" }],
+    }));
+    const nativeInput = setupNativeInput();
+    const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+
+    target.querySelector(".bds-plus-btn").click();
+    await flushUi();
+    getAttachItemByText("Upload File").click();
+    await flushNativePick();
+
+    expect(Array.from(nativeInput.files, (file) => file.name)).toEqual(["a.md"]);
+    expect(state.ui.showToast).toHaveBeenCalledOnce();
+    expect(state.ui.showToast.mock.calls[0][0]).toContain("1");
+    expect(state.ui.showToast.mock.calls[0][0]).toContain("2");
+    cleanup();
+  });
+
+  it("toasts folderNoTextFiles when a folder pick yields no files", async () => {
+    installAndroidBridgeMock(() => ({
+      files: [],
+      folderName: "repo",
+      skipped: [{ name: "photo.png", reason: "unsupported-type" }],
+    }));
+    const nativeInput = setupNativeInput();
+    const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+
+    target.querySelector(".bds-plus-btn").click();
+    await flushUi();
+    getAttachItemByText("Upload Folder").click();
+    await flushNativePick();
+
+    expect(state.ui.showToast).toHaveBeenCalledWith(
+      "No supported text files were found in the selected folder.",
+    );
+    cleanup();
+  });
+
+  it("toasts pickTimeout when the picker rejects with picker-timeout", async () => {
+    vi.useFakeTimers();
+    process.env.BDS_TARGET = "android";
+    window.AndroidBridge = { pickFiles: vi.fn() };
+    const nativeInput = setupNativeInput();
+    const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+
+    target.querySelector(".bds-plus-btn").click();
+    await flushUi();
+    getAttachItemByText("Upload File").click();
+    await vi.advanceTimersByTimeAsync(10000);
+    await flushUi();
+
+    expect(state.ui.showToast).toHaveBeenCalledWith(
+      "The file picker did not return a result. Please try again.",
+    );
+    cleanup();
+  });
+
+  it("stays silent on user cancel", async () => {
+    installAndroidBridgeMock(() => ({ error: "cancelled", files: [] }));
+    const nativeInput = setupNativeInput();
+    const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+
+    target.querySelector(".bds-plus-btn").click();
+    await flushUi();
+    getAttachItemByText("Upload File").click();
+    await flushNativePick();
+
+    expect(nativeInput.files).toHaveLength(0);
+    expect(state.ui.showToast).not.toHaveBeenCalled();
     cleanup();
   });
 });

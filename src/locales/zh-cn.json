@@ -251,6 +251,10 @@
       "importError": "请先粘贴 AI 的回复。"
     },
     "projectsManager": {
+      "noFilesPicked": "未附加任何内容 - 所选文件不受支持、过大（超过 2 MB）或为二进制文件。",
+      "someFilesSkipped": "所选 {{total}} 个文件中有 {{skipped}} 个无法附加（不受支持、过大或为二进制）。",
+      "folderNoTextFiles": "所选文件夹中未找到受支持的文本文件。",
+      "pickTimeout": "文件选择器未返回结果。请重试。",
       "back": "返回",
       "title": "项目",
       "manage": "管理项目",
@@ -341,6 +345,10 @@
       "dismiss": "关闭"
     },
     "attachMenu": {
+      "noFilesPicked": "未附加任何内容 - 所选文件不受支持、过大（超过 2 MB）或为二进制文件。",
+      "someFilesSkipped": "所选 {{total}} 个文件中有 {{skipped}} 个无法附加（不受支持、过大或为二进制）。",
+      "folderNoTextFiles": "所选文件夹中未找到受支持的文本文件。",
+      "pickTimeout": "文件选择器未返回结果。请重试。",
       "buttonTitle": "高级上传",
       "attachProject": "关联项目",
       "voicePrompt": "语音输入",

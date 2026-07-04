@@ -170,6 +170,46 @@ test("Upload Folder on Android uses native picker bridge and injects workspace",
     .toBe("folder");
 });
 
+test("reassembles multi-chunk native folder payloads", async ({ page }) => {
+  await page.evaluate(() => {
+    window.__bdsPickChunkSize = 64;
+    window.__bdsNativeFilePicker = () => ({
+      files: [{ name: "src/big.js", content: "x".repeat(5000) }],
+      folderName: "repo",
+      skipped: [],
+    });
+  });
+
+  await page.locator(".bds-plus-btn").click({ force: true });
+  await page
+    .locator(".bds-attach-dropdown .bds-attach-item")
+    .filter({ hasText: "Upload Folder" })
+    .click({ force: true });
+
+  await expect
+    .poll(() => page.evaluate(() => window.__mockDeepSeek.getAttachedFiles()))
+    .toContain("repo_workspace.txt");
+});
+
+test("shows a toast when the native picker returns only skipped files", async ({ page }) => {
+  await page.evaluate(() => {
+    window.__bdsNativeFilePicker = () => ({
+      files: [],
+      skipped: [{ name: "photo.png", reason: "unsupported-type" }],
+    });
+  });
+
+  await page.locator(".bds-plus-btn").click({ force: true });
+  await page
+    .locator(".bds-attach-dropdown .bds-attach-item")
+    .filter({ hasText: "Upload File" })
+    .click({ force: true });
+
+  await expect(page.locator("#bds-toast-stack .bds-toast")).toContainText(
+    "Nothing was attached",
+  );
+});
+
 test("drawer import inputs stay single-file on Android", async ({ page }) => {
   await openDrawer(page);
   await page.evaluate(() => {
