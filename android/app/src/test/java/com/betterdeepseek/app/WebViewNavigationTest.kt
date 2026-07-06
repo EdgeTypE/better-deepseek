@@ -5,6 +5,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.widget.FrameLayout
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -85,6 +86,16 @@ class WebViewNavigationTest {
 
         val result = webView.webViewClient.shouldOverrideUrlLoading(webView, request)
         assertFalse("Google OAuth URL must stay inside WebView", result)
+    }
+
+    @Test
+    fun `Google OAuth requests are not intercepted`() {
+        val request = mock<WebResourceRequest> {
+            on { url } doReturn Uri.parse("https://accounts.google.com/o/oauth2/v2/auth")
+        }
+
+        val result = webView.webViewClient.shouldInterceptRequest(webView, request)
+        assertNull("Google OAuth should load through the native WebView network stack", result)
     }
 
     @Test

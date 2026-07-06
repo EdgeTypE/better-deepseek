@@ -28,11 +28,10 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.webkit.UserAgentMetadata
+import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewAssetLoader
-import java.io.ByteArrayInputStream
-import java.util.concurrent.TimeUnit
-import okhttp3.OkHttpClient
-import okhttp3.Request
+import androidx.webkit.WebViewFeature
 
 internal fun applyRootWindowInsets(view: View, windowInsets: WindowInsetsCompat): WindowInsetsCompat {
     val systemBars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -53,6 +52,7 @@ internal fun shouldOpenExternally(url: Uri, assetHost: String = "bds-asset.local
     val host = url.host?.lowercase() ?: return false
     if (host == assetHost.lowercase()) return false
     if (host == "deepseek.com" || host.endsWith(".deepseek.com")) return false
+    if (host == "hcaptcha.com" || host.endsWith(".hcaptcha.com")) return false
     if (
             host == "accounts.google.com" ||
                     host.endsWith(".accounts.google.com") ||
@@ -62,6 +62,41 @@ internal fun shouldOpenExternally(url: Uri, assetHost: String = "bds-asset.local
     }
 
     return true
+}
+
+internal fun deriveWebViewUserAgent(defaultUserAgent: String): String {
+    return defaultUserAgent
+            .replace(Regex(""";\s*wv(?=\))"""), "")
+            .replace(Regex("""\bVersion/\d+(?:\.\d+)*\s*"""), "")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+}
+
+internal fun parseChromeMajorVersion(ua: String): String? {
+    return CHROME_VERSION_REGEX.find(ua)?.groupValues?.get(1)?.substringBefore('.')
+}
+
+internal fun buildUserAgentMetadata(derivedUa: String): UserAgentMetadata {
+    val chromeVersion = CHROME_VERSION_REGEX.find(derivedUa)?.groupValues?.get(1)
+    val builder = UserAgentMetadata.Builder().setPlatform("Android").setMobile(true)
+    if (chromeVersion != null) {
+        val majorVersion = chromeVersion.substringBefore('.')
+        val brandVersions =
+                listOf(
+                        UserAgentMetadata.BrandVersion.Builder()
+                                .setBrand("Chromium")
+                                .setMajorVersion(majorVersion)
+                                .setFullVersion(chromeVersion)
+                                .build(),
+                        UserAgentMetadata.BrandVersion.Builder()
+                                .setBrand("Google Chrome")
+                                .setMajorVersion(majorVersion)
+                                .setFullVersion(chromeVersion)
+                                .build(),
+                )
+        builder.setFullVersion(chromeVersion).setBrandVersionList(brandVersions)
+    }
+    return builder.build()
 }
 
 internal fun buildFileChooserIntent(acceptTypes: Array<String>?, allowMultiple: Boolean): Intent {
@@ -125,14 +160,11 @@ private fun mapAcceptTypes(acceptTypes: Array<String>?): List<String> {
     return mapped.toList()
 }
 
+private val CHROME_VERSION_REGEX = Regex("""\bChrome/(\d+(?:\.\d+)*)""")
+
 /**
  * Single-activity host. Loads chat.deepseek.com inside a full-screen WebView and injects the BDS
  * extension scripts on every page finish.
- *
- * Google OAuth is proxied through OkHttp via [shouldInterceptRequest] so the code_verifier /
- * code_challenge pair generated in the WebView's JavaScript context is preserved. Cookies flow
- * bidirectionally: the WebView's [CookieManager] cookies are forwarded on proxy requests, and
- * `Set-Cookie` response headers are fed back into the WebView's cookie store.
  */
 class MainActivity : ComponentActivity() {
 
@@ -211,15 +243,6 @@ class MainActivity : ComponentActivity() {
                 }.start()
             }
 
-    private val proxyClient: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-                .connectTimeout(20, TimeUnit.SECONDS)
-                .readTimeout(60, TimeUnit.SECONDS)
-                .callTimeout(120, TimeUnit.SECONDS)
-                .followRedirects(false)
-                .build()
-    }
-
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -262,6 +285,8 @@ class MainActivity : ComponentActivity() {
         // DeepSeek's persisted theme drives colours; system dark mode is only the first-launch
         // fallback (before any reportTheme call has been persisted to prefs).
         val isPageDark = bridge.getLastKnownIsDark(default = isSystemDark)
+        val derivedUserAgent =
+                deriveWebViewUserAgent(WebSettings.getDefaultUserAgent(this@MainActivity))
 
         webView =
                 WebView(this).apply {
@@ -279,7 +304,7 @@ class MainActivity : ComponentActivity() {
                         mediaPlaybackRequiresUserGesture = false
                         mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                         cacheMode = WebSettings.LOAD_DEFAULT
-                        userAgentString = String.format(SPOOFED_UA, BuildConfig.VERSION_NAME)
+                        userAgentString = derivedUserAgent
                     }
                     addJavascriptInterface(bridge, BRIDGE_NAME)
                     webViewClient = bdsWebViewClient()
@@ -290,6 +315,7 @@ class MainActivity : ComponentActivity() {
                 }
 
         configureWebViewCookiePolicy(webView)
+        configureWebViewFingerprint(webView, derivedUserAgent)
         applySystemLocaleCookie()
 
         // FrameLayout wrapper receives system-bar padding and expands its bottom inset for IME.
@@ -324,6 +350,9 @@ class MainActivity : ComponentActivity() {
         }
 
         setContentView(rootLayout)
+        if (BuildConfig.DEBUG) {
+            WebView.setWebContentsDebuggingEnabled(true)
+        }
         webView.loadUrl(getString(R.string.bds_target_url))
 
         onBackPressedDispatcher.addCallback(
@@ -344,6 +373,21 @@ class MainActivity : ComponentActivity() {
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(webView, true)
         cookieManager.flush()
+    }
+
+    private fun configureWebViewFingerprint(webView: WebView, derivedUa: String) {
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
+            WebSettingsCompat.setRequestedWithHeaderOriginAllowList(
+                    webView.settings,
+                    emptySet<String>(),
+            )
+        }
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA)) {
+            WebSettingsCompat.setUserAgentMetadata(
+                    webView.settings,
+                    buildUserAgentMetadata(derivedUa),
+            )
+        }
     }
 
     private fun applySystemLocaleCookie() {
@@ -408,10 +452,8 @@ class MainActivity : ComponentActivity() {
             object : WebViewClient() {
 
                 /**
-                 * Intercept Google OAuth requests and proxy them through OkHttp. This keeps the
-                 * entire OAuth flow inside the WebView's cookie jar so the code_verifier /
-                 * code_challenge generated in JavaScript is preserved. All other requests fall
-                 * through to the asset loader or native WebView loading.
+                 * Serve bundled BDS assets. Network requests fall through to native WebView
+                 * loading so Chromium owns a single session and transport path.
                  */
                 override fun shouldInterceptRequest(
                         view: WebView,
@@ -419,10 +461,6 @@ class MainActivity : ComponentActivity() {
                 ): WebResourceResponse? {
                     assetLoader.shouldInterceptRequest(request.url)?.let {
                         return it
-                    }
-
-                    if (isGoogleOAuthUrl(request.url)) {
-                        return proxyGoogleOAuthRequest(request)
                     }
 
                     return null
@@ -480,8 +518,7 @@ class MainActivity : ComponentActivity() {
 
                 /**
                  * Supply a stub WebView when JS calls window.open() so the caller never receives
-                 * null. Google OAuth navigations are intercepted by [shouldInterceptRequest] and do
-                 * not need a popup.
+                 * null. Visible popup targets still go through the same external-link routing.
                  */
                 override fun onCreateWindow(
                         view: WebView?,
@@ -506,7 +543,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-    // ── OAuth proxy ──────────────────────────────────────────────────────
+    // External URL handling
 
     private fun openExternalUrl(url: Uri): Boolean {
         return runCatching {
@@ -518,106 +555,6 @@ class MainActivity : ComponentActivity() {
                 }
                 .onFailure { Log.w(TAG, "Failed to open external URL: $url", it) }
                 .isSuccess
-    }
-
-    /** Domains that must be proxied so the OAuth code_verifier state survives. */
-    private fun isGoogleOAuthUrl(url: Uri): Boolean {
-        val host = url.host?.lowercase() ?: return false
-        return host == "accounts.google.com" ||
-                host.endsWith(".accounts.google.com") ||
-                host == "accounts.youtube.com"
-    }
-
-    /**
-     * Forward the WebView request through OkHttp and return a [WebResourceResponse] the WebView can
-     * consume.
-     *
-     * - Strips `X-Requested-With` so Google doesn't reject the embedded UA.
-     * - Forwards the WebView's cookies into the proxy request.
-     * - Feeds `Set-Cookie` response headers back into the WebView's cookie manager so subsequent
-     * requests carry the correct session.
-     * - On failure, returns `null` so the WebView falls back to native loading (the user may see a
-     * "disallowed_useragent" page, but will not be stuck with an indefinite spinner).
-     */
-    private fun proxyGoogleOAuthRequest(request: WebResourceRequest): WebResourceResponse? {
-        return try {
-            val url = request.url.toString()
-            val method = request.method
-            val requestHeaders = request.requestHeaders
-
-            val builder = Request.Builder().url(url)
-
-            // Mirror safe headers, strip X-Requested-With
-            for ((name, value) in requestHeaders) {
-                if (name.equals("X-Requested-With", ignoreCase = true)) continue
-                if (name.equals("Host", ignoreCase = true)) continue
-                if (name.equals("Connection", ignoreCase = true)) continue
-                if (name.equals("Accept-Encoding", ignoreCase = true)) continue
-                if (name.equals("Content-Length", ignoreCase = true)) continue
-                builder.header(name, value)
-            }
-
-            // Forward WebView cookies so the proxy request carries the
-            // same session state (including any prior OAuth cookies).
-            val cookies = cookieManager.getCookie(url)
-            if (!cookies.isNullOrEmpty()) {
-                builder.header("Cookie", cookies)
-            }
-
-            // WebResourceRequest does not expose the request body, so POST/PUT
-            // cannot be proxied. Fall through to native WebView loading — the
-            // spoofed UA alone is usually sufficient for form-submission POSTs
-            // to succeed. The critical GET-based OAuth authorization requests
-            // are fully proxied with X-Requested-With stripped.
-            if (!method.equals("GET", ignoreCase = true) &&
-                            !method.equals("HEAD", ignoreCase = true)
-            ) {
-                return null
-            }
-
-            val proxyResponse = proxyClient.newCall(builder.build()).execute()
-            proxyResponse.use { resp ->
-                // Feed Set-Cookie back into the WebView
-                val setCookieHeaders = resp.headers("Set-Cookie")
-                for (cookie in setCookieHeaders) {
-                    cookieManager.setCookie(url, cookie)
-                }
-                cookieManager.flush()
-
-                val responseBody = resp.body?.bytes() ?: ByteArray(0)
-                val responseHeaders = mutableMapOf<String, String>()
-
-                for ((name, value) in resp.headers) {
-                    if (name.equals("Set-Cookie", ignoreCase = true)) continue
-                    if (name.equals("Content-Encoding", ignoreCase = true)) continue
-                    if (name.equals("Transfer-Encoding", ignoreCase = true)) continue
-                    if (name.equals("Content-Length", ignoreCase = true)) continue
-                    responseHeaders[name] = value
-                }
-
-                val fullContentType = resp.header("Content-Type") ?: "text/html"
-                val mimeType = fullContentType.split(";").firstOrNull()?.trim() ?: "text/html"
-                val encoding =
-                        if (mimeType.startsWith("text/") ||
-                                        mimeType == "application/json" ||
-                                        mimeType == "application/javascript"
-                        )
-                                "UTF-8"
-                        else null
-
-                WebResourceResponse(
-                        mimeType,
-                        encoding,
-                        resp.code,
-                        resp.message,
-                        responseHeaders,
-                        ByteArrayInputStream(responseBody)
-                )
-            }
-        } catch (t: Throwable) {
-            Log.e(TAG, "OAuth proxy failed for ${request.url}", t)
-            null
-        }
     }
 
     // ── BDS script injection ─────────────────────────────────────────────
@@ -704,16 +641,5 @@ class MainActivity : ComponentActivity() {
         // blends seamlessly before (and if) the page reports its live theme via reportTheme().
         private val PAGE_BG_DARK = Color.rgb(0x15, 0x15, 0x17)
         private val PAGE_BG_LIGHT = Color.WHITE
-
-        /**
-         * Fully synthetic Chrome-mobile UA string. Servers that block embedded WebViews (notably
-         * Google OAuth) check for the legacy "; wv)" marker AND for the `Version/4.0` part that
-         * Android WebView adds even when the stock UA is customised. We replace the entire string.
-         */
-        private const val SPOOFED_UA =
-                "Mozilla/5.0 (Linux; Android 14; Pixel 9 Pro) " +
-                        "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                        "Chrome/132.0.6834.122 Mobile Safari/537.36 " +
-                        "BetterDeepSeekAndroid/%s"
     }
 }

@@ -41,6 +41,17 @@ class AndroidLinkRoutingTest {
     }
 
     @Test
+    fun `hCaptcha hosts stay inside the WebView`() {
+        assertFalse(shouldOpenExternally(Uri.parse("https://hcaptcha.com/")))
+        assertFalse(
+                shouldOpenExternally(
+                        Uri.parse("https://newassets.hcaptcha.com/captcha/v1/hcaptcha.html")
+                )
+        )
+        assertFalse(shouldOpenExternally(Uri.parse("https://api.hcaptcha.com/getcaptcha")))
+    }
+
+    @Test
     fun `non-http schemes are not routed as browser links`() {
         assertFalse(shouldOpenExternally(Uri.parse("mailto:hello@example.com")))
         assertFalse(shouldOpenExternally(Uri.parse("javascript:alert(1)")))
