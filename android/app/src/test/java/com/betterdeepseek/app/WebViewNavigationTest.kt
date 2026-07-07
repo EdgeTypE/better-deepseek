@@ -56,14 +56,29 @@ class WebViewNavigationTest {
     }
 
     @Test
-    fun `top-level external URL opens in browser`() {
+    fun `top-level external URL from a user gesture opens in browser`() {
         val request = mock<WebResourceRequest> {
             on { url } doReturn Uri.parse("https://github.com/EdgeTypE/better-deepseek")
             on { isForMainFrame } doReturn true
+            on { hasGesture() } doReturn true
         }
 
         val result = webView.webViewClient.shouldOverrideUrlLoading(webView, request)
-        assertTrue("External top-level URL must open externally", result)
+        assertTrue("External top-level URL from a tap must open externally", result)
+    }
+
+    @Test
+    fun `external redirect without a gesture stays in WebView`() {
+        // OAuth redirect chains (302 / JS hops through non-allowlisted Google hosts) carry no
+        // gesture; externalizing them drops the session cookies and yields Google 400.
+        val request = mock<WebResourceRequest> {
+            on { url } doReturn Uri.parse("https://www.google.co.in/oauth/continue?state=abc")
+            on { isForMainFrame } doReturn true
+            on { hasGesture() } doReturn false
+        }
+
+        val result = webView.webViewClient.shouldOverrideUrlLoading(webView, request)
+        assertFalse("Non-gesture OAuth redirect must stay inside WebView", result)
     }
 
     @Test

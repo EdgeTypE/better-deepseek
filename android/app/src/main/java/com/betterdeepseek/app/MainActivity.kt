@@ -71,6 +71,25 @@ internal fun shouldCapturePopupInApp(url: Uri, assetHost: String = "bds-asset.lo
     return !shouldOpenExternally(url, assetHost)
 }
 
+/**
+ * Decide whether a top-level navigation should be handed to the external browser.
+ *
+ * Only deliberate user-gesture navigations leave the app. OAuth redirect chains bounce through
+ * Google consent / ccTLD hosts that are not on the in-app allow list via 302 and JS redirects,
+ * none of which carry a gesture. Routing those to an external browser drops the WebView session
+ * cookies, so Google returns "400 malformed request". Keeping non-gesture navigations in-app
+ * lets the whole sign-in flow complete inside the WebView session.
+ */
+internal fun shouldOpenRequestExternally(
+        request: WebResourceRequest,
+        assetHost: String = "bds-asset.local"
+): Boolean {
+    if (!request.isForMainFrame) return false
+    val url = request.url ?: return false
+    if (!shouldOpenExternally(url, assetHost)) return false
+    return request.hasGesture()
+}
+
 internal fun deriveWebViewUserAgent(defaultUserAgent: String): String {
     return defaultUserAgent
             .replace(Regex(""";\s*wv(?=\))"""), "")
@@ -520,10 +539,8 @@ class MainActivity : ComponentActivity() {
                 ): Boolean {
                     val url = request.url ?: return false
                     // Never externalize subframe/iframe navigations (e.g. hCaptcha captcha
-                    // iframes, embedded auth flows). Only top-level navigation decisions are
-                    // delegated to shouldOpenExternally.
-                    if (!request.isForMainFrame) return false
-                    if (!shouldOpenExternally(url, getString(R.string.bds_asset_authority))) {
+                    // iframes, embedded auth flows) or non-gesture redirect hops (OAuth chains).
+                    if (!shouldOpenRequestExternally(request, getString(R.string.bds_asset_authority))) {
                         return false
                     }
                     return openExternalUrl(url)
@@ -596,8 +613,7 @@ class MainActivity : ComponentActivity() {
                         request: WebResourceRequest
                 ): Boolean {
                     val url = request.url ?: return false
-                    if (!request.isForMainFrame) return false
-                    if (!shouldOpenExternally(url, getString(R.string.bds_asset_authority))) {
+                    if (!shouldOpenRequestExternally(request, getString(R.string.bds_asset_authority))) {
                         return false
                     }
                     openExternalUrl(url)
