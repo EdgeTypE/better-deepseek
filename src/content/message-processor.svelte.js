@@ -498,7 +498,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
     if (hasTags) {
       // Ensure a stable loading index for this message
       if (!stateData.loadingIndex) {
-        stateData.loadingIndex = Math.floor(Math.random() * 3) + 1;
+        stateData.loadingIndex = Math.floor(Math.random() * 4) + 1;
       }
       const loadingIndex = stateData.loadingIndex;
       
