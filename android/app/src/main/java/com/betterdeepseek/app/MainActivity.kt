@@ -28,11 +28,10 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.webkit.UserAgentMetadata
+import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewAssetLoader
-import java.io.ByteArrayInputStream
-import java.util.concurrent.TimeUnit
-import okhttp3.OkHttpClient
-import okhttp3.Request
+import androidx.webkit.WebViewFeature
 
 internal fun applyRootWindowInsets(view: View, windowInsets: WindowInsetsCompat): WindowInsetsCompat {
     val systemBars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -53,15 +52,102 @@ internal fun shouldOpenExternally(url: Uri, assetHost: String = "bds-asset.local
     val host = url.host?.lowercase() ?: return false
     if (host == assetHost.lowercase()) return false
     if (host == "deepseek.com" || host.endsWith(".deepseek.com")) return false
-    if (
-            host == "accounts.google.com" ||
-                    host.endsWith(".accounts.google.com") ||
-                    host == "accounts.youtube.com"
-    ) {
-        return false
-    }
+    if (host == "hcaptcha.com" || host.endsWith(".hcaptcha.com")) return false
+    if (isGoogleAuthHost(host)) return false
 
     return true
+}
+
+internal fun isGoogleAuthHost(host: String): Boolean {
+    val h = host.lowercase()
+    return h == "google.com" ||
+            h.endsWith(".google.com") ||
+            h == "accounts.youtube.com" ||
+            h == "googleusercontent.com" ||
+            h.endsWith(".googleusercontent.com")
+}
+
+internal fun shouldCapturePopupInApp(url: Uri, assetHost: String = "bds-asset.local"): Boolean {
+    return !shouldOpenExternally(url, assetHost)
+}
+
+/**
+ * Decide whether a top-level navigation should be handed to the external browser.
+ *
+ * Only deliberate user-gesture navigations leave the app. OAuth redirect chains bounce through
+ * Google consent / ccTLD hosts that are not on the in-app allow list via 302 and JS redirects,
+ * none of which carry a gesture. Routing those to an external browser drops the WebView session
+ * cookies, so Google returns "400 malformed request". Keeping non-gesture navigations in-app
+ * lets the whole sign-in flow complete inside the WebView session.
+ */
+internal fun shouldOpenRequestExternally(
+        request: WebResourceRequest,
+        assetHost: String = "bds-asset.local"
+): Boolean {
+    if (!request.isForMainFrame) return false
+    val url = request.url ?: return false
+    if (!shouldOpenExternally(url, assetHost)) return false
+    return request.hasGesture()
+}
+
+internal fun deriveWebViewUserAgent(defaultUserAgent: String): String {
+    return defaultUserAgent
+            .replace(Regex(""";\s*wv(?=\))"""), "")
+            .replace(Regex("""\bVersion/\d+(?:\.\d+)*\s*"""), "")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+}
+
+internal fun parseChromeMajorVersion(ua: String): String? {
+    return CHROME_VERSION_REGEX.find(ua)?.groupValues?.get(1)?.substringBefore('.')
+}
+
+internal fun parseAndroidPlatformVersion(ua: String): String? {
+    return Regex("""Android\s+(\d+(?:\.\d+)*)""").find(ua)?.groupValues?.get(1)
+}
+
+internal fun parseDeviceModel(ua: String): String? {
+    val inner =
+            Regex("""Android\s+[\d.]+;\s*([^;)]+)""")
+                    .find(ua)
+                    ?.groupValues
+                    ?.get(1)
+                    ?.trim()
+                    ?: return null
+    return inner.substringBefore(" Build/").trim().ifBlank { null }
+}
+
+internal fun buildUserAgentMetadata(derivedUa: String): UserAgentMetadata {
+    val builder = UserAgentMetadata.Builder().setPlatform("Android").setMobile(true)
+    val chromeVersion = CHROME_VERSION_REGEX.find(derivedUa)?.groupValues?.get(1)
+    if (chromeVersion != null) {
+        val majorVersion = chromeVersion.substringBefore('.')
+        val brandVersions =
+                listOf(
+                        // GREASE brand; real Chrome includes a placeholder brand.
+                        UserAgentMetadata.BrandVersion.Builder()
+                                .setBrand("Not/A)Brand")
+                                .setMajorVersion("8")
+                                .setFullVersion("8.0.0.0")
+                                .build(),
+                        UserAgentMetadata.BrandVersion.Builder()
+                                .setBrand("Chromium")
+                                .setMajorVersion(majorVersion)
+                                .setFullVersion(chromeVersion)
+                                .build(),
+                        UserAgentMetadata.BrandVersion.Builder()
+                                .setBrand("Google Chrome")
+                                .setMajorVersion(majorVersion)
+                                .setFullVersion(chromeVersion)
+                                .build(),
+                )
+        builder.setFullVersion(chromeVersion).setBrandVersionList(brandVersions)
+    }
+    // Mobile Chrome sends empty architecture and default bitness; platformVersion and model match the UA.
+    builder.setArchitecture("").setBitness(UserAgentMetadata.BITNESS_DEFAULT)
+    parseAndroidPlatformVersion(derivedUa)?.let { builder.setPlatformVersion(it) }
+    parseDeviceModel(derivedUa)?.let { builder.setModel(it) }
+    return builder.build()
 }
 
 internal fun buildFileChooserIntent(acceptTypes: Array<String>?, allowMultiple: Boolean): Intent {
@@ -125,21 +211,23 @@ private fun mapAcceptTypes(acceptTypes: Array<String>?): List<String> {
     return mapped.toList()
 }
 
+private val CHROME_VERSION_REGEX = Regex("""\bChrome/(\d+(?:\.\d+)*)""")
+
 /**
  * Single-activity host. Loads chat.deepseek.com inside a full-screen WebView and injects the BDS
  * extension scripts on every page finish.
- *
- * Google OAuth is proxied through OkHttp via [shouldInterceptRequest] so the code_verifier /
- * code_challenge pair generated in the WebView's JavaScript context is preserved. Cookies flow
- * bidirectionally: the WebView's [CookieManager] cookies are forwarded on proxy requests, and
- * `Set-Cookie` response headers are fed back into the WebView's cookie store.
  */
 class MainActivity : ComponentActivity() {
 
     private lateinit var webView: WebView
+    private lateinit var rootLayout: FrameLayout
     private lateinit var assetLoader: WebViewAssetLoader
     private lateinit var bridge: WebViewBridge
     private lateinit var cookieManager: CookieManager
+    private lateinit var derivedUserAgent: String
+
+    private var popupContainer: FrameLayout? = null
+    private var popupWebView: WebView? = null
 
     private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
     private val fileChooserLauncher: ActivityResultLauncher<Intent> =
@@ -211,15 +299,6 @@ class MainActivity : ComponentActivity() {
                 }.start()
             }
 
-    private val proxyClient: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-                .connectTimeout(20, TimeUnit.SECONDS)
-                .readTimeout(60, TimeUnit.SECONDS)
-                .callTimeout(120, TimeUnit.SECONDS)
-                .followRedirects(false)
-                .build()
-    }
-
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -262,6 +341,8 @@ class MainActivity : ComponentActivity() {
         // DeepSeek's persisted theme drives colours; system dark mode is only the first-launch
         // fallback (before any reportTheme call has been persisted to prefs).
         val isPageDark = bridge.getLastKnownIsDark(default = isSystemDark)
+        derivedUserAgent =
+                deriveWebViewUserAgent(WebSettings.getDefaultUserAgent(this@MainActivity))
 
         webView =
                 WebView(this).apply {
@@ -270,17 +351,7 @@ class MainActivity : ComponentActivity() {
                                     ViewGroup.LayoutParams.MATCH_PARENT,
                                     ViewGroup.LayoutParams.MATCH_PARENT
                             )
-                    settings.apply {
-                        javaScriptEnabled = true
-                        domStorageEnabled = true
-                        databaseEnabled = true
-                        useWideViewPort = true
-                        loadWithOverviewMode = true
-                        mediaPlaybackRequiresUserGesture = false
-                        mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                        cacheMode = WebSettings.LOAD_DEFAULT
-                        userAgentString = String.format(SPOOFED_UA, BuildConfig.VERSION_NAME)
-                    }
+                    applyBdsWebSettings(this, derivedUserAgent)
                     addJavascriptInterface(bridge, BRIDGE_NAME)
                     webViewClient = bdsWebViewClient()
                     webChromeClient = bdsWebChromeClient()
@@ -289,13 +360,12 @@ class MainActivity : ComponentActivity() {
                     setBackgroundColor(if (isPageDark) PAGE_BG_DARK else PAGE_BG_LIGHT)
                 }
 
-        configureWebViewCookiePolicy(webView)
         applySystemLocaleCookie()
 
         // FrameLayout wrapper receives system-bar padding and expands its bottom inset for IME.
         // WebView.setPadding() does not shift the viewport reliably, so the wrapper is the
         // inset target. Its background fills the padding band behind the system bars.
-        val rootLayout = FrameLayout(this).apply {
+        rootLayout = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -324,13 +394,19 @@ class MainActivity : ComponentActivity() {
         }
 
         setContentView(rootLayout)
+        if (BuildConfig.DEBUG) {
+            WebView.setWebContentsDebuggingEnabled(true)
+        }
         webView.loadUrl(getString(R.string.bds_target_url))
 
         onBackPressedDispatcher.addCallback(
                 this,
                 object : OnBackPressedCallback(true) {
                     override fun handleOnBackPressed() {
-                        if (webView.canGoBack()) {
+                        val popup = popupWebView
+                        if (popup != null) {
+                            closePopup(popup)
+                        } else if (webView.canGoBack()) {
                             webView.goBack()
                         } else {
                             moveTaskToBack(true)
@@ -340,10 +416,44 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun applyBdsWebSettings(webView: WebView, derivedUa: String) {
+        webView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            databaseEnabled = true
+            useWideViewPort = true
+            loadWithOverviewMode = true
+            mediaPlaybackRequiresUserGesture = false
+            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            cacheMode = WebSettings.LOAD_DEFAULT
+            userAgentString = derivedUa
+            setSupportMultipleWindows(true)
+            javaScriptCanOpenWindowsAutomatically = true
+        }
+        configureWebViewCookiePolicy(webView)
+        configureWebViewFingerprint(webView, derivedUa)
+    }
+
     private fun configureWebViewCookiePolicy(webView: WebView) {
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(webView, true)
         cookieManager.flush()
+    }
+
+    private fun configureWebViewFingerprint(webView: WebView, derivedUa: String) {
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
+            WebSettingsCompat.setRequestedWithHeaderOriginAllowList(
+                    webView.settings,
+                    emptySet<String>(),
+            )
+        }
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA)) {
+            WebSettingsCompat.setUserAgentMetadata(
+                    webView.settings,
+                    buildUserAgentMetadata(derivedUa),
+            )
+        }
     }
 
     private fun applySystemLocaleCookie() {
@@ -381,6 +491,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        popupWebView?.let { closePopup(it) }
         bridge.onThemeChanged = null
         bridge.evaluateJs = null
         bridge.onPickFiles = null
@@ -408,10 +519,8 @@ class MainActivity : ComponentActivity() {
             object : WebViewClient() {
 
                 /**
-                 * Intercept Google OAuth requests and proxy them through OkHttp. This keeps the
-                 * entire OAuth flow inside the WebView's cookie jar so the code_verifier /
-                 * code_challenge generated in JavaScript is preserved. All other requests fall
-                 * through to the asset loader or native WebView loading.
+                 * Serve bundled BDS assets. Network requests fall through to native WebView
+                 * loading so Chromium owns a single session and transport path.
                  */
                 override fun shouldInterceptRequest(
                         view: WebView,
@@ -419,10 +528,6 @@ class MainActivity : ComponentActivity() {
                 ): WebResourceResponse? {
                     assetLoader.shouldInterceptRequest(request.url)?.let {
                         return it
-                    }
-
-                    if (isGoogleOAuthUrl(request.url)) {
-                        return proxyGoogleOAuthRequest(request)
                     }
 
                     return null
@@ -434,10 +539,8 @@ class MainActivity : ComponentActivity() {
                 ): Boolean {
                     val url = request.url ?: return false
                     // Never externalize subframe/iframe navigations (e.g. hCaptcha captcha
-                    // iframes, embedded auth flows). Only top-level navigation decisions are
-                    // delegated to shouldOpenExternally.
-                    if (!request.isForMainFrame) return false
-                    if (!shouldOpenExternally(url, getString(R.string.bds_asset_authority))) {
+                    // iframes, embedded auth flows) or non-gesture redirect hops (OAuth chains).
+                    if (!shouldOpenRequestExternally(request, getString(R.string.bds_asset_authority))) {
                         return false
                     }
                     return openExternalUrl(url)
@@ -479,9 +582,8 @@ class MainActivity : ComponentActivity() {
                 }
 
                 /**
-                 * Supply a stub WebView when JS calls window.open() so the caller never receives
-                 * null. Google OAuth navigations are intercepted by [shouldInterceptRequest] and do
-                 * not need a popup.
+                 * Capture OAuth popups in-app so window.opener/postMessage flows stay attached to
+                 * the main WebView session.
                  */
                 override fun onCreateWindow(
                         view: WebView?,
@@ -489,24 +591,87 @@ class MainActivity : ComponentActivity() {
                         isUserGesture: Boolean,
                         resultMsg: android.os.Message?
                 ): Boolean {
-                    val targetUrl = view?.hitTestResult?.extra
-                    if (!targetUrl.isNullOrBlank()) {
-                        val uri = Uri.parse(targetUrl)
-                        if (shouldOpenExternally(uri, getString(R.string.bds_asset_authority))) {
-                            openExternalUrl(uri)
-                            return false
-                        }
-                    }
-
-                    val transport = resultMsg?.obj as? WebView.WebViewTransport
-                    val stub = WebView(this@MainActivity)
-                    transport?.webView = stub
-                    resultMsg?.sendToTarget()
+                    val transport = resultMsg?.obj as? WebView.WebViewTransport ?: return false
+                    val popup =
+                            WebView(this@MainActivity).apply {
+                                applyBdsWebSettings(this, derivedUserAgent)
+                                webViewClient = popupWebViewClient(this)
+                                webChromeClient = popupWebChromeClient(this)
+                                setBackgroundColor(Color.WHITE)
+                            }
+                    attachPopup(popup)
+                    transport.webView = popup
+                    resultMsg.sendToTarget()
                     return true
                 }
             }
 
-    // ── OAuth proxy ──────────────────────────────────────────────────────
+    private fun popupWebViewClient(popup: WebView) =
+            object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(
+                        view: WebView,
+                        request: WebResourceRequest
+                ): Boolean {
+                    val url = request.url ?: return false
+                    if (!shouldOpenRequestExternally(request, getString(R.string.bds_asset_authority))) {
+                        return false
+                    }
+                    openExternalUrl(url)
+                    closePopup(popup)
+                    return true
+                }
+            }
+
+    private fun popupWebChromeClient(popup: WebView) =
+            object : WebChromeClient() {
+                override fun onCloseWindow(window: WebView?) {
+                    closePopup(popup)
+                }
+
+                override fun onCreateWindow(
+                        view: WebView?,
+                        isDialog: Boolean,
+                        isUserGesture: Boolean,
+                        resultMsg: android.os.Message?
+                ): Boolean {
+                    return false
+                }
+            }
+
+    private fun attachPopup(popup: WebView) {
+        popupWebView?.let { closePopup(it) }
+        val container =
+                FrameLayout(this).apply {
+                    layoutParams =
+                            FrameLayout.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                            )
+                    addView(
+                            popup,
+                            FrameLayout.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                            ),
+                    )
+                }
+        popupContainer = container
+        popupWebView = popup
+        rootLayout.addView(container)
+    }
+
+    private fun closePopup(popup: WebView) {
+        if (popupWebView !== popup) return
+        popupWebView = null
+        popupContainer?.let { container ->
+            container.removeView(popup)
+            rootLayout.removeView(container)
+        }
+        popupContainer = null
+        popup.destroy()
+    }
+
+    // External URL handling
 
     private fun openExternalUrl(url: Uri): Boolean {
         return runCatching {
@@ -518,106 +683,6 @@ class MainActivity : ComponentActivity() {
                 }
                 .onFailure { Log.w(TAG, "Failed to open external URL: $url", it) }
                 .isSuccess
-    }
-
-    /** Domains that must be proxied so the OAuth code_verifier state survives. */
-    private fun isGoogleOAuthUrl(url: Uri): Boolean {
-        val host = url.host?.lowercase() ?: return false
-        return host == "accounts.google.com" ||
-                host.endsWith(".accounts.google.com") ||
-                host == "accounts.youtube.com"
-    }
-
-    /**
-     * Forward the WebView request through OkHttp and return a [WebResourceResponse] the WebView can
-     * consume.
-     *
-     * - Strips `X-Requested-With` so Google doesn't reject the embedded UA.
-     * - Forwards the WebView's cookies into the proxy request.
-     * - Feeds `Set-Cookie` response headers back into the WebView's cookie manager so subsequent
-     * requests carry the correct session.
-     * - On failure, returns `null` so the WebView falls back to native loading (the user may see a
-     * "disallowed_useragent" page, but will not be stuck with an indefinite spinner).
-     */
-    private fun proxyGoogleOAuthRequest(request: WebResourceRequest): WebResourceResponse? {
-        return try {
-            val url = request.url.toString()
-            val method = request.method
-            val requestHeaders = request.requestHeaders
-
-            val builder = Request.Builder().url(url)
-
-            // Mirror safe headers, strip X-Requested-With
-            for ((name, value) in requestHeaders) {
-                if (name.equals("X-Requested-With", ignoreCase = true)) continue
-                if (name.equals("Host", ignoreCase = true)) continue
-                if (name.equals("Connection", ignoreCase = true)) continue
-                if (name.equals("Accept-Encoding", ignoreCase = true)) continue
-                if (name.equals("Content-Length", ignoreCase = true)) continue
-                builder.header(name, value)
-            }
-
-            // Forward WebView cookies so the proxy request carries the
-            // same session state (including any prior OAuth cookies).
-            val cookies = cookieManager.getCookie(url)
-            if (!cookies.isNullOrEmpty()) {
-                builder.header("Cookie", cookies)
-            }
-
-            // WebResourceRequest does not expose the request body, so POST/PUT
-            // cannot be proxied. Fall through to native WebView loading — the
-            // spoofed UA alone is usually sufficient for form-submission POSTs
-            // to succeed. The critical GET-based OAuth authorization requests
-            // are fully proxied with X-Requested-With stripped.
-            if (!method.equals("GET", ignoreCase = true) &&
-                            !method.equals("HEAD", ignoreCase = true)
-            ) {
-                return null
-            }
-
-            val proxyResponse = proxyClient.newCall(builder.build()).execute()
-            proxyResponse.use { resp ->
-                // Feed Set-Cookie back into the WebView
-                val setCookieHeaders = resp.headers("Set-Cookie")
-                for (cookie in setCookieHeaders) {
-                    cookieManager.setCookie(url, cookie)
-                }
-                cookieManager.flush()
-
-                val responseBody = resp.body?.bytes() ?: ByteArray(0)
-                val responseHeaders = mutableMapOf<String, String>()
-
-                for ((name, value) in resp.headers) {
-                    if (name.equals("Set-Cookie", ignoreCase = true)) continue
-                    if (name.equals("Content-Encoding", ignoreCase = true)) continue
-                    if (name.equals("Transfer-Encoding", ignoreCase = true)) continue
-                    if (name.equals("Content-Length", ignoreCase = true)) continue
-                    responseHeaders[name] = value
-                }
-
-                val fullContentType = resp.header("Content-Type") ?: "text/html"
-                val mimeType = fullContentType.split(";").firstOrNull()?.trim() ?: "text/html"
-                val encoding =
-                        if (mimeType.startsWith("text/") ||
-                                        mimeType == "application/json" ||
-                                        mimeType == "application/javascript"
-                        )
-                                "UTF-8"
-                        else null
-
-                WebResourceResponse(
-                        mimeType,
-                        encoding,
-                        resp.code,
-                        resp.message,
-                        responseHeaders,
-                        ByteArrayInputStream(responseBody)
-                )
-            }
-        } catch (t: Throwable) {
-            Log.e(TAG, "OAuth proxy failed for ${request.url}", t)
-            null
-        }
     }
 
     // ── BDS script injection ─────────────────────────────────────────────
@@ -704,16 +769,5 @@ class MainActivity : ComponentActivity() {
         // blends seamlessly before (and if) the page reports its live theme via reportTheme().
         private val PAGE_BG_DARK = Color.rgb(0x15, 0x15, 0x17)
         private val PAGE_BG_LIGHT = Color.WHITE
-
-        /**
-         * Fully synthetic Chrome-mobile UA string. Servers that block embedded WebViews (notably
-         * Google OAuth) check for the legacy "; wv)" marker AND for the `Version/4.0` part that
-         * Android WebView adds even when the stock UA is customised. We replace the entire string.
-         */
-        private const val SPOOFED_UA =
-                "Mozilla/5.0 (Linux; Android 14; Pixel 9 Pro) " +
-                        "AppleWebKit/537.36 (KHTML, like Gecko) " +
-                        "Chrome/132.0.6834.122 Mobile Safari/537.36 " +
-                        "BetterDeepSeekAndroid/%s"
     }
 }
