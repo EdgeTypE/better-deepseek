@@ -31,6 +31,7 @@ import { i18n } from "../lib/i18n.svelte.js";
 import { remoteConfig } from "../lib/remote-config.svelte.js";
 import { makeId } from "../lib/utils/helpers.js";
 import { STORAGE_KEYS } from "../lib/constants.js";
+import { isPredominantlyRtl } from '../lib/utils/rtl-detector.js';
 
 const messageOverlays = new Map();
 const nodeStates = new WeakMap();
@@ -237,6 +238,10 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
   const parsed = parseBdsMessage(rawText, shouldForceCloseTags);
   const preGateBlocks = parsed.renderableBlocks;
 
+  // --- RTL DETECTION ---
+  const isRtl = isPredominantlyRtl(rawText);
+  stateData.isRtl = isRtl;
+  applyRtlToNative(node, isRtl);
   // --- AUTO INTERFACES (instant trigger on completion) ---
   // Triggers immediately when the global stop button disappears,
   // which signals that DeepSeek's SSE stream has fired "event: close".
@@ -507,6 +512,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
         existing.props.blocks = newBlocks;
         existing.props.loading = isLoading;
         existing.props.loadingIndex = loadingIndex;
+        existing.props.isRtl = stateData.isRtl || false; 
       } else {
         const host = getOrCreateHost(node, "bds-overlay-host");
         removeStaleMessageOverlays(host);
@@ -519,7 +525,8 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
           text: newText,
           blocks: newBlocks,
           loading: isLoading,
-          loadingIndex: loadingIndex
+          loadingIndex: loadingIndex,
+          isRtl: stateData.isRtl || false 
         });
 
         const component = mount(MessageOverlay, {
@@ -820,6 +827,26 @@ function syncVisibilityState(node, isLatestAssistant, stateData, isSettled) {
   }
 }
 
+/**
+ * Apply RTL styling directly to the native message's markdown container
+ * for messages that don't trigger an overlay.
+ */
+function applyRtlToNative(node, isRtl) {
+  if (!isRtl) return;
+
+  // Find ALL markdown containers (including thinking blocks)
+  const allMarkdown = node.querySelectorAll('.ds-markdown, [class*="markdown"]');
+  
+  for (const target of allMarkdown) {
+    // Skip cursor elements
+    if (target.closest('.ds-cursor')) continue;
+    
+    target.setAttribute('dir', 'rtl');
+    target.style.direction = 'rtl';
+    target.style.textAlign = 'right';
+    target.classList.add('bds-rtl-native');
+  }
+}
 /**
  * Play voice response using Web Speech Synthesis.
  */

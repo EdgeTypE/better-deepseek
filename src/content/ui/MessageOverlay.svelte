@@ -32,7 +32,7 @@
    *   blocks: ToolBlock[],
    *   loading?: boolean
    * }} */
-  let { text, blocks = [], loading = false, loadingIndex = 1 } = $props();
+  let { text, blocks = [], loading = false, loadingIndex = 1, isRtl = false } = $props();
 
   let answeredData = $state(null);
   let outerOpen = $state(false);
@@ -175,7 +175,7 @@
   });
 </script>
 
-<div class="bds-message-overlay">
+<div class="bds-message-overlay" class:rtl={isRtl} dir={isRtl ? 'rtl' : 'ltr'}>
   <!-- INTERLEAVED TEXT AND BLOCKS -->
   {#each interleave(text, blocks) as segment}
     {#if segment.type === 'text'}
@@ -942,5 +942,45 @@
   .bds-sanitized-text :global(>:last-child) {
     margin-bottom: 0!important;
   }
+  /* ── RTL support ── */
+.bds-message-overlay.rtl {
+  direction: rtl;
+  text-align: right;
+  unicode-bidi: isolate;
+}
+
+/* Keep code blocks, tables, and other LTR‑only elements LTR */
+.bds-message-overlay.rtl pre,
+.bds-message-overlay.rtl code,
+.bds-message-overlay.rtl .bds-code-block,
+.bds-message-overlay.rtl table,
+.bds-message-overlay.rtl th,
+.bds-message-overlay.rtl td {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: embed;
+}
+
+/* Adjust lists, blockquotes, etc. for RTL */
+.bds-message-overlay.rtl ul,
+.bds-message-overlay.rtl ol {
+  padding-right: 1.5em;
+  padding-left: 0;
+}
+
+.bds-message-overlay.rtl blockquote {
+  border-right: 2px solid var(--dsw-alias-label-caption, var(--bds-text-tertiary, #6b6b7b));
+  border-left: none;
+  padding-right: 14px;
+  padding-left: 0;
+}
+
+/* Override table header alignment for RTL */
+.bds-message-overlay.rtl th:is(:lang(ae),:lang(ar),:lang(arc),:lang(bcc),:lang(bqi),:lang(ckb),:lang(dv),:lang(fa),:lang(glk),:lang(he),:lang(ku),:lang(mzn),:lang(nqo),:lang(pnb),:lang(ps),:lang(sd),:lang(ug),:lang(ur),:lang(yi)) {
+  text-align: right;
+}
+.bds-message-overlay.rtl th:not(:is(:lang(ae),:lang(ar),:lang(arc),:lang(bcc),:lang(bqi),:lang(ckb),:lang(dv),:lang(fa),:lang(glk),:lang(he),:lang(ku),:lang(mzn),:lang(nqo),:lang(pnb),:lang(ps),:lang(sd),:lang(ug),:lang(ur),:lang(yi))) {
+  text-align: left;
+}
 
 </style>
