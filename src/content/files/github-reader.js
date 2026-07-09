@@ -212,6 +212,11 @@ export async function fetchGitHubRepo(repoUrl, onStatus = () => { }, options = {
   }
 
   if (!zipData) {
+    if (lastFailure && lastFailure.status === 404 && token && (proxyPrefix || hostname !== "github.com")) {
+      throw new Error(
+        "Private repositories cannot be imported using proxy or mirror URLs. Please use a direct GitHub URL to use your access token safely."
+      );
+    }
     throw buildGitHubFetchError(
       lastFailure,
       `Could not download ${owner}/${repo}/${branch}. Check the URL and make sure the repo is public.`

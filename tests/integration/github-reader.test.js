@@ -165,4 +165,15 @@ describe("github-reader integration", () => {
       "https://hk.gh-proxy.org/https://hub.fastgit.xyz/owner/repo/archive/refs/heads/main.zip"
     );
   });
+
+  it("rejects token use for private repo imports over proxy or mirror", async () => {
+    chrome.runtime.sendMessage.mockReset().mockResolvedValue({
+      ok: false,
+      status: 404,
+    });
+
+    await expect(
+      fetchGitHubRepo("https://hk.gh-proxy.org/https://github.com/owner/repo", () => {}, { token: "ghp_sometoken" })
+    ).rejects.toThrow("Private repositories cannot be imported using proxy or mirror URLs");
+  });
 });
