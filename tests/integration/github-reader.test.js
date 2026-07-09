@@ -40,11 +40,36 @@ describe("github-reader integration", () => {
       owner: "owner",
       repo: "repo",
       branch: "main",
+      hostname: "github.com",
+      proxyPrefix: "",
     });
     expect(parseGitHubUrl("https://github.com/owner/repo/tree/feature/x")).toEqual({
       owner: "owner",
       repo: "repo",
       branch: "feature/x",
+      hostname: "github.com",
+      proxyPrefix: "",
+    });
+    expect(parseGitHubUrl("https://hk.gh-proxy.org/https://github.com/owner/repo")).toEqual({
+      owner: "owner",
+      repo: "repo",
+      branch: "main",
+      hostname: "github.com",
+      proxyPrefix: "https://hk.gh-proxy.org/",
+    });
+    expect(parseGitHubUrl("https://github.com.cnpmjs.org/owner/repo")).toEqual({
+      owner: "owner",
+      repo: "repo",
+      branch: "main",
+      hostname: "github.com.cnpmjs.org",
+      proxyPrefix: "",
+    });
+    expect(parseGitHubUrl("https://hk.gh-proxy.org/https://hub.fastgit.xyz/owner/repo/tree/branch-x")).toEqual({
+      owner: "owner",
+      repo: "repo",
+      branch: "branch-x",
+      hostname: "hub.fastgit.xyz",
+      proxyPrefix: "https://hk.gh-proxy.org/",
     });
     expect(parseGitHubUrl("https://example.com/nope")).toBeNull();
   });
@@ -114,5 +139,30 @@ describe("github-reader integration", () => {
     });
 
     await expect(fetchGitHubRepo("owner/repo")).rejects.toThrow("GitHub rejected your token");
+  });
+
+  it("constructs proxy and mirror zip URLs correctly", async () => {
+    const base64 = zipToBase64({ "repo-main/index.js": "export {};" });
+    
+    // Test case 1: Proxy prefix on standard GitHub URL
+    chrome.runtime.sendMessage.mockReset().mockResolvedValue({ ok: true, base64 });
+    await fetchGitHubRepo("https://hk.gh-proxy.org/https://github.com/owner/repo");
+    expect(chrome.runtime.sendMessage.mock.calls[0][0].url).toBe(
+      "https://hk.gh-proxy.org/https://github.com/owner/repo/archive/refs/heads/main.zip"
+    );
+
+    // Test case 2: Domain mirror
+    chrome.runtime.sendMessage.mockReset().mockResolvedValue({ ok: true, base64 });
+    await fetchGitHubRepo("https://github.com.cnpmjs.org/owner/repo");
+    expect(chrome.runtime.sendMessage.mock.calls[0][0].url).toBe(
+      "https://github.com.cnpmjs.org/owner/repo/archive/refs/heads/main.zip"
+    );
+
+    // Test case 3: Mirror combined with proxy prefix
+    chrome.runtime.sendMessage.mockReset().mockResolvedValue({ ok: true, base64 });
+    await fetchGitHubRepo("https://hk.gh-proxy.org/https://hub.fastgit.xyz/owner/repo");
+    expect(chrome.runtime.sendMessage.mock.calls[0][0].url).toBe(
+      "https://hk.gh-proxy.org/https://hub.fastgit.xyz/owner/repo/archive/refs/heads/main.zip"
+    );
   });
 });

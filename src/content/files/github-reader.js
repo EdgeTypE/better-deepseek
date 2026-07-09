@@ -74,12 +74,19 @@ export function parseGitHubUrl(input) {
   // owner/repo shorthand
   if (/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(trimmed)) {
     const [owner, repo] = trimmed.split("/");
-    return { owner, repo, branch: "main" };
+    return { owner, repo, branch: "main", hostname: "github.com", proxyPrefix: "" };
+  }
+
+  let proxyPrefix = "";
+  const doubleProtocolMatch = trimmed.match(/^(https?:\/\/[^\/]+\/)(https?:\/\/.*)$/i);
+  if (doubleProtocolMatch) {
+    proxyPrefix = doubleProtocolMatch[1];
+    trimmed = doubleProtocolMatch[2];
   }
 
   try {
     const url = new URL(trimmed);
-    if (url.hostname !== "github.com") return null;
+    const hostname = url.hostname;
 
     const parts = url.pathname.split("/").filter(Boolean);
     if (parts.length < 2) return null;
@@ -96,11 +103,12 @@ export function parseGitHubUrl(input) {
       branch = parts.slice(3).join("/");
     }
 
-    return { owner, repo, branch };
+    return { owner, repo, branch, hostname, proxyPrefix };
   } catch {
     return null;
   }
 }
+
 
 /**
  * Fetch, extract, and concatenate a GitHub repo.
@@ -152,7 +160,7 @@ export async function fetchGitHubRepo(repoUrl, onStatus = () => { }, options = {
     throw new Error("Invalid GitHub URL. Use: https://github.com/owner/repo");
   }
 
-  const { owner, repo, branch } = parsed;
+  const { owner, repo, branch, hostname, proxyPrefix } = parsed;
   const token = String(
     typeof options.token === "string" ? options.token : ""
   ).trim();
@@ -163,7 +171,19 @@ export async function fetchGitHubRepo(repoUrl, onStatus = () => { }, options = {
   let resolvedBranch = branch;
   let lastFailure = null;
   for (const b of [branch, branch === "main" ? "master" : null].filter(Boolean)) {
-    const codeloadUrl = `https://codeload.github.com/${owner}/${repo}/zip/refs/heads/${b}`;
+    let codeloadUrl;
+    if (hostname === "github.com") {
+      if (proxyPrefix) {
+        codeloadUrl = `${proxyPrefix}https://github.com/${owner}/${repo}/archive/refs/heads/${b}.zip`;
+      } else {
+        codeloadUrl = `https://codeload.github.com/${owner}/${repo}/zip/refs/heads/${b}`;
+      }
+    } else {
+      codeloadUrl = `https://${hostname}/${owner}/${repo}/archive/refs/heads/${b}.zip`;
+      if (proxyPrefix) {
+        codeloadUrl = `${proxyPrefix}${codeloadUrl}`;
+      }
+    }
     onStatus(`Downloading ${owner}/${repo} (${b})...`);
 
     try {
