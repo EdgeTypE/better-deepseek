@@ -36,7 +36,7 @@ export const BRIDGE_EVENTS = {
 };
 
 // ── Versioning ──
-export const SYSTEM_PROMPT_TEMPLATE_VERSION = 13;
+export const SYSTEM_PROMPT_TEMPLATE_VERSION = 14;
 export const DOWNLOAD_BEHAVIOR_VERSION = 2;
 export const LONG_WORK_STALE_MS = 30000;
 
@@ -133,9 +133,10 @@ export const DEFAULT_SYSTEM_PROMPT = [
   "9. YouTube Fetch: <BDS:AUTO:REQUEST_YOUTUBE_FETCH>video_url</BDS:AUTO:REQUEST_YOUTUBE_FETCH>",
   "10. Image Viewer: <BDS:IMAGE>search query</BDS:IMAGE>",
   "11. Auto Code Runner: <BDS:AUTO:CODE_RUNNER language=\"python|javascript|typescript|lua|ruby\">code</BDS:AUTO:CODE_RUNNER>",
-   "12. Character(Persona File) Creator: <BDS:character_create name=\"...\" usage=\"...\">...</BDS:character_create>",
-   "13. Skill Creator: <BDS:skill_create name=\"...\">...</BDS:skill_create>",
-   "14. Clarifying Questions: <BDS:ask_question>[{\"id\":\"...\",\"question\":\"...\",\"type\":\"...\"}]</BDS:ask_question>",
+  "12. Character(Persona File) Creator: <BDS:character_create name=\"...\" usage=\"...\">...</BDS:character_create>",
+  "13. Skill Creator: <BDS:skill_create name=\"...\">...</BDS:skill_create>",
+  "14. Clarifying Questions: <BDS:ask_question>[{\"id\":\"...\",\"question\":\"...\",\"type\":\"...\"}]</BDS:ask_question>",
+  "15. To-Do List/Checklist Card: <BDS:todo>\\n### Step 1 Title\\nStep 1 Description\\n\\n### Step 2 Title\\nStep 2 Description\\n</BDS:todo>",
   "",
   "When using <BDS:ask_question>JSON_ARRAY</BDS:ask_question>:",
   "- Use this tool when you are not 90% sure about the user's project, task, or ambiguous request.",
@@ -151,6 +152,13 @@ export const DEFAULT_SYSTEM_PROMPT = [
   "  }",
   "- Only provide this tag when you need clarification. Do not add chat/explanations.",
   "- Don't be afraid to ask questions, even if it takes time.",
+  "",
+  "When using <BDS:todo>...</BDS:todo>:",
+  "- Use this tool when you are explaining a step-by-step workflow, tutorial, task list, checklist, or guide to the user.",
+  "- Structure it using markdown headers (###) for each step's title, followed by the description of the step on the next lines.",
+  "- Use markdown formatting inside descriptions (bold, italics, inline code, etc.) as needed.",
+  "- Do NOT add step numbers in the titles, the extension will number them automatically.",
+  "- Output only the tag when providing the to-do list, or embed it cleanly in your explanation.",
   "",
   "When using <BDS:AUTO:REQUEST_WEB_FETCH>url</BDS:AUTO:REQUEST_WEB_FETCH>:",
   "- Instructs the Better DeepSeek extension to automatically fetch a web page.",

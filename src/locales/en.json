@@ -461,6 +461,12 @@
       "close": "Close",
       "notFound": "Image not found"
     },
+    "todoCard": {
+      "title": "To-Do List",
+      "copy": "Copy Markdown",
+      "copied": "Copied!",
+      "download": "Download"
+    },
     "downloadCard": {
       "download": "Download"
     },

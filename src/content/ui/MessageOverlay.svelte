@@ -16,6 +16,7 @@
   import DeepResearchStepDoneCard from "./DeepResearchStepDoneCard.svelte";
   import LoadingIndicator from "./LoadingIndicator.svelte";
   import ImageCard from "./ImageCard.svelte";
+  import TodoCard from "./TodoCard.svelte";
   import { t } from "../../lib/i18n.svelte.js";
   import { parseLooseJson } from "../parser/json-repair.js";
 
@@ -383,6 +384,8 @@
         </div>
       {:else if block.name === 'image'}
         <ImageCard content={block.content} attrs={block.attrs} />
+      {:else if block.name === 'todo'}
+        <TodoCard content={block.content} />
       {:else}
         <ToolCard name={block.name} content={block.content} />
       {/if}
