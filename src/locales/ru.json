@@ -458,6 +458,12 @@
       "close": "Закрыть",
       "notFound": "Изображение не найдено"
     },
+    "todoCard": {
+      "title": "Список задач",
+      "copy": "Копировать Markdown",
+      "copied": "Скопировано!",
+      "download": "Скачать"
+    },
     "downloadCard": {
       "download": "Скачать"
     },

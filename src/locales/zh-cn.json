@@ -457,6 +457,12 @@
       "close": "关闭",
       "notFound": "未找到图片"
     },
+    "todoCard": {
+      "title": "待办事项清单",
+      "copy": "复制为 Markdown",
+      "copied": "已复制！",
+      "download": "下载"
+    },
     "downloadCard": {
       "download": "下载"
     },

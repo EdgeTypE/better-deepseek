@@ -458,6 +458,12 @@
       "close": "Kapat",
       "notFound": "Resim bulunamadı"
     },
+    "todoCard": {
+      "title": "Yapılacaklar Listesi",
+      "copy": "Markdown Kopyala",
+      "copied": "Kopyalandı!",
+      "download": "İndir"
+    },
     "downloadCard": {
       "download": "İndir"
     },
