@@ -61,12 +61,45 @@ const TEXT_EXTS = new Set([
   "gitignore", "editorconfig", "eslintrc", "prettierrc",
 ]);
 
+function isPrivateOrLocal(hostname) {
+  const host = hostname.toLowerCase().trim();
+  if (host === "localhost" || host === "[::1]") {
+    return true;
+  }
+
+  // Check IPv4 addresses
+  const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+  const match = host.match(ipv4Regex);
+  if (match) {
+    const octet1 = parseInt(match[1], 10);
+    const octet2 = parseInt(match[2], 10);
+    if (octet1 === 127) return true; // loopback
+    if (octet1 === 10) return true; // private class A
+    if (octet1 === 172 && (octet2 >= 16 && octet2 <= 31)) return true; // private class B
+    if (octet1 === 192 && octet2 === 168) return true; // private class C
+    if (octet1 === 169 && octet2 === 254) return true; // link-local
+    if (octet1 === 0) return true; // local identification
+  }
+
+  // Check IPv6 unique local and link-local prefixes
+  if (host.startsWith("fe8") || host.startsWith("fe9") || host.startsWith("fea") || host.startsWith("feb")) {
+    return true; // IPv6 link-local
+  }
+  if (host.startsWith("fc") || host.startsWith("fd")) {
+    return true; // IPv6 unique local
+  }
+
+  return false;
+}
+
 /**
- * Parse a GitHub URL into { owner, repo, branch }.
+ * Parse a GitHub URL into { owner, repo, branch, hostname, proxyPrefix }.
  * Supports:
  *   https://github.com/owner/repo
  *   https://github.com/owner/repo/tree/branch
  *   owner/repo
+ *   https://hk.gh-proxy.org/https://github.com/owner/repo
+ *   https://github.com.cnpmjs.org/owner/repo
  */
 export function parseGitHubUrl(input) {
   let trimmed = input.trim().replace(/\/+$/, "");
@@ -80,12 +113,23 @@ export function parseGitHubUrl(input) {
   let proxyPrefix = "";
   const doubleProtocolMatch = trimmed.match(/^(https?:\/\/[^\/]+\/)(https?:\/\/.*)$/i);
   if (doubleProtocolMatch) {
-    proxyPrefix = doubleProtocolMatch[1];
-    trimmed = doubleProtocolMatch[2];
+    try {
+      const proxyUrl = new URL(doubleProtocolMatch[1]);
+      if (proxyUrl.protocol !== "http:" && proxyUrl.protocol !== "https:") return null;
+      if (isPrivateOrLocal(proxyUrl.hostname)) return null;
+
+      proxyPrefix = doubleProtocolMatch[1];
+      trimmed = doubleProtocolMatch[2];
+    } catch {
+      return null;
+    }
   }
 
   try {
     const url = new URL(trimmed);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    if (isPrivateOrLocal(url.hostname)) return null;
+
     const hostname = url.hostname;
 
     const parts = url.pathname.split("/").filter(Boolean);

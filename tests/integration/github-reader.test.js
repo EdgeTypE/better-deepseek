@@ -72,6 +72,16 @@ describe("github-reader integration", () => {
       proxyPrefix: "https://hk.gh-proxy.org/",
     });
     expect(parseGitHubUrl("https://example.com/nope")).toBeNull();
+
+    // SSRF / Local IP prevention checks
+    expect(parseGitHubUrl("https://localhost/owner/repo")).toBeNull();
+    expect(parseGitHubUrl("https://127.0.0.1/owner/repo")).toBeNull();
+    expect(parseGitHubUrl("https://10.0.0.1/owner/repo")).toBeNull();
+    expect(parseGitHubUrl("https://172.16.0.1/owner/repo")).toBeNull();
+    expect(parseGitHubUrl("https://192.168.1.1/owner/repo")).toBeNull();
+    expect(parseGitHubUrl("https://[::1]/owner/repo")).toBeNull();
+    expect(parseGitHubUrl("ftp://github.com/owner/repo")).toBeNull();
+    expect(parseGitHubUrl("https://127.0.0.1/https://github.com/owner/repo")).toBeNull();
   });
 
   it("decodes zip payloads from base64", () => {
