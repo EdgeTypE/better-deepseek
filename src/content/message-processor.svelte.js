@@ -7,6 +7,7 @@ import { simpleHash } from "../lib/utils/hash.js";
 import {
   detectMessageRole,
   isLatestAssistantMessage,
+  isAbsoluteLastMessage,
   scheduleScan,
   collectMessageNodes
 } from "./scanner.js";
@@ -481,7 +482,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
       }
     }
 
-    if (!state.activeQuestions && !isSystemGenerating() && parsed.askQuestions.length > 0 && isLatestAssistantMessage(node)) {
+    if (!state.activeQuestions && !isSystemGenerating() && parsed.askQuestions.length > 0 && isLatestAssistantMessage(node) && isAbsoluteLastMessage(node)) {
       state.activeQuestions = parsed.askQuestions;
       window.dispatchEvent(new CustomEvent('bds-ask-questions', { 
         detail: { 

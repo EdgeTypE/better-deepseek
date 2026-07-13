@@ -415,6 +415,32 @@ describe("message processor integration", () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 
+  it("does not reopen clarifying questions after a user reply", () => {
+    const originalNode = createMessageNode(
+      '<BDS:ask_question>[{"id":"q1","question":"Pick one","type":"test","options":["A"]}]</BDS:ask_question>',
+    );
+    const listener = vi.fn();
+    window.addEventListener("bds-ask-questions", listener);
+
+    processMessageNode(originalNode);
+    vi.advanceTimersByTime(3000);
+    processMessageNode(originalNode);
+
+    expect(listener).toHaveBeenCalledOnce();
+
+    state.activeQuestions = null;
+    originalNode.remove();
+    const recreatedNode = createMessageNode(originalNode.dataset.rawText);
+    recreatedNode.dataset.absoluteLast = "0";
+    processMessageNode(recreatedNode);
+    vi.advanceTimersByTime(3000);
+    processMessageNode(recreatedNode);
+
+    expect(state.activeQuestions).toBeNull();
+    expect(listener).toHaveBeenCalledOnce();
+    window.removeEventListener("bds-ask-questions", listener);
+  });
+
   it("removes injected BetterDeepSeek blocks from user messages", () => {
     const node = createMessageNode(
       "<BetterDeepSeek>Hidden</BetterDeepSeek>\nVisible text",
