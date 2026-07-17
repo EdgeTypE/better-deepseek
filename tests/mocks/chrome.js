@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import { deepEqual } from "../../src/lib/deep-equal.js";
 
 const listeners = new Set();
 
@@ -12,34 +13,6 @@ export const chromeMockState = {
 function clone(value) {
   if (value === undefined) return undefined;
   return structuredClone(value);
-}
-
-/**
- * Deep structural equality. Objects compared by sorted keys; arrays by index.
- * Primitive-like types compared by ===.
- */
-function deepEqual(a, b) {
-  if (a === b) return true;
-  if (typeof a !== typeof b) return false;
-  if (typeof a !== "object" || a === null || b === null) return false;
-  if (Array.isArray(a) !== Array.isArray(b)) return false;
-
-  if (Array.isArray(a)) {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-      if (!deepEqual(a[i], b[i])) return false;
-    }
-    return true;
-  }
-
-  const aKeys = Object.keys(a).sort();
-  const bKeys = Object.keys(b).sort();
-  if (aKeys.length !== bKeys.length) return false;
-  for (let i = 0; i < aKeys.length; i++) {
-    if (aKeys[i] !== bKeys[i]) return false;
-    if (!deepEqual(a[aKeys[i]], b[bKeys[i]])) return false;
-  }
-  return true;
 }
 
 function computeChanges(oldData, newValues, removedKeys = []) {
@@ -65,12 +38,12 @@ function computeChanges(oldData, newValues, removedKeys = []) {
   return changes;
 }
 
-// ── Per-operation FIFO notification queue ──
+// ── Per-operation FIFO notification queue with generation-safe reset ──
 
 /** @type {Array<Record<string, {oldValue?: any, newValue?: any}>>} */
 const notificationQueue = [];
 let flushPromise = null;
-let flushResolve = null;
+let flushGeneration = 0;
 
 function scheduleNotification(changes) {
   const changeKeys = Object.keys(changes);
@@ -78,19 +51,19 @@ function scheduleNotification(changes) {
   notificationQueue.push({ ...changes });
 
   if (!flushPromise) {
-    flushPromise = new Promise((resolve) => {
-      flushResolve = resolve;
-    }).then(async () => {
+    const gen = flushGeneration;
+    flushPromise = Promise.resolve().then(async () => {
+      // Abort if reset occurred since scheduling
+      if (gen !== flushGeneration) return;
       // Drain queue one operation at a time
       while (notificationQueue.length > 0) {
+        // Check generation before each batch
+        if (gen !== flushGeneration) return;
         const batch = notificationQueue.shift();
         await notifyListeners(batch);
       }
       flushPromise = null;
-      flushResolve = null;
     });
-    // Kick off the microtask
-    Promise.resolve().then(() => flushResolve());
   }
 }
 
@@ -200,10 +173,12 @@ export function installChromeMock() {
 export function resetChromeMock() {
   chromeMockState.storageData = {};
   chromeMockState.mode = "chrome";
-  // Invalidate pending notification jobs so no prior microtask fires in a later test
+  // Invalidate pending notification jobs by advancing generation.
+  // Prior microtasks check the generation and abort, preventing delivery
+  // of stale events or calls to nulled callbacks.
+  flushGeneration += 1;
   notificationQueue.length = 0;
   flushPromise = null;
-  flushResolve = null;
   chromeMock.storage.local.get.mockClear();
   chromeMock.storage.local.set.mockClear();
   chromeMock.storage.local.remove.mockClear();
@@ -243,6 +218,9 @@ export async function flushStorageChanges() {
  * (per MDN compatibility note for Firefox's storage.onChanged behavior).
  */
 export function setStorageMockMode(mode) {
+  if (mode !== "chrome" && mode !== "firefox") {
+    throw new Error(`Invalid storage mock mode: "${mode}". Must be "chrome" or "firefox".`);
+  }
   chromeMockState.mode = mode;
 }
 

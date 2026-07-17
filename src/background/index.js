@@ -439,105 +439,20 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 });
 
-// Remote status announcement system
-const REMOTE_STATUS_URL = "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/extension/status.json";
+import {
+  persistRemoteConfig,
+  persistRemoteStatus,
+  persistLocales,
+} from "../lib/remote-persistence.js";
 
-async function fetchRemoteStatus() {
-  try {
-    const response = await fetch(`${REMOTE_STATUS_URL}?t=${Date.now()}`, {
-      cache: "no-store"
-    });
-    if (!response.ok) return;
-    
-    let data = await response.json();
-    if (data) {
-      // Ensure data is always an array for the new multi-announcement system
-      const announcements = Array.isArray(data) ? data : [data];
-      await chrome.storage.local.set({ bds_remote_announcement: announcements });
-    }
-  } catch (err) {
-    console.error("Failed to fetch remote status:", err);
-  }
-}
-
-// Remote config system — fetch the latest config from GitHub
-const REMOTE_CONFIG_URL = "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/extension/remote-config.json";
-
-/**
- * Deep structural equality check. Returns true when `a` and `b` have the same
- * JSON-serializable shape (key order independent for objects).
- */
-function isDeepEqual(a, b) {
-  if (a === b) return true;
-  if (typeof a !== typeof b) return false;
-  if (typeof a !== "object" || a === null || b === null) return false;
-  if (Array.isArray(a) !== Array.isArray(b)) return false;
-
-  if (Array.isArray(a)) {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-      if (!isDeepEqual(a[i], b[i])) return false;
-    }
-    return true;
-  }
-
-  const aKeys = Object.keys(a).sort();
-  const bKeys = Object.keys(b).sort();
-  if (aKeys.length !== bKeys.length) return false;
-  for (let i = 0; i < aKeys.length; i++) {
-    if (aKeys[i] !== bKeys[i]) return false;
-    if (!isDeepEqual(a[aKeys[i]], b[bKeys[i]])) return false;
-  }
-  return true;
-}
-
-async function fetchRemoteConfig() {
-  try {
-    const response = await fetch(`${REMOTE_CONFIG_URL}?t=${Date.now()}`, {
-      cache: "no-store"
-    });
-    if (!response.ok) return;
-
-    const config = await response.json();
-    if (!config || typeof config !== "object") return;
-
-    // Compare structurally with stored config to avoid unnecessary writes.
-    // Only write bds_remote_config when the fetched value actually changed.
-    const stored = await chrome.storage.local.get("bds_remote_config");
-    const currentConfig = stored?.bds_remote_config;
-
-    // Normalize: strip metadata from config before comparison, and exclude
-    // meta from the config key itself (meta lives in bds_remote_config_meta).
-    const configForComparison = { ...config };
-    delete configForComparison.meta;
-
-    const storedForComparison = currentConfig && typeof currentConfig === "object"
-      ? (() => { const c = { ...currentConfig }; delete c.meta; return c; })()
-      : null;
-
-    if (!isDeepEqual(configForComparison, storedForComparison)) {
-      await chrome.storage.local.set({ bds_remote_config: config });
-    }
-
-    // Metadata always updates (tracks last-fetch time and version for cache-busting).
-    // Written separately so a metadata-only change does not disturb config consumers.
-    const meta = {
-      lastFetched: Date.now(),
-      version: config.meta?.version || 0,
-    };
-    const storedMeta = await chrome.storage.local.get("bds_remote_config_meta");
-    const currentMeta = storedMeta?.bds_remote_config_meta;
-    if (!isDeepEqual(meta, currentMeta)) {
-      await chrome.storage.local.set({ bds_remote_config_meta: meta });
-    }
-  } catch (err) {
-    console.error("Failed to fetch remote config:", err);
-  }
-}
+const storageAdapter = {
+  get: (key) => chrome.storage.local.get(key),
+  set: (values) => chrome.storage.local.set(values),
+};
 
 // Run once on startup
-fetchRemoteStatus();
-fetchRemoteConfig();
+persistRemoteStatus({ fetch, storage: storageAdapter });
+persistRemoteConfig({ fetch, storage: storageAdapter });
 
 const localeMods = import.meta.glob("../locales/*.json", { eager: true });
 const localeCodes = Object.keys(localeMods)
@@ -545,33 +460,7 @@ const localeCodes = Object.keys(localeMods)
   .filter(Boolean);
 
 async function handleLanguageUpdate() {
-  try {
-    const BASE_URL = "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/src/locales";
-    const results = await Promise.allSettled(
-      localeCodes.map(code =>
-        fetch(`${BASE_URL}/${code}.json?t=${Date.now()}`, { cache: "no-store" })
-          .then(r => r.ok ? r.json() : null)
-          .then(data => data?.messages ? { [code]: data } : null)
-      )
-    );
-    const updates = {};
-    for (const result of results) {
-      if (result.status === "fulfilled" && result.value) {
-        Object.assign(updates, result.value);
-      }
-    }
-    if (Object.keys(updates).length === 0) {
-      return { success: false, error: "No valid locale files fetched" };
-    }
-    await chrome.storage.local.set({
-      bds_locale_updates: updates,
-      bds_locale_update_last_checked: new Date().toLocaleDateString()
-    });
-    return { success: true };
-  } catch (err) {
-    console.error("Failed to execute dynamic language update:", err);
-    return { success: false, error: err.message };
-  }
+  return persistLocales({ fetch, storage: storageAdapter }, localeCodes);
 }
 
 async function handleLanguageReset() {
