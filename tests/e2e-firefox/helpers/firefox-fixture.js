@@ -29,6 +29,9 @@ import {
   pricingJson,
   githubZip,
   githubCommits,
+  remoteConfigFixture,
+  remoteStatusFixture,
+  makeLocaleFixture,
 } from "../../e2e/fixtures/payloads.js";
 
 function toBase64(body) {
@@ -57,6 +60,18 @@ function resolveResponse(url) {
   if (url.startsWith("https://status.deepseek.com")) {
     return { statusCode: 200, body: '{"status":"ok"}', mediaType: "application/json; charset=utf-8" };
   }
+  // ── Background updater routes (#108 fix) ──
+  if (url.startsWith("https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/extension/remote-config.json")) {
+    return { statusCode: 200, body: JSON.stringify(remoteConfigFixture), mediaType: "application/json; charset=utf-8" };
+  }
+  if (url.startsWith("https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/extension/status.json")) {
+    return { statusCode: 200, body: JSON.stringify(remoteStatusFixture), mediaType: "application/json; charset=utf-8" };
+  }
+  const localeMatch = url.match(/\/src\/locales\/(en|tr|ru|zh-cn)\.json/);
+  if (localeMatch) {
+    const code = localeMatch[1];
+    return { statusCode: 200, body: JSON.stringify(makeLocaleFixture(code)), mediaType: "application/json; charset=utf-8" };
+  }
   // AWS WAF / captcha subdomains — must be intercepted to prevent challenge loops
   if (url.includes("awswaf.com") || url.includes("captcha")) {
     return { statusCode: 200, body: "", mediaType: "text/plain" };
@@ -72,6 +87,20 @@ export async function createFirefoxFixture() {
   }
 
   const firefoxBin = process.env.FIREFOX_BIN || undefined;
+  if (firefoxBin) {
+    // Validate: must be an absolute path to an existing executable.
+    // Values like "firefox" (relative / command name) cause Selenium to fail.
+    if (!path.isAbsolute(firefoxBin)) {
+      throw new Error(
+        `FIREFOX_BIN must be an absolute path, got "${firefoxBin}". ` +
+        `Use the firefox-path output from browser-actions/setup-firefox in CI, ` +
+        `or set FIREFOX_BIN to an absolute path (e.g. "C:\\Program Files\\Firefox\\firefox.exe").`
+      );
+    }
+    if (!fs.existsSync(firefoxBin)) {
+      throw new Error(`FIREFOX_BIN path does not exist: ${firefoxBin}`);
+    }
+  }
   const firefoxOpts = new firefox.Options();
   if (firefoxBin) firefoxOpts.setBinary(firefoxBin);
   firefoxOpts.enableBidi();

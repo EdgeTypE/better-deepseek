@@ -463,23 +463,71 @@ async function fetchRemoteStatus() {
 // Remote config system — fetch the latest config from GitHub
 const REMOTE_CONFIG_URL = "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/extension/remote-config.json";
 
+/**
+ * Deep structural equality check. Returns true when `a` and `b` have the same
+ * JSON-serializable shape (key order independent for objects).
+ */
+function isDeepEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (typeof a !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!isDeepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
+  const aKeys = Object.keys(a).sort();
+  const bKeys = Object.keys(b).sort();
+  if (aKeys.length !== bKeys.length) return false;
+  for (let i = 0; i < aKeys.length; i++) {
+    if (aKeys[i] !== bKeys[i]) return false;
+    if (!isDeepEqual(a[aKeys[i]], b[bKeys[i]])) return false;
+  }
+  return true;
+}
+
 async function fetchRemoteConfig() {
   try {
     const response = await fetch(`${REMOTE_CONFIG_URL}?t=${Date.now()}`, {
       cache: "no-store"
     });
     if (!response.ok) return;
-    
+
     const config = await response.json();
-    if (config && typeof config === "object") {
-      // Store full config; the content script will deep-merge with built-in defaults
+    if (!config || typeof config !== "object") return;
+
+    // Compare structurally with stored config to avoid unnecessary writes.
+    // Only write bds_remote_config when the fetched value actually changed.
+    const stored = await chrome.storage.local.get("bds_remote_config");
+    const currentConfig = stored?.bds_remote_config;
+
+    // Normalize: strip metadata from config before comparison, and exclude
+    // meta from the config key itself (meta lives in bds_remote_config_meta).
+    const configForComparison = { ...config };
+    delete configForComparison.meta;
+
+    const storedForComparison = currentConfig && typeof currentConfig === "object"
+      ? (() => { const c = { ...currentConfig }; delete c.meta; return c; })()
+      : null;
+
+    if (!isDeepEqual(configForComparison, storedForComparison)) {
       await chrome.storage.local.set({ bds_remote_config: config });
-      
-      // Store fetch metadata for cache-busting
-      const meta = {
-        lastFetched: Date.now(),
-        version: config.meta?.version || 0,
-      };
+    }
+
+    // Metadata always updates (tracks last-fetch time and version for cache-busting).
+    // Written separately so a metadata-only change does not disturb config consumers.
+    const meta = {
+      lastFetched: Date.now(),
+      version: config.meta?.version || 0,
+    };
+    const storedMeta = await chrome.storage.local.get("bds_remote_config_meta");
+    const currentMeta = storedMeta?.bds_remote_config_meta;
+    if (!isDeepEqual(meta, currentMeta)) {
       await chrome.storage.local.set({ bds_remote_config_meta: meta });
     }
   } catch (err) {

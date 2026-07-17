@@ -516,15 +516,16 @@
           function appendAndMeasureProcessing(text, timeoutMs) {
             const deadline = timeoutMs || 5000;
             const node = createTextMessage("assistant", text);
-            appendMessage(node);
+            // Install observer and record start time BEFORE appending so
+            // append cost is included and no race exists.
             const start = performance.now();
+            let observer;
+            let timeoutId;
+            const cleanup = () => {
+              if (observer) observer.disconnect();
+              if (timeoutId) clearTimeout(timeoutId);
+            };
             return new Promise((resolve, reject) => {
-              let observer;
-              let timeoutId;
-              const cleanup = () => {
-                if (observer) observer.disconnect();
-                if (timeoutId) clearTimeout(timeoutId);
-              };
               observer = new MutationObserver(() => {
                 if (node.getAttribute("data-bds-msg-id")) {
                   cleanup();
@@ -539,6 +540,14 @@
                   "data-bds-msg-id within " + Math.round(deadline) + "ms"
                 ));
               }, deadline);
+              // Handle case where data-bds-msg-id is already set before observer fires
+              if (node.getAttribute("data-bds-msg-id")) {
+                cleanup();
+                resolve({ duration: performance.now() - start, id: node.getAttribute("data-bds-msg-id") });
+                return;
+              }
+              // Append after observer is fully set up
+              appendMessage(node);
             });
           }
 

@@ -5,6 +5,8 @@ const listeners = new Set();
 export const chromeMockState = {
   storageData: {},
   extensionBaseUrl: "chrome-extension://better-deepseek-test/",
+  /** "chrome" | "firefox" — controls whether unchanged keys produce events. */
+  mode: "chrome",
 };
 
 function clone(value) {
@@ -12,17 +14,30 @@ function clone(value) {
   return structuredClone(value);
 }
 
-function shallowEqual(a, b) {
+/**
+ * Deep structural equality. Objects compared by sorted keys; arrays by index.
+ * Primitive-like types compared by ===.
+ */
+function deepEqual(a, b) {
   if (a === b) return true;
   if (typeof a !== typeof b) return false;
   if (typeof a !== "object" || a === null || b === null) return false;
-  // Compare own keys shallowly — matches real chrome.storage behavior
-  const aKeys = Object.keys(a);
-  const bKeys = Object.keys(b);
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!deepEqual(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
+  const aKeys = Object.keys(a).sort();
+  const bKeys = Object.keys(b).sort();
   if (aKeys.length !== bKeys.length) return false;
-  for (const key of aKeys) {
-    if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
-    if (a[key] !== b[key]) return false;
+  for (let i = 0; i < aKeys.length; i++) {
+    if (aKeys[i] !== bKeys[i]) return false;
+    if (!deepEqual(a[aKeys[i]], b[bKeys[i]])) return false;
   }
   return true;
 }
@@ -34,8 +49,11 @@ function computeChanges(oldData, newValues, removedKeys = []) {
   for (const [key, newValue] of Object.entries(newValues)) {
     const oldValue = clone(chromeMockState.storageData[key]);
     if (oldValue === undefined && newValue === undefined) continue;
-    // Only emit if value actually changed (shallow compare per chrome.storage spec)
-    if (shallowEqual(oldValue, newValue)) continue;
+    // Chrome mode: only emit if value structurally changed
+    // Firefox mode: emit for every key supplied to set (see MDN compat note)
+    if (chromeMockState.mode === "chrome") {
+      if (deepEqual(oldValue, newValue)) continue;
+    }
     changes[key] = { oldValue, newValue: clone(newValue) };
   }
 
@@ -47,37 +65,53 @@ function computeChanges(oldData, newValues, removedKeys = []) {
   return changes;
 }
 
+// ── Per-operation FIFO notification queue ──
+
+/** @type {Array<Record<string, {oldValue?: any, newValue?: any}>>} */
+const notificationQueue = [];
+let flushPromise = null;
+let flushResolve = null;
+
+function scheduleNotification(changes) {
+  const changeKeys = Object.keys(changes);
+  if (changeKeys.length === 0) return;
+  notificationQueue.push({ ...changes });
+
+  if (!flushPromise) {
+    flushPromise = new Promise((resolve) => {
+      flushResolve = resolve;
+    }).then(async () => {
+      // Drain queue one operation at a time
+      while (notificationQueue.length > 0) {
+        const batch = notificationQueue.shift();
+        await notifyListeners(batch);
+      }
+      flushPromise = null;
+      flushResolve = null;
+    });
+    // Kick off the microtask
+    Promise.resolve().then(() => flushResolve());
+  }
+}
+
 async function notifyListeners(changes) {
   const changeKeys = Object.keys(changes);
   if (changeKeys.length === 0) return;
 
-  // Clone for each listener so they can't mutate shared state
+  // Deep-clone for each listener independently so no listener can mutate
+  // another listener's view or the internal state.
   for (const listener of listeners) {
     const cloned = {};
     for (const key of changeKeys) {
-      cloned[key] = { ...changes[key] };
+      cloned[key] = {
+        oldValue: clone(changes[key].oldValue),
+        newValue: clone(changes[key].newValue),
+      };
     }
     // Fire asynchronously to match real chrome.storage behavior
     await Promise.resolve();
     listener(cloned, "local");
   }
-}
-
-// Deferred notification queue for flushStorageChanges
-let pendingChanges = null;
-let flushPromise = null;
-
-function scheduleNotification(changes) {
-  if (!pendingChanges) {
-    pendingChanges = {};
-    flushPromise = Promise.resolve().then(async () => {
-      const c = pendingChanges;
-      pendingChanges = null;
-      flushPromise = null;
-      await notifyListeners(c);
-    });
-  }
-  Object.assign(pendingChanges, changes);
 }
 
 export const chromeMock = {
@@ -165,8 +199,11 @@ export function installChromeMock() {
 
 export function resetChromeMock() {
   chromeMockState.storageData = {};
-  pendingChanges = null;
+  chromeMockState.mode = "chrome";
+  // Invalidate pending notification jobs so no prior microtask fires in a later test
+  notificationQueue.length = 0;
   flushPromise = null;
+  flushResolve = null;
   chromeMock.storage.local.get.mockClear();
   chromeMock.storage.local.set.mockClear();
   chromeMock.storage.local.remove.mockClear();
@@ -196,6 +233,17 @@ export async function flushStorageChanges() {
   if (flushPromise) {
     await flushPromise;
   }
+  // Ensure any remaining microtasks complete
+  await Promise.resolve();
+}
+
+/**
+ * Set storage mock mode. "chrome" emits only structurally changed keys;
+ * "firefox" may emit keys supplied to `set` even when values are unchanged
+ * (per MDN compatibility note for Firefox's storage.onChanged behavior).
+ */
+export function setStorageMockMode(mode) {
+  chromeMockState.mode = mode;
 }
 
 /**

@@ -678,78 +678,101 @@ test("performance #105: 200 and 2000 message append within time bounds", async (
 });
 
 test("storage #108: single write, zero on repeat, idle stability", async ({ page }) => {
-  // Start storage probe in extension realm via debug API
-  await page.evaluate(() => {
-    window.dispatchEvent(new CustomEvent("bds:debug-api-request", {
-      detail: JSON.stringify({ id: "probe-start", method: "startStorageProbe", args: [] }),
-    }));
-  });
+  // Helper: send a debug request and await its correlated response
+  async function debugRequest(id, method, args = []) {
+    const result = await page.evaluate(({ id, method, args }) => {
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error(`debugRequest ${id} timed out`)), 10000);
+        const handler = (e) => {
+          let detail = e.detail;
+          if (typeof detail === "string") detail = JSON.parse(detail);
+          if (detail.id === id) {
+            clearTimeout(timeout);
+            window.removeEventListener("bds:debug-api-response", handler);
+            resolve(detail.result);
+          }
+        };
+        window.addEventListener("bds:debug-api-response", handler);
+        window.dispatchEvent(new CustomEvent("bds:debug-api-request", {
+          detail: JSON.stringify({ id, method, args }),
+        }));
+      });
+    }, { id, method, args });
+    return result;
+  }
 
-  // Start page-level event counter
-  await page.evaluate(() => {
-    window.__bdsTestEvents = { remoteConfigUpdated: 0 };
-    window.addEventListener("bds:remote-config-updated", () => {
-      window.__bdsTestEvents.remoteConfigUpdated++;
-    });
-  });
-
-  const ts = Date.now();
-
-  // Unique replaceRemote via debug API
-  await page.evaluate((ts) => {
-    window.dispatchEvent(new CustomEvent("bds:debug-api-request", {
-      detail: JSON.stringify({ id: "cr-1", method: "replaceRemote",
-        args: [{ features: { testChrome: true, ts } }] }),
-    }));
-  }, ts);
-
-  // Wait for response + flush
-  await page.waitForTimeout(750);
-
-  const eventsAfterFirst = await page.evaluate(() => window.__bdsTestEvents.remoteConfigUpdated);
-  expect(eventsAfterFirst).toBe(1);
-
-  // Idle window — count must remain stable
+  // Wait for fixture startup quiescence: no storage events for 500ms.
+  // Seed a unique value first so we have a baseline.
+  const startupToken = `startup-${Date.now()}`;
+  await debugRequest("quiesce-seed", "replaceRemote", [{ features: { startupToken } }]);
   await page.waitForTimeout(500);
-  const eventsAfterIdle = await page.evaluate(() => window.__bdsTestEvents.remoteConfigUpdated);
-  expect(eventsAfterIdle).toBe(1);
-
-  // Identical replacement — zero additional events
-  await page.evaluate((ts) => {
-    window.dispatchEvent(new CustomEvent("bds:debug-api-request", {
-      detail: JSON.stringify({ id: "cr-2", method: "replaceRemote",
-        args: [{ features: { testChrome: true, ts } }] }),
-    }));
-  }, ts);
+  await debugRequest("quiesce-start", "startStorageProbe");
   await page.waitForTimeout(750);
+  const startupProbe = await debugRequest("quiesce-check", "getStorageProbe");
+  // Startup probe should show 0 events after seeding (the seed was before probe start)
+  // If startup background fetches are still arriving, we'll see them here
+  await debugRequest("quiesce-stop", "stopStorageProbe");
 
-  const eventsAfterRepeat = await page.evaluate(() => window.__bdsTestEvents.remoteConfigUpdated);
-  expect(eventsAfterRepeat).toBe(1);
+  // ── Actual #108 contract ──
+  try {
+    // Start/reset the storage probe
+    await debugRequest("probe-start", "startStorageProbe");
 
-  // Get storage probe results
-  const probeResult = await page.evaluate(() => {
-    return new Promise((resolve) => {
-      const handler = (e) => {
-        let detail = e.detail;
-        if (typeof detail === "string") detail = JSON.parse(detail);
-        if (detail.id === "probe-get") resolve(detail.result);
-      };
-      window.addEventListener("bds:debug-api-response", handler, { once: true });
-      window.dispatchEvent(new CustomEvent("bds:debug-api-request", {
-        detail: JSON.stringify({ id: "probe-get", method: "getStorageProbe", args: [] }),
-      }));
+    // Start page-level event counter
+    await page.evaluate(() => {
+      window.__bdsTestEvents = { remoteConfigUpdated: 0 };
+      window.addEventListener("bds:remote-config-updated", () => {
+        window.__bdsTestEvents.remoteConfigUpdated++;
+      });
     });
-  });
 
-  expect(probeResult).toBeTruthy();
-  expect(probeResult.remoteConfig).toBe(1);
+    const ts = Date.now();
+    const uniqueConfig = { features: { testChrome: true, ts } };
 
-  // Stop probe
-  await page.evaluate(() => {
-    window.dispatchEvent(new CustomEvent("bds:debug-api-request", {
-      detail: JSON.stringify({ id: "probe-stop", method: "stopStorageProbe", args: [] }),
-    }));
-  });
+    // Apply unique remote config and await correlated response
+    await debugRequest("cr-1", "replaceRemote", [uniqueConfig]);
+
+    // Allow a short flush window for storage events
+    await page.waitForTimeout(300);
+
+    const eventsAfterFirst = await page.evaluate(() => window.__bdsTestEvents.remoteConfigUpdated);
+    expect(eventsAfterFirst).toBe(1);
+
+    // Get probe — total events must be exactly 1
+    const probeAfterFirst = await debugRequest("probe-get-1", "getStorageProbe");
+    expect(probeAfterFirst).toBeTruthy();
+    expect(probeAfterFirst.total).toBe(1);
+    expect(probeAfterFirst.remoteConfig).toBe(1);
+
+    // Idle window — counts must remain stable
+    await page.waitForTimeout(500);
+    const eventsAfterIdle = await page.evaluate(() => window.__bdsTestEvents.remoteConfigUpdated);
+    expect(eventsAfterIdle).toBe(1);
+
+    // Reapply structurally identical config (with reordered keys)
+    const identicalConfig = { features: { ts, testChrome: true } };
+    await debugRequest("cr-2", "replaceRemote", [identicalConfig]);
+
+    await page.waitForTimeout(500);
+
+    // Zero additional events or writes
+    const eventsAfterRepeat = await page.evaluate(() => window.__bdsTestEvents.remoteConfigUpdated);
+    expect(eventsAfterRepeat).toBe(1);
+
+    const probeAfterRepeat = await debugRequest("probe-get-2", "getStorageProbe");
+    expect(probeAfterRepeat.total).toBe(1);
+
+    // Verify stored data is correct via debug API
+    const storedConfig = await debugRequest("probe-get-raw", "getRaw");
+    expect(storedConfig).toBeTruthy();
+    expect(storedConfig.features.testChrome).toBe(true);
+
+  } finally {
+    // Always stop the probe
+    await debugRequest("probe-stop", "stopStorageProbe");
+    // Clean up event counter
+    await page.evaluate(() => { window.__bdsTestEvents = null; });
+  }
 });
 
 test("host wrapper: create_file download card in block-level nonzero wrapper", async ({ page }) => {

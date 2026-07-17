@@ -590,10 +590,10 @@ describe("scanner scheduling", () => {
 
     const div = document.createElement("div");
     div.className = "not-a-message";
+    document.body.appendChild(div);
     scheduleMessageScan(div);
-    // Arm happens even for non-message elements (it adds to dirty set and arms timer)
-    // But when scan runs, it won't find a message
-    expect(state.scanTimer).toBeTruthy();
+    // Non-message element — no timer armed, no processing
+    expect(state.scanTimer).toBe(0);
     vi.advanceTimersByTime(200);
     expect(processMessageNodeMock).not.toHaveBeenCalled();
   });
@@ -615,13 +615,15 @@ describe("scanner scheduling", () => {
 
   it("scheduleMessageScan ignores detached elements", async () => {
     const { scheduleMessageScan } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
     const detached = makeMessage("assistant", "detached");
     // Not appended to document
 
     scheduleMessageScan(detached);
+    // Detached elements must not arm the timer
+    expect(state.scanTimer).toBe(0);
     vi.advanceTimersByTime(200);
-    // Detached at flush time → disposed (not processed)
-    expect(disposeMessageNodeMock).toHaveBeenCalledWith(detached);
+    expect(disposeMessageNodeMock).not.toHaveBeenCalled();
     expect(processMessageNodeMock).not.toHaveBeenCalled();
   });
 

@@ -224,7 +224,15 @@ export function observeChatDom() {
  * Coalesced under the same debounce timer. Never requests a full scan.
  */
 export function scheduleMessageScan(node) {
-  if (!node || !(node instanceof Element) || node.closest?.("#bds-root")) {
+  // Require a connected div.ds-message element. Non-message elements, text
+  // nodes, detached nodes, and nodes inside #bds-root must not arm a scan.
+  if (
+    !node ||
+    !(node instanceof Element) ||
+    !node.classList?.contains("ds-message") ||
+    !document.contains(node) ||
+    node.closest?.("#bds-root")
+  ) {
     return;
   }
   dirtyNodes.add(node);

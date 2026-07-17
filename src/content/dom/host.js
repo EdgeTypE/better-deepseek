@@ -9,33 +9,61 @@
  */
 
 const hostWrappers = new WeakMap();
+const wrapperOwner = new WeakMap();
+
+function adoptWrapper(wrapper, node) {
+  const previousOwner = wrapperOwner.get(wrapper);
+  if (previousOwner && previousOwner !== node) {
+    hostWrappers.delete(previousOwner);
+  }
+  wrapperOwner.set(wrapper, node);
+  hostWrappers.set(node, wrapper);
+}
 
 /**
  * Get or create the bds-host-wrapper for a message node.
+ * A cached wrapper that is still in the document and adjacent to the message
+ * is reused as-is. If the message has moved, the wrapper is reinserted
+ * immediately after the message in its new parent.
  */
 export function getOrCreateWrapper(node) {
   let wrapper = hostWrappers.get(node);
-  if (!wrapper || !document.contains(wrapper)) {
-    // Search existing siblings for an existing wrapper
-    let sibling = node.nextElementSibling;
-    let attempts = 0;
-    while (sibling && attempts < 10) {
-      if (sibling.classList?.contains("ds-message")) break;
-      if (sibling.classList?.contains("bds-host-wrapper")) {
-        wrapper = sibling;
-        break;
-      }
-      sibling = sibling.nextElementSibling;
-      attempts++;
-    }
 
-    if (!wrapper) {
-      wrapper = document.createElement("div");
-      wrapper.className = "bds-host-wrapper";
+  // Validate: wrapper must still be in the document, and its owner must
+  // still point to this message (prevents adoption by a different message).
+  if (wrapper && document.contains(wrapper) && wrapperOwner.get(wrapper) === node) {
+    // Ensure adjacency — if reparented, move wrapper with the message
+    if (wrapper.previousElementSibling !== node) {
       node.insertAdjacentElement("afterend", wrapper);
     }
-    hostWrappers.set(node, wrapper);
+    return wrapper;
   }
+
+  // Search existing siblings for a pre-existing but unowned wrapper
+  let sibling = node.nextElementSibling;
+  let attempts = 0;
+  while (sibling && attempts < 10) {
+    if (sibling.classList?.contains("ds-message")) break;
+    if (sibling.classList?.contains("bds-host-wrapper") && !wrapperOwner.has(sibling)) {
+      wrapper = sibling;
+      break;
+    }
+    sibling = sibling.nextElementSibling;
+    attempts++;
+  }
+
+  if (!wrapper) {
+    wrapper = document.createElement("div");
+    wrapper.className = "bds-host-wrapper";
+    node.insertAdjacentElement("afterend", wrapper);
+  } else {
+    // Reinsert adjacency if needed
+    if (wrapper.previousElementSibling !== node) {
+      node.insertAdjacentElement("afterend", wrapper);
+    }
+  }
+
+  adoptWrapper(wrapper, node);
   return wrapper;
 }
 

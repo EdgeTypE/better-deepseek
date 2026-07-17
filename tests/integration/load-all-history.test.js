@@ -290,7 +290,7 @@ describe("load-all-history async flow", () => {
     expect(result2).toEqual(messages);
   });
 
-  it("requests for different sessions do not share pending state", async () => {
+  it("cross-session: old pending cancelled, only new session cached", async () => {
     const { loadAllHistory, isLoadInProgress } = await import("../../src/content/load-all-history.js");
 
     // Load session A
@@ -298,32 +298,33 @@ describe("load-all-history async flow", () => {
     const promiseA = loadAllHistory();
     await Promise.resolve();
 
-    // Switch URL to session B and load
+    expect(isLoadInProgress()).toBe(true);
+
+    // Switch URL to session B — retainOnlyHistorySession should cancel session A
     Object.defineProperty(window, "location", {
       value: { href: "https://chat.deepseek.com/chat/s/test-session-b" },
       writable: true,
       configurable: true,
     });
 
+    // Simulate handleHistoryMessages: retainOnlyHistorySession is called with
+    // new session ID when session B data arrives, evicting session A.
+    const { retainOnlyHistorySession } = await import("../../src/content/load-all-history.js");
+    retainOnlyHistorySession("test-session-b");
+
+    // Session A promise cancelled — resolves to null
+    const resultA = await promiseA;
+    expect(resultA).toBeNull();
+
+    // Session A cache evicted
+    expect(state.chatMessagesBySession.has(sessionIdA)).toBe(false);
+
+    // Session B can load normally
     const promiseB = loadAllHistory();
     await Promise.resolve();
-
-    // Both should be pending independently
-    expect(isLoadInProgress()).toBe(true);
-
-    // Resolve session A — session B still pending
-    simulateResponse(sessionIdA, [makeMsg("a-m1")]);
-    const resultA = await promiseA;
-    expect(resultA).toHaveLength(1);
-
-    // Session B still pending (different session)
-    // Resolve it
     simulateResponse("test-session-b", [makeMsg("b-m1")]);
     const resultB = await promiseB;
     expect(resultB).toHaveLength(1);
-
-    // Both caches independent
-    expect(state.chatMessagesBySession.get(sessionIdA)).toHaveLength(1);
     expect(state.chatMessagesBySession.get("test-session-b")).toHaveLength(1);
   });
 });

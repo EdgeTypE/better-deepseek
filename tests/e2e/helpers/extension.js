@@ -7,6 +7,9 @@ import {
   pricingJson,
   githubZip,
   githubCommits,
+  remoteConfigFixture,
+  remoteStatusFixture,
+  makeLocaleFixture,
 } from "../fixtures/payloads.js";
 
 const projectRoot = process.cwd();
@@ -69,6 +72,45 @@ async function routeFixtureRequests(context) {
       });
     },
   );
+
+  // ── Background updater routes (#108 fix) ──
+
+  await context.route(
+    "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/extension/remote-config.json**",
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json; charset=utf-8",
+        body: JSON.stringify(remoteConfigFixture),
+      });
+    },
+  );
+
+  await context.route(
+    "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/extension/status.json**",
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json; charset=utf-8",
+        body: JSON.stringify(remoteStatusFixture),
+      });
+    },
+  );
+
+  // Locale files — en, tr, ru, zh-cn
+  const localeCodes = ["en", "tr", "ru", "zh-cn"];
+  for (const code of localeCodes) {
+    await context.route(
+      `https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/src/locales/${code}.json**`,
+      async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json; charset=utf-8",
+          body: JSON.stringify(makeLocaleFixture(code)),
+        });
+      },
+    );
+  }
 }
 
 async function createExtensionContext() {

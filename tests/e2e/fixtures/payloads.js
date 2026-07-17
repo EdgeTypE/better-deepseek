@@ -55,6 +55,25 @@ export const githubCommits = Array.from({ length: 3 }, (_, index) => ({
   },
 }));
 
+// ── Background updater fixtures (#108 fix) ──
+
+export const remoteConfigFixture = {
+  features: {
+    attachMenu: { enabled: true },
+    fileUpload: { enabled: true },
+  },
+  selectors: {},
+  api: { statusUrl: "https://status.deepseek.com/api/v1/status" },
+  modelMappings: {},
+  meta: { version: 1 },
+};
+
+export const remoteStatusFixture = [];
+
+export function makeLocaleFixture(code) {
+  return { messages: { testKey: `fixture-locale-${code}` } };
+}
+
 /**
  * Route patterns used by both Playwright and BiDi interception.
  */
@@ -63,6 +82,12 @@ export const ROUTES = {
   pricingHtml: "https://api-docs.deepseek.com/**",
   pricingJson:
     "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/extension/pricing.json",
+  remoteConfig:
+    "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/extension/remote-config.json",
+  remoteStatus:
+    "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/extension/status.json",
+  locales:
+    "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/src/locales/*.json",
   githubZip: "https://codeload.github.com/octocat/Hello-World/zip/refs/heads/*",
   githubCommits: "https://api.github.com/repos/octocat/Hello-World/commits**",
 };

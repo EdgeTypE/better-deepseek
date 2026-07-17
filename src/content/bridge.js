@@ -21,10 +21,16 @@ function getCurrentConversationIdForBudget() {
   return match ? match[1] : null;
 }
 
+let _bridgeEventsInstalled = false;
+
 /**
  * Set up listeners for bridge events from the injected script.
+ * Idempotent — subsequent calls are no-ops.
  */
 export function setupBridgeEvents() {
+  if (_bridgeEventsInstalled) return;
+  _bridgeEventsInstalled = true;
+
   window.addEventListener(BRIDGE_EVENTS.requestConfig, () => {
     pushConfigToPage();
   });

@@ -90,9 +90,13 @@ describe("host wrapper", () => {
     expect(fresh).not.toBe(wrapper);
   });
 
-  it("ownership remains correct after message reparenting", () => {
-    const host = getOrCreateHost(msg, "bds-overlay-host");
+  it("reparenting moves wrapper into new parent adjacent to message", () => {
+    getOrCreateHost(msg, "bds-overlay-host");
     const wrapper = getOrCreateWrapper(msg);
+
+    // Verify initial adjacency
+    expect(msg.nextElementSibling).toBe(wrapper);
+    expect(wrapper.previousElementSibling).toBe(msg);
 
     // Move message to a new parent
     const newParent = document.createElement("div");
@@ -100,9 +104,26 @@ describe("host wrapper", () => {
     document.body.appendChild(newParent);
     newParent.appendChild(msg);
 
-    // Wrapper should be rediscovered (still next to msg in new parent)
+    // Wrapper should be moved into new parent, adjacent to msg
     const refound = getOrCreateWrapper(msg);
     expect(refound).toBe(wrapper);
+    expect(wrapper.parentElement).toBe(newParent);
+    expect(msg.nextElementSibling).toBe(wrapper);
+    expect(wrapper.previousElementSibling).toBe(msg);
+  });
+
+  it("wrapper owned by one message is not adopted by another", () => {
+    const wrapper = getOrCreateWrapper(msg);
+
+    const msg2 = document.createElement("div");
+    msg2.className = "ds-message _63c77b1";
+    document.body.appendChild(msg2);
+
+    // msg2 should get its own wrapper, not adopt msg's
+    const wrapper2 = getOrCreateWrapper(msg2);
+    expect(wrapper2).not.toBe(wrapper);
+    expect(msg.nextElementSibling).toBe(wrapper);
+    expect(msg2.nextElementSibling).toBe(wrapper2);
   });
 
   it("wrapper creation for different messages is independent", () => {

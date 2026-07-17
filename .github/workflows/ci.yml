@@ -93,12 +93,13 @@ jobs:
             ${{ runner.os }}-selenium-
 
       - name: Setup Firefox
+        id: setup-firefox
         uses: browser-actions/setup-firefox@v1
         with:
           firefox-version: latest
 
       - name: Print Firefox version
-        run: firefox --version
+        run: ${{ steps.setup-firefox.outputs.firefox-path }} --version
 
       - name: Build Firefox extension
         run: npm run build:firefox
@@ -107,7 +108,7 @@ jobs:
         run: npm run test:e2e:firefox
         env:
           CI: "1"
-          FIREFOX_BIN: firefox
+          FIREFOX_BIN: ${{ steps.setup-firefox.outputs.firefox-path }}
 
       - name: Upload Firefox test artifacts
         if: always()

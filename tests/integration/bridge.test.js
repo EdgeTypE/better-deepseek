@@ -343,8 +343,7 @@ describe("handleHistoryMessages validation", () => {
       __bdsExplicit: true,
     });
 
-    // At least one completion event (multiple listeners may fire from prior describe blocks)
-    expect(handler).toHaveBeenCalled();
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 
   it("valid REPLACE replaces existing cache", async () => {
