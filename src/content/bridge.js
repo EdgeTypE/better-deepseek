@@ -10,6 +10,7 @@ import { getActiveProject, getActiveFiles, getFilesForProject } from "./project-
 import { getDirectoryFiles } from "../lib/local-directory-source.js";
 import { discoverTags } from "./tags/tag-manager.js";
 import { recordOutgoingContext, recordServerUsage } from "./context-budget.js";
+import { retainOnlyHistorySession } from "./load-all-history.js";
 
 /**
  * Extract the current conversation ID from the URL for budget tracking.
@@ -166,13 +167,15 @@ function handleHistoryMessages(data) {
   const sessionId = bizData.chat_session?.id;
   if (!sessionId) return;
 
-  // Ignore history responses whose session ID no longer matches current URL
+  // Require exact match with current URL session — ignore stale responses
   const match = String(location.href || "").match(/\/chat\/s\/([^/?#]+)/);
   const currentSessionId = match ? match[1] : null;
-  if (currentSessionId && sessionId !== currentSessionId) return;
+  if (!currentSessionId || sessionId !== currentSessionId) return;
 
   const incomingMessages = bizData.chat_messages;
-  if (!Array.isArray(incomingMessages) || incomingMessages.length === 0) return;
+
+  // Enforce current-session-only invariant before storing
+  retainOnlyHistorySession(currentSessionId);
 
   const cacheControl = bizData.cache_control || "APPEND";
 
@@ -183,15 +186,17 @@ function handleHistoryMessages(data) {
   const existing = state.chatMessagesBySession.get(sessionId);
   const existingIds = new Set(existing.map(m => m.message_id));
 
-  for (const msg of incomingMessages) {
-    if (!existingIds.has(msg.message_id)) {
-      existing.push(msg);
-      existingIds.add(msg.message_id);
+  if (Array.isArray(incomingMessages)) {
+    for (const msg of incomingMessages) {
+      if (!existingIds.has(msg.message_id)) {
+        existing.push(msg);
+        existingIds.add(msg.message_id);
+      }
     }
   }
 
-  // Only notify explicit full-history requests to avoid partial data from
-  // DeepSeek's lazy-load paginated calls also resolving the promise.
+  // Notify explicit full-history requests (including empty responses —
+  // treat as completed so waiters resolve promptly without timeout).
   if (data.__bdsExplicit) {
     window.dispatchEvent(new CustomEvent("bds:history-msgs-loaded", {
       detail: JSON.stringify({ sessionId, count: existing.length })
@@ -200,6 +205,7 @@ function handleHistoryMessages(data) {
 
   // Trigger page rescan to inject precise timestamps from API — only when
   // timestamp rendering is enabled, since that is the primary consumer.
+  // Explicit export/select waiters still resolve via the event above.
   if (state.settings.showTimestamps) {
     scheduleScan();
   }

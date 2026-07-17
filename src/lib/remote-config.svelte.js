@@ -81,7 +81,8 @@ class RemoteConfigManager {
    * external syncs are read-only consumers.
    */
   syncFromStorage(value) {
-    const normalized = value && typeof value === "object" ? value : {};
+    // Normalize invalid roots (null, undefined, arrays, primitives) to {}
+    const normalized = (value && typeof value === "object" && !Array.isArray(value)) ? value : {};
     const prevRaw = this.raw;
     this.#remote = normalized;
     const nextRaw = this.raw;
@@ -109,9 +110,13 @@ class RemoteConfigManager {
   }
 
   resetToBuiltin() {
-    if (!this.#isStructurallyEqual(this.#remote, {})) {
-      this.#remote = {};
-      this.#clearStorage();
+    const hadOverrides = !this.#isStructurallyEqual(this.#remote, {});
+    this.#remote = {};
+    // Always clear persisted config + metadata, even when in-memory override
+    // is already empty — storage hygiene is unconditional.
+    this.#clearStorage();
+    // Suppress notification only when logical configuration did not change.
+    if (hadOverrides) {
       this.#notify();
     }
   }

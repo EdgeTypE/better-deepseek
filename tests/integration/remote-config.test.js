@@ -435,12 +435,15 @@ describe("RemoteConfigManager", () => {
       window.removeEventListener(REMOTE_CONFIG_EVENT, handler);
     });
 
-    it("resetToBuiltin skips persist and notify when already at defaults", () => {
-      const setCallsBefore = chromeMock.storage.local.set.mock.calls.length;
+    it("resetToBuiltin always clears storage but skips notification when already at defaults", () => {
       const handler = vi.fn();
       window.addEventListener(REMOTE_CONFIG_EVENT, handler);
       remoteConfig.resetToBuiltin();
-      expect(chromeMock.storage.local.set.mock.calls.length).toBe(setCallsBefore);
+      // Always clears persisted config + metadata
+      expect(chromeMock.storage.local.remove).toHaveBeenCalledWith(
+        [STORAGE_KEYS.remoteConfig, STORAGE_KEYS.remoteConfigMeta],
+      );
+      // No notification when config didn't change
       expect(handler).not.toHaveBeenCalled();
       window.removeEventListener(REMOTE_CONFIG_EVENT, handler);
     });

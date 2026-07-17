@@ -23,7 +23,7 @@ import { upsertCharacters } from "./parser/character-parser.js";
 import { upsertSkills } from "./parser/skill-parser.js";
 import { collectLongWorkFiles, finalizeLongWork, emitZipForFiles } from "./files/long-work.js";
 import { emitStandaloneFiles } from "./files/standalone.js";
-import { getOrCreateHost } from "./dom/host.js";
+import { getOrCreateHost, removeAllMessageHosts, removeMessageHost } from "./dom/host.js";
 import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun } from "./auto.js";
 import { handleManagedAutoContinuation, isManagedRunActive, trySynthesizeReport } from "./deep-research.js";
 
@@ -43,7 +43,7 @@ const processedSearchResultCards = new WeakSet();
 
 /**
  * Dispose a single message node: clear its timers, unmount its Svelte
- * component, remove its registry entry, and clean up orphaned overlay hosts.
+ * component, remove its registry entry, and clean up all hosts.
  */
 export function disposeMessageNode(node) {
   const stateData = nodeStates.get(node);
@@ -59,21 +59,16 @@ export function disposeMessageNode(node) {
       try { unmount(entry.component); } catch (e) { /* already unmounted */ }
     }
     messageOverlays.delete(node);
-
-    // Remove orphaned overlay host/wrapper
-    if (entry.host) {
-      const wrapper = entry.host.closest?.(".bds-host-wrapper");
-      if (wrapper && !wrapper.querySelector(".bds-overlay-host, .bds-file-host, .bds-download-card")) {
-        wrapper.remove();
-      } else if (entry.host.parentNode) {
-        entry.host.remove();
-      }
-    }
   }
 
+  // Clear all weak-set memberships
   readMessages.delete(node);
   userMsgCleaned.delete(node);
   processedSearchResultCards.delete(node);
+  nodeStates.delete(node);
+
+  // Remove all associated hosts and wrapper
+  removeAllMessageHosts(node);
 }
 
 /**
@@ -129,6 +124,10 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
     nodeIndex = collected.indexOf(node);
     nodes = collected;
   }
+
+  // Resolve cached context for isMessageFinished / isLatestAssistant
+  const cachedIsLatestAssistant = context ? context.latestAssistantNode === node : null;
+  const cachedSystemGenerating = context ? context.systemGenerating : null;
 
   // Inject Run buttons into any Python/JS/Lua/Ruby code blocks in this message
   injectPythonRunButtons(node);
@@ -272,7 +271,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
   const isStalled = timeSinceUpdate > 2500;
 
   // Fix false positives: a message cannot be completely settled if it's currently mutating
-  let isSettled = isMessageFinished(node);
+  let isSettled = isMessageFinished(node, cachedIsLatestAssistant, cachedSystemGenerating);
   if (!isStalled) {
     isSettled = false;
   }
@@ -606,12 +605,8 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
       
       stateData.overlayActive = false;
       
-      // NEVER remove the bds-host-wrapper, as it may contain bds-file-host (the ZIP card).
-      // Only clear the overlay sub-container.
-      const overlayHost = node.nextElementSibling?.querySelector(".bds-overlay-host");
-      if (overlayHost) {
-        overlayHost.replaceChildren();
-      }
+      // Remove only the overlay host; preserve file/tool hosts (ZIP cards, etc.)
+      removeMessageHost(node, "bds-overlay-host");
     }
   }
 }
@@ -812,18 +807,22 @@ export function isSystemGenerating() {
 /**
  * Checks if a specific message has finished and settled.
  * Settled messages have action buttons (Copy, Regenerate, etc.).
+ *
+ * @param {Element} node
+ * @param {boolean|null} cachedIsLatest - pre-computed latest-assistant result, or null to query
+ * @param {boolean|null} cachedGenerating - pre-computed systemGenerating result, or null to query
  */
-function isMessageFinished(node) {
+function isMessageFinished(node, cachedIsLatest = null, cachedGenerating = null) {
   const hasCursor = !!node.querySelector('.ds-cursor');
   const isCurrentlyStreamingClass = node.classList.contains('_streaming');
-  
+
   // If we see a cursor or the active streaming class, it's NOT finished, regardless of buttons.
   if (hasCursor || isCurrentlyStreamingClass) {
     return false;
   }
 
-  const generating = isSystemGenerating();
-  
+  const generating = cachedGenerating ?? isSystemGenerating();
+
   // If the system is no longer generating globally, it's definitely done.
   if (!generating) {
     return true;
@@ -833,9 +832,9 @@ function isMessageFinished(node) {
   // (e.g. it's an earlier message in the session).
   // We look for action buttons as a sign of completion.
   const hasFooterButtons = !!node.querySelector('div[role="button"] svg, .ds-icon-copy, .ds-icon-regenerate, .ds-icon-share');
-  
+
   // Backup check: if it's the latest message and the system is generating, it's usually NOT finished.
-  const isLatest = isLatestAssistantMessage(node);
+  const isLatest = cachedIsLatest ?? isLatestAssistantMessage(node);
   if (isLatest && generating) {
     return false;
   }

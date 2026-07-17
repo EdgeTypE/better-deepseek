@@ -5,7 +5,7 @@
 import state, { withObserverPaused } from "./state.js";
 import { LONG_WORK_STALE_MS } from "../lib/constants.js";
 import { devLog } from "../lib/dev-log.js";
-import { processMessageNode, disposeMessageNode, disposeDetachedMessageOverlays } from "./message-processor.svelte.js";
+import { processMessageNode, disposeMessageNode, disposeDetachedMessageOverlays, isSystemGenerating } from "./message-processor.svelte.js";
 import { mount, unmount } from "svelte";
 import AttachMenu from "./ui/AttachMenu.svelte";
 import ExpandToggle from "./ui/ExpandToggle.svelte";
@@ -22,9 +22,21 @@ import CommandsHelp from "./commands/CommandsHelp.svelte";
 
 // ── Incremental scan state ──
 const dirtyNodes = new Set();
+const removedNodes = new Set();
 let pendingFullScan = false;
 let previousLatestAssistant = null;
 let previousAbsoluteLast = null;
+
+// ── Internal: arm the shared debounce timer ──
+function armScanTimer() {
+  if (state.scanTimer) {
+    clearTimeout(state.scanTimer);
+  }
+  state.scanTimer = window.setTimeout(() => {
+    state.scanTimer = 0;
+    scanPage();
+  }, 140);
+}
 
 /**
  * Collect all message nodes from the chat DOM.
@@ -47,11 +59,12 @@ export function collectMessageNodes() {
 
 /**
  * Find the latest assistant message node.
+ * Accepts an optional pre-collected nodes array to avoid redundant DOM walks.
  */
-export function findLatestAssistantMessageNode() {
-  const nodes = collectMessageNodes();
-  for (let index = nodes.length - 1; index >= 0; index -= 1) {
-    const candidate = nodes[index];
+export function findLatestAssistantMessageNode(nodes) {
+  const list = nodes || collectMessageNodes();
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const candidate = list[index];
     if (!candidate || candidate.closest("#bds-root")) {
       continue;
     }
@@ -94,17 +107,19 @@ export function detectMessageRole(node) {
 
 /**
  * Check if a node is the absolute last message in the entire chat.
+ * Accepts an optional pre-collected nodes array.
  */
-export function isAbsoluteLastMessage(node) {
-  const nodes = collectMessageNodes();
-  return nodes[nodes.length - 1] === node;
+export function isAbsoluteLastMessage(node, nodes) {
+  const list = nodes || collectMessageNodes();
+  return list[list.length - 1] === node;
 }
 
 /**
  * Check if a node is the latest assistant message.
+ * Accepts an optional pre-collected nodes array.
  */
-export function isLatestAssistantMessage(node) {
-  return findLatestAssistantMessageNode() === node;
+export function isLatestAssistantMessage(node, nodes) {
+  return findLatestAssistantMessageNode(nodes) === node;
 }
 
 /**
@@ -120,6 +135,7 @@ function closestMessageNode(target) {
 /**
  * Set up a MutationObserver on the document body.
  * Collects dirty message nodes for incremental processing.
+ * Arms the scan timer but never requests a full scan on its own.
  */
 export function observeChatDom() {
   if (state.observer || !document.body) {
@@ -127,35 +143,35 @@ export function observeChatDom() {
   }
 
   state.observer = new MutationObserver((records) => {
-    let hasNonMessageMutation = false;
-
     for (const r of records) {
-      // Check removed nodes for messages needing disposal
+      // Ignore records wholly owned by #bds-root
+      if (r.target.closest?.("#bds-root")) continue;
+
+      // Collect removed message subtrees
       for (const removed of r.removedNodes) {
         if (removed.nodeType !== Node.ELEMENT_NODE) continue;
-        // Collect removed message subtrees
+        if (removed.closest?.("#bds-root")) continue;
+
         const removedMessages = removed.classList?.contains("ds-message")
           ? [removed]
           : Array.from(removed.querySelectorAll?.("div.ds-message") || []);
         for (const rm of removedMessages) {
           if (!rm.closest?.("#bds-root")) {
-            dirtyNodes.add(rm);
+            removedNodes.add(rm);
           }
         }
       }
 
-      // Check added nodes for new/modified messages
+      // Collect added/modified messages
       for (const added of r.addedNodes) {
         if (added.nodeType !== Node.ELEMENT_NODE) continue;
+        if (added.closest?.("#bds-root")) continue;
 
         if (added.classList?.contains("ds-message")) {
-          if (!added.closest?.("#bds-root")) {
-            dirtyNodes.add(added);
-          }
+          dirtyNodes.add(added);
           continue;
         }
 
-        // Check descendant messages
         const descendantMessages = added.querySelectorAll?.("div.ds-message");
         if (descendantMessages?.length) {
           for (const dm of descendantMessages) {
@@ -166,20 +182,19 @@ export function observeChatDom() {
         }
       }
 
-      // For mutations without explicit message nodes (e.g. text changes),
-      // find the closest message ancestor
+      // For mutations without explicit message nodes, find closest message ancestor
       const target = r.target;
-      if (target && target !== document.body) {
+      if (target && target !== document.body && !target.closest?.("#bds-root")) {
         const msg = closestMessageNode(target);
         if (msg) {
           dirtyNodes.add(msg);
-        } else if (!target.closest?.("#bds-root")) {
-          hasNonMessageMutation = true;
         }
+        // Non-message mutations don't trigger message processing —
+        // page-wide enhancers run unconditionally in scanPage().
       }
     }
 
-    scheduleScan();
+    armScanTimer();
   });
 
   state.observer.observe(document.body, {
@@ -190,39 +205,26 @@ export function observeChatDom() {
 
 /**
  * Schedule targeted reprocessing of a single message node.
- * Coalesced under the same debounce timer as full scans.
+ * Coalesced under the same debounce timer. Never requests a full scan.
  */
 export function scheduleMessageScan(node) {
   if (node && !node.closest?.("#bds-root")) {
     dirtyNodes.add(node);
   }
-  scheduleScan();
+  armScanTimer();
 }
 
 /**
- * Debounced page scan scheduler. Trailing-edge: coalesces bursts into one
- * scan ~140ms after the LAST mutation.
- *
- * When called with pendingFullScan=true (default), targeted work is
- * discarded in favor of a full scan.
+ * Schedule a full page scan. Explicit full-scan API for initialization,
+ * settings/pricing changes, URL/focus recovery, timestamp refreshes.
  */
-export function scheduleScan(fullScan = true) {
-  if (fullScan) {
-    pendingFullScan = true;
-  }
-
-  if (state.scanTimer) {
-    clearTimeout(state.scanTimer);
-  }
-
-  state.scanTimer = window.setTimeout(() => {
-    state.scanTimer = 0;
-    scanPage();
-  }, 140);
+export function scheduleScan() {
+  pendingFullScan = true;
+  armScanTimer();
 }
 
 /**
- * Full page scan — process all or only dirty message nodes.
+ * Central scan dispatcher. Called when the debounce timer fires.
  */
 function scanPage() {
   withObserverPaused(() => {
@@ -241,22 +243,34 @@ function scanPage() {
     const doFullScan = pendingFullScan;
     pendingFullScan = false;
 
+    // Always process disconnected removedNodes first — full scan must not discard disposal
+    const toDispose = new Set(removedNodes);
+    removedNodes.clear();
+    for (const rn of toDispose) {
+      if (!document.contains(rn)) {
+        disposeMessageNode(rn);
+      }
+    }
+
     if (doFullScan) {
-      // Full scan: process all messages with shared context.
-      // First, dispose removed message overlays.
+      // Full scan: process all messages with shared context
       disposeDetachedMessageOverlays();
       dirtyNodes.clear();
+
       const nodes = collectMessageNodes();
-      const latestAssistant = findLatestAssistantMessageNode();
+      const latestAssistant = findLatestAssistantMessageNode(nodes);
       const absoluteLast = nodes[nodes.length - 1] || null;
+      const systemGenerating = isSystemGenerating();
+      const context = {
+        latestAssistantNode: latestAssistant,
+        absoluteLastNode: absoluteLast,
+        systemGenerating,
+      };
 
       for (let i = 0; i < nodes.length; i++) {
         const node = nodes[i];
         try {
-          processMessageNode(node, i, nodes, {
-            latestAssistantNode: latestAssistant,
-            absoluteLastNode: absoluteLast,
-          });
+          processMessageNode(node, i, nodes, context);
         } catch (err) {
           console.error("[BDS] Error processing message node:", err, node);
         }
@@ -264,22 +278,28 @@ function scanPage() {
 
       previousLatestAssistant = latestAssistant;
       previousAbsoluteLast = absoluteLast;
-    } else if (dirtyNodes.size > 0) {
+    } else if (dirtyNodes.size > 0 || toDispose.size > 0) {
       // Incremental: process only dirty and state-transition nodes
       const nodes = collectMessageNodes();
       const nodeSet = new Set(nodes);
-      const latestAssistant = findLatestAssistantMessageNode();
+      const latestAssistant = findLatestAssistantMessageNode(nodes);
       const absoluteLast = nodes[nodes.length - 1] || null;
+      const systemGenerating = isSystemGenerating();
 
-      // Dispose dirty nodes that are no longer in the document (moved/removed)
+      // Dispose remaining dirty nodes disconnected at flush time (skip reparented)
       for (const dn of dirtyNodes) {
         if (!document.contains(dn)) {
           disposeMessageNode(dn);
         }
       }
 
-      // Build process set: dirty nodes + previous/current transition nodes
-      const toProcess = new Set(dirtyNodes);
+      // Build process set: still-connected dirty nodes + transition nodes
+      const toProcess = new Set();
+      for (const dn of dirtyNodes) {
+        if (document.contains(dn)) {
+          toProcess.add(dn);
+        }
+      }
       if (previousLatestAssistant && nodeSet.has(previousLatestAssistant)) {
         toProcess.add(previousLatestAssistant);
       }
@@ -291,14 +311,23 @@ function scanPage() {
 
       dirtyNodes.clear();
 
+      const context = {
+        latestAssistantNode: latestAssistant,
+        absoluteLastNode: absoluteLast,
+        systemGenerating,
+      };
+
+      // Build node-to-index map for efficient iteration
+      const indexMap = new Map();
       for (let i = 0; i < nodes.length; i++) {
-        const node = nodes[i];
-        if (!toProcess.has(node)) continue;
+        indexMap.set(nodes[i], i);
+      }
+
+      for (const node of toProcess) {
+        const idx = indexMap.get(node);
+        if (idx === undefined) continue;
         try {
-          processMessageNode(node, i, nodes, {
-            latestAssistantNode: latestAssistant,
-            absoluteLastNode: absoluteLast,
-          });
+          processMessageNode(node, idx, nodes, context);
         } catch (err) {
           console.error("[BDS] Error processing message node:", err, node);
         }
@@ -323,6 +352,7 @@ function scanPage() {
  */
 export function resetIncrementalState() {
   dirtyNodes.clear();
+  removedNodes.clear();
   pendingFullScan = false;
   previousLatestAssistant = null;
   previousAbsoluteLast = null;
@@ -855,6 +885,9 @@ export function startUrlWatcher() {
     const oldUrl = state.lastUrl;
     state.lastUrl = location.href;
     resetIncrementalState();
+    // Clear processed-standalone-files signature set so identical files can
+    // render in a later conversation without growing across sessions.
+    state.processedStandaloneFiles.clear();
     window.dispatchEvent(new CustomEvent("bds:urlChanged"));
 
     const isNewSessionTransition = (oldUrl === "https://chat.deepseek.com/" || oldUrl === "https://chat.deepseek.com") && state.lastUrl.includes("/chat/s/");
