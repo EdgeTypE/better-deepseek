@@ -12,6 +12,123 @@ function clone(value) {
   return structuredClone(value);
 }
 
+function shallowEqual(a, b) {
+  if (a === b) return true;
+  if (typeof a !== typeof b) return false;
+  if (typeof a !== "object" || a === null || b === null) return false;
+  // Compare own keys shallowly — matches real chrome.storage behavior
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const key of aKeys) {
+    if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
+}
+
+function computeChanges(oldData, newValues, removedKeys = []) {
+  /** @type {Record<string, {oldValue?: any, newValue?: any}>} */
+  const changes = {};
+
+  for (const [key, newValue] of Object.entries(newValues)) {
+    const oldValue = clone(chromeMockState.storageData[key]);
+    if (oldValue === undefined && newValue === undefined) continue;
+    // Only emit if value actually changed (shallow compare per chrome.storage spec)
+    if (shallowEqual(oldValue, newValue)) continue;
+    changes[key] = { oldValue, newValue: clone(newValue) };
+  }
+
+  for (const key of removedKeys) {
+    if (!(key in chromeMockState.storageData)) continue;
+    changes[key] = { oldValue: clone(chromeMockState.storageData[key]) };
+  }
+
+  return changes;
+}
+
+async function notifyListeners(changes) {
+  const changeKeys = Object.keys(changes);
+  if (changeKeys.length === 0) return;
+
+  // Clone for each listener so they can't mutate shared state
+  for (const listener of listeners) {
+    const cloned = {};
+    for (const key of changeKeys) {
+      cloned[key] = { ...changes[key] };
+    }
+    // Fire asynchronously to match real chrome.storage behavior
+    await Promise.resolve();
+    listener(cloned, "local");
+  }
+}
+
+// Deferred notification queue for flushStorageChanges
+let pendingChanges = null;
+let flushPromise = null;
+
+function scheduleNotification(changes) {
+  if (!pendingChanges) {
+    pendingChanges = {};
+    flushPromise = Promise.resolve().then(async () => {
+      const c = pendingChanges;
+      pendingChanges = null;
+      flushPromise = null;
+      await notifyListeners(c);
+    });
+  }
+  Object.assign(pendingChanges, changes);
+}
+
+export const chromeMock = {
+  storage: {
+    local: {
+      get: vi.fn(async (keys) => normalizeGetResult(keys)),
+      set: vi.fn(async (values) => {
+        const changes = computeChanges(chromeMockState.storageData, values);
+        Object.assign(chromeMockState.storageData, clone(values));
+        scheduleNotification(changes);
+      }),
+      remove: vi.fn(async (keys) => {
+        const list = Array.isArray(keys) ? keys : [keys];
+        const changes = computeChanges(chromeMockState.storageData, {}, list);
+        for (const key of list) {
+          delete chromeMockState.storageData[key];
+        }
+        scheduleNotification(changes);
+      }),
+      clear: vi.fn(async () => {
+        const removedKeys = Object.keys(chromeMockState.storageData);
+        const changes = computeChanges(chromeMockState.storageData, {}, removedKeys);
+        chromeMockState.storageData = {};
+        scheduleNotification(changes);
+      }),
+    },
+    onChanged: {
+      addListener: vi.fn((listener) => {
+        listeners.add(listener);
+      }),
+      removeListener: vi.fn((listener) => {
+        listeners.delete(listener);
+      }),
+    },
+  },
+  runtime: {
+    sendMessage: vi.fn(async () => undefined),
+    getURL: vi.fn((path = "") => `${chromeMockState.extensionBaseUrl}${path}`),
+    onMessage: {
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      hasListener: vi.fn(() => false),
+    },
+    onInstalled: {
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      hasListener: vi.fn(() => false),
+    },
+  },
+};
+
 function normalizeGetResult(keys) {
   if (keys == null) {
     return clone(chromeMockState.storageData);
@@ -41,48 +158,6 @@ function normalizeGetResult(keys) {
   return {};
 }
 
-export const chromeMock = {
-  storage: {
-    local: {
-      get: vi.fn(async (keys) => normalizeGetResult(keys)),
-      set: vi.fn(async (values) => {
-        Object.assign(chromeMockState.storageData, clone(values));
-      }),
-      remove: vi.fn(async (keys) => {
-        const list = Array.isArray(keys) ? keys : [keys];
-        for (const key of list) {
-          delete chromeMockState.storageData[key];
-        }
-      }),
-      clear: vi.fn(async () => {
-        chromeMockState.storageData = {};
-      }),
-    },
-    onChanged: {
-      addListener: vi.fn((listener) => {
-        listeners.add(listener);
-      }),
-      removeListener: vi.fn((listener) => {
-        listeners.delete(listener);
-      }),
-    },
-  },
-  runtime: {
-    sendMessage: vi.fn(async () => undefined),
-    getURL: vi.fn((path = "") => `${chromeMockState.extensionBaseUrl}${path}`),
-    onMessage: {
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      hasListener: vi.fn(() => false),
-    },
-    onInstalled: {
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      hasListener: vi.fn(() => false),
-    },
-  },
-};
-
 export function installChromeMock() {
   globalThis.chrome = chromeMock;
   return chromeMock;
@@ -90,6 +165,8 @@ export function installChromeMock() {
 
 export function resetChromeMock() {
   chromeMockState.storageData = {};
+  pendingChanges = null;
+  flushPromise = null;
   chromeMock.storage.local.get.mockClear();
   chromeMock.storage.local.set.mockClear();
   chromeMock.storage.local.remove.mockClear();
@@ -111,6 +188,19 @@ export function setChromeStorage(data) {
   chromeMockState.storageData = clone(data) || {};
 }
 
+/**
+ * Flush all pending storage.onChanged notifications.
+ * Call this instead of arbitrary waits in tests.
+ */
+export async function flushStorageChanges() {
+  if (flushPromise) {
+    await flushPromise;
+  }
+}
+
+/**
+ * @deprecated Use storage.local.set() + flushStorageChanges() instead.
+ */
 export function emitStorageChange(changes, areaName = "local") {
   for (const listener of listeners) {
     listener(changes, areaName);

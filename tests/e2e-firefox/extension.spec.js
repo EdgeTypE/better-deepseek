@@ -43,16 +43,20 @@ describe("Firefox extension", () => {
     const { driver } = fx;
     const ts = Date.now();
 
-    // Init event counter
+    // Start extension-realm storage probe
+    await driver.executeScript(`
+      window.dispatchEvent(new CustomEvent("bds:debug-api-request", {
+        detail: JSON.stringify({id:"fx-probe-start",method:"startStorageProbe",args:[]})
+      }));
+    `);
+
+    // Init page-level event counter
     await driver.executeScript(`
       window.__bdsTestEvents = { remoteConfigUpdated: 0 };
       window.addEventListener("bds:remote-config-updated", () => {
         window.__bdsTestEvents.remoteConfigUpdated++;
       });
     `);
-    const eventsBefore = await driver.executeScript(
-      "return window.__bdsTestEvents.remoteConfigUpdated;",
-    );
 
     // Unique replaceRemote
     await driver.executeScript(
@@ -66,15 +70,14 @@ describe("Firefox extension", () => {
     const afterFirst = await driver.executeScript(
       "return window.__bdsTestEvents.remoteConfigUpdated;",
     );
-    // Exactly one new event
-    expect(afterFirst).toBe(eventsBefore + 1);
+    expect(afterFirst).toBe(1);
 
-    // Idle window — count must remain stable (no background writes)
+    // Idle window — count must remain stable
     await driver.sleep(500);
     const afterIdle = await driver.executeScript(
       "return window.__bdsTestEvents.remoteConfigUpdated;",
     );
-    expect(afterIdle).toBe(afterFirst);
+    expect(afterIdle).toBe(1);
 
     // Identical replacement — zero additional events
     await driver.executeScript(
@@ -88,108 +91,93 @@ describe("Firefox extension", () => {
     const afterRepeat = await driver.executeScript(
       "return window.__bdsTestEvents.remoteConfigUpdated;",
     );
-    expect(afterRepeat).toBe(afterFirst);
+    expect(afterRepeat).toBe(1);
+
+    // Verify storage probe: exactly 1 remoteConfig event
+    const probeResult = await driver.executeScript(`
+      return new Promise(function(resolve) {
+        var handler = function(e) {
+          var detail = e.detail;
+          if (typeof detail === "string") detail = JSON.parse(detail);
+          if (detail.id === "fx-probe-get") { window.removeEventListener("bds:debug-api-response", handler); resolve(detail.result); }
+        };
+        window.addEventListener("bds:debug-api-response", handler);
+        window.dispatchEvent(new CustomEvent("bds:debug-api-request", {
+          detail: JSON.stringify({id:"fx-probe-get",method:"getStorageProbe",args:[]})
+        }));
+      });
+    `);
+
+    expect(probeResult).toBeTruthy();
+    expect(probeResult.remoteConfig).toBe(1);
+
+    // Stop probe
+    await driver.executeScript(`
+      window.dispatchEvent(new CustomEvent("bds:debug-api-request", {
+        detail: JSON.stringify({id:"fx-probe-stop",method:"stopStorageProbe",args:[]})
+      }));
+    `);
   });
 
   // ── Contract 3: Performance (#105 fix) ──
   it("processes messages within time bounds at 200 and 2000 scale", async () => {
     const { driver } = fx;
-    const samples = { small: [], large: [] };
+    const median = (arr) => { const s = [...arr].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
 
-    // Baseline: 200 messages, verify settlement
+    // 200 baseline
     await driver.executeScript("window.__mockDeepSeek.clearMessages();");
     await driver.executeScript("window.__mockDeepSeek.seedMessages(200);");
-
-    // Wait until every message has data-bds-msg-id (proves processing settled)
-    await driver.sleep(3000);
-    const settled200 = await driver.executeScript(`
-      var msgs = document.querySelectorAll(".ds-message");
-      for (var i = 0; i < msgs.length; i++) {
-        if (!msgs[i].getAttribute("data-bds-msg-id")) return false;
-      }
-      return msgs.length;
-    `);
+    const settled200 = await driver.executeScript(
+      "return window.__mockDeepSeek.waitForAllMessagesProcessed(200, 30000);",
+    );
     expect(settled200).toBe(200);
 
-    // 5 timing samples at 200
+    const smallSamples = [];
     for (let i = 0; i < 5; i++) {
-      const start = Date.now();
-      await driver.executeScript(
-        'window.__mockDeepSeek.addAssistantMessage("Firefox timing sample " + ' + i + ');',
+      const result = await driver.executeScript(
+        "return window.__mockDeepSeek.appendAndMeasureProcessing('Firefox timing sample " + i + "', 5000);",
       );
-      // Wait for processing — poll for data-bds-msg-id on the new message
-      await driver.sleep(500);
-      const done = await driver.executeScript(`
-        var msgs = document.querySelectorAll(".ds-message");
-        var last = msgs[msgs.length - 1];
-        return !!(last && last.getAttribute("data-bds-msg-id"));
-      `);
-      const elapsed = Date.now() - start;
-      if (done) samples.small.push(elapsed);
-      // Each sample must complete within 2 seconds
-      expect(elapsed).toBeLessThan(2000);
+      smallSamples.push(result.duration);
+      expect(result.duration).toBeLessThan(2000);
     }
-    expect(samples.small.length).toBeGreaterThanOrEqual(3);
+    expect(smallSamples).toHaveLength(5);
 
-    // Scale to 2000
+    // 2000 baseline
     await driver.executeScript("window.__mockDeepSeek.clearMessages();");
     await driver.executeScript("window.__mockDeepSeek.seedMessages(2000);");
-
-    await driver.sleep(5000);
-    const settled2000 = await driver.executeScript(`
-      var msgs = document.querySelectorAll(".ds-message");
-      for (var i = 0; i < msgs.length; i++) {
-        if (!msgs[i].getAttribute("data-bds-msg-id")) return false;
-      }
-      return msgs.length;
-    `);
+    const settled2000 = await driver.executeScript(
+      "return window.__mockDeepSeek.waitForAllMessagesProcessed(2000, 60000);",
+    );
     expect(settled2000).toBe(2000);
 
-    // 5 timing samples at 2000
+    const largeSamples = [];
     for (let i = 0; i < 5; i++) {
-      const start = Date.now();
-      await driver.executeScript(
-        'window.__mockDeepSeek.addAssistantMessage("Firefox large sample " + ' + i + ');',
+      const result = await driver.executeScript(
+        "return window.__mockDeepSeek.appendAndMeasureProcessing('Firefox large sample " + i + "', 5000);",
       );
-      await driver.sleep(500);
-      const done = await driver.executeScript(`
-        var msgs = document.querySelectorAll(".ds-message");
-        var last = msgs[msgs.length - 1];
-        return !!(last && last.getAttribute("data-bds-msg-id"));
-      `);
-      const elapsed = Date.now() - start;
-      if (done) samples.large.push(elapsed);
-      expect(elapsed).toBeLessThan(2000);
+      largeSamples.push(result.duration);
+      expect(result.duration).toBeLessThan(2000);
     }
-    expect(samples.large.length).toBeGreaterThanOrEqual(3);
+    expect(largeSamples).toHaveLength(5);
 
-    // Performance ratios
-    const median = (arr) => {
-      const sorted = [...arr].sort((a, b) => a - b);
-      return sorted[Math.floor(sorted.length / 2)];
-    };
-    const smallMed = median(samples.small);
-    const largeMed = median(samples.large);
-    expect(largeMed).toBeLessThanOrEqual(smallMed * 2.5);
-    expect(largeMed - smallMed).toBeLessThanOrEqual(750);
-  }, 60000);
+    expect(median(largeSamples)).toBeLessThanOrEqual(median(smallSamples) * 2.5);
+    expect(median(largeSamples) - median(smallSamples)).toBeLessThanOrEqual(750);
+  }, 120000);
 
   // ── Contract 4: Host wrapper box model ──
   it("renders create_file download card in host wrapper with block-level box", async () => {
     const { driver } = fx;
     await driver.executeScript("window.__mockDeepSeek.clearMessages();");
 
-    // Add a real create_file message that produces .bds-download-card
     await driver.executeScript(`
       window.__mockDeepSeek.addAssistantMessage(
         '<BDS:CREATE_FILE fileName="test-firefox.txt">\\nHello Firefox E2E\\n</BDS:CREATE_FILE>'
       );
     `);
 
-    // Wait for parsing + overlay rendering
+    // Await download card observably
     await driver.sleep(3000);
 
-    // Must find download card inside host wrapper
     const card = await driver.findElement({ css: ".bds-download-card" });
     expect(card).toBeTruthy();
 
@@ -201,6 +189,7 @@ describe("Firefox extension", () => {
       wrapper,
     );
     expect(rect.w).toBeGreaterThan(0);
+    expect(rect.h).toBeGreaterThan(0);
 
     const display = await wrapper.getCssValue("display");
     expect(display).not.toBe("contents");

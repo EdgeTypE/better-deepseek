@@ -182,7 +182,16 @@ function handleHistoryMessages(data) {
   // Reject the entire payload if any entry is not a non-null object with
   // a non-empty message_id. A later valid response remains accepted.
   for (const msg of incomingMessages) {
-    if (!msg || typeof msg !== "object" || !msg.message_id) return;
+    if (
+      !msg ||
+      typeof msg !== "object" ||
+      Array.isArray(msg) ||
+      Object.getPrototypeOf(msg) !== Object.prototype ||
+      typeof msg.message_id !== "string" ||
+      !msg.message_id.trim()
+    ) {
+      return;
+    }
   }
 
   // Enforce current-session-only invariant before storing

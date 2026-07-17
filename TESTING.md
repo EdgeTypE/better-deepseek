@@ -67,7 +67,7 @@ Useful variants:
 1. Build both extensions with `npm run build`.
 2. Selenium Manager auto-provisions GeckoDriver. Set `FIREFOX_BIN` to override the Firefox binary.
 3. Firefox launches with BiDi enabled and the unsigned `dist-firefox/` extension installed temporarily via `installAddon(path, true)`.
-4. BiDi `network.addIntercept` + `network.continueResponse` serve the same deterministic fixture HTML and API payloads as the Chrome lane (shared `tests/e2e/fixtures/payloads.js`).
+4. BiDi `network.addIntercept` + `network.provideResponse` serve the same deterministic fixture HTML and API payloads as the Chrome lane (shared `tests/e2e/fixtures/payloads.js`).
 5. `npm run test:e2e:firefox` invokes Vitest with `vitest.firefox.config.js`, running tests from `tests/e2e-firefox/`.
 6. In CI, Firefox runs headless. Selenium caches at `~/.cache/selenium` — cache this directory for faster runs.
 7. Test results are written to `test-results-firefox/` on failure.
@@ -75,9 +75,13 @@ Useful variants:
 ### Firefox contracts
 
 1. **Boot**: Extension boots on the mock fixture and exposes `#bds-toggle`, `.bds-plus-btn`.
-2. **Storage quiescence**: A unique `replaceRemote` produces exactly one `bds:remote-config-updated` event over 750 ms; repeating the identical replacement produces zero additional events. This validates the [#108](https://github.com/EdgeTypE/better-deepseek/issues/108) fix in Firefox.
-3. **2000-message processing**: After seeding 2,000 settled messages and appending one new message, the new message gains `data-bds-msg-id`, proving the built extension processes it. This validates the [#105](https://github.com/EdgeTypE/better-deepseek/issues/105) fix in Firefox.
-4. **Host wrapper box model**: The `bds-host-wrapper` has a nonzero box, is not `display: contents`, and sibling tool/unknown hosts survive when another host is removed.
+2. **Storage quiescence (#108)**: A unique `replaceRemote` produces exactly one `bds:remote-config-updated` event and exactly one `chrome.storage.onChanged` event for the remoteConfig key. Repeating the identical replacement produces zero additional events or storage writes. A 500 ms idle window shows stable counts. Verified via extension-realm storage probe (`startStorageProbe`/`getStorageProbe`/`stopStorageProbe` debug API methods).
+3. **Performance (#105)**: 200-message baseline and 2000-message scale. All five samples at each scale must complete; each append under 2,000 ms. Median ratio ≤ 2.5×, absolute median increase ≤ 750 ms. Uses observable `waitForAllMessagesProcessed` and `appendAndMeasureProcessing` helpers (no fixed sleeps).
+4. **Host wrapper box model**: `create_file` message produces `.bds-download-card` inside `.bds-host-wrapper`. Wrapper `display` is not `contents`; both `width` and `height` are greater than zero.
+
+### Chrome contracts (matching)
+
+The Chrome Playwright lane runs the identical performance (#105), storage (#108), and host-wrapper contracts using the same shared mock fixture helpers (`waitForAllMessagesProcessed`, `appendAndMeasureProcessing`, debug API storage probe).
 
 ## Android simulator
 
@@ -96,7 +100,9 @@ Useful variants:
 
 ## CI
 
-- GitHub Actions runs two jobs: a web lane and an Android lane.
-- The web lane builds `dist-chrome/` and `dist-firefox/`, runs `npm run test:unit`, then runs `npm run test:e2e` (Chrome) and `npm run test:e2e:firefox`.
+- GitHub Actions runs three jobs: **Web / Extension** (Chrome + unit), **Firefox E2E**, and **Android**.
+- The web lane builds `dist-chrome/`, runs `npm run test:unit`, then runs `npm run test:e2e` (Chrome Playwright).
+- The Firefox lane builds `dist-firefox/` on `ubuntu-latest` with Node 20, installs Firefox Stable via `browser-actions/setup-firefox@v1`, caches `~/.cache/selenium`, runs `npm run test:e2e:firefox`, and uploads `test-results-firefox/` on failure.
 - The Android lane builds `dist-android/`, assembles the debug APK, runs `npm run test:e2e:android`, then runs `npm run android:test`.
-- Coverage, Playwright reports, Android artifacts, and Firefox `test-results-firefox/` are uploaded on every CI run.
+- Coverage, Playwright reports, Android artifacts, and Firefox test results are uploaded on every CI run.
+- `npm test` builds (`pretest`) before running the unit + Chrome + Firefox suites — works from a clean checkout with no pre-existing `dist-chrome/` or `dist-firefox/`.

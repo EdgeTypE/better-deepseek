@@ -146,15 +146,17 @@ export function observeChatDom() {
     let hasExternalMutation = false;
 
     for (const r of records) {
-      // Ignore records wholly owned by #bds-root
+      // Ignore records where the target itself is within #bds-root
       if (r.target.closest?.("#bds-root")) continue;
 
-      hasExternalMutation = true;
+      let recordHasExternal = false;
 
       // Collect removed message subtrees
       for (const removed of r.removedNodes) {
         if (removed.nodeType !== Node.ELEMENT_NODE) continue;
         if (removed.closest?.("#bds-root")) continue;
+
+        recordHasExternal = true;
 
         const removedMessages = removed.classList?.contains("ds-message")
           ? [removed]
@@ -170,6 +172,8 @@ export function observeChatDom() {
       for (const added of r.addedNodes) {
         if (added.nodeType !== Node.ELEMENT_NODE) continue;
         if (added.closest?.("#bds-root")) continue;
+
+        recordHasExternal = true;
 
         if (added.classList?.contains("ds-message")) {
           dirtyNodes.add(added);
@@ -191,9 +195,13 @@ export function observeChatDom() {
       if (target && target !== document.body && !target.closest?.("#bds-root")) {
         const msg = closestMessageNode(target);
         if (msg) {
+          recordHasExternal = true;
           dirtyNodes.add(msg);
         }
-        // Non-message mutations still schedule page-wide enhancers
+      }
+
+      if (recordHasExternal) {
+        hasExternalMutation = true;
       }
     }
 

@@ -97,6 +97,53 @@ async function init() {
     pushConfigToPage();
   });
 
+  // ── Storage probe state (#108 contract verification) ──
+  let storageProbeListener = null;
+  let storageProbeState = null;
+
+  function sanitizeStorageValue(value) {
+    if (value === undefined) return undefined;
+    try { return JSON.parse(JSON.stringify(value)); } catch { return undefined; }
+  }
+
+  function startStorageProbe() {
+    if (storageProbeListener) return; // already started — idempotent
+    storageProbeState = { total: 0, remoteConfig: 0, events: [] };
+    storageProbeListener = (changes, area) => {
+      if (area !== "local") return;
+      storageProbeState.total += 1;
+      const sanitized = {};
+      for (const [key, change] of Object.entries(changes)) {
+        sanitized[key] = {
+          oldValue: sanitizeStorageValue(change.oldValue),
+          newValue: sanitizeStorageValue(change.newValue),
+        };
+      }
+      if (changes[STORAGE_KEYS.remoteConfig]) {
+        storageProbeState.remoteConfig += 1;
+      }
+      storageProbeState.events.push(sanitized);
+    };
+    chrome.storage.onChanged.addListener(storageProbeListener);
+  }
+
+  function getStorageProbe() {
+    if (!storageProbeState) return null;
+    return {
+      total: storageProbeState.total,
+      remoteConfig: storageProbeState.remoteConfig,
+      events: storageProbeState.events.slice(),
+    };
+  }
+
+  function stopStorageProbe() {
+    if (storageProbeListener) {
+      chrome.storage.onChanged.removeListener(storageProbeListener);
+      storageProbeListener = null;
+    }
+    storageProbeState = null;
+  }
+
   // Debug API — listen for requests from MAIN-world injected script
   window.addEventListener("bds:debug-api-request", (e) => {
     let detail = e.detail;
@@ -114,6 +161,17 @@ async function init() {
         case "detectModel": result = detectModelType() || "instant"; break;
         case "toggleDebugPanel":
           window.dispatchEvent(new CustomEvent("bds:toggle-debug-panel"));
+          result = true;
+          break;
+        case "startStorageProbe":
+          startStorageProbe();
+          result = true;
+          break;
+        case "getStorageProbe":
+          result = getStorageProbe();
+          break;
+        case "stopStorageProbe":
+          stopStorageProbe();
           result = true;
           break;
       }

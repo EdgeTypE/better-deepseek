@@ -614,23 +614,13 @@ test("creates the PDF export iframe from the sidebar menu", async ({ page }) => 
 // The storage quiescence and performance contracts are verified in
 // the Firefox E2E lane with Selenium WebDriver + BiDi.
 
-test("storage quiescence: extension processes storage changes without DOM regression", async ({ page }) => {
-  // Verify the extension is stable after repeated DOM mutations.
-  // The #105/#108 fixes prevent quadratic slowdown and storage loops.
-  // We verify by: (1) the UI remains responsive after many mutations,
-  // (2) no duplicate overlays appear after repeated scans.
-
-  // Clear and seed 50 messages to stress the scanner
+test("scanner smoke: no duplicate overlays after repeated scans", async ({ page }) => {
+  // Scanner deduplication smoke test — distinct from #108 storage contract.
   await page.evaluate(() => window.__mockDeepSeek.clearMessages());
   await page.evaluate(() => window.__mockDeepSeek.seedMessages(50));
-  await page.waitForTimeout(2000);
+  await page.evaluate(() => window.__mockDeepSeek.waitForAllMessagesProcessed(50, 15000));
 
-  // The toggle should still be visible (extension didn't crash)
-  await expect(page.locator("#bds-toggle")).toBeVisible();
-
-  // No duplicate overlays — the scanner deduplicates
   const overlayCount = await page.locator(".bds-message-overlay").count();
-  // Add one tagged message and verify overlay appears exactly once
   await page.evaluate(() => {
     window.__mockDeepSeek.addAssistantMessage(
       '<BDS:VISUALIZER><div class="v-card"><h2>Storage Test</h2></div></BDS:VISUALIZER>',
@@ -648,64 +638,118 @@ test("storage quiescence: extension processes storage changes without DOM regres
   expect(afterRescanCount).toBe(newOverlayCount);
 });
 
-test("performance: 200 and 2000 message append within time bounds", async ({ page }) => {
-  const samples = { small: [], large: [] };
+test("performance #105: 200 and 2000 message append within time bounds", async ({ page }) => {
+  const median = (arr) => { const s = [...arr].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
 
-  // 200 baseline — wait for settlement
+  // 200 baseline
   await page.evaluate(() => window.__mockDeepSeek.clearMessages());
   await page.evaluate(() => window.__mockDeepSeek.seedMessages(200));
-  await page.waitForTimeout(3000);
-
-  const settled200 = await page.evaluate(() => {
-    const msgs = document.querySelectorAll(".ds-message");
-    for (const m of msgs) { if (!m.getAttribute("data-bds-msg-id")) return false; }
-    return msgs.length;
-  });
+  const settled200 = await page.evaluate(() => window.__mockDeepSeek.waitForAllMessagesProcessed(200, 30000));
   expect(settled200).toBe(200);
 
+  const smallSamples = [];
   for (let i = 0; i < 5; i++) {
-    const start = Date.now();
-    await page.evaluate((i) => window.__mockDeepSeek.addAssistantMessage("Chrome timing " + i), i);
-    await page.waitForTimeout(500);
-    const done = await page.evaluate(() => {
-      const msgs = document.querySelectorAll(".ds-message");
-      const last = msgs[msgs.length - 1];
-      return !!(last && last.getAttribute("data-bds-msg-id"));
-    });
-    if (done) samples.small.push(Date.now() - start);
-    expect(Date.now() - start).toBeLessThan(2000);
+    const result = await page.evaluate((i) =>
+      window.__mockDeepSeek.appendAndMeasureProcessing("Chrome timing " + i, 5000),
+    i);
+    smallSamples.push(result.duration);
+    expect(result.duration).toBeLessThan(2000);
   }
-  expect(samples.small.length).toBeGreaterThanOrEqual(3);
+  expect(smallSamples).toHaveLength(5);
 
-  // 2000 — wait for settlement
+  // 2000 baseline
   await page.evaluate(() => window.__mockDeepSeek.clearMessages());
   await page.evaluate(() => window.__mockDeepSeek.seedMessages(2000));
-  await page.waitForTimeout(5000);
-
-  const settled2000 = await page.evaluate(() => {
-    const msgs = document.querySelectorAll(".ds-message");
-    for (const m of msgs) { if (!m.getAttribute("data-bds-msg-id")) return false; }
-    return msgs.length;
-  });
+  const settled2000 = await page.evaluate(() => window.__mockDeepSeek.waitForAllMessagesProcessed(2000, 60000));
   expect(settled2000).toBe(2000);
 
+  const largeSamples = [];
   for (let i = 0; i < 5; i++) {
-    const start = Date.now();
-    await page.evaluate((i) => window.__mockDeepSeek.addAssistantMessage("Chrome large " + i), i);
-    await page.waitForTimeout(500);
-    const done = await page.evaluate(() => {
-      const msgs = document.querySelectorAll(".ds-message");
-      const last = msgs[msgs.length - 1];
-      return !!(last && last.getAttribute("data-bds-msg-id"));
-    });
-    if (done) samples.large.push(Date.now() - start);
-    expect(Date.now() - start).toBeLessThan(2000);
+    const result = await page.evaluate((i) =>
+      window.__mockDeepSeek.appendAndMeasureProcessing("Chrome large " + i, 5000),
+    i);
+    largeSamples.push(result.duration);
+    expect(result.duration).toBeLessThan(2000);
   }
-  expect(samples.large.length).toBeGreaterThanOrEqual(3);
+  expect(largeSamples).toHaveLength(5);
 
-  const median = (arr) => { const s = [...arr].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
-  expect(median(samples.large)).toBeLessThanOrEqual(median(samples.small) * 2.5);
-  expect(median(samples.large) - median(samples.small)).toBeLessThanOrEqual(750);
+  expect(median(largeSamples)).toBeLessThanOrEqual(median(smallSamples) * 2.5);
+  expect(median(largeSamples) - median(smallSamples)).toBeLessThanOrEqual(750);
+});
+
+test("storage #108: single write, zero on repeat, idle stability", async ({ page }) => {
+  // Start storage probe in extension realm via debug API
+  await page.evaluate(() => {
+    window.dispatchEvent(new CustomEvent("bds:debug-api-request", {
+      detail: JSON.stringify({ id: "probe-start", method: "startStorageProbe", args: [] }),
+    }));
+  });
+
+  // Start page-level event counter
+  await page.evaluate(() => {
+    window.__bdsTestEvents = { remoteConfigUpdated: 0 };
+    window.addEventListener("bds:remote-config-updated", () => {
+      window.__bdsTestEvents.remoteConfigUpdated++;
+    });
+  });
+
+  const ts = Date.now();
+
+  // Unique replaceRemote via debug API
+  await page.evaluate((ts) => {
+    window.dispatchEvent(new CustomEvent("bds:debug-api-request", {
+      detail: JSON.stringify({ id: "cr-1", method: "replaceRemote",
+        args: [{ features: { testChrome: true, ts } }] }),
+    }));
+  }, ts);
+
+  // Wait for response + flush
+  await page.waitForTimeout(750);
+
+  const eventsAfterFirst = await page.evaluate(() => window.__bdsTestEvents.remoteConfigUpdated);
+  expect(eventsAfterFirst).toBe(1);
+
+  // Idle window — count must remain stable
+  await page.waitForTimeout(500);
+  const eventsAfterIdle = await page.evaluate(() => window.__bdsTestEvents.remoteConfigUpdated);
+  expect(eventsAfterIdle).toBe(1);
+
+  // Identical replacement — zero additional events
+  await page.evaluate((ts) => {
+    window.dispatchEvent(new CustomEvent("bds:debug-api-request", {
+      detail: JSON.stringify({ id: "cr-2", method: "replaceRemote",
+        args: [{ features: { testChrome: true, ts } }] }),
+    }));
+  }, ts);
+  await page.waitForTimeout(750);
+
+  const eventsAfterRepeat = await page.evaluate(() => window.__bdsTestEvents.remoteConfigUpdated);
+  expect(eventsAfterRepeat).toBe(1);
+
+  // Get storage probe results
+  const probeResult = await page.evaluate(() => {
+    return new Promise((resolve) => {
+      const handler = (e) => {
+        let detail = e.detail;
+        if (typeof detail === "string") detail = JSON.parse(detail);
+        if (detail.id === "probe-get") resolve(detail.result);
+      };
+      window.addEventListener("bds:debug-api-response", handler, { once: true });
+      window.dispatchEvent(new CustomEvent("bds:debug-api-request", {
+        detail: JSON.stringify({ id: "probe-get", method: "getStorageProbe", args: [] }),
+      }));
+    });
+  });
+
+  expect(probeResult).toBeTruthy();
+  expect(probeResult.remoteConfig).toBe(1);
+
+  // Stop probe
+  await page.evaluate(() => {
+    window.dispatchEvent(new CustomEvent("bds:debug-api-request", {
+      detail: JSON.stringify({ id: "probe-stop", method: "stopStorageProbe", args: [] }),
+    }));
+  });
 });
 
 test("host wrapper: create_file download card in block-level nonzero wrapper", async ({ page }) => {
@@ -715,9 +759,9 @@ test("host wrapper: create_file download card in block-level nonzero wrapper", a
       '<BDS:CREATE_FILE fileName="test-chrome.txt">\nHello Chrome E2E\n</BDS:CREATE_FILE>',
     );
   });
-  await page.waitForTimeout(3000);
+  // Await the download card observably instead of sleeping
+  await expect(page.locator(".bds-download-card")).toBeVisible({ timeout: 10000 });
 
-  await expect(page.locator(".bds-download-card")).toBeVisible();
   const wrapper = page.locator(".bds-host-wrapper").first();
   await expect(wrapper).toBeVisible();
 
@@ -728,4 +772,5 @@ test("host wrapper: create_file download card in block-level nonzero wrapper", a
     const r = el.getBoundingClientRect(); return { w: r.width, h: r.height };
   });
   expect(rect.w).toBeGreaterThan(0);
+  expect(rect.h).toBeGreaterThan(0);
 });

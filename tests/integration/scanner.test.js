@@ -327,6 +327,133 @@ describe("scanner input controls", () => {
   });
 });
 
+describe("scanner #bds-root isolation", () => {
+  beforeEach(async () => {
+    resetAppState();
+    vi.useFakeTimers();
+    mountMock.mockClear();
+    processMessageNodeMock.mockClear();
+    disposeMessageNodeMock.mockClear();
+    disposeDetachedMessageOverlaysMock.mockClear();
+    isSystemGeneratingMock.mockReturnValue(false);
+    document.body.innerHTML = "";
+    const { resetIncrementalState } = await import("../../src/content/scanner.js");
+    resetIncrementalState();
+  });
+
+  afterEach(async () => {
+    const state = (await import("../../src/content/state.js")).default;
+    if (state.observer) {
+      state.observer.disconnect();
+      state.observer = null;
+    }
+    if (state.scanTimer) {
+      clearTimeout(state.scanTimer);
+      state.scanTimer = 0;
+    }
+    const { resetIncrementalState } = await import("../../src/content/scanner.js");
+    resetIncrementalState();
+    vi.useRealTimers();
+  });
+
+  function makeMessage(role, text = "Hello") {
+    const div = document.createElement("div");
+    div.className = "ds-message _63c77b1";
+    div.dataset.role = role;
+    div.dataset.rawText = text;
+    if (role === "user") div.classList.add("d29f3d7d");
+    return div;
+  }
+
+  it("adding #bds-root to body arms no timer", async () => {
+    const { observeChatDom } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+    observeChatDom();
+
+    const root = document.createElement("div");
+    root.id = "bds-root";
+    document.body.appendChild(root);
+    await Promise.resolve();
+
+    // No timer armed — scanTimer should still be 0
+    expect(state.scanTimer).toBe(0);
+  });
+
+  it("removing #bds-root arms no timer", async () => {
+    const { observeChatDom } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+
+    const root = document.createElement("div");
+    root.id = "bds-root";
+    document.body.appendChild(root);
+
+    observeChatDom();
+    await Promise.resolve();
+
+    root.remove();
+    await Promise.resolve();
+
+    expect(state.scanTimer).toBe(0);
+  });
+
+  it("changes wholly within #bds-root remain ignored", async () => {
+    const { observeChatDom } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+
+    const root = document.createElement("div");
+    root.id = "bds-root";
+    document.body.appendChild(root);
+
+    observeChatDom();
+    await Promise.resolve();
+
+    // Add a child element inside #bds-root
+    const child = document.createElement("span");
+    child.className = "ds-message _63c77b1";
+    root.appendChild(child);
+    await Promise.resolve();
+
+    expect(state.scanTimer).toBe(0);
+    expect(processMessageNodeMock).not.toHaveBeenCalled();
+  });
+
+  it("batch with root + external message schedules one scan", async () => {
+    const { observeChatDom } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+
+    const root = document.createElement("div");
+    root.id = "bds-root";
+    document.body.appendChild(root);
+
+    observeChatDom();
+    await Promise.resolve();
+
+    // Simultaneous: add child to root + add external message
+    const rootChild = document.createElement("span");
+    root.appendChild(rootChild);
+
+    const extMsg = makeMessage("assistant", "external");
+    document.body.appendChild(extMsg);
+
+    await Promise.resolve();
+
+    // Timer should be armed exactly once
+    expect(state.scanTimer).toBeTruthy();
+    // Only external message should be processed (after timer fires)
+    vi.advanceTimersByTime(200);
+    expect(processMessageNodeMock).toHaveBeenCalledTimes(1);
+    expect(processMessageNodeMock).toHaveBeenCalledWith(
+      extMsg, expect.any(Number), expect.any(Array), expect.any(Object),
+    );
+    // Root child should not be processed
+    // Only extMsg should have been passed to processMessageNode
+    expect(processMessageNodeMock).toHaveBeenCalledTimes(1);
+    expect(processMessageNodeMock).toHaveBeenCalledWith(
+      extMsg, expect.any(Number), expect.any(Array), expect.any(Object),
+    );
+  });
+});
+
 describe("scanner scheduling", () => {
   beforeEach(async () => {
     resetAppState();
@@ -393,10 +520,109 @@ describe("scanner scheduling", () => {
 
     vi.advanceTimersByTime(200);
 
-    // Should process only the target + transition nodes, not all 50
+    // Should process only the target + transition nodes (latest assistant, absolute last),
+    // not all 50. In a list of 50 messages alternating user/assistant:
+    // - target: messages[10] (user at idx 10)
+    // - latestAssistant: messages[49] (assistant at idx 49)
+    // - absoluteLast: messages[49] (idx 49)
+    // Max 3 nodes expected.
     const callCount = processMessageNodeMock.mock.calls.length;
-    expect(callCount).toBeLessThan(50);
+    expect(callCount).toBeLessThanOrEqual(3);
     expect(callCount).toBeGreaterThanOrEqual(1);
+    // The target node must be among the processed nodes
+    const processedNodes = processMessageNodeMock.mock.calls.map(c => c[0]);
+    expect(processedNodes).toContain(messages[10]);
+  });
+
+  it("observer-driven append processes only new message plus transitions among 2000", async () => {
+    const { observeChatDom } = await import("../../src/content/scanner.js");
+
+    // Seed 2000 messages
+    for (let i = 0; i < 2000; i++) {
+      const msg = makeMessage(i % 2 === 0 ? "user" : "assistant", `msg${i}`);
+      document.body.appendChild(msg);
+    }
+    // Run a full scan first so all are processed and transition state is set
+    const { scheduleScan } = await import("../../src/content/scanner.js");
+    scheduleScan();
+    vi.advanceTimersByTime(200);
+    processMessageNodeMock.mockClear();
+
+    // Now set up the observer and append one new message
+    observeChatDom();
+    await Promise.resolve();
+
+    const newMsg = makeMessage("assistant", "new-message");
+    document.body.appendChild(newMsg);
+    await Promise.resolve();
+
+    vi.advanceTimersByTime(200);
+
+    // Should process only the new message + transition nodes, never all 2000
+    const callCount = processMessageNodeMock.mock.calls.length;
+    expect(callCount).toBeLessThanOrEqual(3);
+    expect(callCount).toBeGreaterThanOrEqual(1);
+    const processedNodes = processMessageNodeMock.mock.calls.map(c => c[0]);
+    expect(processedNodes).toContain(newMsg);
+  });
+
+  it("scheduleMessageScan ignores null", async () => {
+    const { scheduleMessageScan } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+
+    scheduleMessageScan(null);
+    // No timer armed
+    expect(state.scanTimer).toBe(0);
+  });
+
+  it("scheduleMessageScan ignores text nodes", async () => {
+    const { scheduleMessageScan } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+
+    const textNode = document.createTextNode("hello");
+    scheduleMessageScan(textNode);
+    expect(state.scanTimer).toBe(0);
+  });
+
+  it("scheduleMessageScan ignores non-message elements", async () => {
+    const { scheduleMessageScan } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+
+    const div = document.createElement("div");
+    div.className = "not-a-message";
+    scheduleMessageScan(div);
+    // Arm happens even for non-message elements (it adds to dirty set and arms timer)
+    // But when scan runs, it won't find a message
+    expect(state.scanTimer).toBeTruthy();
+    vi.advanceTimersByTime(200);
+    expect(processMessageNodeMock).not.toHaveBeenCalled();
+  });
+
+  it("scheduleMessageScan ignores elements within #bds-root", async () => {
+    const { scheduleMessageScan } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+
+    const root = document.createElement("div");
+    root.id = "bds-root";
+    document.body.appendChild(root);
+    const inner = document.createElement("div");
+    inner.className = "ds-message _63c77b1";
+    root.appendChild(inner);
+
+    scheduleMessageScan(inner);
+    expect(state.scanTimer).toBe(0);
+  });
+
+  it("scheduleMessageScan ignores detached elements", async () => {
+    const { scheduleMessageScan } = await import("../../src/content/scanner.js");
+    const detached = makeMessage("assistant", "detached");
+    // Not appended to document
+
+    scheduleMessageScan(detached);
+    vi.advanceTimersByTime(200);
+    // Detached at flush time → disposed (not processed)
+    expect(disposeMessageNodeMock).toHaveBeenCalledWith(detached);
+    expect(processMessageNodeMock).not.toHaveBeenCalled();
   });
 
   it("full scan supersedes targeted work", async () => {
