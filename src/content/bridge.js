@@ -178,6 +178,13 @@ function handleHistoryMessages(data) {
   const incomingMessages = bizData.chat_messages;
   if (!Array.isArray(incomingMessages)) return;
 
+  // Validate every entry before mutating cache state.
+  // Reject the entire payload if any entry is not a non-null object with
+  // a non-empty message_id. A later valid response remains accepted.
+  for (const msg of incomingMessages) {
+    if (!msg || typeof msg !== "object" || !msg.message_id) return;
+  }
+
   // Enforce current-session-only invariant before storing
   retainOnlyHistorySession(currentSessionId);
 

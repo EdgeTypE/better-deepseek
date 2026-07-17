@@ -472,6 +472,11 @@
             return container.querySelectorAll(".ds-message").length;
           }
 
+          function clearMessages() {
+            const container = document.querySelector("#chat-messages");
+            if (container) container.replaceChildren();
+          }
+
           window.__mockDeepSeek = {
             addAssistantMessage(text) {
               return appendMessage(createTextMessage("assistant", text));
@@ -486,6 +491,7 @@
             getAttachedFiles,
             replaceFileInput,
             seedMessages,
+            clearMessages,
             getSendCount() {
               return sendCount;
             },

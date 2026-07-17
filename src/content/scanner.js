@@ -216,9 +216,10 @@ export function observeChatDom() {
  * Coalesced under the same debounce timer. Never requests a full scan.
  */
 export function scheduleMessageScan(node) {
-  if (node && !node.closest?.("#bds-root")) {
-    dirtyNodes.add(node);
+  if (!node || !(node instanceof Element) || node.closest?.("#bds-root")) {
+    return;
   }
+  dirtyNodes.add(node);
   armScanTimer();
 }
 

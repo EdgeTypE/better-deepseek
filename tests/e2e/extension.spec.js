@@ -605,3 +605,127 @@ test("creates the PDF export iframe from the sidebar menu", async ({ page }) => 
 
   await expect(page.locator("#bds-print-iframe")).toHaveCount(1);
 });
+
+// ── Cross-browser contracts (Chrome parity with Firefox) ──
+// Note: Chrome contracts use DOM-based assertions because Playwright's
+// page.evaluate runs in the MAIN world, while chrome.storage is only
+// available in the extension's ISOLATED content-script world.
+// Firefox Selenium tests use executeScript which bridges both worlds.
+// The storage quiescence and performance contracts are verified in
+// the Firefox E2E lane with Selenium WebDriver + BiDi.
+
+test("storage quiescence: extension processes storage changes without DOM regression", async ({ page }) => {
+  // Verify the extension is stable after repeated DOM mutations.
+  // The #105/#108 fixes prevent quadratic slowdown and storage loops.
+  // We verify by: (1) the UI remains responsive after many mutations,
+  // (2) no duplicate overlays appear after repeated scans.
+
+  // Clear and seed 50 messages to stress the scanner
+  await page.evaluate(() => window.__mockDeepSeek.clearMessages());
+  await page.evaluate(() => window.__mockDeepSeek.seedMessages(50));
+  await page.waitForTimeout(2000);
+
+  // The toggle should still be visible (extension didn't crash)
+  await expect(page.locator("#bds-toggle")).toBeVisible();
+
+  // No duplicate overlays — the scanner deduplicates
+  const overlayCount = await page.locator(".bds-message-overlay").count();
+  // Add one tagged message and verify overlay appears exactly once
+  await page.evaluate(() => {
+    window.__mockDeepSeek.addAssistantMessage(
+      '<BDS:VISUALIZER><div class="v-card"><h2>Storage Test</h2></div></BDS:VISUALIZER>',
+    );
+  });
+  await page.waitForTimeout(1500);
+
+  const newOverlayCount = await page.locator(".bds-message-overlay").count();
+  expect(newOverlayCount).toBe(overlayCount + 1);
+
+  // Rescan should not create duplicate overlays
+  await page.evaluate(() => window.__mockDeepSeek.addAssistantMessage("Trigger rescan."));
+  await page.waitForTimeout(1500);
+  const afterRescanCount = await page.locator(".bds-message-overlay").count();
+  expect(afterRescanCount).toBe(newOverlayCount);
+});
+
+test("performance: 200 and 2000 message append within time bounds", async ({ page }) => {
+  const samples = { small: [], large: [] };
+
+  // 200 baseline — wait for settlement
+  await page.evaluate(() => window.__mockDeepSeek.clearMessages());
+  await page.evaluate(() => window.__mockDeepSeek.seedMessages(200));
+  await page.waitForTimeout(3000);
+
+  const settled200 = await page.evaluate(() => {
+    const msgs = document.querySelectorAll(".ds-message");
+    for (const m of msgs) { if (!m.getAttribute("data-bds-msg-id")) return false; }
+    return msgs.length;
+  });
+  expect(settled200).toBe(200);
+
+  for (let i = 0; i < 5; i++) {
+    const start = Date.now();
+    await page.evaluate((i) => window.__mockDeepSeek.addAssistantMessage("Chrome timing " + i), i);
+    await page.waitForTimeout(500);
+    const done = await page.evaluate(() => {
+      const msgs = document.querySelectorAll(".ds-message");
+      const last = msgs[msgs.length - 1];
+      return !!(last && last.getAttribute("data-bds-msg-id"));
+    });
+    if (done) samples.small.push(Date.now() - start);
+    expect(Date.now() - start).toBeLessThan(2000);
+  }
+  expect(samples.small.length).toBeGreaterThanOrEqual(3);
+
+  // 2000 — wait for settlement
+  await page.evaluate(() => window.__mockDeepSeek.clearMessages());
+  await page.evaluate(() => window.__mockDeepSeek.seedMessages(2000));
+  await page.waitForTimeout(5000);
+
+  const settled2000 = await page.evaluate(() => {
+    const msgs = document.querySelectorAll(".ds-message");
+    for (const m of msgs) { if (!m.getAttribute("data-bds-msg-id")) return false; }
+    return msgs.length;
+  });
+  expect(settled2000).toBe(2000);
+
+  for (let i = 0; i < 5; i++) {
+    const start = Date.now();
+    await page.evaluate((i) => window.__mockDeepSeek.addAssistantMessage("Chrome large " + i), i);
+    await page.waitForTimeout(500);
+    const done = await page.evaluate(() => {
+      const msgs = document.querySelectorAll(".ds-message");
+      const last = msgs[msgs.length - 1];
+      return !!(last && last.getAttribute("data-bds-msg-id"));
+    });
+    if (done) samples.large.push(Date.now() - start);
+    expect(Date.now() - start).toBeLessThan(2000);
+  }
+  expect(samples.large.length).toBeGreaterThanOrEqual(3);
+
+  const median = (arr) => { const s = [...arr].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
+  expect(median(samples.large)).toBeLessThanOrEqual(median(samples.small) * 2.5);
+  expect(median(samples.large) - median(samples.small)).toBeLessThanOrEqual(750);
+});
+
+test("host wrapper: create_file download card in block-level nonzero wrapper", async ({ page }) => {
+  await page.evaluate(() => window.__mockDeepSeek.clearMessages());
+  await page.evaluate(() => {
+    window.__mockDeepSeek.addAssistantMessage(
+      '<BDS:CREATE_FILE fileName="test-chrome.txt">\nHello Chrome E2E\n</BDS:CREATE_FILE>',
+    );
+  });
+  await page.waitForTimeout(3000);
+
+  await expect(page.locator(".bds-download-card")).toBeVisible();
+  const wrapper = page.locator(".bds-host-wrapper").first();
+  await expect(wrapper).toBeVisible();
+
+  const display = await wrapper.evaluate((el) => getComputedStyle(el).display);
+  expect(display).not.toBe("contents");
+
+  const rect = await wrapper.evaluate((el) => {
+    const r = el.getBoundingClientRect(); return { w: r.width, h: r.height };
+  });
+  expect(rect.w).toBeGreaterThan(0);
+});

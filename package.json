@@ -12,7 +12,7 @@
     "build:android": "node build.js --target=android && node scripts/copy-to-android-assets.js",
     "build:source": "node build.js --source",
     "sanitize": "node scripts/sanitize-dist.js",
-    "test": "npm run test:unit && npm run test:e2e",
+    "test": "npm run test:unit && npm run test:e2e && npm run test:e2e:firefox",
     "test:unit": "vitest run --coverage",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",

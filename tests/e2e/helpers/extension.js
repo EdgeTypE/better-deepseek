@@ -106,7 +106,18 @@ export const test = base.extend({
         // "Target page, context or browser has been closed". This is a
         // Playwright/Chromium Windows-only issue unrelated to test correctness.
       }
-      fs.rmSync(userDataDir, { recursive: true, force: true });
+      // Retry removal on Windows where file locks may persist briefly
+      const maxRetries = 5;
+      const retryDelay = 500;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          fs.rmSync(userDataDir, { recursive: true, force: true });
+          break;
+        } catch (e) {
+          if (attempt === maxRetries - 1) throw e;
+          await new Promise((r) => setTimeout(r, retryDelay));
+        }
+      }
     }
   },
 
