@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { resetAppState } from "../helpers/app-state.js";
 
 const mountMock = vi.hoisted(() => vi.fn(() => ({})));
@@ -9,12 +9,22 @@ const attachMenuMock = vi.hoisted(() => ({ name: "AttachMenu" }));
 const expandToggleMock = vi.hoisted(() => ({ name: "ExpandToggle" }));
 const ragPreviewMock = vi.hoisted(() => ({ name: "RagPreview" }));
 
+const processMessageNodeMock = vi.hoisted(() => vi.fn());
+const disposeMessageNodeMock = vi.hoisted(() => vi.fn());
+const disposeDetachedMessageOverlaysMock = vi.hoisted(() => vi.fn());
+const isSystemGeneratingMock = vi.hoisted(() => vi.fn(() => false));
+const resetMessagePricingMock = vi.hoisted(() => vi.fn());
+
 vi.mock("svelte", () => ({
   mount: mountMock,
 }));
 
 vi.mock("../../src/content/message-processor.svelte.js", () => ({
-  processMessageNode: vi.fn(),
+  processMessageNode: processMessageNodeMock,
+  disposeMessageNode: disposeMessageNodeMock,
+  disposeDetachedMessageOverlays: disposeDetachedMessageOverlaysMock,
+  isSystemGenerating: isSystemGeneratingMock,
+  resetMessagePricing: resetMessagePricingMock,
 }));
 
 vi.mock("../../src/content/ui/AttachMenu.svelte", () => ({
@@ -316,5 +326,471 @@ describe("scanner input controls", () => {
 
     expect(document.querySelector(".bds-deep-research-mount")).toBeTruthy();
     expect(mountMock).toHaveBeenCalled();
+  });
+});
+
+describe("scanner #bds-root isolation", () => {
+  beforeEach(async () => {
+    resetAppState();
+    vi.useFakeTimers();
+    mountMock.mockClear();
+    processMessageNodeMock.mockClear();
+    disposeMessageNodeMock.mockClear();
+    disposeDetachedMessageOverlaysMock.mockClear();
+    isSystemGeneratingMock.mockReturnValue(false);
+    document.body.innerHTML = "";
+    const { resetIncrementalState } = await import("../../src/content/scanner.js");
+    resetIncrementalState();
+  });
+
+  afterEach(async () => {
+    const state = (await import("../../src/content/state.js")).default;
+    if (state.observer) {
+      state.observer.disconnect();
+      state.observer = null;
+    }
+    if (state.scanTimer) {
+      clearTimeout(state.scanTimer);
+      state.scanTimer = 0;
+    }
+    const { resetIncrementalState } = await import("../../src/content/scanner.js");
+    resetIncrementalState();
+    vi.useRealTimers();
+  });
+
+  function makeMessage(role, text = "Hello") {
+    const div = document.createElement("div");
+    div.className = "ds-message _63c77b1";
+    div.dataset.role = role;
+    div.dataset.rawText = text;
+    if (role === "user") div.classList.add("d29f3d7d");
+    return div;
+  }
+
+  it("adding #bds-root to body arms no timer", async () => {
+    const { observeChatDom } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+    observeChatDom();
+
+    const root = document.createElement("div");
+    root.id = "bds-root";
+    document.body.appendChild(root);
+    await Promise.resolve();
+
+    // No timer armed — scanTimer should still be 0
+    expect(state.scanTimer).toBe(0);
+  });
+
+  it("removing #bds-root arms no timer", async () => {
+    const { observeChatDom } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+
+    const root = document.createElement("div");
+    root.id = "bds-root";
+    document.body.appendChild(root);
+
+    observeChatDom();
+    await Promise.resolve();
+
+    root.remove();
+    await Promise.resolve();
+
+    expect(state.scanTimer).toBe(0);
+  });
+
+  it("changes wholly within #bds-root remain ignored", async () => {
+    const { observeChatDom } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+
+    const root = document.createElement("div");
+    root.id = "bds-root";
+    document.body.appendChild(root);
+
+    observeChatDom();
+    await Promise.resolve();
+
+    // Add a child element inside #bds-root
+    const child = document.createElement("span");
+    child.className = "ds-message _63c77b1";
+    root.appendChild(child);
+    await Promise.resolve();
+
+    expect(state.scanTimer).toBe(0);
+    expect(processMessageNodeMock).not.toHaveBeenCalled();
+  });
+
+  it("batch with root + external message schedules one scan", async () => {
+    const { observeChatDom } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+
+    const root = document.createElement("div");
+    root.id = "bds-root";
+    document.body.appendChild(root);
+
+    observeChatDom();
+    await Promise.resolve();
+
+    // Simultaneous: add child to root + add external message
+    const rootChild = document.createElement("span");
+    root.appendChild(rootChild);
+
+    const extMsg = makeMessage("assistant", "external");
+    document.body.appendChild(extMsg);
+
+    await Promise.resolve();
+
+    // Timer should be armed exactly once
+    expect(state.scanTimer).toBeTruthy();
+    // Only external message should be processed (after timer fires)
+    vi.advanceTimersByTime(200);
+    expect(processMessageNodeMock).toHaveBeenCalledTimes(1);
+    expect(processMessageNodeMock).toHaveBeenCalledWith(
+      extMsg, expect.any(Number), expect.any(Array), expect.any(Object),
+    );
+    // Root child should not be processed
+    // Only extMsg should have been passed to processMessageNode
+    expect(processMessageNodeMock).toHaveBeenCalledTimes(1);
+    expect(processMessageNodeMock).toHaveBeenCalledWith(
+      extMsg, expect.any(Number), expect.any(Array), expect.any(Object),
+    );
+  });
+});
+
+describe("scanner scheduling", () => {
+  beforeEach(async () => {
+    resetAppState();
+    vi.useFakeTimers();
+    mountMock.mockClear();
+    processMessageNodeMock.mockClear();
+    disposeMessageNodeMock.mockClear();
+    disposeDetachedMessageOverlaysMock.mockClear();
+    isSystemGeneratingMock.mockReturnValue(false);
+    document.body.innerHTML = "";
+    // Reset module-level scan state between tests
+    const { resetIncrementalState } = await import("../../src/content/scanner.js");
+    resetIncrementalState();
+  });
+
+  afterEach(async () => {
+    // Disconnect any observer and clear timers to prevent cross-test leaks
+    const state = (await import("../../src/content/state.js")).default;
+    if (state.observer) {
+      state.observer.disconnect();
+      state.observer = null;
+    }
+    if (state.scanTimer) {
+      clearTimeout(state.scanTimer);
+      state.scanTimer = 0;
+    }
+    const { resetIncrementalState } = await import("../../src/content/scanner.js");
+    resetIncrementalState();
+    vi.useRealTimers();
+  });
+
+  function makeMessage(role, text = "Hello") {
+    const div = document.createElement("div");
+    div.className = "ds-message _63c77b1";
+    div.dataset.role = role;
+    div.dataset.rawText = text;
+    if (role === "user") div.classList.add("d29f3d7d");
+    return div;
+  }
+
+  it("explicit scheduleScan processes all messages exactly once", async () => {
+    const msg1 = makeMessage("user", "hi");
+    const msg2 = makeMessage("assistant", "hello");
+    document.body.append(msg1, msg2);
+
+    const { scheduleScan } = await import("../../src/content/scanner.js");
+    scheduleScan();
+
+    vi.advanceTimersByTime(200);
+
+    expect(processMessageNodeMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("scheduleMessageScan processes bounded set not every message", async () => {
+    const messages = [];
+    for (let i = 0; i < 50; i++) {
+      const msg = makeMessage(i % 2 === 0 ? "user" : "assistant", `msg${i}`);
+      document.body.appendChild(msg);
+      messages.push(msg);
+    }
+
+    const { scheduleMessageScan } = await import("../../src/content/scanner.js");
+    scheduleMessageScan(messages[10]);
+
+    vi.advanceTimersByTime(200);
+
+    // Exactly: dirty target messages[10] + transition node messages[49]
+    // (latestAssistant === absoluteLast at idx 49). No previous transition
+    // state exists. Total: exactly 2 unique nodes.
+    const calls = processMessageNodeMock.mock.calls;
+    const processedIds = new Set(calls.map(c => c[0]));
+    expect(processedIds.size).toBe(2);
+    expect(processedIds.has(messages[10])).toBe(true);
+    expect(processedIds.has(messages[49])).toBe(true);
+    // Each processed exactly once
+    expect(calls.filter(c => c[0] === messages[10])).toHaveLength(1);
+    expect(calls.filter(c => c[0] === messages[49])).toHaveLength(1);
+  });
+
+  it("observer-driven append processes only new message plus transitions among 2000", async () => {
+    const { observeChatDom } = await import("../../src/content/scanner.js");
+
+    // Seed 2000 messages — capture all references for exact assertions
+    const allMsgs = [];
+    for (let i = 0; i < 2000; i++) {
+      const msg = makeMessage(i % 2 === 0 ? "user" : "assistant", `msg${i}`);
+      document.body.appendChild(msg);
+      allMsgs.push(msg);
+    }
+    // Run a full scan first so all are processed and transition state is set
+    const { scheduleScan } = await import("../../src/content/scanner.js");
+    scheduleScan();
+    vi.advanceTimersByTime(200);
+    processMessageNodeMock.mockClear();
+
+    const querySelectorAllSpy = vi.spyOn(document, "querySelectorAll");
+
+    // Now set up the observer and append one new message
+    observeChatDom();
+    await Promise.resolve();
+
+    const newMsg = makeMessage("assistant", "new-message");
+    document.body.appendChild(newMsg);
+    await Promise.resolve();
+
+    vi.advanceTimersByTime(200);
+
+    // Previous full scan set latestAssistant=absoluteLast at msg index 1999 (0-based).
+    // New assistant at index 2000 becomes new latestAssistant + absoluteLast.
+    // Dirty: newMsg (idx 2000). Previous transition: messages[1999] (still in DOM).
+    // Current transition: newMsg itself (idx 2000).
+    // Exactly 2 unique nodes, never all 2000, no historical re-enumeration.
+    const calls = processMessageNodeMock.mock.calls;
+    const processedIds = new Set(calls.map(c => c[0]));
+    expect(processedIds.size).toBe(2);
+    expect(processedIds.has(newMsg)).toBe(true);
+    expect(processedIds.has(allMsgs[1999])).toBe(true);
+    expect(calls.filter(c => c[0] === newMsg)).toHaveLength(1);
+    expect(calls.filter(c => c[0] === allMsgs[1999])).toHaveLength(1);
+    // No unrelated historical message processed (indices 0..1997 untouched)
+    for (const call of calls) {
+      expect(call[1]).toBeGreaterThanOrEqual(1999);
+    }
+
+    const messageEnumerations = querySelectorAllSpy.mock.calls.filter(
+      ([selector]) => selector === "div.ds-message._63c77b1" || selector === "div.ds-message",
+    );
+    expect(messageEnumerations).toHaveLength(0);
+    querySelectorAllSpy.mockRestore();
+  });
+
+  it("reparents a known message without disposing or losing it from the ordered registry", async () => {
+    const { observeChatDom, scheduleScan } = await import("../../src/content/scanner.js");
+    const first = makeMessage("user", "first");
+    const moved = makeMessage("assistant", "moved");
+    const last = makeMessage("assistant", "last");
+    document.body.append(first, moved, last);
+
+    scheduleScan();
+    vi.advanceTimersByTime(200);
+    processMessageNodeMock.mockClear();
+    disposeMessageNodeMock.mockClear();
+
+    observeChatDom();
+    const newParent = document.createElement("section");
+    document.body.appendChild(newParent);
+    newParent.appendChild(moved);
+    await Promise.resolve();
+    vi.advanceTimersByTime(200);
+
+    expect(disposeMessageNodeMock).not.toHaveBeenCalledWith(moved);
+    const movedCall = processMessageNodeMock.mock.calls.find(([node]) => node === moved);
+    expect(movedCall).toBeTruthy();
+    expect(movedCall[1]).toBe(2);
+    expect(movedCall[2][2]).toBe(moved);
+  });
+
+  it("scheduleMessageScan ignores null", async () => {
+    const { scheduleMessageScan } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+
+    scheduleMessageScan(null);
+    // No timer armed
+    expect(state.scanTimer).toBe(0);
+  });
+
+  it("scheduleMessageScan ignores text nodes", async () => {
+    const { scheduleMessageScan } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+
+    const textNode = document.createTextNode("hello");
+    scheduleMessageScan(textNode);
+    expect(state.scanTimer).toBe(0);
+  });
+
+  it("scheduleMessageScan ignores non-message elements", async () => {
+    const { scheduleMessageScan } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+
+    const div = document.createElement("div");
+    div.className = "not-a-message";
+    document.body.appendChild(div);
+    scheduleMessageScan(div);
+    // Non-message element — no timer armed, no processing
+    expect(state.scanTimer).toBe(0);
+    vi.advanceTimersByTime(200);
+    expect(processMessageNodeMock).not.toHaveBeenCalled();
+  });
+
+  it("scheduleMessageScan ignores elements within #bds-root", async () => {
+    const { scheduleMessageScan } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+
+    const root = document.createElement("div");
+    root.id = "bds-root";
+    document.body.appendChild(root);
+    const inner = document.createElement("div");
+    inner.className = "ds-message _63c77b1";
+    root.appendChild(inner);
+
+    scheduleMessageScan(inner);
+    expect(state.scanTimer).toBe(0);
+  });
+
+  it("scheduleMessageScan ignores detached elements", async () => {
+    const { scheduleMessageScan } = await import("../../src/content/scanner.js");
+    const state = (await import("../../src/content/state.js")).default;
+    const detached = makeMessage("assistant", "detached");
+    // Not appended to document
+
+    scheduleMessageScan(detached);
+    // Detached elements must not arm the timer
+    expect(state.scanTimer).toBe(0);
+    vi.advanceTimersByTime(200);
+    expect(disposeMessageNodeMock).not.toHaveBeenCalled();
+    expect(processMessageNodeMock).not.toHaveBeenCalled();
+  });
+
+  it("full scan supersedes targeted work", async () => {
+    const messages = [];
+    for (let i = 0; i < 20; i++) {
+      const msg = makeMessage("user", `msg${i}`);
+      document.body.appendChild(msg);
+      messages.push(msg);
+    }
+
+    const { scheduleMessageScan, scheduleScan } = await import("../../src/content/scanner.js");
+    scheduleMessageScan(messages[5]);
+    scheduleScan(); // full scan should supersede
+
+    vi.advanceTimersByTime(200);
+
+    // Full scan: all 20 messages processed
+    expect(processMessageNodeMock).toHaveBeenCalledTimes(20);
+  });
+
+  it("removed node is disposed even when full scan supersedes targeted", async () => {
+    const msg1 = makeMessage("user", "hi");
+    const msg2 = makeMessage("assistant", "hello");
+    document.body.append(msg1, msg2);
+
+    const { scheduleScan, observeChatDom } = await import("../../src/content/scanner.js");
+
+    // Set up observer to track mutations
+    observeChatDom();
+
+    // Remove msg2 from DOM
+    msg2.remove();
+
+    // Flush microtasks so MutationObserver callback fires and populates removedNodes
+    await Promise.resolve();
+
+    // Full scan supersedes
+    scheduleScan();
+
+    vi.advanceTimersByTime(200);
+
+    // msg2 was removed — should be disposed
+    expect(disposeMessageNodeMock).toHaveBeenCalledWith(msg2);
+  });
+
+  it("reparented node still connected at flush is not disposed", async () => {
+    const msg1 = makeMessage("user", "hi");
+    document.body.appendChild(msg1);
+
+    const { scheduleScan, observeChatDom } = await import("../../src/content/scanner.js");
+    observeChatDom();
+
+    // Remove then re-add to simulate move
+    msg1.remove();
+    document.body.appendChild(msg1);
+
+    // Flush microtasks so observer processes the remove/add
+    await Promise.resolve();
+
+    scheduleScan();
+    vi.advanceTimersByTime(200);
+
+    // msg1 is still connected — should NOT be disposed
+    expect(disposeMessageNodeMock).not.toHaveBeenCalledWith(msg1);
+  });
+
+  it("processMessageNode receives context with systemGenerating", async () => {
+    isSystemGeneratingMock.mockReturnValue(true);
+    const msg1 = makeMessage("assistant", "streaming");
+    document.body.appendChild(msg1);
+
+    const { scheduleScan } = await import("../../src/content/scanner.js");
+    scheduleScan();
+    vi.advanceTimersByTime(200);
+
+    const callArgs = processMessageNodeMock.mock.calls[0];
+    const context = callArgs[3];
+    expect(context).toBeDefined();
+    expect(context.systemGenerating).toBe(true);
+    expect(context.latestAssistantNode).toBeDefined();
+    expect(context.absoluteLastNode).toBeDefined();
+  });
+
+  it("duplicate scheduleMessageScan calls for same node deduplicate", async () => {
+    const msg1 = makeMessage("assistant", "hello");
+    document.body.appendChild(msg1);
+
+    const { scheduleMessageScan } = await import("../../src/content/scanner.js");
+
+    // Call scheduleMessageScan twice for same node
+    scheduleMessageScan(msg1);
+    scheduleMessageScan(msg1);
+
+    vi.advanceTimersByTime(200);
+
+    // Should process the node only once despite being scheduled twice
+    const calls = processMessageNodeMock.mock.calls.filter(c => c[0] === msg1);
+    expect(calls.length).toBe(1);
+  });
+
+  it("appending a message refreshes latest-assistant and absolute-last state", async () => {
+    const msg1 = makeMessage("assistant", "first");
+    document.body.appendChild(msg1);
+
+    const { scheduleScan } = await import("../../src/content/scanner.js");
+    scheduleScan();
+    vi.advanceTimersByTime(200);
+    expect(processMessageNodeMock).toHaveBeenCalledTimes(1);
+
+    processMessageNodeMock.mockClear();
+
+    // Append a new user message
+    const msg2 = makeMessage("user", "second");
+    document.body.appendChild(msg2);
+
+    scheduleScan();
+    vi.advanceTimersByTime(200);
+
+    // Both messages should be re-processed in a full scan
+    expect(processMessageNodeMock).toHaveBeenCalledTimes(2);
   });
 });

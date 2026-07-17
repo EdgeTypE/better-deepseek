@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   isLatestAssistantMessage: vi.fn((node) => node.dataset.latest === "1"),
   isAbsoluteLastMessage: vi.fn((node) => node.dataset.absoluteLast === "1"),
   scheduleScan: vi.fn(),
+  scheduleMessageScan: vi.fn(),
   collectMessageNodes: vi.fn(() => []),
   extractMessageRawText: vi.fn((node) => node.dataset.rawText || ""),
   injectPythonRunButtons: vi.fn(),
@@ -43,6 +44,7 @@ vi.mock("../../src/content/scanner.js", () => ({
   isLatestAssistantMessage: mocks.isLatestAssistantMessage,
   isAbsoluteLastMessage: mocks.isAbsoluteLastMessage,
   scheduleScan: mocks.scheduleScan,
+  scheduleMessageScan: mocks.scheduleMessageScan,
   collectMessageNodes: mocks.collectMessageNodes,
 }));
 vi.mock("../../src/content/dom/message-text.js", async () => {
@@ -86,7 +88,11 @@ vi.mock("svelte", async () => {
   return { ...actual, mount: mocks.mount, unmount: mocks.unmount };
 });
 
-import { processMessageNode } from "../../src/content/message-processor.svelte.js";
+import {
+  disposeMessageNode,
+  processMessageNode,
+  resetMessagePricing,
+} from "../../src/content/message-processor.svelte.js";
 
 function createMessageNode(rawText, role = "assistant") {
   const node = document.createElement("div");
@@ -108,6 +114,7 @@ function createMessageNode(rawText, role = "assistant") {
 describe("message processor integration", () => {
   beforeEach(() => {
     resetAppState();
+    resetMessagePricing();
     Object.values(mocks).forEach((mock) => {
       if (typeof mock?.mockReset === "function") mock.mockReset();
     });
@@ -153,6 +160,55 @@ describe("message processor integration", () => {
     expect(mocks.mount).toHaveBeenCalledOnce();
     expect(mocks.mount.mock.calls[0][1].props.text).toBe("Updated intro\n\x00BLOCK:0\x00");
     expect(document.querySelectorAll(".mock-overlay")).toHaveLength(1);
+  });
+
+  it("moves an existing wrapper when an unchanged message is reparented", () => {
+    const node = createMessageNode(
+      "Intro\n<BDS:VISUALIZER><div>viz</div></BDS:VISUALIZER>",
+    );
+    const nodes = [node];
+    const context = {
+      latestAssistantNode: node,
+      absoluteLastNode: node,
+      systemGenerating: false,
+    };
+    processMessageNode(node, 0, nodes, context);
+    const wrapper = node.nextElementSibling;
+
+    const newParent = document.createElement("section");
+    document.body.appendChild(newParent);
+    newParent.appendChild(node);
+    processMessageNode(node, 0, nodes, context);
+
+    expect(node.nextElementSibling).toBe(wrapper);
+    expect(wrapper.parentElement).toBe(newParent);
+    expect(document.querySelectorAll(".bds-host-wrapper")).toHaveLength(1);
+  });
+
+  it("updates token totals without re-enumerating every message", () => {
+    state.settings.tokenPriceDisplay = true;
+    mocks.collectMessageNodes.mockImplementation(() => {
+      throw new Error("whole-chat enumeration is forbidden during incremental pricing");
+    });
+
+    const nodes = Array.from({ length: 40 }, (_, index) =>
+      createMessageNode(`user message ${index}`, "user"),
+    );
+    const context = {
+      latestAssistantNode: null,
+      absoluteLastNode: nodes.at(-1),
+      systemGenerating: false,
+    };
+
+    nodes.forEach((node, index) => processMessageNode(node, index, nodes, context));
+
+    expect(mocks.collectMessageNodes).not.toHaveBeenCalled();
+    expect(state.pricing.sessionInputTokens).toBeGreaterThan(0);
+    expect(state.pricing.sessionOutputTokens).toBe(0);
+
+    const beforeDispose = state.pricing.sessionInputTokens;
+    disposeMessageNode(nodes[0]);
+    expect(state.pricing.sessionInputTokens).toBeLessThan(beforeDispose);
   });
 
   it("removes stale DOM overlays before mounting a replacement", () => {

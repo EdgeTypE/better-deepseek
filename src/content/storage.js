@@ -442,11 +442,35 @@ export function normalizeCssSnippets(raw) {
 
 // ── Storage change listener ──
 
+let _storageListenerRef = null;
+let _storageCleanupRef = null;
+
+/**
+ * Bind the storage.onChanged listener. Idempotent — subsequent calls
+ * return the same cleanup handle. The returned cleanup function removes
+ * the listener and permits a later fresh bind.
+ *
+ * @returns {() => void}
+ */
 export function bindStorageChangeListener() {
-  chrome.storage.onChanged.addListener((changes, areaName) => {
+  // Re-register if previously cleared (e.g. mock reset)
+  if (_storageListenerRef) {
+    // Verify the listener is still registered; mock resets clear the Set
+    if (!chrome.storage.onChanged.hasListener(_storageListenerRef)) {
+      _storageListenerRef = null;
+      _storageCleanupRef = null;
+    } else {
+      return _storageCleanupRef;
+    }
+  }
+
+  if (!_storageListenerRef) {
+    _storageListenerRef = (changes, areaName) => {
     if (areaName !== "local") {
       return;
     }
+
+    let pageConfigChanged = false;
 
     if (changes[STORAGE_KEYS.settings]) {
       state.settings = {
@@ -467,6 +491,7 @@ export function bindStorageChangeListener() {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent("bds:settingsChanged"));
       }
+      pageConfigChanged = true;
     }
 
     if (changes[STORAGE_KEYS.skills]) {
@@ -474,6 +499,7 @@ export function bindStorageChangeListener() {
       if (state.ui) {
         state.ui.refreshSkills();
       }
+      pageConfigChanged = true;
     }
 
     if (changes[STORAGE_KEYS.memories]) {
@@ -483,6 +509,7 @@ export function bindStorageChangeListener() {
       if (state.ui) {
         state.ui.refreshMemories();
       }
+      pageConfigChanged = true;
     }
 
     if (changes[STORAGE_KEYS.characters]) {
@@ -492,16 +519,19 @@ export function bindStorageChangeListener() {
       if (state.ui) {
         state.ui.refreshCharacters();
       }
+      pageConfigChanged = true;
     }
 
     if (changes[STORAGE_KEYS.projects]) {
       state.projects = normalizeProjects(changes[STORAGE_KEYS.projects].newValue);
       if (state.ui) state.ui.refreshProjects();
+      pageConfigChanged = true;
     }
 
     if (changes[STORAGE_KEYS.projectFiles]) {
       state.projectFiles = normalizeProjectFiles(changes[STORAGE_KEYS.projectFiles].newValue);
       if (state.ui) state.ui.refreshProjects();
+      pageConfigChanged = true;
     }
 
     if (changes[STORAGE_KEYS.whatsNewPending]) {
@@ -513,7 +543,7 @@ export function bindStorageChangeListener() {
 
     if (changes[STORAGE_KEYS.chatTags]) {
       state.chatTags = normalizeChatTags(changes[STORAGE_KEYS.chatTags].newValue);
-      
+
       // Update sidebar tag chips if search is active
       import("./ui/SidebarSearch.js").then(m => {
         if (typeof m.renderTagChips === 'function') {
@@ -521,7 +551,7 @@ export function bindStorageChangeListener() {
         }
       });
     }
-    
+
     if (changes[STORAGE_KEYS.savedItems]) {
       state.savedItems = normalizeSavedItems(changes[STORAGE_KEYS.savedItems].newValue);
       if (state.ui) state.ui.refreshSavedItems();
@@ -549,11 +579,9 @@ export function bindStorageChangeListener() {
     }
 
     if (changes[STORAGE_KEYS.remoteConfig]) {
-      const newConfig = changes[STORAGE_KEYS.remoteConfig].newValue;
-      if (newConfig && typeof newConfig === "object") {
-        remoteConfig.replaceRemote(newConfig);
-        state.remoteConfig = remoteConfig.raw;
-      }
+      // syncFromStorage NEVER writes back — it is the ownership boundary
+      remoteConfig.syncFromStorage(changes[STORAGE_KEYS.remoteConfig].newValue ?? {});
+      state.remoteConfig = remoteConfig.raw;
     }
 
     if (changes.bds_locale_updates) {
@@ -564,6 +592,21 @@ export function bindStorageChangeListener() {
       }
     }
 
-    pushConfigToPage();
-  });
+    if (pageConfigChanged) {
+      pushConfigToPage();
+    }
+  };
+
+  chrome.storage.onChanged.addListener(_storageListenerRef);
+  const listener = _storageListenerRef;
+  _storageCleanupRef = () => {
+    chrome.storage.onChanged.removeListener(listener);
+    if (_storageListenerRef === listener) {
+      _storageListenerRef = null;
+      _storageCleanupRef = null;
+    }
+  };
+  }
+
+  return _storageCleanupRef;
 }

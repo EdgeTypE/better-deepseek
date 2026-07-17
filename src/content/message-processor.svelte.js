@@ -9,6 +9,7 @@ import {
   isLatestAssistantMessage,
   isAbsoluteLastMessage,
   scheduleScan,
+  scheduleMessageScan,
   collectMessageNodes
 } from "./scanner.js";
 import { extractMessageRawText } from "./dom/message-text.js";
@@ -22,7 +23,12 @@ import { upsertCharacters } from "./parser/character-parser.js";
 import { upsertSkills } from "./parser/skill-parser.js";
 import { collectLongWorkFiles, finalizeLongWork, emitZipForFiles } from "./files/long-work.js";
 import { emitStandaloneFiles } from "./files/standalone.js";
-import { getOrCreateHost } from "./dom/host.js";
+import {
+  getOrCreateHost,
+  reconcileMessageHost,
+  removeAllMessageHosts,
+  removeMessageHost,
+} from "./dom/host.js";
 import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun } from "./auto.js";
 import { handleManagedAutoContinuation, isManagedRunActive, trySynthesizeReport } from "./deep-research.js";
 
@@ -39,6 +45,83 @@ const nodeStates = new WeakMap();
 const userMsgCleaned = new WeakSet();
 const readMessages = new WeakSet();
 const processedSearchResultCards = new WeakSet();
+const pricingContributions = new Map();
+
+function removePricingContribution(node) {
+  const previous = pricingContributions.get(node);
+  if (!previous) return;
+  pricingContributions.delete(node);
+  if (previous.role === "user") {
+    state.pricing.sessionInputTokens -= previous.tokens;
+  } else {
+    state.pricing.sessionOutputTokens -= previous.tokens;
+  }
+  state.pricing.sessionTotals.totalCost -= previous.cost;
+}
+
+function setPricingContribution(node, stateData, role, tokens, cost) {
+  removePricingContribution(node);
+  pricingContributions.set(node, { role, tokens, cost });
+  if (role === "user") state.pricing.sessionInputTokens += tokens;
+  else state.pricing.sessionOutputTokens += tokens;
+  state.pricing.sessionTotals.totalCost += cost;
+  stateData.role = role;
+  stateData.tokens = tokens;
+  stateData.cost = cost;
+  refreshSessionTotalDisplayInline();
+}
+
+export function resetMessagePricing() {
+  pricingContributions.clear();
+  state.pricing.sessionInputTokens = 0;
+  state.pricing.sessionOutputTokens = 0;
+  state.pricing.sessionTotals = { inputCost: 0, outputCost: 0, totalCost: 0 };
+  document.querySelector(".bds-session-total")?.remove();
+}
+
+/**
+ * Dispose a single message node: clear its timers, unmount its Svelte
+ * component, remove its registry entry, and clean up all hosts.
+ */
+export function disposeMessageNode(node) {
+  const stateData = nodeStates.get(node);
+  if (stateData) {
+    if (stateData.autoTimer) { clearTimeout(stateData.autoTimer); stateData.autoTimer = null; }
+    if (stateData.stallTimer) { clearTimeout(stateData.stallTimer); stateData.stallTimer = null; }
+    if (stateData.deepResearchTimer) { clearTimeout(stateData.deepResearchTimer); stateData.deepResearchTimer = null; }
+  }
+
+  const entry = messageOverlays.get(node);
+  if (entry) {
+    if (entry.component) {
+      try { unmount(entry.component); } catch (e) { /* already unmounted */ }
+    }
+    messageOverlays.delete(node);
+  }
+
+  // Clear all weak-set memberships
+  readMessages.delete(node);
+  userMsgCleaned.delete(node);
+  processedSearchResultCards.delete(node);
+  nodeStates.delete(node);
+  removePricingContribution(node);
+  refreshSessionTotalDisplayInline();
+
+  // Remove all associated hosts and wrapper
+  removeAllMessageHosts(node);
+}
+
+/**
+ * Dispose overlays whose message nodes are no longer in the document.
+ * Safe to call during URL transitions — only removes truly detached nodes.
+ */
+export function disposeDetachedMessageOverlays() {
+  for (const [node] of messageOverlays) {
+    if (!document.contains(node)) {
+      disposeMessageNode(node);
+    }
+  }
+}
 
 function normalizeSearchKeyPart(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -65,17 +148,28 @@ function getNodeState(node) {
 
 /**
  * Process a single message node — the main per-node logic.
+ *
+ * @param {Element} node
+ * @param {number} [nodeIndex=-1]
+ * @param {Element[]|null} [nodes=null]
+ * @param {{latestAssistantNode?: Element|null, absoluteLastNode?: Element|null}} [context]
  */
-export function processMessageNode(node, nodeIndex = -1, nodes = null) {
+export function processMessageNode(node, nodeIndex = -1, nodes = null, context = null) {
   if (!node || node.closest("#bds-root")) {
     return;
   }
+
+  reconcileMessageHost(node);
 
   if (nodeIndex === -1 || !nodes) {
     const collected = collectMessageNodes();
     nodeIndex = collected.indexOf(node);
     nodes = collected;
   }
+
+  // Resolve cached context for isMessageFinished / isLatestAssistant
+  const cachedIsLatestAssistant = context ? context.latestAssistantNode === node : null;
+  const cachedSystemGenerating = context ? context.systemGenerating : null;
 
   // Inject Run buttons into any Python/JS/Lua/Ruby code blocks in this message
   injectPythonRunButtons(node);
@@ -122,7 +216,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
           removeStaleMessageOverlays(host);
           const props = $state({ text: "", blocks: newBlocks, loading: false });
           const component = mount(MessageOverlay, { target: host, props });
-          messageOverlays.set(node, { component, props });
+          messageOverlays.set(node, { component, props, host });
         }
         syncVisibilityState(node, false, stateData, true);
       }
@@ -165,7 +259,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
             removeStaleMessageOverlays(host);
             const props = $state({ text: "", blocks: newBlocks, loading: false });
             const component = mount(MessageOverlay, { target: host, props });
-            messageOverlays.set(node, { component, props });
+            messageOverlays.set(node, { component, props, host });
           }
           syncVisibilityState(node, false, stateData, true);
         }
@@ -193,19 +287,17 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
       const cacheHitTokens = 0; // We will handle cache hit logic differently or just ignore for user display
       const { inputCost } = calcCostInline(newInputTokens, 0, modelName);
       
-      stateData.tokens = newInputTokens;
-      stateData.cost = inputCost;
-      stateData.role = "user";
-      
       injectPriceUser(node, newInputTokens, inputCost);
-      refreshSessionTotalDisplayInline();
+      setPricingContribution(node, stateData, "user", newInputTokens, inputCost);
       stateData.priceInjected = true;
     }
     handleUserMessageCollapse(node);
     return;
   }
 
-  const isLatestAssistant = role === "assistant" && isLatestAssistantMessage(node);
+  const isLatestAssistant = role === "assistant" && (
+    context ? context.latestAssistantNode === node : isLatestAssistantMessage(node)
+  );
 
   const now = Date.now();
   if (stateData.lastRawText !== rawText) {
@@ -217,7 +309,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
   const isStalled = timeSinceUpdate > 2500;
 
   // Fix false positives: a message cannot be completely settled if it's currently mutating
-  let isSettled = isMessageFinished(node);
+  let isSettled = isMessageFinished(node, cachedIsLatestAssistant, cachedSystemGenerating);
   if (!isStalled) {
     isSettled = false;
   }
@@ -328,7 +420,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
     } else if (!stateData.autoTimer) {
       stateData.autoTimer = setTimeout(() => {
         stateData.autoTimer = null;
-        scheduleScan();
+        scheduleMessageScan(node);
       }, 3000);
     }
   }
@@ -337,7 +429,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
   if (!isStalled && parsed.isStreamingTool) {
     if (stateData.stallTimer) clearTimeout(stateData.stallTimer);
     stateData.stallTimer = setTimeout(() => {
-      scheduleScan();
+      scheduleMessageScan(node);
     }, 2600);
   }
 
@@ -354,7 +446,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
     } else if (!stateData.deepResearchTimer) {
       stateData.deepResearchTimer = setTimeout(() => {
         stateData.deepResearchTimer = null;
-        scheduleScan();
+        scheduleMessageScan(node);
       }, 3000);
     }
   }
@@ -482,7 +574,8 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
       }
     }
 
-    if (!state.activeQuestions && !isSystemGenerating() && parsed.askQuestions.length > 0 && isLatestAssistantMessage(node) && isAbsoluteLastMessage(node)) {
+    const isAbsLast = context ? context.absoluteLastNode === node : isAbsoluteLastMessage(node);
+    if (!state.activeQuestions && !isSystemGenerating() && parsed.askQuestions.length > 0 && isLatestAssistant && isAbsLast) {
       state.activeQuestions = parsed.askQuestions;
       window.dispatchEvent(new CustomEvent('bds-ask-questions', { 
         detail: { 
@@ -550,12 +643,8 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null) {
       
       stateData.overlayActive = false;
       
-      // NEVER remove the bds-host-wrapper, as it may contain bds-file-host (the ZIP card).
-      // Only clear the overlay sub-container.
-      const overlayHost = node.nextElementSibling?.querySelector(".bds-overlay-host");
-      if (overlayHost) {
-        overlayHost.replaceChildren();
-      }
+      // Remove only the overlay host; preserve file/tool hosts (ZIP cards, etc.)
+      removeMessageHost(node, "bds-overlay-host");
     }
   }
 }
@@ -756,18 +845,22 @@ export function isSystemGenerating() {
 /**
  * Checks if a specific message has finished and settled.
  * Settled messages have action buttons (Copy, Regenerate, etc.).
+ *
+ * @param {Element} node
+ * @param {boolean|null} cachedIsLatest - pre-computed latest-assistant result, or null to query
+ * @param {boolean|null} cachedGenerating - pre-computed systemGenerating result, or null to query
  */
-function isMessageFinished(node) {
+function isMessageFinished(node, cachedIsLatest = null, cachedGenerating = null) {
   const hasCursor = !!node.querySelector('.ds-cursor');
   const isCurrentlyStreamingClass = node.classList.contains('_streaming');
-  
+
   // If we see a cursor or the active streaming class, it's NOT finished, regardless of buttons.
   if (hasCursor || isCurrentlyStreamingClass) {
     return false;
   }
 
-  const generating = isSystemGenerating();
-  
+  const generating = cachedGenerating ?? isSystemGenerating();
+
   // If the system is no longer generating globally, it's definitely done.
   if (!generating) {
     return true;
@@ -777,9 +870,9 @@ function isMessageFinished(node) {
   // (e.g. it's an earlier message in the session).
   // We look for action buttons as a sign of completion.
   const hasFooterButtons = !!node.querySelector('div[role="button"] svg, .ds-icon-copy, .ds-icon-regenerate, .ds-icon-share');
-  
+
   // Backup check: if it's the latest message and the system is generating, it's usually NOT finished.
-  const isLatest = isLatestAssistantMessage(node);
+  const isLatest = cachedIsLatest ?? isLatestAssistantMessage(node);
   if (isLatest && generating) {
     return false;
   }
@@ -819,12 +912,8 @@ function syncVisibilityState(node, isLatestAssistant, stateData, isSettled) {
     const outputTokens = estimateTokensInline(totalText);
     const { outputCost } = calcCostInline(0, outputTokens, modelName);
     
-    stateData.tokens = outputTokens;
-    stateData.cost = outputCost;
-    stateData.role = "assistant";
-    
     injectPriceAssistant(node, outputTokens, outputCost);
-    refreshSessionTotalDisplayInline();
+    setPricingContribution(node, stateData, "assistant", outputTokens, outputCost);
   }
 }
 
@@ -1182,28 +1271,10 @@ function formatCostDisplay(cost) {
 
 function refreshSessionTotalDisplayInline() {
   if (!state.settings.tokenPriceDisplay) return;
-  
-  const nodes = collectMessageNodes();
-  let totalInputTokens = 0;
-  let totalOutputTokens = 0;
-  let totalCost = 0;
 
-  for (const node of nodes) {
-    const sd = nodeStates.get(node);
-    if (sd && sd.tokens) {
-      if (sd.role === "user") {
-        totalInputTokens += sd.tokens;
-      } else {
-        totalOutputTokens += sd.tokens;
-      }
-      totalCost += sd.cost || 0;
-    }
-  }
-
-  // Update global state for other components that might read it
-  state.pricing.sessionInputTokens = totalInputTokens;
-  state.pricing.sessionOutputTokens = totalOutputTokens;
-  state.pricing.sessionTotals.totalCost = totalCost;
+  const totalInputTokens = state.pricing.sessionInputTokens;
+  const totalOutputTokens = state.pricing.sessionOutputTokens;
+  const totalCost = state.pricing.sessionTotals.totalCost;
 
   let el = document.querySelector(".bds-session-total");
   if (!el) {

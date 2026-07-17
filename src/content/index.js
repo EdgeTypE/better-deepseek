@@ -33,7 +33,7 @@ import { initDeepResearchRuntime } from "./deep-research.js";
 import { i18n } from "../lib/i18n.svelte.js";
 import { remoteConfig, REMOTE_CONFIG_EVENT, detectModelType } from "../lib/remote-config.svelte.js";
 import { STORAGE_KEYS, CSS_PRESETS } from "../lib/constants.js";
-import { loadAllHistory } from "./load-all-history.js";
+import { loadAllHistory, retainOnlyHistorySession } from "./load-all-history.js";
 
 const CONTENT_BOOTSTRAP_KEY = "__bdsContentBootstrapped";
 
@@ -58,9 +58,12 @@ async function init() {
   i18n.init(state.settings.syncLocale ? null : state.settings.locale);
 
   // Silently check for language updates on startup
-  if (typeof chrome !== "undefined" && chrome.runtime?.sendMessage) {
-    chrome.runtime.sendMessage({ type: "BDS_UPDATE_LANGUAGES" });
-  }
+  const languageUpdatePromise =
+    typeof chrome !== "undefined" && chrome.runtime?.sendMessage
+      ? chrome.runtime
+          .sendMessage({ type: "BDS_UPDATE_LANGUAGES" })
+          .catch((error) => ({ success: false, error: error.message }))
+      : Promise.resolve({ success: true });
 
   injectHookScript();
   setupBridgeEvents();
@@ -97,8 +100,55 @@ async function init() {
     pushConfigToPage();
   });
 
+  // ── Storage probe state (#108 contract verification) ──
+  let storageProbeListener = null;
+  let storageProbeState = null;
+
+  function sanitizeStorageValue(value) {
+    if (value === undefined) return undefined;
+    try { return JSON.parse(JSON.stringify(value)); } catch { return undefined; }
+  }
+
+  function startStorageProbe() {
+    if (storageProbeListener) return; // already started — idempotent
+    storageProbeState = { total: 0, remoteConfig: 0, events: [] };
+    storageProbeListener = (changes, area) => {
+      if (area !== "local") return;
+      storageProbeState.total += 1;
+      const sanitized = {};
+      for (const [key, change] of Object.entries(changes)) {
+        sanitized[key] = {
+          oldValue: sanitizeStorageValue(change.oldValue),
+          newValue: sanitizeStorageValue(change.newValue),
+        };
+      }
+      if (changes[STORAGE_KEYS.remoteConfig]) {
+        storageProbeState.remoteConfig += 1;
+      }
+      storageProbeState.events.push(sanitized);
+    };
+    chrome.storage.onChanged.addListener(storageProbeListener);
+  }
+
+  function getStorageProbe() {
+    if (!storageProbeState) return null;
+    return {
+      total: storageProbeState.total,
+      remoteConfig: storageProbeState.remoteConfig,
+      events: storageProbeState.events.slice(),
+    };
+  }
+
+  function stopStorageProbe() {
+    if (storageProbeListener) {
+      chrome.storage.onChanged.removeListener(storageProbeListener);
+      storageProbeListener = null;
+    }
+    storageProbeState = null;
+  }
+
   // Debug API — listen for requests from MAIN-world injected script
-  window.addEventListener("bds:debug-api-request", (e) => {
+  window.addEventListener("bds:debug-api-request", async (e) => {
     let detail = e.detail;
     if (typeof detail === "string") { try { detail = JSON.parse(detail); } catch { return; } }
     const { id, method, args } = detail || {};
@@ -108,14 +158,37 @@ async function init() {
         case "getRaw":   result = remoteConfig.raw; break;
         case "getFlag":  result = remoteConfig.getFlag(args?.[0]); break;
         case "getConfig": result = remoteConfig.getConfig(args?.[0]); break;
-        case "applyRemote":   remoteConfig.applyRemote(args?.[0]); result = remoteConfig.raw; break;
-        case "replaceRemote": remoteConfig.replaceRemote(args?.[0]); result = remoteConfig.raw; break;
-        case "resetToBuiltin": remoteConfig.resetToBuiltin(); result = remoteConfig.raw; break;
+        case "applyRemote":   await remoteConfig.applyRemote(args?.[0]); result = remoteConfig.raw; break;
+        case "replaceRemote": await remoteConfig.replaceRemote(args?.[0]); result = remoteConfig.raw; break;
+        case "resetToBuiltin": await remoteConfig.resetToBuiltin(); result = remoteConfig.raw; break;
         case "detectModel": result = detectModelType() || "instant"; break;
         case "toggleDebugPanel":
           window.dispatchEvent(new CustomEvent("bds:toggle-debug-panel"));
           result = true;
           break;
+        case "startStorageProbe":
+          startStorageProbe();
+          result = true;
+          break;
+        case "getStorageProbe":
+          result = getStorageProbe();
+          break;
+        case "stopStorageProbe":
+          stopStorageProbe();
+          result = true;
+          break;
+        case "waitForStartup": {
+          const [background, locales] = await Promise.all([
+            chrome.runtime.sendMessage({ type: "BDS_WAIT_FOR_STARTUP" }),
+            languageUpdatePromise,
+          ]);
+          result = {
+            success: Boolean(background?.success && locales?.success),
+            background,
+            locales,
+          };
+          break;
+        }
       }
     } catch (err) { result = { __error: err.message }; }
     window.dispatchEvent(new CustomEvent("bds:debug-api-response", {
@@ -138,6 +211,10 @@ async function init() {
   }
 
   window.addEventListener("bds:urlChanged", () => {
+    // Evict every session's cached messages except the current one
+    const newId = (location.href.match(/\/chat\/s\/([^/?#]+)/) || [])[1] || null;
+    retainOnlyHistorySession(newId);
+
     if ((state.settings.loadAllHistoryOnSession || state.settings.showTimestamps) && location.href.includes("/chat/s/")) {
       loadAllHistory();
     }

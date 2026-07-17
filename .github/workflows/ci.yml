@@ -68,6 +68,56 @@ jobs:
           path: test-results
           if-no-files-found: ignore
 
+  firefox-e2e:
+    name: Firefox E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Selenium browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/selenium
+          key: ${{ runner.os }}-selenium-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-selenium-
+
+      - name: Setup Firefox
+        id: setup-firefox
+        uses: browser-actions/setup-firefox@v1
+        with:
+          firefox-version: latest
+
+      - name: Print Firefox version
+        run: ${{ steps.setup-firefox.outputs.firefox-path }} --version
+
+      - name: Build Firefox extension
+        run: npm run build:firefox
+
+      - name: Run Firefox E2E suite
+        run: npm run test:e2e:firefox
+        env:
+          CI: "1"
+          FIREFOX_BIN: ${{ steps.setup-firefox.outputs.firefox-path }}
+
+      - name: Upload Firefox test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-firefox
+          path: test-results-firefox
+          if-no-files-found: ignore
+
   android:
     name: Android
     runs-on: ubuntu-latest

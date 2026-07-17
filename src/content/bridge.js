@@ -10,6 +10,7 @@ import { getActiveProject, getActiveFiles, getFilesForProject } from "./project-
 import { getDirectoryFiles } from "../lib/local-directory-source.js";
 import { discoverTags } from "./tags/tag-manager.js";
 import { recordOutgoingContext, recordServerUsage } from "./context-budget.js";
+import { retainOnlyHistorySession } from "./load-all-history.js";
 
 /**
  * Extract the current conversation ID from the URL for budget tracking.
@@ -20,44 +21,58 @@ function getCurrentConversationIdForBudget() {
   return match ? match[1] : null;
 }
 
+let _bridgeCleanup = null;
+let _bridgeGen = 0;
+
 /**
  * Set up listeners for bridge events from the injected script.
+ * Idempotent — subsequent calls return the same cleanup handle.
+ * Returns a cleanup function that removes all registered listeners
+ * and permits a later fresh setup via another `setupBridgeEvents()` call.
+ * A stale cleanup from a prior generation does not clear the current one.
+ *
+ * @returns {() => void}
  */
 export function setupBridgeEvents() {
-  window.addEventListener(BRIDGE_EVENTS.requestConfig, () => {
-    pushConfigToPage();
-  });
+  if (_bridgeCleanup) return _bridgeCleanup;
 
-  window.addEventListener(BRIDGE_EVENTS.networkState, (event) => {
+  const handlers = {};
+
+  handlers[BRIDGE_EVENTS.requestConfig] = () => {
+    pushConfigToPage();
+  };
+  window.addEventListener(BRIDGE_EVENTS.requestConfig, handlers[BRIDGE_EVENTS.requestConfig]);
+
+  handlers[BRIDGE_EVENTS.networkState] = (event) => {
     let detail = event && event.detail ? event.detail : {};
-    // Handle stringified detail (Firefox Xray Vision fix)
     if (typeof detail === "string") {
-      try {
-        detail = JSON.parse(detail);
-      } catch (e) {
+      try { detail = JSON.parse(detail); } catch (e) {
         console.error("[BDS] Failed to parse networkState detail:", e);
       }
     }
     handleNetworkState(detail);
-  });
+  };
+  window.addEventListener(BRIDGE_EVENTS.networkState, handlers[BRIDGE_EVENTS.networkState]);
 
-  window.addEventListener("bds:session-data", (event) => {
+  handlers["bds:session-data"] = (event) => {
     let data = event.detail;
     if (typeof data === "string") {
       try { data = JSON.parse(data); } catch (e) { return; }
     }
     handleSessionData(data);
-  });
+  };
+  window.addEventListener("bds:session-data", handlers["bds:session-data"]);
 
-  window.addEventListener("bds:history-msgs", (event) => {
+  handlers["bds:history-msgs"] = (event) => {
     let data = event.detail;
     if (typeof data === "string") {
       try { data = JSON.parse(data); } catch (e) { return; }
     }
     handleHistoryMessages(data);
-  });
+  };
+  window.addEventListener("bds:history-msgs", handlers["bds:history-msgs"]);
 
-  window.addEventListener("bds:token-usage", (event) => {
+  handlers["bds:token-usage"] = (event) => {
     let data = event.detail;
     if (typeof data === "string") {
       try { data = JSON.parse(data); } catch (e) { return; }
@@ -65,8 +80,6 @@ export function setupBridgeEvents() {
     if (data && data.modelName) {
       state.pricing.modelName = data.modelName;
     }
-    // Feed server-reported usage into the context budget tracker for the
-    // active Deep Research conversation (if any guard is enabled).
     if (data && state.settings.deepResearchContextGuardEnabled) {
       const conversationId = getCurrentConversationIdForBudget();
       if (conversationId) {
@@ -78,9 +91,10 @@ export function setupBridgeEvents() {
         });
       }
     }
-  });
+  };
+  window.addEventListener("bds:token-usage", handlers["bds:token-usage"]);
 
-  window.addEventListener("bds:mutation-applied", (event) => {
+  handlers["bds:mutation-applied"] = (event) => {
     let data = event.detail;
     if (typeof data === "string") {
       try { data = JSON.parse(data); } catch (e) { return; }
@@ -98,18 +112,33 @@ export function setupBridgeEvents() {
         });
       }
     }
-  });
+  };
+  window.addEventListener("bds:mutation-applied", handlers["bds:mutation-applied"]);
 
-  window.addEventListener("bds:network-error", (event) => {
+  handlers["bds:network-error"] = (event) => {
     let detail = event.detail;
     if (typeof detail === "string") {
       try { detail = JSON.parse(detail); } catch (e) { return; }
     }
     console.warn("[BDS] Network error detected:", detail);
-
-    // Trigger immediate status check
     import("./status-monitor.js").then(m => m.fetchServerStatus());
-  });
+  };
+  window.addEventListener("bds:network-error", handlers["bds:network-error"]);
+
+  _bridgeGen += 1;
+  const gen = _bridgeGen;
+
+  _bridgeCleanup = () => {
+    // Only clear if this is still the current generation.
+    // A stale cleanup from a prior install must not null the current one.
+    if (_bridgeGen !== gen) return;
+    for (const [event, handler] of Object.entries(handlers)) {
+      window.removeEventListener(event, handler);
+    }
+    _bridgeCleanup = null;
+  };
+
+  return _bridgeCleanup;
 }
 
 /**
@@ -166,8 +195,35 @@ function handleHistoryMessages(data) {
   const sessionId = bizData.chat_session?.id;
   if (!sessionId) return;
 
+  // Require exact match with current URL session — ignore stale responses
+  const match = String(location.href || "").match(/\/chat\/s\/([^/?#]+)/);
+  const currentSessionId = match ? match[1] : null;
+  if (!currentSessionId || sessionId !== currentSessionId) return;
+
+  // Reject malformed payloads — only arrays (including empty) are valid.
+  // Non-array chat_messages cannot complete a request; a later valid
+  // response must still be accepted.
   const incomingMessages = bizData.chat_messages;
-  if (!Array.isArray(incomingMessages) || incomingMessages.length === 0) return;
+  if (!Array.isArray(incomingMessages)) return;
+
+  // Validate every entry before mutating cache state.
+  // Reject the entire payload if any entry is not a non-null object with
+  // a non-empty message_id. A later valid response remains accepted.
+  for (const msg of incomingMessages) {
+    if (
+      !msg ||
+      typeof msg !== "object" ||
+      Array.isArray(msg) ||
+      Object.getPrototypeOf(msg) !== Object.prototype ||
+      typeof msg.message_id !== "string" ||
+      !msg.message_id.trim()
+    ) {
+      return;
+    }
+  }
+
+  // Enforce current-session-only invariant before storing
+  retainOnlyHistorySession(currentSessionId);
 
   const cacheControl = bizData.cache_control || "APPEND";
 
@@ -185,16 +241,20 @@ function handleHistoryMessages(data) {
     }
   }
 
-  // Only notify explicit full-history requests to avoid partial data from
-  // DeepSeek's lazy-load paginated calls also resolving the promise.
+  // Notify explicit full-history requests — including empty arrays so
+  // waiters resolve promptly without hitting the 10 s timeout.
   if (data.__bdsExplicit) {
     window.dispatchEvent(new CustomEvent("bds:history-msgs-loaded", {
       detail: JSON.stringify({ sessionId, count: existing.length })
     }));
   }
 
-  // Trigger page rescan to inject precise timestamps from API
-  scheduleScan();
+  // Trigger page rescan to inject precise timestamps from API — only when
+  // timestamp rendering is enabled, since that is the primary consumer.
+  // Explicit export/select waiters still resolve via the event above.
+  if (state.settings.showTimestamps) {
+    scheduleScan();
+  }
 }
 
 /**

@@ -199,6 +199,7 @@ describe("RemoteConfigManager", () => {
     });
 
     it("notifies on Reset", () => {
+      remoteConfig.replaceRemote({ features: { attachMenu: { enabled: false } } });
       const cb = vi.fn();
       remoteConfig.onChange(cb);
       remoteConfig.resetToBuiltin();
@@ -224,6 +225,7 @@ describe("RemoteConfigManager", () => {
     });
 
     it("fires callback on resetToBuiltin", () => {
+      remoteConfig.replaceRemote({ features: { attachMenu: { enabled: false } } });
       const cb = vi.fn();
       remoteConfig.onChange(cb);
       remoteConfig.resetToBuiltin();
@@ -282,6 +284,7 @@ describe("RemoteConfigManager", () => {
     });
 
     it("dispatches REMOTE_CONFIG_EVENT on resetToBuiltin", () => {
+      remoteConfig.replaceRemote({ features: { attachMenu: { enabled: false } } });
       const handler = vi.fn();
       window.addEventListener(REMOTE_CONFIG_EVENT, handler);
       remoteConfig.resetToBuiltin();
@@ -352,6 +355,110 @@ describe("RemoteConfigManager", () => {
     it("applyRemote writes to chrome.storage.local", () => {
       remoteConfig.applyRemote({ features: { attachMenu: { enabled: false } } });
       expect(chromeMock.storage.local.set).toHaveBeenCalled();
+    });
+  });
+
+  // ── syncFromStorage (external sync, no persistence) ──
+
+  describe("syncFromStorage", () => {
+    it("updates merged config from external value with zero storage writes", () => {
+      const setCallsBefore = chromeMock.storage.local.set.mock.calls.length;
+      remoteConfig.syncFromStorage({ features: { attachMenu: { enabled: false } } });
+      expect(getFlag("features.attachMenu.enabled")).toBe(false);
+      expect(chromeMock.storage.local.set.mock.calls.length).toBe(setCallsBefore);
+    });
+
+    it("normalizes invalid values to {} without writing", () => {
+      remoteConfig.syncFromStorage(null);
+      expect(getFlag("features.attachMenu.enabled")).toBe(true);
+      remoteConfig.syncFromStorage(undefined);
+      expect(getFlag("features.attachMenu.enabled")).toBe(true);
+      remoteConfig.syncFromStorage("not-an-object");
+      expect(getFlag("features.attachMenu.enabled")).toBe(true);
+    });
+
+    it("emits notification when merged config actually changes", () => {
+      const handler = vi.fn();
+      window.addEventListener(REMOTE_CONFIG_EVENT, handler);
+      remoteConfig.syncFromStorage({ features: { attachMenu: { enabled: false } } });
+      expect(handler).toHaveBeenCalledOnce();
+      window.removeEventListener(REMOTE_CONFIG_EVENT, handler);
+    });
+
+    it("emits zero notifications when external data is structurally identical", () => {
+      remoteConfig.syncFromStorage({ features: { attachMenu: { enabled: false } } });
+      const handler = vi.fn();
+      window.addEventListener(REMOTE_CONFIG_EVENT, handler);
+      remoteConfig.syncFromStorage({ features: { attachMenu: { enabled: false } } });
+      expect(handler).not.toHaveBeenCalled();
+      window.removeEventListener(REMOTE_CONFIG_EVENT, handler);
+    });
+
+    it("restores built-ins when storage is removed (empty value)", () => {
+      remoteConfig.syncFromStorage({ features: { attachMenu: { enabled: false } } });
+      expect(getFlag("features.attachMenu.enabled")).toBe(false);
+      remoteConfig.syncFromStorage({});
+      expect(getFlag("features.attachMenu.enabled")).toBe(true);
+    });
+
+    it("never calls chrome.storage.local.set", () => {
+      const setCallsBefore = chromeMock.storage.local.set.mock.calls.length;
+      remoteConfig.syncFromStorage({ features: { attachMenu: { enabled: false } } });
+      remoteConfig.syncFromStorage({});
+      remoteConfig.syncFromStorage(null);
+      expect(chromeMock.storage.local.set.mock.calls.length).toBe(setCallsBefore);
+    });
+  });
+
+  // ── Structural equality guard ──
+
+  describe("structural equality", () => {
+    it("replaceRemote skips persist and notify for identical value", () => {
+      remoteConfig.replaceRemote({ features: { attachMenu: { enabled: false } } });
+      const setCallsBefore = chromeMock.storage.local.set.mock.calls.length;
+      const handler = vi.fn();
+      window.addEventListener(REMOTE_CONFIG_EVENT, handler);
+      remoteConfig.replaceRemote({ features: { attachMenu: { enabled: false } } });
+      expect(chromeMock.storage.local.set.mock.calls.length).toBe(setCallsBefore);
+      expect(handler).not.toHaveBeenCalled();
+      window.removeEventListener(REMOTE_CONFIG_EVENT, handler);
+    });
+
+    it("applyRemote skips persist and notify for no-op merge", () => {
+      remoteConfig.applyRemote({ features: { attachMenu: { enabled: false } } });
+      const setCallsBefore = chromeMock.storage.local.set.mock.calls.length;
+      const handler = vi.fn();
+      window.addEventListener(REMOTE_CONFIG_EVENT, handler);
+      remoteConfig.applyRemote({ features: { attachMenu: { enabled: false } } });
+      expect(chromeMock.storage.local.set.mock.calls.length).toBe(setCallsBefore);
+      expect(handler).not.toHaveBeenCalled();
+      window.removeEventListener(REMOTE_CONFIG_EVENT, handler);
+    });
+
+    it("resetToBuiltin always clears storage but skips notification when already at defaults", () => {
+      const handler = vi.fn();
+      window.addEventListener(REMOTE_CONFIG_EVENT, handler);
+      remoteConfig.resetToBuiltin();
+      // Always clears persisted config + metadata
+      expect(chromeMock.storage.local.remove).toHaveBeenCalledWith(
+        [STORAGE_KEYS.remoteConfig, STORAGE_KEYS.remoteConfigMeta],
+      );
+      // No notification when config didn't change
+      expect(handler).not.toHaveBeenCalled();
+      window.removeEventListener(REMOTE_CONFIG_EVENT, handler);
+    });
+
+    it("local mutation APIs still persist exactly once when value changes", () => {
+      const cb = vi.fn();
+      remoteConfig.onChange(cb);
+      remoteConfig.replaceRemote({ features: { attachMenu: { enabled: false } } });
+      expect(chromeMock.storage.local.set).toHaveBeenCalledTimes(1);
+      expect(cb).toHaveBeenCalledOnce();
+
+      chromeMock.storage.local.set.mockClear();
+      remoteConfig.applyRemote({ features: { fileUpload: { enabled: false } } });
+      expect(chromeMock.storage.local.set).toHaveBeenCalledTimes(1);
+      expect(cb).toHaveBeenCalledTimes(2);
     });
   });
 

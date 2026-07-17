@@ -145,3 +145,353 @@ describe("bridge integration", () => {
     expect(document.getElementById("bds-injected-hook")).toBeNull();
   });
 });
+
+describe("handleHistoryMessages validation", () => {
+  beforeAll(() => {
+    setupBridgeEvents();
+  });
+
+  beforeEach(async () => {
+    resetAppState();
+    vi.useFakeTimers();
+    const { retainOnlyHistorySession } = await import("../../src/content/load-all-history.js");
+    retainOnlyHistorySession(null);
+    // jsdom doesn't support navigation — mock location.href via property descriptor
+    Object.defineProperty(window, "location", {
+      value: { href: "https://chat.deepseek.com/chat/s/test-session-1" },
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function dispatchHistory(data) {
+    window.dispatchEvent(new CustomEvent("bds:history-msgs", {
+      detail: typeof data === "string" ? data : JSON.stringify(data),
+    }));
+  }
+
+  function makeMsg(id, extra) {
+    return { message_id: id, role: "assistant", fragments: [], ...(extra || {}) };
+  }
+
+  it("ignores wrong-session history (sessionId !== current URL)", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+    const prevSize = state.chatMessagesBySession.size;
+
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "wrong-session" },
+          chat_messages: [makeMsg("m1")],
+        },
+      },
+      __bdsExplicit: true,
+    });
+
+    // No cache mutation for wrong session
+    expect(state.chatMessagesBySession.has("wrong-session")).toBe(false);
+    expect(state.chatMessagesBySession.size).toBe(prevSize);
+  });
+
+  it("ignores non-array chat_messages", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: "not-an-array",
+        },
+      },
+    });
+
+    expect(state.chatMessagesBySession.has("test-session-1")).toBe(false);
+  });
+
+  it("ignores missing chat_messages", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+        },
+      },
+    });
+
+    expect(state.chatMessagesBySession.has("test-session-1")).toBe(false);
+  });
+
+  it("rejects an entry that is an array (not a plain object)", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [makeMsg("m1"), ["not-an-object"]],
+        },
+      },
+    });
+
+    // Entire payload rejected — no cache mutation
+    expect(state.chatMessagesBySession.has("test-session-1")).toBe(false);
+  });
+
+  it("rejects an entry with null message_id", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [{ message_id: null, role: "user" }],
+        },
+      },
+    });
+
+    expect(state.chatMessagesBySession.has("test-session-1")).toBe(false);
+  });
+
+  it("rejects an entry with non-string message_id", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [{ message_id: 12345, role: "user" }],
+        },
+      },
+    });
+
+    expect(state.chatMessagesBySession.has("test-session-1")).toBe(false);
+  });
+
+  it("rejects an entry with empty string message_id", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [{ message_id: "", role: "user" }],
+        },
+      },
+    });
+
+    expect(state.chatMessagesBySession.has("test-session-1")).toBe(false);
+  });
+
+  it("rejects an entry with whitespace-only message_id", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [{ message_id: "   ", role: "user" }],
+        },
+      },
+    });
+
+    expect(state.chatMessagesBySession.has("test-session-1")).toBe(false);
+  });
+
+  it("later valid response accepted after malformed response", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+
+    // Malformed first
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [{ message_id: "", role: "user" }],
+        },
+      },
+    });
+    expect(state.chatMessagesBySession.has("test-session-1")).toBe(false);
+
+    // Valid second — should be accepted
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [makeMsg("m1")],
+        },
+      },
+    });
+    expect(state.chatMessagesBySession.has("test-session-1")).toBe(true);
+    expect(state.chatMessagesBySession.get("test-session-1")).toHaveLength(1);
+  });
+
+  it("valid explicit empty array emits exactly one completion event", async () => {
+    const handler = vi.fn();
+    window.addEventListener("bds:history-msgs-loaded", handler);
+
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [],
+        },
+      },
+      __bdsExplicit: true,
+    });
+
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("valid REPLACE replaces existing cache", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+
+    // First: seed with APPEND
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [makeMsg("m1")],
+          cache_control: "APPEND",
+        },
+      },
+    });
+    expect(state.chatMessagesBySession.get("test-session-1")).toHaveLength(1);
+
+    // Second: REPLACE should clear and replace
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [makeMsg("m2"), makeMsg("m3")],
+          cache_control: "REPLACE",
+        },
+      },
+    });
+    expect(state.chatMessagesBySession.get("test-session-1")).toHaveLength(2);
+    expect(state.chatMessagesBySession.get("test-session-1")[0].message_id).toBe("m2");
+  });
+
+  it("valid APPEND deduplicates by message_id", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+
+    // Seed initial messages
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [makeMsg("m1"), makeMsg("m2")],
+        },
+      },
+    });
+    expect(state.chatMessagesBySession.get("test-session-1")).toHaveLength(2);
+
+    // Append with duplicate m1 + new m3
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [makeMsg("m1"), makeMsg("m3")],
+          cache_control: "APPEND",
+        },
+      },
+    });
+    // Only m3 is new
+    const msgs = state.chatMessagesBySession.get("test-session-1");
+    expect(msgs).toHaveLength(3);
+    expect(msgs.map(m => m.message_id).sort()).toEqual(["m1", "m2", "m3"]);
+  });
+
+  it("malformed response does not complete a pending load-all-history request", async () => {
+    // Set up the load-all-history module to create a pending request
+    const { loadAllHistory } = await import("../../src/content/load-all-history.js");
+    const { retainOnlyHistorySession } = await import("../../src/content/load-all-history.js");
+    retainOnlyHistorySession(null);
+
+    // Simulate: dispatch request event (this is what injected script does)
+    window.dispatchEvent(new CustomEvent("bds:request-history-msgs", {
+      detail: JSON.stringify({ sessionId: "test-session-1" }),
+    }));
+
+    // Start loadAllHistory — it should dispatch bds:request-history-msgs
+    // and wait for bds:history-msgs-loaded
+    const loadPromise = loadAllHistory();
+
+    // Dispatch malformed response
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [{ message_id: "", role: "user" }],
+        },
+      },
+      __bdsExplicit: true,
+    });
+
+    // The load promise should NOT resolve from the malformed response
+    // Advance past timeout to verify it resolves to null
+    vi.advanceTimersByTime(11000);
+
+    const result = await loadPromise;
+    expect(result).toBeNull();
+
+    // Cache should not be populated
+    const state = (await import("../../src/content/state.js")).default;
+    expect(state.chatMessagesBySession.has("test-session-1")).toBe(false);
+  });
+});
+
+describe("setupBridgeEvents lifecycle", () => {
+  let setupBridgeEvents;
+
+  beforeAll(async () => {
+    ({ setupBridgeEvents } = await import("../../src/content/bridge.js"));
+  });
+
+  it("repeated setup returns same active cleanup", () => {
+    const c1 = setupBridgeEvents();
+    const c2 = setupBridgeEvents();
+    expect(c1).toBe(c2);
+    c1(); // cleanup
+  });
+
+  it("cleanup removes listeners so reinstall creates fresh handle", () => {
+    const c1 = setupBridgeEvents();
+    c1(); // cleanup gen 1
+
+    const c2 = setupBridgeEvents(); // gen 2
+    expect(c2).not.toBe(c1);
+    c2(); // cleanup
+  });
+
+  it("setup after cleanup installs exactly one fresh set", () => {
+    const c1 = setupBridgeEvents();
+    c1();
+
+    const c2 = setupBridgeEvents();
+    const c3 = setupBridgeEvents();
+    expect(c2).toBe(c3);
+    c2();
+  });
+
+  it("stale cleanup from gen 1 does not clear gen 2", () => {
+    const c1 = setupBridgeEvents();
+    c1(); // cleanup gen 1
+
+    const c2 = setupBridgeEvents(); // gen 2 active
+    c1(); // stale call — must NOT null gen 2
+    const c3 = setupBridgeEvents(); // still gen 2
+    expect(c3).toBe(c2);
+    c2();
+  });
+
+  it("repeated cleanup is harmless (no throw)", () => {
+    const c = setupBridgeEvents();
+    c();
+    c();
+    c();
+  });
+});

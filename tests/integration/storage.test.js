@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
 const bridgeMocks = vi.hoisted(() => ({
   pushConfigToPage: vi.fn(),
@@ -31,7 +31,7 @@ import {
   SYSTEM_PROMPT_TEMPLATE_VERSION,
 } from "../../src/lib/constants.js";
 import { resetAppState } from "../helpers/app-state.js";
-import { emitStorageChange, setChromeStorage } from "../mocks/chrome.js";
+import { emitStorageChange, setChromeStorage, resetChromeMock, installChromeMock } from "../mocks/chrome.js";
 
 describe("storage integration", () => {
   beforeEach(() => {
@@ -168,5 +168,620 @@ describe("storage integration", () => {
     expect(normalizeCharacters([{ content: "", active: "yes" }, { name: "A", content: "B" }])).toHaveLength(1);
     expect(normalizeProjects([{ id: "p1", name: "P" }, null])).toHaveLength(1);
     expect(normalizeProjectFiles([{ id: "f1", projectId: "p1", content: "body" }, {}])).toHaveLength(1);
+  });
+});
+
+describe("storage loop prevention", () => {
+  beforeEach(() => {
+    resetAppState();
+    bridgeMocks.pushConfigToPage.mockReset();
+    bridgeMocks.setMaxChatSessions.mockReset();
+    messageTextMocks.setHtmlToMarkdownMaxDepth.mockReset();
+  });
+
+  afterEach(() => {
+    state.ui = null;
+  });
+
+  it("remote-config storage event writes zero times to storage (no re-entrant loop)", () => {
+    bindStorageChangeListener();
+
+    const setCallsBefore = chrome.storage.local.set.mock.calls.length;
+    emitStorageChange({
+      [STORAGE_KEYS.remoteConfig]: { newValue: { features: { attachMenu: { enabled: false } } } },
+    });
+
+    // syncFromStorage must never call set — zero new writes
+    expect(chrome.storage.local.set.mock.calls.length).toBe(setCallsBefore);
+  });
+
+  it("remote-config storage removal restores builtins without storage write", async () => {
+    // Seed remote so removal has an effect — await the import
+    const { remoteConfig } = await import("../../src/lib/remote-config.svelte.js");
+    remoteConfig.syncFromStorage({ features: { attachMenu: { enabled: false } } });
+    expect(remoteConfig.getFlag("features.attachMenu.enabled")).toBe(false);
+
+    bindStorageChangeListener();
+    const setCallsBefore = chrome.storage.local.set.mock.calls.length;
+
+    emitStorageChange({
+      [STORAGE_KEYS.remoteConfig]: { newValue: undefined },
+    });
+
+    // syncFromStorage never writes — zero new set calls
+    expect(chrome.storage.local.set.mock.calls.length).toBe(setCallsBefore);
+    // Built-ins restored
+    expect(remoteConfig.getFlag("features.attachMenu.enabled")).toBe(true);
+  });
+
+  it("re-entrant same-value event terminates without second write", () => {
+    bindStorageChangeListener();
+
+    // First event — sets remote with new data
+    emitStorageChange({
+      [STORAGE_KEYS.remoteConfig]: { newValue: { features: { test: true } } },
+    });
+
+    const setCallsAfterFirst = chrome.storage.local.set.mock.calls.length;
+
+    // Second event — same value. Must NOT cause another write.
+    emitStorageChange({
+      [STORAGE_KEYS.remoteConfig]: { newValue: { features: { test: true } } },
+    });
+
+    expect(chrome.storage.local.set.mock.calls.length).toBe(setCallsAfterFirst);
+  });
+
+  it("remote-config storage removal restores builtins and emits zero writes", () => {
+    bindStorageChangeListener();
+
+    const setCallsBefore = chrome.storage.local.set.mock.calls.length;
+
+    emitStorageChange({
+      [STORAGE_KEYS.remoteConfig]: { newValue: undefined },
+    });
+
+    // Removal must not write to storage
+    expect(chrome.storage.local.set.mock.calls.length).toBe(setCallsBefore);
+  });
+
+  it("relevant storage keys push page config once; irrelevant keys push zero times", () => {
+    bindStorageChangeListener();
+
+    // settings = relevant → should push
+    bridgeMocks.pushConfigToPage.mockClear();
+    emitStorageChange({
+      [STORAGE_KEYS.settings]: { newValue: { preferredLang: "FR" } },
+    });
+    expect(bridgeMocks.pushConfigToPage).toHaveBeenCalledOnce();
+
+    // skills = relevant
+    bridgeMocks.pushConfigToPage.mockClear();
+    emitStorageChange({
+      [STORAGE_KEYS.skills]: { newValue: [{ name: "S", content: "X" }] },
+    });
+    expect(bridgeMocks.pushConfigToPage).toHaveBeenCalledOnce();
+
+    // savedItems = irrelevant (not injected into page config)
+    bridgeMocks.pushConfigToPage.mockClear();
+    emitStorageChange({
+      [STORAGE_KEYS.savedItems]: { newValue: [{ id: "x", content: "y" }] },
+    });
+    expect(bridgeMocks.pushConfigToPage).not.toHaveBeenCalled();
+
+    // chatTags = irrelevant
+    bridgeMocks.pushConfigToPage.mockClear();
+    emitStorageChange({
+      [STORAGE_KEYS.chatTags]: { newValue: { s1: ["tag1"] } },
+    });
+    expect(bridgeMocks.pushConfigToPage).not.toHaveBeenCalled();
+
+    // remoteConfig = irrelevant (has dedicated notification path)
+    bridgeMocks.pushConfigToPage.mockClear();
+    emitStorageChange({
+      [STORAGE_KEYS.remoteConfig]: { newValue: { features: { test: true } } },
+    });
+    expect(bridgeMocks.pushConfigToPage).not.toHaveBeenCalled();
+  });
+});
+
+describe("storage mock contracts (#108)", () => {
+  beforeEach(() => {
+    resetChromeMock();
+    installChromeMock();
+    resetAppState();
+    bridgeMocks.pushConfigToPage.mockReset();
+    bridgeMocks.setMaxChatSessions.mockReset();
+    messageTextMocks.setHtmlToMarkdownMaxDepth.mockReset();
+  });
+
+  afterEach(async () => {
+    state.ui = null;
+    // Flush any pending notifications to avoid cross-test leaks
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    await flushStorageChanges();
+  });
+
+  it("local replaceRemote performs exactly one write", async () => {
+    const { remoteConfig } = await import("../../src/lib/remote-config.svelte.js");
+    remoteConfig.resetToBuiltin();
+    chrome.storage.local.set.mockClear();
+
+    const persisted = remoteConfig.replaceRemote({ features: { attachMenu: { enabled: false } } });
+
+    expect(persisted).toBeInstanceOf(Promise);
+    await persisted;
+    expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
+  });
+
+  it("replaceRemote write emits exactly one remote-config storage event", async () => {
+    const { remoteConfig } = await import("../../src/lib/remote-config.svelte.js");
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    remoteConfig.resetToBuiltin();
+
+    // Register an onChanged listener
+    const events = [];
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === "local" && changes[STORAGE_KEYS.remoteConfig]) {
+        events.push(changes[STORAGE_KEYS.remoteConfig]);
+      }
+    });
+
+    remoteConfig.replaceRemote({ features: { attachMenu: { enabled: false } } });
+    await flushStorageChanges();
+
+    expect(events).toHaveLength(1);
+    expect(events[0].newValue).toEqual({ features: { attachMenu: { enabled: false } } });
+  });
+
+  it("repeating identical replacement performs zero writes and zero events", async () => {
+    const { remoteConfig } = await import("../../src/lib/remote-config.svelte.js");
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    remoteConfig.resetToBuiltin();
+
+    const data = { features: { attachMenu: { enabled: false } } };
+    remoteConfig.replaceRemote(data);
+    await flushStorageChanges();
+
+    // Register spy AFTER first event
+    const events = [];
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === "local" && changes[STORAGE_KEYS.remoteConfig]) {
+        events.push(changes[STORAGE_KEYS.remoteConfig]);
+      }
+    });
+
+    chrome.storage.local.set.mockClear();
+    remoteConfig.replaceRemote(data);
+    await flushStorageChanges();
+
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    expect(events).toHaveLength(0);
+  });
+
+  it("removing stored config restores built-ins without write-back", async () => {
+    const { remoteConfig } = await import("../../src/lib/remote-config.svelte.js");
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    remoteConfig.resetToBuiltin();
+
+    // Seed remote config via replaceRemote (writes to storage)
+    remoteConfig.replaceRemote({ features: { attachMenu: { enabled: false } } });
+    await flushStorageChanges();
+    expect(remoteConfig.getFlag("features.attachMenu.enabled")).toBe(false);
+
+    // Now remove from storage
+    chrome.storage.local.set.mockClear();
+    await chrome.storage.local.remove(STORAGE_KEYS.remoteConfig);
+    await flushStorageChanges();
+
+    // bindStorageChangeListener should process the removal via syncFromStorage
+    bindStorageChangeListener();
+    // Simulate the removal event (syncFromStorage sees empty/undefined value)
+    remoteConfig.syncFromStorage({});
+    expect(remoteConfig.getFlag("features.attachMenu.enabled")).toBe(true);
+
+    // No write-back — built-ins restored without persistence
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  it("external synchronization performs zero writes", async () => {
+    const { remoteConfig } = await import("../../src/lib/remote-config.svelte.js");
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    remoteConfig.resetToBuiltin();
+
+    chrome.storage.local.set.mockClear();
+    remoteConfig.syncFromStorage({ features: { attachMenu: { enabled: false } } });
+    await flushStorageChanges();
+
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  it("invalid remote-config roots normalize without loop (array)", async () => {
+    const { remoteConfig } = await import("../../src/lib/remote-config.svelte.js");
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    remoteConfig.resetToBuiltin();
+
+    chrome.storage.local.set.mockClear();
+    remoteConfig.syncFromStorage([]);
+    await flushStorageChanges();
+
+    // Should normalize to default, no crash, no writes
+    expect(remoteConfig.getFlag("features.attachMenu.enabled")).toBe(true);
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  it("invalid remote-config roots normalize without loop (primitive)", async () => {
+    const { remoteConfig } = await import("../../src/lib/remote-config.svelte.js");
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    remoteConfig.resetToBuiltin();
+
+    chrome.storage.local.set.mockClear();
+    remoteConfig.syncFromStorage("not-an-object");
+    await flushStorageChanges();
+
+    expect(remoteConfig.getFlag("features.attachMenu.enabled")).toBe(true);
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  it("invalid remote-config roots normalize without loop (null)", async () => {
+    const { remoteConfig } = await import("../../src/lib/remote-config.svelte.js");
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    remoteConfig.resetToBuiltin();
+
+    chrome.storage.local.set.mockClear();
+    remoteConfig.syncFromStorage(null);
+    await flushStorageChanges();
+
+    expect(remoteConfig.getFlag("features.attachMenu.enabled")).toBe(true);
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  it("invalid remote-config roots normalize without loop (undefined)", async () => {
+    const { remoteConfig } = await import("../../src/lib/remote-config.svelte.js");
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    remoteConfig.resetToBuiltin();
+
+    chrome.storage.local.set.mockClear();
+    remoteConfig.syncFromStorage(undefined);
+    await flushStorageChanges();
+
+    expect(remoteConfig.getFlag("features.attachMenu.enabled")).toBe(true);
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  it("identical writes produce no onChange event", async () => {
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+
+    const events = [];
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === "local") events.push(changes);
+    });
+
+    // Write value
+    await chrome.storage.local.set({ test: { a: 1 } });
+    await flushStorageChanges();
+    expect(events).toHaveLength(1);
+
+    // Identical write — no event
+    await chrome.storage.local.set({ test: { a: 1 } });
+    await flushStorageChanges();
+    expect(events).toHaveLength(1);
+  });
+
+  it("remove emits changes only for keys that existed", async () => {
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+
+    await chrome.storage.local.set({ keep: 1, removeMe: 2 });
+    await flushStorageChanges();
+
+    const events = [];
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === "local") events.push(changes);
+    });
+
+    await chrome.storage.local.remove(["removeMe", "neverExisted"]);
+    await flushStorageChanges();
+
+    // Only "removeMe" was in storage — only one change
+    expect(events).toHaveLength(1);
+    expect(Object.keys(events[0])).toEqual(["removeMe"]);
+    expect(events[0].removeMe.newValue).toBeUndefined();
+  });
+
+  it("clear emits one change record for each removed key", async () => {
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+
+    await chrome.storage.local.set({ a: 1, b: 2, c: 3 });
+    await flushStorageChanges();
+
+    const events = [];
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === "local") events.push(changes);
+    });
+
+    await chrome.storage.local.clear();
+    await flushStorageChanges();
+
+    expect(events).toHaveLength(1);
+    expect(Object.keys(events[0]).sort()).toEqual(["a", "b", "c"]);
+  });
+
+  it("listeners receive cloned values — mutating the change does not affect storage", async () => {
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+
+    const mutations = [];
+    chrome.storage.onChanged.addListener((changes) => {
+      // Attempt to mutate the received change object
+      for (const key of Object.keys(changes)) {
+        if (changes[key].newValue && typeof changes[key].newValue === "object") {
+          changes[key].newValue.mutated = true;
+          mutations.push(key);
+        }
+      }
+    });
+
+    await chrome.storage.local.set({ config: { original: true } });
+    await flushStorageChanges();
+
+    expect(mutations).toHaveLength(1);
+    // Storage should still have the original value
+    const stored = await chrome.storage.local.get("config");
+    expect(stored.config).toEqual({ original: true });
+    expect(stored.config.mutated).toBeUndefined();
+  });
+});
+
+describe("storage mock contracts", () => {
+  beforeEach(async () => {
+    const { resetChromeMock, installChromeMock } = await import("../mocks/chrome.js");
+    resetChromeMock();
+    installChromeMock();
+  });
+
+  afterEach(async () => {
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    await flushStorageChanges();
+  });
+
+  it("reset after set() delivers no events and no unhandled rejection", async () => {
+    const { resetChromeMock, flushStorageChanges } = await import("../mocks/chrome.js");
+    const events = [];
+    chrome.storage.onChanged.addListener((c, a) => { if (a === "local") events.push(c); });
+
+    await chrome.storage.local.set({ key1: "value1" });
+    // Reset before microtask fires
+    resetChromeMock();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(events).toHaveLength(0);
+  });
+
+  it("reset while listener delivery suspended stops remaining listeners", async () => {
+    const { resetChromeMock } = await import("../mocks/chrome.js");
+    const delivered = [];
+    chrome.storage.onChanged.addListener(() => { delivered.push("L1"); });
+    chrome.storage.onChanged.addListener(() => {
+      delivered.push("L2-start");
+      // Reset during L2 — L3+ should never fire
+      resetChromeMock();
+    });
+    chrome.storage.onChanged.addListener(() => { delivered.push("L3"); });
+
+    await chrome.storage.local.set({ k: "v" });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(delivered).toContain("L1");
+    expect(delivered).toContain("L2-start");
+    expect(delivered).not.toContain("L3");
+  });
+
+  it("two FIFO writes to same key preserve separate old/new transitions", async () => {
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    const events = [];
+    chrome.storage.onChanged.addListener((c, a) => { if (a === "local") events.push(c); });
+
+    await chrome.storage.local.set({ counter: 1 });
+    await chrome.storage.local.set({ counter: 2 });
+    await flushStorageChanges();
+
+    expect(events).toHaveLength(2);
+    expect(events[0].counter.oldValue).toBeUndefined();
+    expect(events[0].counter.newValue).toBe(1);
+    expect(events[1].counter.oldValue).toBe(1);
+    expect(events[1].counter.newValue).toBe(2);
+  });
+
+  it("two listeners receive independent deep clones", async () => {
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    const L1 = [];
+    const L2 = [];
+    chrome.storage.onChanged.addListener((c) => { if (c.x) L1.push(c.x.newValue); });
+    chrome.storage.onChanged.addListener((c) => { if (c.x) L2.push(c.x.newValue); });
+
+    await chrome.storage.local.set({ x: { nested: [1, 2] } });
+    await flushStorageChanges();
+
+    // Mutate what L1 received — must not affect L2's view
+    L1[0].nested.push(99);
+    expect(L2[0].nested).toEqual([1, 2]);
+  });
+
+  it("Chrome mode suppresses identical writes", async () => {
+    const { flushStorageChanges, setStorageMockMode } = await import("../mocks/chrome.js");
+    setStorageMockMode("chrome");
+    const events = [];
+    chrome.storage.onChanged.addListener((c, a) => { if (a === "local") events.push(c); });
+
+    await chrome.storage.local.set({ deep: { a: 1, b: { c: 2 } } });
+    await flushStorageChanges();
+    expect(events).toHaveLength(1);
+
+    await chrome.storage.local.set({ deep: { b: { c: 2 }, a: 1 } });
+    await flushStorageChanges();
+    expect(events).toHaveLength(1);
+  });
+
+  it("Firefox mode emits unchanged keys", async () => {
+    const { flushStorageChanges, setStorageMockMode } = await import("../mocks/chrome.js");
+    setStorageMockMode("firefox");
+    const events = [];
+    chrome.storage.onChanged.addListener((c, a) => { if (a === "local") events.push(c); });
+
+    await chrome.storage.local.set({ k: "same" });
+    await flushStorageChanges();
+    expect(events).toHaveLength(1);
+
+    await chrome.storage.local.set({ k: "same" });
+    await flushStorageChanges();
+    // Firefox mode: second write emits even for unchanged value
+    expect(events).toHaveLength(2);
+  });
+
+  it("setStorageMockMode rejects invalid values", async () => {
+    const { setStorageMockMode } = await import("../mocks/chrome.js");
+    expect(() => setStorageMockMode("webkit")).toThrow(/Invalid storage mock mode/);
+    expect(() => setStorageMockMode("")).toThrow(/Invalid storage mock mode/);
+  });
+
+  it("isolates a throwing listener and continues future FIFO deliveries", async () => {
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    const delivered = [];
+    chrome.storage.onChanged.addListener(() => {
+      delivered.push("throws");
+      throw new Error("listener failure");
+    });
+    chrome.storage.onChanged.addListener((changes) => {
+      delivered.push(changes.value.newValue);
+    });
+
+    await chrome.storage.local.set({ value: 1 });
+    await flushStorageChanges();
+    await chrome.storage.local.set({ value: 2 });
+    await flushStorageChanges();
+
+    expect(delivered).toEqual(["throws", 1, "throws", 2]);
+  });
+});
+
+describe("storage listener lifecycle", () => {
+  beforeEach(() => {
+    resetChromeMock();
+    installChromeMock();
+    resetAppState();
+  });
+
+  it("returns one idempotent cleanup handle for an active binding", () => {
+    const first = bindStorageChangeListener();
+    const second = bindStorageChangeListener();
+
+    expect(second).toBe(first);
+    first();
+  });
+
+  it("a stale cleanup cannot remove a later binding", async () => {
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    const first = bindStorageChangeListener();
+    first();
+    const current = bindStorageChangeListener();
+
+    first();
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.settings]: { tokenPriceDisplay: true },
+    });
+    await flushStorageChanges();
+
+    expect(state.settings.tokenPriceDisplay).toBe(true);
+    current();
+  });
+});
+
+describe("real Firefox feedback loop test", () => {
+  beforeEach(async () => {
+    const { resetChromeMock, installChromeMock, setStorageMockMode } = await import("../mocks/chrome.js");
+    resetChromeMock();
+    installChromeMock();
+    setStorageMockMode("firefox");
+    resetAppState();
+  });
+
+  afterEach(async () => {
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    await flushStorageChanges();
+    state.ui = null;
+  });
+
+  it("external storage set triggers syncFromStorage exactly once, no write-back", async () => {
+    const { remoteConfig } = await import("../../src/lib/remote-config.svelte.js");
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    remoteConfig.resetToBuiltin();
+
+    // Bind the real production storage listener
+    bindStorageChangeListener();
+    await flushStorageChanges();
+
+    // Perform one external storage.local.set for remote config
+    await chrome.storage.local.set({
+      bds_remote_config: { features: { attachMenu: { enabled: false } } },
+    });
+    await flushStorageChanges();
+
+    // Clear mock AFTER the external write flushed, so only write-backs remain
+    chrome.storage.local.set.mockClear();
+    await flushStorageChanges();
+
+    // The manager must have synced once via syncFromStorage
+    // and performed NO additional set() calls (no write-back loop)
+    const setCallsAfterSync = chrome.storage.local.set.mock.calls.filter(
+      (c) => "bds_remote_config" in (c[0] || {}),
+    );
+    expect(setCallsAfterSync).toHaveLength(0);
+
+    // Config was applied in memory
+    expect(remoteConfig.getFlag("features.attachMenu.enabled")).toBe(false);
+  });
+});
+
+describe("config-removal integration", () => {
+  beforeEach(async () => {
+    const { resetChromeMock, installChromeMock } = await import("../mocks/chrome.js");
+    resetChromeMock();
+    installChromeMock();
+    resetAppState();
+  });
+
+  afterEach(async () => {
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+    await flushStorageChanges();
+  });
+
+  it("bindStorageChangeListener active before remove restores built-ins with zero write-back", async () => {
+    const { remoteConfig } = await import("../../src/lib/remote-config.svelte.js");
+    const { flushStorageChanges } = await import("../mocks/chrome.js");
+
+    // Seed remote config
+    await chrome.storage.local.set({
+      bds_remote_config: { features: { attachMenu: { enabled: false } } },
+    });
+    await flushStorageChanges();
+    remoteConfig.syncFromStorage({ features: { attachMenu: { enabled: false } } });
+    expect(remoteConfig.getFlag("features.attachMenu.enabled")).toBe(false);
+
+    // Bind listener BEFORE removal
+    bindStorageChangeListener();
+    await flushStorageChanges();
+
+    // Remove the key
+    chrome.storage.local.set.mockClear();
+    await chrome.storage.local.remove("bds_remote_config");
+    await flushStorageChanges();
+
+    // Built-ins restored
+    expect(remoteConfig.getFlag("features.attachMenu.enabled")).toBe(true);
+    // No write-back — bds_remote_config was NOT re-set
+    const setCalls = chrome.storage.local.set.mock.calls;
+    const configWrites = setCalls.filter((c) => c[0] && "bds_remote_config" in c[0]);
+    expect(configWrites).toHaveLength(0);
   });
 });

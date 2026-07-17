@@ -45,6 +45,7 @@ coverage/
 playwright-report/
 playwright-report-android/
 test-results/
+test-results-firefox/
 # Ignore local Claude Code files
 .claude
 AGENTS.md
