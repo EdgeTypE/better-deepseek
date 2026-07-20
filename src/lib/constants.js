@@ -788,6 +788,7 @@ export const DEFAULT_SETTINGS = {
   // Load all history — scroll to top on session open to trigger lazy-load
   loadAllHistoryOnSession: false,
   showTimestamps: false,
+  disableTipBox: false,
 };
 
 // ── Default Remote Config (built-in fallback) ──

@@ -182,7 +182,9 @@
       "exitEditMode": "Exit Edit Mode",
       "noSnippets": "No CSS snippets yet.",
       "advancedSearchPlaceholder": "Search settings...",
-      "advancedNoResults": "No matching settings found."
+      "advancedNoResults": "No matching settings found.",
+      "disableTipBox": "Disable Tip Box",
+      "disableTipBoxHint": "Shows a random tip each time you open the drawer."
     },
     "skillList": {
       "title": "Skill Set",
@@ -1083,6 +1085,18 @@
       "betaFeatureDescription": "Beta endpoint features (use with caution).",
       "codeGen": "Code Gen",
       "promptSuffix": "Prompt Suffix"
+    },
+    "tips": {
+      "title": "\uD83D\uDCA1 Tip",
+      "disableInSettings": "You can disable this from Settings.",
+      "0": "To export a chat, click the ... button next to the session in the chat history.",
+      "1": "You can disable this tip box from Settings.",
+      "2": "You can export your current settings and data. Just visit the Advanced Settings section.",
+      "3": "Save your frequently used prompts as snippets and easily send them again later. You can even assign snippets to a \"/\" command to speed things up. Visit the Snippets tab in the BDS drawer for details.",
+      "4": "Did you know you can activate Multi-System Prompt mode to use multiple system prompts at the same time, with various schedules and conditions to create your own custom workflow?",
+      "5": "You can import your memories from another AI into BDS. Click \"Import memory from Another AI\" at the bottom of the Memory section.",
+      "6": "Did you know Better DeepSeek also has an <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">Android app</a>?",
+      "7": "If you like the extension, share it with your friends! To request a feature, let us know on our <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub page</a>."
     }
   }
 }

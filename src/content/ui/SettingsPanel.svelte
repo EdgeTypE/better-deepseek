@@ -16,7 +16,7 @@
   import { makeId } from "../../lib/utils/helpers.js";
   import SnippetList from "./SnippetList.svelte";
 
-  let { onapiplayground, onimportdata } = $props();
+  let { onapiplayground, onimportdata, onsave } = $props();
 
   let customSystemPrompts = $state(appState.settings.customSystemPrompts || []);
   let activeSystemPromptId = $state(appState.settings.activeSystemPromptId || "default");
@@ -96,6 +96,7 @@
   let subIntegrationsOpen = $state(false);
   let subUtilitiesOpen = $state(false);
   let subCSSOpen = $state(false);
+  let disableTipBox = $state(Boolean(appState.settings.disableTipBox));
   let advancedSearchQuery = $state("");
   let autocompleteSelectedIndex = $state(-1);
   let savedSectionStates = $state(null);
@@ -147,7 +148,7 @@
       processGitignoreOnUpload, injectSystemDateTime, skipDeletionConfirmation,
       deepResearchDeepFetch,
       locale, syncLocale, collapseLongUserMessages,
-      loadAllHistoryOnSession, customCSS
+      loadAllHistoryOnSession, customCSS, disableTipBox
     });
   }
 
@@ -434,7 +435,7 @@
       'settings.saveAsSnippet', 'settings.manageSnippets',
     ]},
     { key: 'subUtilities', labelKey: 'settings.subUtilities', settingKeys: [
-      'apiPlayground.title', 'drawer.exportAll', 'drawer.importAll',
+      'apiPlayground.title', 'drawer.exportAll', 'drawer.importAll', 'settings.disableTipBox',
     ]},
   ];
 
@@ -591,6 +592,7 @@
     locale = appState.settings.locale || availableLocaleCodes[0] || "en";
     syncLocale = Boolean(appState.settings.syncLocale);
     customCSS = appState.settings.customCSS || "";
+    disableTipBox = Boolean(appState.settings.disableTipBox);
     cssSnippets = [...appState.cssSnippets];
     if (snippetListRef) snippetListRef.refresh();
     chrome.storage.local.get("bds_locale_update_last_checked", (data) => {
@@ -823,6 +825,7 @@
     appState.settings.locale = locale;
     appState.settings.syncLocale = syncLocale;
     appState.settings.customCSS = customCSS;
+    appState.settings.disableTipBox = disableTipBox;
 
     await chrome.storage.local.set({
       [STORAGE_KEYS.settings]: appState.settings,
@@ -837,6 +840,8 @@
     if (appState.ui) {
       appState.ui.showToast(t("settings.settingsSaved"));
     }
+
+    onsave?.();
   }
 
   function openPromptEditor(prompt = null) {
@@ -1783,6 +1788,17 @@
         <div class="bds-toggle-row" role="button" tabindex="0" onclick={onapiplayground} onkeydown={(e) => e.key === 'Enter' && onapiplayground?.()} style="cursor: pointer;">
           <span class="bds-toggle-label">API Playground</span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+
+        <div class="bds-toggle-row">
+          <div>
+            <span class="bds-toggle-label">{t('settings.disableTipBox')}</span>
+            <p style="font-size: 10px; opacity: 0.5; margin: 2px 0 0;">{t('settings.disableTipBoxHint')}</p>
+          </div>
+          <label class="bds-switch">
+            <input type="checkbox" bind:checked={disableTipBox} />
+            <span class="bds-switch-track"></span>
+          </label>
         </div>
 
         <div class="bds-export-section">

@@ -10,9 +10,31 @@
   import { COMMANDS } from "../commands/registry.js";
   import { findChatEditor, setChatInputText } from "../auto.js";
   import appState from "../state.js";
-  import { t } from "../../lib/i18n.svelte.js";
+  import { i18n, t } from "../../lib/i18n.svelte.js";
 
   let { open = false, onclose, onopenapiplayground } = $props();
+
+  let TIP_COUNT = $derived.by(() => {
+    const tips = i18n.messages?.messages?.tips;
+    return tips ? Object.keys(tips).filter(k => /^\d+$/.test(k)).length : 0;
+  });
+  let currentTipIndex = $state(-1);
+  let disableTipBox = $state(Boolean(appState.settings.disableTipBox));
+
+  function handleSettingsSaved() {
+    disableTipBox = Boolean(appState.settings.disableTipBox);
+  }
+
+  $effect(() => {
+    disableTipBox = Boolean(appState.settings.disableTipBox);
+    if (open && !disableTipBox && TIP_COUNT > 0) {
+      queueMicrotask(() => {
+        currentTipIndex = Math.floor(Math.random() * TIP_COUNT);
+      });
+    } else {
+      currentTipIndex = -1;
+    }
+  });
 
   function openApiPlayground() {
     onclose();
@@ -90,73 +112,84 @@
   </div>
 
   {#if showProjectsManager}
-    <ProjectsManager bind:this={projectsManagerRef} onback={closeProjectsManager} />
+    <div class="bds-projects-body">
+      <ProjectsManager bind:this={projectsManagerRef} onback={closeProjectsManager} />
+    </div>
   {:else}
 
+    <div class="bds-drawer-body">
+      <SettingsPanel bind:this={settingsRef} onsave={handleSettingsSaved} onapiplayground={openApiPlayground} onimportdata={() => { refreshSettings(); refreshSkills(); refreshCharacters(); refreshMemories(); refreshProjects(); refreshSavedItems(); }} />
 
-    <SettingsPanel bind:this={settingsRef} onapiplayground={openApiPlayground} onimportdata={() => { refreshSettings(); refreshSkills(); refreshCharacters(); refreshMemories(); refreshProjects(); refreshSavedItems(); }} />
+      <hr />
 
-    <hr />
+      <SkillList bind:this={skillsRef} />
 
-    <SkillList bind:this={skillsRef} />
+      <hr />
 
-    <hr />
+      <CharacterList bind:this={charactersRef} />
 
-    <CharacterList bind:this={charactersRef} />
+      <hr />
 
-    <hr />
+      <MemoryList bind:this={memoryRef} />
 
-    <MemoryList bind:this={memoryRef} />
+      <hr />
+      
+      <ProjectsCard onmanage={openProjectsManager} />
 
-    <hr />
-    
-    <ProjectsCard onmanage={openProjectsManager} />
+      <hr />
 
-    <hr />
+      <SavedItems bind:this={savedItemsRef} />
 
-    <SavedItems bind:this={savedItemsRef} />
+      <hr />
 
-    <hr />
-
-    <div class="bds-section-title">
-      <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span class="bds-icon-inline">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          </span>
-          <span>{t("commands.title")}</span>
-        </div>
-        <button type="button" class="bds-btn-outlined" style="font-size:11px;padding:3px 7px;" onclick={() => showCmdManager = !showCmdManager}>
-          {showCmdManager ? t("commands.done") : t("commands.manage")}
-        </button>
-      </div>
-    </div>
-    {#if !showCmdManager}
-      <div class="bds-featured-list">
-        <h4>{t("commands.builtinCommands")}</h4>
-        {#each COMMANDS as cmd}
-          <button type="button" class="bds-featured-item" onclick={() => insertCommand(cmd.id)}>
-            <span class="bds-cmd-icon">{@html cmd.icon}</span>
-            <span class="bds-cmd-info">
-              <span class="bds-cmd-name">/{cmd.id}</span>
-              <span class="bds-cmd-desc">{t(cmd.descKey)}</span>
+      <div class="bds-section-title">
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="bds-icon-inline">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
             </span>
-            <span class="bds-cmd-usage">{t(cmd.usageKey)}</span>
+            <span>{t("commands.title")}</span>
+          </div>
+          <button type="button" class="bds-btn-outlined" style="font-size:11px;padding:3px 7px;" onclick={() => showCmdManager = !showCmdManager}>
+            {showCmdManager ? t("commands.done") : t("commands.manage")}
           </button>
-        {/each}
+        </div>
       </div>
-    {/if}
-    {#if showCmdManager}
-      <CommandManager onclose={() => showCmdManager = false} />
-    {/if}
+      {#if !showCmdManager}
+        <div class="bds-featured-list">
+          <h4>{t("commands.builtinCommands")}</h4>
+          {#each COMMANDS as cmd}
+            <button type="button" class="bds-featured-item" onclick={() => insertCommand(cmd.id)}>
+              <span class="bds-cmd-icon">{@html cmd.icon}</span>
+              <span class="bds-cmd-info">
+                <span class="bds-cmd-name">/{cmd.id}</span>
+                <span class="bds-cmd-desc">{t(cmd.descKey)}</span>
+              </span>
+              <span class="bds-cmd-usage">{t(cmd.usageKey)}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+      {#if showCmdManager}
+        <CommandManager onclose={() => showCmdManager = false} />
+      {/if}
+    </div>
 
-    <div class="bds-drawer-footer">
-      <a href="https://github.com/EdgeTypE/better-deepseek" target="_blank" rel="noopener noreferrer" class="bds-github-link">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
-        </svg>
-        <span>{t('drawer.github')} <small style="opacity: 0.6; font-weight: 400; margin-left: 4px;">{t('drawer.version', { version: '0.1.10' })}</small></span>
-      </a>
+    <div class="bds-drawer-bottom">
+      {#if TIP_COUNT > 0 && !disableTipBox && currentTipIndex >= 0}
+        <div class="bds-tip-bar">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>
+          <span>{@html t('tips.' + currentTipIndex)}</span>
+        </div>
+      {/if}
+      <div class="bds-drawer-footer">
+        <a href="https://github.com/EdgeTypE/better-deepseek" target="_blank" rel="noopener noreferrer" class="bds-github-link">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+          </svg>
+          <span>{t('drawer.github')} <small style="opacity: 0.6; font-weight: 400; margin-left: 4px;">{t('drawer.version', { version: '0.1.11' })}</small></span>
+        </a>
+      </div>
     </div>
   {/if}
 </aside>

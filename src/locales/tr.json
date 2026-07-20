@@ -182,7 +182,9 @@
       "exitEditMode": "Düzenlemeden Çık",
       "noSnippets": "Henüz CSS snippet'ı yok.",
       "advancedSearchPlaceholder": "Ayarlarda ara...",
-      "advancedNoResults": "Eşleşen ayar bulunamadı."
+      "advancedNoResults": "Eşleşen ayar bulunamadı.",
+      "disableTipBox": "İpucu Kutusunu Devre Dışı Bırak",
+      "disableTipBoxHint": "Drawer her açıldığında rastgele bir ipucu gösterir."
     },
     "skillList": {
       "title": "Yetenek Seti",
@@ -1080,6 +1082,18 @@
       "enterJsonSchema": "JSON şeması girin...",
       "useActiveKey": "Kullanılan anahtar: {{name}}",
       "noActiveKey": "Aktif API anahtarı yok"
+    },
+    "tips": {
+      "title": "\uD83D\uDCA1 \u0130pucu",
+      "disableInSettings": "Bu ipucunu Ayarlar'dan kapatabilirsin.",
+      "0": "Bir sohbeti d\u0131\u015Far\u0131 aktarmak i\u00E7in sohbet ge\u00E7mi\u015Finde session'\u0131n yan\u0131ndaki ... butonuna t\u0131klayabilirsin.",
+      "1": "Ayarlar'dan bu ipucu kutusunu devre d\u0131\u015F\u0131 b\u0131rakabilirsin.",
+      "2": "Dilersen, mevcut ayarlar\u0131n\u0131 ve verilerini d\u0131\u015Far\u0131 aktarabilirsin. Geli\u015Fmi\u015F ayarlar\u0131 ziyaret etmen yeterli.",
+      "3": "S\u0131k kulland\u0131\u011F\u0131n prompt'lar\u0131 snippet olarak atay\u0131p daha sonra kolayca tekrardan g\u00F6nderebilirsin. Dilersen snippet'lar\u0131 bir \"/\" komutuna atayarak i\u015Fleri h\u0131zland\u0131rabilirsin. Detayl\u0131 bilgi i\u00E7in BDS drawer'\u0131ndaki snippet sekmesini ziyaret et.",
+      "4": "Multi system prompt'u aktif ederek ayn\u0131 anda birden fazla system prompt kullanabilece\u011Fini, ve dilersen bunlar\u0131 \u00E7e\u015Fitli s\u0131ralar ve ko\u015Fullarla kullanarak kendine \u00F6zel bir workflow olu\u015Fturabilece\u011Fini biliyor muydun?",
+      "5": "Ba\u015Fka bir AI'daki memory'ni BDS'e aktarabilirsin. Bunun i\u00E7in haf\u0131za men\u00FCs\u00FCn\u00FCn en alt\u0131ndaki \"Import memory from Another AI\" yaz\u0131s\u0131na t\u0131klaman yeterli.",
+      "6": "Better DeepSeek'in bir <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">Android uygulamas\u0131</a> da oldu\u011Funu biliyor muydun?",
+      "7": "Eklentiden memnunsan arkada\u015Flar\u0131nla payla\u015F\u0131rsan \u00E7ok seviniriz. Ayr\u0131ca eklentide olmas\u0131n\u0131 istedi\u011Fin bir \u00F6zellik var ise <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub</a> sayfam\u0131zdan bildirebilirsin."
     }
   }
 }
