@@ -38,17 +38,52 @@ function stripMarkdownLinks(text) {
 }
 
 /**
+ * Compute ranges of fenced code blocks and inline code in text.
+ * Used to exclude BDS tags inside code blocks from tool processing.
+ */
+function computeCodeBlockRanges(text) {
+  const ranges = [];
+  let match;
+
+  // Fenced code blocks: ```lang ... ```
+  const fenceRe = /```(?:[a-zA-Z0-9_+.-]*)[ \t]*\r?\n?([\s\S]*?)```/g;
+  while ((match = fenceRe.exec(text)) !== null) {
+    ranges.push({ start: match.index, end: match.index + match[0].length });
+  }
+
+  // Inline code: `...` (skip if already inside a fenced block — inline
+  // can't span fence boundaries because `[^`\n]+` excludes newlines)
+  const inlineRe = /`([^`\n]+)`/g;
+  while ((match = inlineRe.exec(text)) !== null) {
+    const { index } = match;
+    if (!ranges.some(r => index >= r.start && index < r.end)) {
+      const end = index + match[0].length;
+      ranges.push({ start: index, end });
+    }
+  }
+
+  return ranges;
+}
+
+/**
  * Parse a raw message text for all BDS tags.
  */
 export function parseBdsMessage(rawText, isSettled = false) {
   let text = String(rawText || "");
   const renderableTagMatches = [];
 
+  // Compute code block ranges once — BDS tags inside these ranges are
+  // documentation examples, not actual tool invocations.
+  const codeBlockRanges = computeCodeBlockRanges(text);
+  const isInsideCodeBlock = (idx) =>
+    codeBlockRanges.some(r => idx >= r.start && idx < r.end);
+
   // Intercept unclosed tags if the message is fully settled (AI stopped generating).
   // This prevents infinite "Working..." animations and lost tool output.
   if (isSettled) {
     const unclosedTags = [];
-    const allTags = Array.from(text.matchAll(/<\/?BDS:([A-Za-z0-9_:]+)[^>]*>/gi));
+    const allTags = Array.from(text.matchAll(/<\/?BDS:([A-Za-z0-9_:]+)[^>]*>/gi))
+      .filter(m => !isInsideCodeBlock(m.index));
     for (const match of allTags) {
       const isClose = match[0].startsWith('</');
       const tName = match[1].toLowerCase();
@@ -104,10 +139,15 @@ export function parseBdsMessage(rawText, isSettled = false) {
 
   // We have BDS tags, but do we have tags that should HIDE the original message?
   // AUTO tags should NOT hide the message, EXCEPT for AUTO:CODE_RUNNER, AUTO:REQUEST_WEB_FETCH, AUTO:REQUEST_GITHUB_FETCH, and AUTO:SEARCH which have UI cards.
-  const hasHidingTags = /(<BDS:(?!AUTO:(?!CODE_RUNNER|REQUEST_WEB_FETCH|REQUEST_GITHUB_FETCH|SEARCH))[a-zA-Z0-9_:]+|<BetterDeepSeek>|Bds create file>)/i.test(text);
-  result.containsControlTags = hasHidingTags;
-  result.longWorkOpen = /<BDS:LONG_WORK>/i.test(text);
-  result.longWorkClose = /<\/BDS:LONG_WORK>/i.test(text);
+  // BDS tags inside code blocks are ignored — they are documentation examples.
+  const hidingRegex = /(<BDS:(?!AUTO:(?!CODE_RUNNER|REQUEST_WEB_FETCH|REQUEST_GITHUB_FETCH|SEARCH))[a-zA-Z0-9_:]+|<BetterDeepSeek>|Bds create file>)/gi;
+  const hidingMatches = Array.from(text.matchAll(hidingRegex))
+    .filter(m => !isInsideCodeBlock(m.index));
+  result.containsControlTags = hidingMatches.length > 0;
+  result.longWorkOpen = Array.from(text.matchAll(/<BDS:LONG_WORK>/gi))
+    .some(m => !isInsideCodeBlock(m.index));
+  result.longWorkClose = Array.from(text.matchAll(/<\/BDS:LONG_WORK>/gi))
+    .some(m => !isInsideCodeBlock(m.index));
 
   // Parse create_file pair tags using position-based matching.
   // This correctly handles content that literally contains </BDS:create_file>
@@ -120,6 +160,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
   const openAttrsList = [];
   let openMatch;
   while ((openMatch = openCreateRegex.exec(text)) !== null) {
+    if (isInsideCodeBlock(openMatch.index)) continue;
     openEnds.push(openMatch.index + openMatch[0].length);
     openAttrsList.push(openMatch[1] || "");
   }
@@ -127,6 +168,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
   const closeStarts = [];
   let closeMatch;
   while ((closeMatch = closeCreateRegex.exec(text)) !== null) {
+    if (isInsideCodeBlock(closeMatch.index)) continue;
     closeStarts.push(closeMatch.index);
   }
 
@@ -156,6 +198,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
     /<BDS:([A-Za-z0-9_:]+)([^>]*)>([\s\S]*?)<\/BDS:\1>/gi;
   let match;
   while ((match = pairTagRegex.exec(text)) !== null) {
+    if (isInsideCodeBlock(match.index)) continue;
     const name = String(match[1] || "").toLowerCase();
     const attrs = parseTagAttributes(match[2] || "");
     const content = normalizeTaggedCodeContent(
@@ -246,51 +289,57 @@ export function parseBdsMessage(rawText, isSettled = false) {
 
   const autoWebFetchRegex = /<BDS:AUTO:REQUEST_WEB_FETCH>([\s\S]*?)<\/BDS:AUTO:REQUEST_WEB_FETCH>/gi;
   while ((match = autoWebFetchRegex.exec(text)) !== null) {
-     const cleanUrl = normalizeAutoHttpTarget(match[1]);
-     if (cleanUrl) {
-       result.autoRequests.webFetch.push(cleanUrl);
-     }
+    if (isInsideCodeBlock(match.index)) continue;
+    const cleanUrl = normalizeAutoHttpTarget(match[1]);
+    if (cleanUrl) {
+      result.autoRequests.webFetch.push(cleanUrl);
+    }
   }
 
   const autoGitHubFetchRegex = /<BDS:AUTO:REQUEST_GITHUB_FETCH>([\s\S]*?)<\/BDS:AUTO:REQUEST_GITHUB_FETCH>/gi;
   while ((match = autoGitHubFetchRegex.exec(text)) !== null) {
-     const cleanUrl = normalizeAutoTextTarget(match[1]);
-     if (cleanUrl) {
-       result.autoRequests.githubFetch.push(cleanUrl);
-     }
+    if (isInsideCodeBlock(match.index)) continue;
+    const cleanUrl = normalizeAutoTextTarget(match[1]);
+    if (cleanUrl) {
+      result.autoRequests.githubFetch.push(cleanUrl);
+    }
   }
 
   const autoTwitterFetchRegex = /<BDS:AUTO:REQUEST_TWITTER_FETCH>([\s\S]*?)<\/BDS:AUTO:REQUEST_TWITTER_FETCH>/gi;
   while ((match = autoTwitterFetchRegex.exec(text)) !== null) {
-     const cleanUrl = normalizeAutoHttpTarget(match[1]);
-     if (cleanUrl) {
-       result.autoRequests.twitterFetch.push(cleanUrl);
-     }
+    if (isInsideCodeBlock(match.index)) continue;
+    const cleanUrl = normalizeAutoHttpTarget(match[1]);
+    if (cleanUrl) {
+      result.autoRequests.twitterFetch.push(cleanUrl);
+    }
   }
 
   const autoYouTubeFetchRegex = /<BDS:AUTO:REQUEST_YOUTUBE_FETCH>([\s\S]*?)<\/BDS:AUTO:REQUEST_YOUTUBE_FETCH>/gi;
   while ((match = autoYouTubeFetchRegex.exec(text)) !== null) {
-     const cleanUrl = normalizeAutoHttpTarget(match[1]);
-     if (cleanUrl) {
-        result.autoRequests.youtubeFetch.push(cleanUrl);
-     }
+    if (isInsideCodeBlock(match.index)) continue;
+    const cleanUrl = normalizeAutoHttpTarget(match[1]);
+    if (cleanUrl) {
+      result.autoRequests.youtubeFetch.push(cleanUrl);
+    }
   }
 
   const autoSearchRegex = /<BDS:AUTO:SEARCH([^>]*)>([\s\S]*?)<\/BDS:AUTO:SEARCH>/gi;
   while ((match = autoSearchRegex.exec(text)) !== null) {
-     const rawQuery = String(match[2] || "").trim();
-     const query = stripMarkdownLinks(rawQuery);
-     if (!query) continue;
-     const attrs = parseTagAttributes(match[1] || "");
-     const deepFetch = Math.max(0, parseInt(attrs.deepFetch, 10) || 0);
-     const runId = attrs.runId || attrs.runid || "";
-     const purpose = String(attrs.purpose || "").trim();
-     const sourceType = String(attrs.sourceType || attrs.sourcetype || "").trim();
-     result.autoRequests.searchQueries.push({ query, deepFetch, runId, purpose, sourceType });
+    if (isInsideCodeBlock(match.index)) continue;
+    const rawQuery = String(match[2] || "").trim();
+    const query = stripMarkdownLinks(rawQuery);
+    if (!query) continue;
+    const attrs = parseTagAttributes(match[1] || "");
+    const deepFetch = Math.max(0, parseInt(attrs.deepFetch, 10) || 0);
+    const runId = attrs.runId || attrs.runid || "";
+    const purpose = String(attrs.purpose || "").trim();
+    const sourceType = String(attrs.sourceType || attrs.sourcetype || "").trim();
+    result.autoRequests.searchQueries.push({ query, deepFetch, runId, purpose, sourceType });
   }
 
   const selfClosingCreateRegex = /<BDS:create_file\s+([^>]*)\/>/gi;
   while ((match = selfClosingCreateRegex.exec(text)) !== null) {
+    if (isInsideCodeBlock(match.index)) continue;
     const attrs = parseTagAttributes(match[1] || "");
     const fileName = attrs.fileName || attrs.filename || attrs.path;
     if (!fileName) {
@@ -305,6 +354,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
 
   const selfClosingImageRegex = /<BDS:IMAGE\s*([^>]*)\/>/gi;
   while ((match = selfClosingImageRegex.exec(text)) !== null) {
+    if (isInsideCodeBlock(match.index)) continue;
     const attrs = parseTagAttributes(match[1] || "");
     if (!attrs.src && !attrs.query && !attrs.q && !attrs.search) continue;
     const query = attrs.src ? "" : (attrs.query || attrs.q || attrs.search || "");
@@ -315,6 +365,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
 
   const selfClosingMemoryRegex = /<BDS:memory_write([^>]*)\/>/gi;
   while ((match = selfClosingMemoryRegex.exec(text)) !== null) {
+    if (isInsideCodeBlock(match.index)) continue;
     const attrs = parseTagAttributes(match[1] || "");
     const parsedMemory = parseMemoryWrite("", attrs);
     if (parsedMemory) {
@@ -325,6 +376,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
   const plainCreateRegex =
     /Bds create file>\s*fileName\s*=\s*"([^"]+)"\s*content\s*=\s*"([\s\S]*?)"/gi;
   while ((match = plainCreateRegex.exec(text)) !== null) {
+    if (isInsideCodeBlock(match.index)) continue;
     result.createFiles.push({
       fileName: String(match[1] || "file.txt"),
       content: normalizeTaggedCodeContent(
@@ -336,8 +388,11 @@ export function parseBdsMessage(rawText, isSettled = false) {
 
   // UNIVERSAL INTERFACE LOCK: Detect if ANY BDS tag is currently open (not closed)
   // This handles streaming for all tools (Visualizer, LongWork, etc.)
-  const allBdsTags = Array.from(text.matchAll(/<BDS:([A-Za-z0-9_:]+)[^>]*>/gi));
-  const allBdsCloseTags = Array.from(text.matchAll(/<\/BDS:([A-Za-z0-9_:]+)>/gi));
+  // BDS tags inside code blocks are excluded — they are documentation examples.
+  const allBdsTags = Array.from(text.matchAll(/<BDS:([A-Za-z0-9_:]+)[^>]*>/gi))
+    .filter(m => !isInsideCodeBlock(m.index));
+  const allBdsCloseTags = Array.from(text.matchAll(/<\/BDS:([A-Za-z0-9_:]+)>/gi))
+    .filter(m => !isInsideCodeBlock(m.index));
 
   let streamingTagName = null;
   let streamingTagStartIdx = -1;
@@ -381,7 +436,24 @@ export function parseBdsMessage(rawText, isSettled = false) {
     visibleText = visibleText.substring(0, index) + marker + visibleText.substring(index + original.length);
   }
 
+  // Protect BDS tags inside code blocks from sanitization by HTML-escaping
+  // the opening `<` so they survive as literal text (rendered correctly by marked).
+  const vtRanges = computeCodeBlockRanges(visibleText);
+  if (vtRanges.length > 0) {
+    let protectedVT = '';
+    let lastPos = 0;
+    for (const { start, end } of vtRanges) {
+      protectedVT += visibleText.substring(lastPos, start);
+      const codeContent = visibleText.substring(start, end);
+      protectedVT += codeContent.replace(/<(\/?(?:BDS:|BetterDeepSeek))/gi, '&lt;$1');
+      lastPos = end;
+    }
+    protectedVT += visibleText.substring(lastPos);
+    visibleText = protectedVT;
+  }
+
   // Remove skill_create tags not captured by pairTagRegex (fallback cleanup)
+  // Tags inside code blocks are already escaped and won't match.
   visibleText = visibleText.replace(/<BDS:skill_create[^>]*>[\s\S]*?<\/BDS:skill_create>/gi, '');
 
   // Strip all remaining BDS tags; markers survive (no <BDS: prefix)

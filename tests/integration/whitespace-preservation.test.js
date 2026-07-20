@@ -1106,6 +1106,59 @@ describe("parseBdsMessage — content containing BDS-like text", () => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
+// [NEW] Integration: parseBdsMessage — BDS tags inside code blocks (related to https://github.com/EdgeTypE/better-deepseek/issues/115)
+// ═════════════════════════════════════════════════════════════════════════════
+describe("parseBdsMessage — BDS tags inside code blocks (issue #115)", () => {
+  it("ignores create_file inside fenced code block", () => {
+    const raw =
+      '```markdown\n<BDS:create_file fileName="x.py">```py\npass\n```</BDS:create_file>\n```';
+    const result = parseBdsMessage(raw);
+    expect(result.createFiles).toHaveLength(0);
+    expect(result.containsControlTags).toBe(false);
+  });
+
+  it("ignores LONG_WORK inside fenced code block", () => {
+    const raw =
+      '```\n<BDS:LONG_WORK>content</BDS:LONG_WORK>\n```';
+    const result = parseBdsMessage(raw);
+    expect(result.longWorkOpen).toBe(false);
+    expect(result.longWorkClose).toBe(false);
+  });
+
+  it("ignores BDS tags inside inline code", () => {
+    const raw =
+      'Use `<BDS:create_file>` to create files.';
+    const result = parseBdsMessage(raw);
+    expect(result.createFiles).toHaveLength(0);
+  });
+
+  it("processes real tags outside code blocks while ignoring fake ones inside", () => {
+    const raw =
+      'Text\n<BDS:create_file fileName="real.py">```py\nx=1\n```</BDS:create_file>\n```markdown\n<BDS:create_file fileName="fake.py">```py\ny=2\n```</BDS:create_file>\n```';
+    const result = parseBdsMessage(raw);
+    expect(result.createFiles).toHaveLength(1);
+    expect(result.createFiles[0].fileName).toBe("real.py");
+  });
+
+  it("preserves BDS tag text inside code block in visibleText", () => {
+    const raw =
+      'Example:\n```markdown\n<BDS:create_file>\n```\nEnd.';
+    const result = parseBdsMessage(raw);
+    expect(result.visibleText).toContain("&lt;BDS:create_file>");
+  });
+
+  it("processes adjacent create_files correctly (regression: spurious inline range)", () => {
+    const raw =
+      '<BDS:create_file fileName="a.py">```py\nx=1\n```</BDS:create_file>' +
+      '<BDS:create_file fileName="b.py">```py\ny=2\n```</BDS:create_file>';
+    const result = parseBdsMessage(raw);
+    expect(result.createFiles).toHaveLength(2);
+    expect(result.createFiles[0].fileName).toBe("a.py");
+    expect(result.createFiles[1].fileName).toBe("b.py");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
 // [NEW] Integration: parseBdsMessage — multiple diverse tag types
 // ═════════════════════════════════════════════════════════════════════════════
 describe("parseBdsMessage — multiple diverse tag types", () => {

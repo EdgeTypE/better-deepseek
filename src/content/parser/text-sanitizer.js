@@ -14,7 +14,7 @@ export function sanitizeVisibleText(text) {
     ""
   );
   output = output.replace(
-    /<BDS:[A-Za-z0-9_:]+[^>]*>[\s\S]*?<\/BDS:[A-Za-z0-9_:]+>/gi,
+    /<BDS:([A-Za-z0-9_:]+)[^>]*>[\s\S]*?<\/BDS:\1>/gi,
     ""
   );
   // Clean up any stray or unclosed tags
