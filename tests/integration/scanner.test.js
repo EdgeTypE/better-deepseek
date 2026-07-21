@@ -54,6 +54,7 @@ vi.mock("../../src/content/tools/pending-export.js", () => ({
 vi.mock("../../src/content/tags/tag-hider.js", () => ({
   hideTagsInHeader: vi.fn(),
   hideTagsInSidebar: vi.fn(),
+  hideBdsTagsInPopovers: vi.fn(),
 }));
 
 vi.mock("../../src/content/deep-research.js", () => ({
