@@ -19,7 +19,7 @@ import RagPreview from "./ui/RagPreview.svelte";
 import DeepResearchToggle from "./ui/DeepResearchToggle.svelte";
 import { injectSearchInput } from "./ui/SidebarSearch.js";
 import { checkPendingExport } from "./tools/pending-export.js";
-import { hideTagsInSidebar, hideTagsInHeader } from "./tags/tag-hider.js";
+import { hideTagsInSidebar, hideTagsInHeader, hideBdsTagsInPopovers } from "./tags/tag-hider.js";
 import { setDeepResearchEnabled } from "./deep-research.js";
 import { tryExecuteRawInput } from "./commands/executor.js";
 import { checkPendingHandoff } from "./commands/context-handoff.js";
@@ -464,6 +464,7 @@ function scanPage() {
     scanInputArea();
     hideTagsInSidebar();
     hideTagsInHeader();
+    hideBdsTagsInPopovers();
   });
 }
 

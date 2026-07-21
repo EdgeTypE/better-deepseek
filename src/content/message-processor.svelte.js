@@ -18,6 +18,7 @@ import { injectJavaScriptRunButtons } from "./dom/javascript-injector.js";
 import { injectLuaRunButtons } from "./dom/lua-injector.js";
 import { injectRubyRunButtons } from "./dom/ruby-injector.js";
 import { parseBdsMessage } from "./parser/index.js";
+import { cleanBdsString } from "./tags/tag-hider.js";
 import { upsertMemories } from "./parser/memory-parser.js";
 import { upsertCharacters } from "./parser/character-parser.js";
 import { upsertSkills } from "./parser/skill-parser.js";
@@ -1022,17 +1023,14 @@ function stripBdsTagsFromUserMessage(node) {
 
   // Use textContent for detection — innerHTML has HTML-encoded angle brackets (&lt; &gt;)
   const plainText = textContainer.textContent || '';
-  if (!/BetterDeepSeek>/i.test(plainText)) return;
+  if (!/BetterDeepSeek|BDS:/i.test(plainText)) return;
 
   // Mark as processed before modifying to prevent re-entry
   userMsgCleaned.add(node);
 
-  // innerHTML has &lt;BetterDeepSeek&gt; (HTML-encoded), so match that form
+  // innerHTML has &lt;BetterDeepSeek&gt; (HTML-encoded) or raw form, so match with cleanBdsString
   const html = textContainer.innerHTML;
-  const cleanedText = html.replace(
-    /&lt;BetterDeepSeek&gt;[\s\S]*?&lt;\/BetterDeepSeek&gt;/gi,
-    ''
-  ).trim();
+  const cleanedText = cleanBdsString(html);
 
   if (cleanedText) {
     // Avoid direct innerHTML assignment to satisfy security linters.
