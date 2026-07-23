@@ -36,6 +36,7 @@ export async function loadStateFromStorage() {
     STORAGE_KEYS.cssSnippets,
     "bds_locale_updates",
     STORAGE_KEYS.commandMappings,
+    STORAGE_KEYS.mcpServers,
   ]);
 
   if (values.bds_locale_updates) {
@@ -120,6 +121,7 @@ export async function loadStateFromStorage() {
   state.chatTags = normalizeChatTags(values[STORAGE_KEYS.chatTags]);
   state.savedItems = normalizeSavedItems(values[STORAGE_KEYS.savedItems]);
   state.commands.customMappings = normalizeCommandMappings(values[STORAGE_KEYS.commandMappings]);
+  state.mcpServers = normalizeMcpServers(values[STORAGE_KEYS.mcpServers]);
   state.remoteAnnouncements = Array.isArray(values[STORAGE_KEYS.remoteAnnouncement]) ? values[STORAGE_KEYS.remoteAnnouncement] : [];
   state.dismissedAnnouncements = Array.isArray(values[STORAGE_KEYS.dismissedAnnouncements]) ? values[STORAGE_KEYS.dismissedAnnouncements] : [];
 
@@ -376,6 +378,25 @@ export function normalizeCommandMappings(raw) {
   return result
 }
 
+export function normalizeMcpServers(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(s => s && s.id && s.serverUrl)
+    .map(s => ({
+      id: String(s.id),
+      name: String(s.name || s.serverUrl || "MCP Server"),
+      serverUrl: String(s.serverUrl),
+      apiKey: String(s.apiKey || ""),
+      tools: Array.isArray(s.tools) ? s.tools.map(t => ({
+        name: String(t.name || ""),
+        description: String(t.description || ""),
+        inputSchema: t.inputSchema || {},
+      })).filter(t => t.name) : [],
+      enabled: s.enabled !== false,
+      createdAt: Number(s.createdAt) || Date.now(),
+    }));
+}
+
 export function normalizeCssSnippets(raw) {
   const defaultPresets = [
     {
@@ -559,6 +580,11 @@ export function bindStorageChangeListener() {
 
     if (changes[STORAGE_KEYS.commandMappings]) {
       state.commands.customMappings = normalizeCommandMappings(changes[STORAGE_KEYS.commandMappings].newValue);
+    }
+
+    if (changes[STORAGE_KEYS.mcpServers]) {
+      state.mcpServers = normalizeMcpServers(changes[STORAGE_KEYS.mcpServers].newValue);
+      pageConfigChanged = true;
     }
 
     if (changes[STORAGE_KEYS.cssSnippets]) {

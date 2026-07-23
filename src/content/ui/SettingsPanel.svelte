@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
   import appState from "../state.js";
-  import { pushConfigToPage } from "../bridge.js";
+  import { pushConfigToPage, discoverMcpToolSchemas } from "../bridge.js";
   import {
     STORAGE_KEYS,
     SYSTEM_PROMPT_TEMPLATE_VERSION,
@@ -96,6 +96,16 @@
   let subIntegrationsOpen = $state(false);
   let subUtilitiesOpen = $state(false);
   let subCSSOpen = $state(false);
+  let subMcpOpen = $state(false);
+  let showMcpEditor = $state(false);
+  let editingMcp = $state(null);
+  let mcpEditorName = $state("");
+  let mcpEditorUrl = $state("");
+  let mcpEditorApiKey = $state("");
+  let mcpEditorEnabled = $state(true);
+  let mcpEditorIsNew = $state(false);
+  let mcpTestingIndex = $state(-1);
+  let mcpServers = $state([...appState.mcpServers]);
   let disableTipBox = $state(Boolean(appState.settings.disableTipBox));
   let advancedSearchQuery = $state("");
   let autocompleteSelectedIndex = $state(-1);
@@ -434,6 +444,9 @@
       'settings.customCSS', 'settings.cssPresets',
       'settings.saveAsSnippet', 'settings.manageSnippets',
     ]},
+    { key: 'subMcp', labelKey: 'MCP Servers', settingKeys: [
+      'MCP Server URLs',
+    ]},
     { key: 'subUtilities', labelKey: 'settings.subUtilities', settingKeys: [
       'apiPlayground.title', 'drawer.exportAll', 'drawer.importAll', 'settings.disableTipBox',
     ]},
@@ -493,6 +506,7 @@
       subProjects: subProjectsOpen, subInjection: subInjectionOpen,
       subResearch: subResearchOpen, subVoice: subVoiceOpen,
       subIntegrations: subIntegrationsOpen, subCSS: subCSSOpen,
+      subMcp: subMcpOpen,
       subUtilities: subUtilitiesOpen,
     };
   }
@@ -503,6 +517,7 @@
     subProjectsOpen = states.subProjects; subInjectionOpen = states.subInjection;
     subResearchOpen = states.subResearch; subVoiceOpen = states.subVoice;
     subIntegrationsOpen = states.subIntegrations; subCSSOpen = states.subCSS;
+    subMcpOpen = states.subMcp;
     subUtilitiesOpen = states.subUtilities;
   }
 
@@ -526,6 +541,7 @@
     subVoiceOpen = matchingKeys.has('subVoice');
     subIntegrationsOpen = matchingKeys.has('subIntegrations');
     subCSSOpen = matchingKeys.has('subCSS');
+    subMcpOpen = matchingKeys.has('subMcp');
     subUtilitiesOpen = matchingKeys.has('subUtilities');
   });
 
@@ -904,6 +920,100 @@
 
   function baseOnDefault() {
     promptEditorContent = appState.settings.systemPrompt || DEFAULT_SYSTEM_PROMPT;
+  }
+
+  function openMcpEditor(server = null) {
+    if (server) {
+      editingMcp = server;
+      mcpEditorName = server.name;
+      mcpEditorUrl = server.serverUrl;
+      mcpEditorApiKey = server.apiKey || "";
+      mcpEditorEnabled = server.enabled !== false;
+      mcpEditorIsNew = false;
+    } else {
+      editingMcp = null;
+      mcpEditorName = "";
+      mcpEditorUrl = "";
+      mcpEditorApiKey = "";
+      mcpEditorEnabled = true;
+      mcpEditorIsNew = true;
+    }
+    showMcpEditor = true;
+  }
+
+  function closeMcpEditor() {
+    showMcpEditor = false;
+    editingMcp = null;
+  }
+
+  async function saveMcpServer() {
+    if (!mcpEditorName.trim() || !mcpEditorUrl.trim()) return;
+    const entry = {
+      id: editingMcp ? editingMcp.id : "mcp_" + Math.random().toString(36).substring(2, 9),
+      name: mcpEditorName.trim(),
+      serverUrl: mcpEditorUrl.trim(),
+      apiKey: mcpEditorApiKey.trim(),
+      enabled: mcpEditorEnabled,
+      tools: editingMcp ? editingMcp.tools : [],
+      createdAt: editingMcp ? editingMcp.createdAt : Date.now(),
+    };
+    if (mcpEditorIsNew) {
+      mcpServers = [...mcpServers, entry];
+    } else {
+      mcpServers = mcpServers.map(s => s.id === entry.id ? entry : s);
+    }
+    const plain = JSON.parse(JSON.stringify(mcpServers));
+    appState.mcpServers = plain;
+    await chrome.storage.local.set({ [STORAGE_KEYS.mcpServers]: plain });
+    await discoverMcpToolSchemas();
+    pushConfigToPage();
+    closeMcpEditor();
+  }
+
+  async function deleteMcpServer(id) {
+    if (!appState.settings?.skipDeletionConfirmation) {
+      if (!(await appState.ui.showConfirm(`Delete MCP server "${mcpServers.find(s => s.id === id)?.name}"?`))) return;
+    }
+    mcpServers = mcpServers.filter(s => s.id !== id);
+    const plainDelete = JSON.parse(JSON.stringify(mcpServers));
+    appState.mcpServers = plainDelete;
+    await chrome.storage.local.set({ [STORAGE_KEYS.mcpServers]: plainDelete });
+    await discoverMcpToolSchemas();
+    pushConfigToPage();
+  }
+
+  async function testMcpServer(index) {
+    mcpTestingIndex = index;
+    const server = mcpServers[index];
+    if (!server) { mcpTestingIndex = -1; return; }
+    try {
+      const response = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage(
+          { type: "bds-mcp-list-tools", serverUrl: server.serverUrl, apiKey: server.apiKey || "" },
+          (resp) => {
+            if (resp?.ok) resolve(resp);
+            else reject(new Error(resp?.error || "Connection failed"));
+          }
+        );
+      });
+      if (response.ok) {
+        const tools = (Array.isArray(response.tools) ? response.tools : (response.tools?.tools || [])).map(t => ({
+          name: t.name,
+          description: t.description || "",
+          inputSchema: t.inputSchema || {},
+        }));
+        mcpServers = mcpServers.map((s, idx) => idx === index ? { ...s, tools } : s);
+        const plainTest = JSON.parse(JSON.stringify(mcpServers));
+        appState.mcpServers = plainTest;
+        await chrome.storage.local.set({ [STORAGE_KEYS.mcpServers]: plainTest });
+        await discoverMcpToolSchemas();
+        pushConfigToPage();
+        if (appState.ui) appState.ui.showToast(`Connected: ${tools.length} tools found`);
+      }
+    } catch (err) {
+      if (appState.ui) appState.ui.showToast(`MCP test failed: ${err.message}`);
+    }
+    mcpTestingIndex = -1;
   }
 
   function scheduleLabel(entry) {
@@ -1774,6 +1884,41 @@
     </div>
     {/if}
 
+    {#if isSectionMatch('subMcp')}
+    <button type="button" class="bds-sub-toggle" class:open={subMcpOpen} onclick={() => subMcpOpen = !subMcpOpen} aria-expanded={subMcpOpen}>
+      MCP Servers
+      <span class="bds-chevron">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+    </button>
+    <div class="bds-sub-content" class:open={subMcpOpen}>
+      <div class="bds-sub-inner">
+        <p style="font-size: 11px; opacity: 0.6; margin: 0 0 8px;">Add remote MCP (Model Context Protocol) servers. The AI can discover and invoke tools from these servers.</p>
+        {#each mcpServers as server, i}
+          <div class="bds-skill-item">
+            <div class="bds-prompt-info">
+              <span class="bds-prompt-name">{server.name}</span>
+              <span class="bds-prompt-status">{server.serverUrl} · {server.tools?.length || 0} tools</span>
+            </div>
+            <div class="bds-prompt-actions">
+              <button class="bds-btn-outlined" style="font-size: 11px; padding: 4px 8px;" onclick={() => testMcpServer(i)} disabled={mcpTestingIndex === i}>
+                {mcpTestingIndex === i ? '...' : 'Test'}
+              </button>
+              <button class="bds-btn-outlined" style="font-size: 11px; padding: 4px 8px;" onclick={() => openMcpEditor(server)}>Edit</button>
+              <button class="bds-btn-danger" onclick={() => deleteMcpServer(server.id)}>×</button>
+            </div>
+          </div>
+        {/each}
+        <button class="bds-add-prompt-btn" onclick={() => openMcpEditor()}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="margin-right: 4px;"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Add MCP Server
+        </button>
+      </div>
+    </div>
+    {/if}
+
     {#if isSectionMatch('subUtilities')}
     <button type="button" class="bds-sub-toggle" class:open={subUtilitiesOpen} onclick={() => subUtilitiesOpen = !subUtilitiesOpen} aria-expanded={subUtilitiesOpen}>
       {t('settings.subUtilities')}
@@ -1946,6 +2091,42 @@
         <button type="button" class="bds-btn" disabled={isImporting || selectedSections.size === 0} onclick={doImportAll}>
           {isImporting ? t('importing') : t('drawer.importBtn')}
         </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if showMcpEditor}
+  <div class="bds-modal-overlay">
+    <div class="bds-modal">
+      <div class="bds-modal-header">
+        <span>{mcpEditorIsNew ? 'Add MCP Server' : 'Edit MCP Server'}</span>
+        <button class="bds-modal-close" onclick={closeMcpEditor}>×</button>
+      </div>
+      <div class="bds-modal-body">
+        <div class="bds-field">
+          <label class="bds-label">Name</label>
+          <input type="text" class="bds-input" bind:value={mcpEditorName} placeholder="My MCP Server" />
+        </div>
+        <div class="bds-field">
+          <label class="bds-label">Server URL</label>
+          <input type="url" class="bds-input" bind:value={mcpEditorUrl} placeholder="https://example.com/mcp" />
+        </div>
+        <div class="bds-field">
+          <label class="bds-label">API Key (optional)</label>
+          <input type="password" class="bds-input" bind:value={mcpEditorApiKey} placeholder="sk-..." />
+        </div>
+        <div class="bds-toggle-row" style="padding: 0;">
+          <span class="bds-toggle-label">Enabled</span>
+          <label class="bds-switch">
+            <input type="checkbox" bind:checked={mcpEditorEnabled} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+      </div>
+      <div class="bds-modal-footer">
+        <button class="bds-btn-outlined" onclick={closeMcpEditor}>Cancel</button>
+        <button class="bds-btn" onclick={saveMcpServer} disabled={!mcpEditorName.trim() || !mcpEditorUrl.trim()}>Save</button>
       </div>
     </div>
   </div>

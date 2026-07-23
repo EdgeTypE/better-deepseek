@@ -30,7 +30,7 @@ import {
   removeAllMessageHosts,
   removeMessageHost,
 } from "./dom/host.js";
-import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun } from "./auto.js";
+import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun, handleAutoMcpCall } from "./auto.js";
 import { handleManagedAutoContinuation, isManagedRunActive, trySynthesizeReport } from "./deep-research.js";
 
 import { mount, unmount } from "svelte";
@@ -345,7 +345,8 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
     parsed.autoRequests.githubFetch.length > 0 ||
     parsed.autoRequests.twitterFetch.length > 0 ||
     parsed.autoRequests.youtubeFetch.length > 0 ||
-    parsed.autoRequests.searchQueries.length > 0;
+    parsed.autoRequests.searchQueries.length > 0 ||
+    parsed.autoRequests.mcpCalls.length > 0;
   const currentConversationId = getCurrentConversationIdInline();
   const managedAutoSuppressionRun = getManagedAutoSuppressionRun(parsed, currentConversationId);
   const suppressManagedAuto = Boolean(managedAutoSuppressionRun);
@@ -406,6 +407,11 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
             handleAutoSearch(query, deepFetch, { purpose, sourceType });
           }
         }
+      }
+
+      for (const mcp of parsed.autoRequests.mcpCalls) {
+        if (suppressManagedAuto) continue;
+        handleAutoMcpCall(mcp.serverUrl, mcp.toolName, mcp.args);
       }
 
       if (
@@ -656,7 +662,8 @@ function hasAnyAutoRequest(parsed) {
     parsed?.autoRequests?.githubFetch?.length ||
     parsed?.autoRequests?.twitterFetch?.length ||
     parsed?.autoRequests?.youtubeFetch?.length ||
-    parsed?.autoRequests?.searchQueries?.length
+    parsed?.autoRequests?.searchQueries?.length ||
+    parsed?.autoRequests?.mcpCalls?.length
   );
 }
 

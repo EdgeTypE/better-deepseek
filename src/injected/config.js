@@ -33,6 +33,16 @@ export function normalizeConfig(config) {
     }))
     .filter(e => e.id && e.content.trim().length > 0 && e.enabled);
 
+  const mcpToolSchemas = Array.isArray(config.mcpToolSchemas)
+    ? config.mcpToolSchemas.map(s => ({
+        serverName: String(s.serverName || ""),
+        serverUrl: String(s.serverUrl || ""),
+        toolName: String(s.toolName || ""),
+        description: String(s.description || ""),
+        inputSchema: s.inputSchema || {},
+      })).filter(s => s.serverName && s.toolName)
+    : [];
+
   return {
     systemPrompt: String(config.systemPrompt || ""),
     systemPromptEntries,
@@ -49,6 +59,7 @@ export function normalizeConfig(config) {
     projectRagLimit: Number(config.projectRagLimit) || 5,
     injectSystemDateTime: Boolean(config.injectSystemDateTime),
     deepResearch: normalizeDeepResearch(config.deepResearch),
+    mcpToolSchemas,
   };
 }
 

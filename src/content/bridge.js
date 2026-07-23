@@ -292,7 +292,10 @@ export async function pushConfigToPage() {
 
     const allFiles = [...activeProjectFiles, ...localDirFiles];
 
+    const mcpSchemas = await discoverMcpToolSchemas();
+
     const detail = {
+      mcpToolSchemas: mcpSchemas,
       systemPrompt: String(activeSystemPrompt),
       systemPromptEntries: state.settings.systemPromptMultiMode
         ? (Array.isArray(state.settings.systemPromptEntries) ? state.settings.systemPromptEntries : [])
@@ -393,6 +396,52 @@ export function handleNetworkState(detail) {
   if (state.ui) {
     state.ui.showToast("LONG_WORK closed because API response ended.");
   }
+}
+
+/**
+ * Discover MCP tool schemas by querying all enabled servers in parallel.
+ * Populates state.mcpToolSchemas for use by payload-mutator.js.
+ */
+export async function discoverMcpToolSchemas() {
+  const enabledServers = state.mcpServers.filter(s => s.enabled);
+  if (!enabledServers.length) {
+    state.mcpToolSchemas = [];
+    return [];
+  }
+
+  const results = await Promise.allSettled(
+    enabledServers.map(server =>
+      new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage(
+          { type: "bds-mcp-list-tools", serverUrl: server.serverUrl, apiKey: server.apiKey || "" },
+          (response) => {
+            if (response?.ok) resolve({ serverName: server.name, serverUrl: server.serverUrl, tools: response.tools });
+            else reject(new Error(response?.error || "Failed to list tools"));
+          }
+        );
+      })
+    )
+  );
+
+  const schemas = [];
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      const { serverName, serverUrl, tools } = result.value;
+      const toolList = Array.isArray(tools) ? tools : (tools?.tools || []);
+      for (const tool of toolList) {
+        schemas.push({
+          serverName,
+          serverUrl,
+          toolName: tool.name,
+          description: tool.description || "",
+          inputSchema: tool.inputSchema || {},
+        });
+      }
+    }
+  }
+
+  state.mcpToolSchemas = schemas;
+  return schemas;
 }
 
 /**

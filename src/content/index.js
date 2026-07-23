@@ -78,6 +78,10 @@ async function init() {
   checkPendingExport();
   checkPendingMemoryImport();
   pushConfigToPage();
+  import("./bridge.js").then(async (m) => {
+    await m.discoverMcpToolSchemas();
+    pushConfigToPage();
+  });
   startStatusMonitor();
   startThemeWatcher();
 

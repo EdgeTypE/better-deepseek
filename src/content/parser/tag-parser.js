@@ -16,20 +16,22 @@ export function parseTagAttributes(rawAttrs) {
     if (!key) continue;
 
     const start = keyRegex.lastIndex;
-    if (start >= rawAttrs.length || rawAttrs[start] !== '"') continue;
+    if (start >= rawAttrs.length) continue;
+    const quoteChar = rawAttrs[start];
+    if (quoteChar !== '"' && quoteChar !== "'") continue;
 
     // Walk character-by-character to find the closing quote,
-    // respecting escaped quotes: \" only
+    // respecting escaped quotes: \" and \' only
     let value = "";
     let i = start + 1;
     while (i < rawAttrs.length) {
       const ch = rawAttrs[i];
-      if (ch === "\\" && rawAttrs[i + 1] === '"') {
-        value += '"';
+      if (ch === "\\" && rawAttrs[i + 1] === quoteChar) {
+        value += quoteChar;
         i += 2;
         continue;
       }
-      if (ch === '"') {
+      if (ch === quoteChar) {
         i++;
         break;
       }

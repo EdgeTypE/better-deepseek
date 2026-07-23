@@ -90,6 +90,10 @@ const state = {
     /** @type {Map<string, {estimate: number, serverTokens: number, lastServerUpdate: number}>} conversationId -> budget */
     conversations: new Map(),
   },
+  /** @type {Array<{id:string,name:string,serverUrl:string,apiKey?:string,tools:Array<{name:string,description:string,inputSchema:object}>,enabled:boolean,createdAt:number}>} */
+  mcpServers: [],
+  /** @type {Array<{serverName:string,toolName:string,description:string,inputSchema:object}>} cached merged tool schemas */
+  mcpToolSchemas: [],
   /** Remote config object (deep-merged with built-in defaults). Populated by RemoteConfigManager. */
   remoteConfig: DEFAULT_REMOTE_CONFIG,
 };

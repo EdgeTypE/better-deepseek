@@ -34,7 +34,7 @@ describe("bridge integration", () => {
     document.head.innerHTML = "";
   });
 
-  it("pushes the current config to the page as a stringified custom event", () => {
+  it("pushes the current config to the page as a stringified custom event", async () => {
     state.settings.preferredLang = "English";
     state.skills = [
       { name: "Active", content: "Use me", active: true },
@@ -57,7 +57,7 @@ describe("bridge integration", () => {
       received = JSON.parse(event.detail);
     }, { once: true });
 
-    pushConfigToPage();
+    await pushConfigToPage();
 
     expect(received).toMatchObject({
       systemPrompt: "You are a test assistant.",

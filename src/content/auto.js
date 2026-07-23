@@ -27,6 +27,7 @@ const processedGitHubFetches = new Set();
 const processedTwitterFetches = new Set();
 const processedYouTubeFetches = new Set();
 const processedSearchQueries = new Set();
+const processedMcpCalls = new Set();
 // Per-run search deduplication for deep research
 const processedRunSearchQueries = new Map();
 
@@ -375,6 +376,56 @@ export async function handleAutoErrorReport(toolName, error, originalCode) {
 
   // We use injectFileAndSend without a file for pure text injection
   await injectPureTextAndSend(autoMessage);
+}
+
+export async function handleAutoMcpCall(serverUrl, toolName, args = {}) {
+  const dedupeKey = `${serverUrl}|${toolName}|${JSON.stringify(args)}`;
+  if (processedMcpCalls.has(dedupeKey)) return;
+  processedMcpCalls.add(dedupeKey);
+
+  devLog("Auto", `Starting MCP call: ${toolName} @ ${serverUrl}`);
+
+  const server = appState.mcpServers.find(s => s.serverUrl === serverUrl || s.name === serverUrl);
+  const apiKey = server?.apiKey || "";
+  const actualUrl = server?.serverUrl || serverUrl;
+
+  try {
+    const result = await new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(
+        { type: "bds-mcp-call", serverUrl: actualUrl, apiKey, toolName, args },
+        (response) => {
+          if (response?.ok) resolve(response.result);
+          else reject(new Error(response?.error || "MCP call failed"));
+        }
+      );
+    });
+
+    const contentType = result?.content?.[0]?.type || "text";
+    const textContent = result?.content?.map(c => c.text || "").filter(Boolean).join("\n") || JSON.stringify(result);
+
+    const autoMessage = [
+      `<BetterDeepSeek>`,
+      `[BDS:AUTO] MCP Result for ${toolName}`,
+      `Server: ${serverUrl}`,
+      `Tool: ${toolName}`,
+      `Args: ${JSON.stringify(args)}`,
+      ``,
+      textContent,
+      `</BetterDeepSeek>`
+    ].join("\n");
+
+    await injectPureTextAndSend(autoMessage, `MCP ${toolName}`);
+  } catch (err) {
+    console.error("[BDS:AUTO] MCP Call Failed:", err);
+    processedMcpCalls.delete(dedupeKey);
+    const errorMessage = [
+      `<BetterDeepSeek>`,
+      `[BDS:AUTO] MCP call failed for ${toolName} @ ${serverUrl}`,
+      `Error: ${err.message}`,
+      `</BetterDeepSeek>`
+    ].join("\n");
+    await injectPureTextAndSend(errorMessage, `MCP error ${toolName}`);
+  }
 }
 
 export async function injectPureTextAndSend(autoMessage, logLabel = "Text prompt") {

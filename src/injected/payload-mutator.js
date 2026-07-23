@@ -403,6 +403,11 @@ export function buildHiddenPrefix(
     }
   }
 
+  const mcpBlock = buildMcpBlock(state);
+  if (mcpBlock) {
+    blocks.push(mcpBlock);
+  }
+
   return blocks.join("\n\n");
 }
 
@@ -625,6 +630,27 @@ export function buildUserDataBlock(state) {
 
   if (blocks.length === 0) return "";
   return `<BetterDeepSeek>\n${blocks.join("\n")}\n</BetterDeepSeek>`;
+}
+
+/**
+ * Build the MCP tool schemas block so the AI knows what external tools are available.
+ */
+export function buildMcpBlock(state) {
+  const schemas = state.config?.mcpToolSchemas;
+  if (!Array.isArray(schemas) || !schemas.length) return "";
+  const lines = schemas.map(s =>
+    `- Server: ${s.serverName} (${s.serverUrl || s.serverName}) | Tool: ${s.toolName}${s.description ? ` | Description: ${s.description}` : ""}`
+  );
+  return [
+    `<BetterDeepSeek>`,
+    `You have access to the following MCP (Model Context Protocol) tools via remote servers.`,
+    `To invoke them, use: <BDS:AUTO:MCP url="SERVER_NAME_OR_URL" tool="TOOL_NAME" args='{"key":"value"}'>`,
+    `The extension will call the tool and inject the result.`,
+    ``,
+    `Available tools:`,
+    ...lines,
+    `</BetterDeepSeek>`,
+  ].join("\n");
 }
 
 /**

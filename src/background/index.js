@@ -107,6 +107,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "bds-mcp-list-tools") {
+    listMcpTools(message.serverUrl, message.apiKey)
+      .then((tools) => sendResponse({ ok: true, tools }))
+      .catch((error) => sendResponse({
+        ok: false,
+        error: String(error && error.message ? error.message : error),
+      }));
+    return true;
+  }
+
+  if (message.type === "bds-mcp-call") {
+    mcpCallTool(message.serverUrl, message.apiKey, message.toolName, message.args)
+      .then((result) => sendResponse({ ok: true, result }))
+      .catch((error) => sendResponse({
+        ok: false,
+        error: String(error && error.message ? error.message : error),
+      }));
+    return true;
+  }
+
   return false;
 });
 
@@ -496,4 +516,80 @@ async function handleLanguageReset() {
     console.error("Failed to reset language files:", err);
     return { success: false, error: err.message };
   }
+}
+
+// ── MCP JSON-RPC Helpers ──
+
+const mcpSessionCache = new Map();
+
+function mcpHeaders(apiKey) {
+  const h = { "Content-Type": "application/json", Accept: "application/json, text/event-stream" };
+  if (apiKey) { h["x-api-key"] = apiKey; h["Authorization"] = `Bearer ${apiKey}`; }
+  return h;
+}
+
+/** Send a JSON-RPC request and parse JSON or SSE response */
+async function mcpFetch(serverUrl, bodyObj, apiKey) {
+  const resp = await fetch(serverUrl, {
+    method: "POST",
+    headers: mcpHeaders(apiKey),
+    body: JSON.stringify(bodyObj),
+  });
+  if (!resp.ok) {
+    let detail = "";
+    try { detail = await resp.text(); } catch (e) {}
+    throw new Error(
+      `MCP server returned ${resp.status}${detail ? ": " + detail.slice(0, 300) : ""}`
+    );
+  }
+  const ct = (resp.headers.get("content-type") || "").toLowerCase();
+  if (ct.includes("text/event-stream")) {
+    const text = await resp.text();
+    let lastResult = null;
+    for (const line of text.split("\n")) {
+      if (line.startsWith("data: ")) {
+        const raw = line.slice(6).trim();
+        if (raw === "[DONE]") continue;
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed.error) throw new Error(parsed.error.message || JSON.stringify(parsed.error));
+          if (parsed.result !== undefined) lastResult = parsed.result;
+        } catch (e) {
+          if (e instanceof SyntaxError) continue;
+          throw e;
+        }
+      }
+    }
+    return lastResult;
+  }
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+  return data.result;
+}
+
+/** Ensure the session is initialized per MCP spec (cached per (url,apiKey)) */
+async function mcpEnsureInitialized(serverUrl, apiKey) {
+  const key = `${serverUrl}|${apiKey}`;
+  if (mcpSessionCache.has(key)) return;
+  // Send initialize
+  await mcpFetch(serverUrl, {
+    jsonrpc: "2.0", id: 1, method: "initialize",
+    params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "better-deepseek", version: "0.1.11" } },
+  }, apiKey);
+  // Send initialized notification (fire-and-forget, returned result ignored)
+  mcpFetch(serverUrl, { jsonrpc: "2.0", method: "notifications/initialized" }, apiKey).catch(() => {});
+  mcpSessionCache.set(key, true);
+}
+
+async function mcpJsonRpcRequest(serverUrl, method, params = {}, apiKey = "") {
+  await mcpEnsureInitialized(serverUrl, apiKey);
+  return mcpFetch(serverUrl, { jsonrpc: "2.0", id: 2, method, params }, apiKey);
+}
+
+async function listMcpTools(serverUrl, apiKey = "") {
+  return mcpJsonRpcRequest(serverUrl, "tools/list", {}, apiKey);
+}
+
+async function mcpCallTool(serverUrl, apiKey = "", toolName, args = {}) {
+  return mcpJsonRpcRequest(serverUrl, "tools/call", { name: toolName, arguments: args }, apiKey);
 }

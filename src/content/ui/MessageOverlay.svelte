@@ -17,6 +17,7 @@
   import LoadingIndicator from "./LoadingIndicator.svelte";
   import ImageCard from "./ImageCard.svelte";
   import TodoCard from "./TodoCard.svelte";
+  import McpLoadingStatus from "./McpLoadingStatus.svelte";
   import { t } from "../../lib/i18n.svelte.js";
   import { parseLooseJson } from "../parser/json-repair.js";
 
@@ -386,6 +387,11 @@
         <ImageCard content={block.content} attrs={block.attrs} />
       {:else if block.name === 'todo'}
         <TodoCard content={block.content} />
+      {:else if block.name === 'auto:mcp'}
+        <McpLoadingStatus
+          toolName={block.attrs.tool || block.attrs.toolName || ""}
+          serverName={block.attrs.url || block.attrs.serverUrl || ""}
+        />
       {:else}
         <ToolCard name={block.name} content={block.content} />
       {/if}
