@@ -437,6 +437,8 @@ export async function discoverMcpToolSchemas() {
           inputSchema: tool.inputSchema || {},
         });
       }
+    } else {
+      console.warn(`[BDS] MCP discovery failed: ${result.reason?.message || "unknown error"}`);
     }
   }
 

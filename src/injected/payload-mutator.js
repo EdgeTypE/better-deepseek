@@ -403,9 +403,17 @@ export function buildHiddenPrefix(
     }
   }
 
-  const mcpBlock = buildMcpBlock(state);
-  if (mcpBlock) {
-    blocks.push(mcpBlock);
+  const currentMcpFingerprint = getMcpFingerprint(state.config?.mcpToolSchemas);
+  let lastMcpFingerprint = null;
+  if (!forceSystemPrompt && messages) {
+    lastMcpFingerprint = getLastMcpFingerprintInHistory(messages, excludeTarget);
+  }
+
+  if (forceSystemPrompt || (currentMcpFingerprint && currentMcpFingerprint !== lastMcpFingerprint)) {
+    const mcpBlock = buildMcpBlock(state, currentMcpFingerprint);
+    if (mcpBlock) {
+      blocks.push(mcpBlock);
+    }
   }
 
   return blocks.join("\n\n");
@@ -484,6 +492,19 @@ export function getSkillsFingerprint(skills) {
   // Use name + content length as a simple heuristic for "same skill version"
   return skills
     .map((s) => `${s.name}:${(s.content || "").length}`)
+    .sort()
+    .join("|");
+}
+
+/**
+ * Generate a semi-stable fingerprint for MCP tool schemas to detect changes.
+ */
+export function getMcpFingerprint(schemas) {
+  if (!Array.isArray(schemas) || !schemas.length) {
+    return "";
+  }
+  return schemas
+    .map((s) => `${s.serverName}:${s.toolName}:${JSON.stringify(s.inputSchema || {})}`)
     .sort()
     .join("|");
 }
@@ -635,21 +656,33 @@ export function buildUserDataBlock(state) {
 /**
  * Build the MCP tool schemas block so the AI knows what external tools are available.
  */
-export function buildMcpBlock(state) {
+export function buildMcpBlock(state, fingerprint) {
   const schemas = state.config?.mcpToolSchemas;
   if (!Array.isArray(schemas) || !schemas.length) return "";
-  const lines = schemas.map(s =>
-    `- Server: ${s.serverName} (${s.serverUrl || s.serverName}) | Tool: ${s.toolName}${s.description ? ` | Description: ${s.description}` : ""}`
-  );
+  const lines = schemas.map(s => {
+    let line = `- Server: ${s.serverName} (${s.serverUrl || s.serverName}) | Tool: ${s.toolName}`;
+    if (s.description) line += ` | Description: ${s.description}`;
+    if (s.inputSchema && typeof s.inputSchema === "object") {
+      const props = s.inputSchema.properties;
+      if (props) {
+        const paramList = Object.entries(props).map(([k, v]) => {
+          const required = (s.inputSchema.required || []).includes(k) ? " (required)" : "";
+          return `${k}: ${v?.type || "any"}${required}`;
+        });
+        if (paramList.length) line += ` | Params: ${paramList.join(", ")}`;
+      }
+    }
+    return line;
+  });
   return [
-    `<BetterDeepSeek>`,
+    `<BetterDeepSeek> <BDS:MCP fingerprint="${fingerprint}">`,
     `You have access to the following MCP (Model Context Protocol) tools via remote servers.`,
     `To invoke them, use: <BDS:AUTO:MCP url="SERVER_NAME_OR_URL" tool="TOOL_NAME" args='{"key":"value"}'>`,
     `The extension will call the tool and inject the result.`,
     ``,
     `Available tools:`,
     ...lines,
-    `</BetterDeepSeek>`,
+    `</BDS:MCP> </BetterDeepSeek>`,
   ].join("\n");
 }
 
@@ -709,6 +742,23 @@ export function getLastSkillsFingerprintInHistory(messages, excludeTarget = null
 
     const text = extractMessageText(msg);
     const match = text.match(/<BDS:SKILLS fingerprint="(.*?)">/);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  return null;
+}
+
+/**
+ * Scan history backwards to find the fingerprint of the last injected MCP tools.
+ */
+export function getLastMcpFingerprintInHistory(messages, excludeTarget = null) {
+  if (!Array.isArray(messages)) return null;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg === excludeTarget) continue;
+    const text = extractMessageText(msg);
+    const match = text.match(/<BDS:MCP fingerprint="(.*?)">/);
     if (match && match[1]) {
       return match[1];
     }

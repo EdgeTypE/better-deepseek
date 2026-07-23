@@ -338,7 +338,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
     result.autoRequests.searchQueries.push({ query, deepFetch, runId, purpose, sourceType });
   }
 
-  const autoMcpRegex = /<BDS:AUTO:MCP\s+([^>]*)>([\s\S]*?)<\/BDS:AUTO:MCP>/gi;
+  const autoMcpRegex = /<BDS:AUTO:MCP\s+((?:[^>"']+|"[^"]*"|'[^']*')*)\s*>([\s\S]*?)<\/BDS:AUTO:MCP>/gi;
   while ((match = autoMcpRegex.exec(text)) !== null) {
     if (isInsideCodeBlock(match.index)) continue;
     const attrs = parseTagAttributes(match[1] || "");

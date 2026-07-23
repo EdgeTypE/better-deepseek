@@ -382,6 +382,10 @@ export async function handleAutoMcpCall(serverUrl, toolName, args = {}) {
   const dedupeKey = `${serverUrl}|${toolName}|${JSON.stringify(args)}`;
   if (processedMcpCalls.has(dedupeKey)) return;
   processedMcpCalls.add(dedupeKey);
+  if (processedMcpCalls.size > 500) {
+    const iter = processedMcpCalls.values();
+    for (let i = 0; i < 100; i++) processedMcpCalls.delete(iter.next().value);
+  }
 
   devLog("Auto", `Starting MCP call: ${toolName} @ ${serverUrl}`);
 
@@ -400,8 +404,9 @@ export async function handleAutoMcpCall(serverUrl, toolName, args = {}) {
       );
     });
 
-    const contentType = result?.content?.[0]?.type || "text";
-    const textContent = result?.content?.map(c => c.text || "").filter(Boolean).join("\n") || JSON.stringify(result);
+    const textContent = Array.isArray(result?.content)
+      ? result.content.map(c => c.text || "").filter(Boolean).join("\n")
+      : JSON.stringify(result);
 
     const autoMessage = [
       `<BetterDeepSeek>`,

@@ -118,7 +118,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "bds-mcp-call") {
-    mcpCallTool(message.serverUrl, message.apiKey, message.toolName, message.args)
+    mcpCallTool(message.serverUrl, message.toolName, message.args, message.apiKey)
       .then((result) => sendResponse({ ok: true, result }))
       .catch((error) => sendResponse({
         ok: false,
@@ -520,7 +520,7 @@ async function handleLanguageReset() {
 
 // ── MCP JSON-RPC Helpers ──
 
-const mcpSessionCache = new Map();
+const mcpInitCache = new Map();
 
 function mcpHeaders(apiKey) {
   const h = { "Content-Type": "application/json", Accept: "application/json, text/event-stream" };
@@ -570,26 +570,29 @@ async function mcpFetch(serverUrl, bodyObj, apiKey) {
 /** Ensure the session is initialized per MCP spec (cached per (url,apiKey)) */
 async function mcpEnsureInitialized(serverUrl, apiKey) {
   const key = `${serverUrl}|${apiKey}`;
-  if (mcpSessionCache.has(key)) return;
-  // Send initialize
-  await mcpFetch(serverUrl, {
-    jsonrpc: "2.0", id: 1, method: "initialize",
-    params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "better-deepseek", version: "0.1.11" } },
-  }, apiKey);
-  // Send initialized notification (fire-and-forget, returned result ignored)
-  mcpFetch(serverUrl, { jsonrpc: "2.0", method: "notifications/initialized" }, apiKey).catch(() => {});
-  mcpSessionCache.set(key, true);
+  if (mcpInitCache.has(key)) return mcpInitCache.get(key);
+  const promise = (async () => {
+    await mcpFetch(serverUrl, {
+      jsonrpc: "2.0", id: 1, method: "initialize",
+      params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "better-deepseek", version: "0.1.11" } },
+    }, apiKey);
+    mcpFetch(serverUrl, { jsonrpc: "2.0", method: "notifications/initialized" }, apiKey).catch(() => {});
+  })().catch(err => { mcpInitCache.delete(key); throw err; });
+  mcpInitCache.set(key, promise);
+  return promise;
 }
 
+let mcpReqId = 1;
 async function mcpJsonRpcRequest(serverUrl, method, params = {}, apiKey = "") {
   await mcpEnsureInitialized(serverUrl, apiKey);
-  return mcpFetch(serverUrl, { jsonrpc: "2.0", id: 2, method, params }, apiKey);
+  const id = ++mcpReqId;
+  return mcpFetch(serverUrl, { jsonrpc: "2.0", id, method, params }, apiKey);
 }
 
 async function listMcpTools(serverUrl, apiKey = "") {
   return mcpJsonRpcRequest(serverUrl, "tools/list", {}, apiKey);
 }
 
-async function mcpCallTool(serverUrl, apiKey = "", toolName, args = {}) {
+async function mcpCallTool(serverUrl, toolName, args = {}, apiKey = "") {
   return mcpJsonRpcRequest(serverUrl, "tools/call", { name: toolName, arguments: args }, apiKey);
 }
