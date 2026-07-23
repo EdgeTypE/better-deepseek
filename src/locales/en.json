@@ -550,6 +550,10 @@
       "moreFiles": "+{{count}} more files",
       "lines": "Lines {{start}}–{{end}}"
     },
+    "mcp": {
+      "detailShow": "▸ Show Details",
+      "detailHide": "▾ Hide Details"
+    },
     "expandToggle": {
       "expand": "Expand",
       "collapse": "Collapse",

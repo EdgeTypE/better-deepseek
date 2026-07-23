@@ -408,18 +408,31 @@ export async function handleAutoMcpCall(serverUrl, toolName, args = {}) {
       ? result.content.map(c => c.text || "").filter(Boolean).join("\n")
       : JSON.stringify(result);
 
+    const MAX_INLINE = 8000;
+    const inlineContent = textContent.length > MAX_INLINE
+      ? textContent.slice(0, MAX_INLINE) + "\n\n...[truncated, full content in attached file]..."
+      : textContent;
+
+    const payload = JSON.stringify({
+      serverName: serverUrl,
+      toolName: toolName,
+      args: args,
+      content: inlineContent,
+    });
+
+    const mcpBlob = new Blob([textContent], { type: "text/plain" });
+    const mcpFile = new File([mcpBlob], `mcp_result_${toolName}.txt`, { type: "text/plain" });
+
     const autoMessage = [
       `<BetterDeepSeek>`,
-      `[BDS:AUTO] MCP Result for ${toolName}`,
-      `Server: ${serverUrl}`,
-      `Tool: ${toolName}`,
-      `Args: ${JSON.stringify(args)}`,
-      ``,
-      textContent,
+      `[BDS:AUTO] MCP Result for ${toolName} @ ${serverUrl}`,
+      `[BDS:AUTO_MCP_RESULT]`,
+      payload,
+      `[/BDS:AUTO_MCP_RESULT]`,
       `</BetterDeepSeek>`
     ].join("\n");
 
-    await injectPureTextAndSend(autoMessage, `MCP ${toolName}`);
+    await injectFileAndSend(mcpFile, autoMessage);
   } catch (err) {
     console.error("[BDS:AUTO] MCP Call Failed:", err);
     processedMcpCalls.delete(dedupeKey);

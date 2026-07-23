@@ -19,7 +19,7 @@ import { sanitizeVisibleText } from "./text-sanitizer.js";
 import { extractHttpUrl } from "../../lib/utils/url-normalizer.js";
 
 // Tool renderers that have visual cards
-const RENDERABLE_TOOLS = new Set(["html", "latex", "visualizer", "pptx", "excel", "docx", "ask_question", "character_create", "skill_create", "auto:code_runner", "auto_code_result", "auto:request_web_fetch", "auto:request_github_fetch", "auto:search", "auto:mcp", "deep_research_plan", "deep_research_status", "deep_research_report", "deep_research_step_done", "image", "todo"]);
+const RENDERABLE_TOOLS = new Set(["html", "latex", "visualizer", "pptx", "excel", "docx", "ask_question", "character_create", "skill_create", "auto:code_runner", "auto_code_result", "auto:request_web_fetch", "auto:request_github_fetch", "auto:search", "auto:mcp", "auto:mcp_result", "deep_research_plan", "deep_research_status", "deep_research_report", "deep_research_step_done", "image", "todo"]);
 
 function normalizeAutoHttpTarget(value) {
   return extractHttpUrl(value);
@@ -139,9 +139,9 @@ export function parseBdsMessage(rawText, isSettled = false) {
   }
 
   // We have BDS tags, but do we have tags that should HIDE the original message?
-  // AUTO tags should NOT hide the message, EXCEPT for AUTO:CODE_RUNNER, AUTO:REQUEST_WEB_FETCH, AUTO:REQUEST_GITHUB_FETCH, and AUTO:SEARCH which have UI cards.
+  // AUTO tags should NOT hide the message, EXCEPT for AUTO:CODE_RUNNER, AUTO:REQUEST_WEB_FETCH, AUTO:REQUEST_GITHUB_FETCH, AUTO:SEARCH, AUTO:MCP, and AUTO:MCP_RESULT which have UI cards.
   // BDS tags inside code blocks are ignored — they are documentation examples.
-  const hidingRegex = /(<BDS:(?!AUTO:(?!CODE_RUNNER|REQUEST_WEB_FETCH|REQUEST_GITHUB_FETCH|SEARCH))[a-zA-Z0-9_:]+|<BetterDeepSeek>|Bds create file>)/gi;
+  const hidingRegex = /(<BDS:(?!AUTO:(?!CODE_RUNNER|REQUEST_WEB_FETCH|REQUEST_GITHUB_FETCH|SEARCH|MCP))[a-zA-Z0-9_:]+|<BetterDeepSeek>|Bds create file>)/gi;
   const hidingMatches = Array.from(text.matchAll(hidingRegex))
     .filter(m => !isInsideCodeBlock(m.index));
   result.containsControlTags = hidingMatches.length > 0;

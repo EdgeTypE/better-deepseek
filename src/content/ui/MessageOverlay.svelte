@@ -18,6 +18,7 @@
   import ImageCard from "./ImageCard.svelte";
   import TodoCard from "./TodoCard.svelte";
   import McpLoadingStatus from "./McpLoadingStatus.svelte";
+  import McpResultCard from "./McpResultCard.svelte";
   import { t } from "../../lib/i18n.svelte.js";
   import { parseLooseJson } from "../parser/json-repair.js";
 
@@ -391,6 +392,14 @@
         <McpLoadingStatus
           toolName={block.attrs.tool || block.attrs.toolName || ""}
           serverName={block.attrs.url || block.attrs.serverUrl || ""}
+          args={block.attrs.args || ""}
+        />
+      {:else if block.name === 'auto:mcp_result'}
+        <McpResultCard
+          serverName={block.attrs.serverName || ""}
+          toolName={block.attrs.toolName || ""}
+          args={block.attrs.args || ""}
+          content={block.content || ""}
         />
       {:else}
         <ToolCard name={block.name} content={block.content} />

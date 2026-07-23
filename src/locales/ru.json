@@ -545,6 +545,10 @@
       "moreFiles": "ещё +{{count}} файл(а/ов)",
       "lines": "Строки {{start}}–{{end}}"
     },
+    "mcp": {
+      "detailShow": "▸ Показать детали",
+      "detailHide": "▾ Скрыть детали"
+    },
     "expandToggle": {
       "expand": "Развернуть",
       "collapse": "Свернуть",

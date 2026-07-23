@@ -194,6 +194,73 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
     const rawUserText = rawText;
     stripBdsTagsFromUserMessage(node);
 
+    function mountMcpResultOverlay(node, stateData, newBlocks) {
+      const existing = messageOverlays.get(node);
+      if (existing) {
+        existing.props.blocks = newBlocks;
+      } else {
+        const host = getOrCreateHost(node, "bds-overlay-host");
+        removeStaleMessageOverlays(host);
+        const props = $state({ text: "", blocks: newBlocks, loading: false });
+        const component = mount(MessageOverlay, { target: host, props });
+        messageOverlays.set(node, { component, props, host });
+      }
+      syncVisibilityState(node, false, stateData, true);
+    }
+
+    // --- MCP RESULT CARD (USER) — new file-based format ---
+    if (rawUserText.includes("[BDS:AUTO_MCP_RESULT]")) {
+      const jsonMatch = rawUserText.match(/\[BDS:AUTO_MCP_RESULT\]\s*([\s\S]*?)\s*\[\/BDS:AUTO_MCP_RESULT\]/);
+      if (jsonMatch) {
+        let parsedData = { serverName: "", toolName: "", args: "{}", content: "" };
+        try {
+          const data = JSON.parse(jsonMatch[1].trim());
+          parsedData = {
+            serverName: data.serverName || data.serverUrl || "",
+            toolName: data.toolName || "",
+            args: JSON.stringify(data.args || {}),
+            content: data.content || ""
+          };
+        } catch (e) {
+          console.error("[BDS:AUTO_MCP_RESULT] Failed to parse JSON:", e);
+        }
+
+        stateData.hasControlTags = true;
+        stateData.mcpResultBlock = {
+          name: "auto:mcp_result",
+          attrs: { serverName: parsedData.serverName, toolName: parsedData.toolName, args: parsedData.args },
+          content: parsedData.content
+        };
+
+        mountMcpResultOverlay(node, stateData, [stateData.mcpResultBlock]);
+      }
+    } else {
+      // --- MCP RESULT CARD (USER) — legacy format <BDS:AUTO:MCP_RESULT> ---
+      const mcpResultPattern = /(?:<|&lt;)BDS:AUTO:MCP_RESULT\s+((?:[^>"']+|"[^"]*"|'[^']*')*)\s*(?:>|&gt;)([\s\S]*?)(?:<|&lt;)\/BDS:AUTO:MCP_RESULT(?:>|&gt;)/i;
+      const mcpResultMatch = mcpResultPattern.test(rawUserText) ? rawUserText.match(mcpResultPattern) : null;
+
+      if (mcpResultMatch) {
+        const attrsRaw = mcpResultMatch[1];
+        const mcpContent = (mcpResultMatch[2] || "").trim();
+        const serverMatch = attrsRaw.match(/serverName\s*=\s*"([^"]*)"/);
+        const toolMatch = attrsRaw.match(/toolName\s*=\s*"([^"]*)"/);
+        const argsMatch = attrsRaw.match(/args\s*=\s*'([^']*)'/);
+
+        const attrs = {
+          serverName: serverMatch ? serverMatch[1] : "",
+          toolName: toolMatch ? toolMatch[1] : "",
+          args: argsMatch ? argsMatch[1] : ""
+        };
+
+        stateData.hasControlTags = true;
+        stateData.mcpResultBlock = { name: "auto:mcp_result", attrs, content: mcpContent };
+
+        mountMcpResultOverlay(node, stateData, [stateData.mcpResultBlock]);
+      } else if (stateData.mcpResultBlock) {
+        mountMcpResultOverlay(node, stateData, [stateData.mcpResultBlock]);
+      }
+    }
+
     // --- CODE RUNNER RESULT CARD (USER) ---
     if (rawUserText.includes("[BDS:AUTO] Code Runner Result")) {
       const match = rawUserText.match(/\[BDS:AUTO\] Code Runner Result \(([^)]+)\)\s+Status: ([^\n]+)\s+Output:\s+(?:```text\n|```)?([\s\S]*?)(?:\n```)?\s*(?:<\/BetterDeepSeek>|$)/i);

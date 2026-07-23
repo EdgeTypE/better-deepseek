@@ -544,6 +544,10 @@
       "moreFiles": "还有 {{count}} 个文件",
       "lines": "第 {{start}}–{{end}} 行"
     },
+    "mcp": {
+      "detailShow": "▸ 显示详情",
+      "detailHide": "▾ 隐藏详情"
+    },
     "expandToggle": {
       "expand": "展开",
       "collapse": "收起",

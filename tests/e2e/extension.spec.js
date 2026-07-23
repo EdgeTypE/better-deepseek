@@ -373,7 +373,7 @@ test("renders the voice prompt control in the composer", async ({ page }) => {
 
 test("persists settings across reloads", async ({ page }) => {
   await openDrawer(page);
-  await page.locator(".bds-add-prompt-btn").click();
+  await page.getByRole("button", { name: "Add New System Prompt" }).click();
   await page.locator(".bds-modal-body input").fill("E2E Rules");
   await page.locator(".bds-modal-body textarea").fill("System prompt from Playwright");
   await page.locator(".bds-modal-footer .bds-btn").click({ force: true });

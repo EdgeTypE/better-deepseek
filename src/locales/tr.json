@@ -547,6 +547,10 @@
       "moreFiles": "+{{count}} dosya daha",
       "lines": "Satır {{start}}–{{end}}"
     },
+    "mcp": {
+      "detailShow": "▸ Detaylı Gör",
+      "detailHide": "▾ Detaylı Gizle"
+    },
     "expandToggle": {
       "expand": "Genişlet",
       "collapse": "Daralt",

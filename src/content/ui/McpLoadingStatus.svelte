@@ -1,13 +1,29 @@
 <script>
-  let { toolName = "", serverName = "" } = $props();
+  let { toolName = "", serverName = "", args = "" } = $props();
+
+  let parsedArgs = $derived.by(() => {
+    try { return JSON.parse(args); } catch { return null; }
+  });
+
+  let argsPreview = $derived.by(() => {
+    if (!parsedArgs || typeof parsedArgs !== "object") return "";
+    const parts = [];
+    for (const [k, v] of Object.entries(parsedArgs).slice(0, 3)) {
+      parts.push(`${k}: ${typeof v === "string" ? `"${v.slice(0, 40)}"` : JSON.stringify(v)}`);
+    }
+    return parts.join("  ");
+  });
 </script>
 
 <div class="bds-mcp-loading">
   <div class="bds-mcp-loading-spinner"></div>
   <div class="bds-mcp-loading-info">
-    <span class="bds-mcp-loading-title">MCP Tool: {toolName}</span>
+    <span class="bds-mcp-loading-title">{toolName}</span>
     {#if serverName}
       <span class="bds-mcp-loading-server">{serverName}</span>
+    {/if}
+    {#if argsPreview}
+      <span class="bds-mcp-loading-args">{argsPreview}</span>
     {/if}
   </div>
 </div>
@@ -41,6 +57,7 @@
     flex-direction: column;
     gap: 2px;
     min-width: 0;
+    flex: 1;
   }
 
   .bds-mcp-loading-title {
@@ -52,6 +69,15 @@
   .bds-mcp-loading-server {
     font-size: 11px;
     color: var(--bds-text-secondary, #8e8ea0);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .bds-mcp-loading-args {
+    font-size: 10px;
+    color: var(--bds-text-tertiary, #6b6b7b);
+    font-family: monospace;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
