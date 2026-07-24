@@ -541,7 +541,7 @@ test("routes blob downloads through AndroidBridge.downloadBlob", async ({ page }
 
 test("persists settings via the AndroidBridge storage mock", async ({ page }) => {
   await openDrawer(page);
-  await page.locator(".bds-add-prompt-btn").click();
+  await page.getByRole("button", { name: "Add New System Prompt" }).click();
   await page.locator(".bds-modal-body input").fill("Android Prompt");
   await page.locator(".bds-modal-body textarea").fill("Android sim prompt");
   await page.locator(".bds-modal-footer .bds-btn").click({ force: true });
