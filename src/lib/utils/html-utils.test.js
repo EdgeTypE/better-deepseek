@@ -29,6 +29,12 @@ describe("buildVisualizerDocument", () => {
     const doc = buildVisualizerDocument("<html><head></head><body>ok</body></html>");
     expect(doc).toContain("<style>");
     expect(doc).toContain("</head>");
+    expect(doc).toContain("BDS_VISUALIZER_ERROR");
+  });
+
+  it("injects error reporting script into snippets", () => {
+    const doc = buildVisualizerDocument("<div>Test</div>");
+    expect(doc).toContain("BDS_VISUALIZER_ERROR");
   });
 });
 

@@ -520,7 +520,22 @@
     "visualizerCard": {
       "title": "Visualizer",
       "subtitle": "Interactive Simulation",
-      "openInPanel": "Open in Panel"
+      "openInPanel": "Open in Panel",
+      "reportIssue": "Report Issue",
+      "runtimeError": "Runtime Error",
+      "reportErrorTooltip": "Runtime error detected. Click to send error to AI and regenerate.",
+      "reportWarningTooltip": "Report visualizer issue",
+      "runtimeErrorTitle": "Visualizer Runtime Error",
+      "feedbackTitle": "Visualizer Feedback",
+      "sentToAi": "Sent to AI for regeneration",
+      "optionBuggy": "Looks incorrect / Buggy behavior",
+      "optionBlank": "Nothing showing up / Blank",
+      "optionOther": "Other (Describe issue)",
+      "otherPlaceholder": "Explain what is missing or incorrect...",
+      "otherEmptyFallback": "Not specified",
+      "sendAndRegenerate": "Report & Regenerate",
+      "sendFailed": "Failed to send. Please try again.",
+      "cancel": "Cancel"
     },
     "previewPanel": {
       "close": "Close",

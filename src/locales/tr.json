@@ -517,7 +517,22 @@
     "visualizerCard": {
       "title": "Görselleştirici",
       "subtitle": "Etkileşimli Simülasyon",
-      "openInPanel": "Panelde Aç"
+      "openInPanel": "Panelde Aç",
+      "reportIssue": "Sorun Bildir",
+      "runtimeError": "Çalıştırma Hatası",
+      "reportErrorTooltip": "Çalışma zamanı hatası oluştu. Yapay zekaya bildirip yeniden ürettirmek için tıklayın.",
+      "reportWarningTooltip": "Görselleştirici sorununu bildir",
+      "runtimeErrorTitle": "Visualizer Çalıştırma Hatası",
+      "feedbackTitle": "Visualizer Geri Bildirimi",
+      "sentToAi": "Yeniden üretmesi için yapay zekaya iletildi",
+      "optionBuggy": "Yanlış gözüküyor / Hatalı çalışıyor",
+      "optionBlank": "Hiç gözükmüyor",
+      "optionOther": "Diğer (Kendin açıkla)",
+      "otherPlaceholder": "Arayüzün nasıl göründüğünü veya neyin hatalı olduğunu açıklayın...",
+      "otherEmptyFallback": "Belirtilmedi",
+      "sendAndRegenerate": "Bildir ve Yeniden Ürettir",
+      "sendFailed": "Gönderilemedi. Lütfen tekrar deneyin.",
+      "cancel": "İptal"
     },
     "previewPanel": {
       "close": "Kapat",

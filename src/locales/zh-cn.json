@@ -514,7 +514,22 @@
     "visualizerCard": {
       "title": "可视化工具",
       "subtitle": "交互式模拟",
-      "openInPanel": "在独立面板中打开"
+      "openInPanel": "在独立面板中打开",
+      "reportIssue": "反馈问题",
+      "runtimeError": "运行错误",
+      "reportErrorTooltip": "检测到运行时错误。点击发送错误信息并重新生成。",
+      "reportWarningTooltip": "反馈可视化组件问题",
+      "runtimeErrorTitle": "可视化工具运行错误",
+      "feedbackTitle": "可视化工具反馈",
+      "sentToAi": "已发送给 AI 重新生成",
+      "optionBuggy": "显示或逻辑异常",
+      "optionBlank": "完全无法显示/白屏",
+      "optionOther": "其他 (自行说明)",
+      "otherPlaceholder": "请描述具体问题...",
+      "otherEmptyFallback": "未说明",
+      "sendAndRegenerate": "反馈并重新生成",
+      "sendFailed": "发送失败，请重试。",
+      "cancel": "取消"
     },
     "previewPanel": {
       "close": "关闭",

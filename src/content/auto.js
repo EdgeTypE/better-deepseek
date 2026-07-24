@@ -502,7 +502,7 @@ export function findChatEditor() {
 
 function isBdsOwnedElement(element) {
   return Boolean(element?.closest?.(
-    "#bds-root, .bds-question-panel, .bds-dr-revision-panel, .bds-attach-wrapper, .bds-rag-preview",
+    "#bds-root, .bds-question-panel, .bds-dr-revision-panel, .bds-attach-wrapper, .bds-rag-preview, .bds-visualizer-card, .bds-preview-panel, .bds-preview-menu",
   ));
 }
 
@@ -945,6 +945,10 @@ async function sendTextWithOverLimitFallbacks(textAttempts, logLabel) {
   }
 
   return false;
+}
+
+export async function sendPromptToChat(promptText, logLabel = "Auto prompt message") {
+  return sendTextWithOverLimitFallbacks([promptText], logLabel);
 }
 
 export async function sendFileWithMessage(file, autoMessage = "", logLabel = "Auto file message", options = {}) {

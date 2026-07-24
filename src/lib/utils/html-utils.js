@@ -605,8 +605,39 @@ canvas {
 }
   `;
 
-  if (/<html[\s>]/i.test(trimmed)) {
-    return trimmed.replace(/<\/head>/i, `<style>${vKitCss}</style></head>`);
+  const errorReportScript = `<script>
+(function() {
+  function sendError(msg, stack, lineno, colno) {
+    try {
+      window.parent.postMessage({
+        type: "BDS_VISUALIZER_ERROR",
+        message: String(msg || "Script error"),
+        stack: stack ? String(stack) : null,
+        lineno: lineno ?? null,
+        colno: colno ?? null
+      }, "*");
+    } catch(e) {}
+  }
+  window.addEventListener("error", function(e) {
+    sendError(e.message, e.error ? e.error.stack : null, e.lineno, e.colno);
+  });
+  window.addEventListener("unhandledrejection", function(e) {
+    var reason = e.reason;
+    var msg = reason ? (reason.message || String(reason)) : "Unhandled Promise Rejection";
+    var stack = reason && reason.stack ? reason.stack : null;
+    sendError(msg, stack);
+  });
+})();
+</script>`;
+
+  if (/<html[^>]*>/i.test(trimmed)) {
+    let result = trimmed;
+    if (/<head[^>]*>/i.test(result)) {
+      result = result.replace(/<head[^>]*>/i, (match) => `${match}${errorReportScript}`);
+      return result.replace(/<\/head>/i, `<style>${vKitCss}</style></head>`);
+    } else {
+      return result.replace(/<html[^>]*>/i, (match) => `${match}<head>${errorReportScript}<style>${vKitCss}</style></head>`);
+    }
   }
 
   return `<!DOCTYPE html>
@@ -614,6 +645,7 @@ canvas {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    ${errorReportScript}
     <style>${vKitCss}</style>
   </head>
   <body>${trimmed}</body>

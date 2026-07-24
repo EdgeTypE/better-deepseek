@@ -2,6 +2,7 @@
   import { marked } from 'marked';
   import { onMount } from 'svelte';
   import VisualizerCard from "./VisualizerCard.svelte";
+  import VisualizerFeedbackCard from "./VisualizerFeedbackCard.svelte";
   import appState from "../state.js";
   import ToolCard from "./ToolCard.svelte";
   import PptxCard from "./PptxCard.svelte";
@@ -193,6 +194,12 @@
         <VisualizerCard
           content={block.content}
           onopenpanel={(srcdoc) => appState.ui?.showPreviewPanel?.('Visualizer', srcdoc)}
+        />
+      {:else if block.name === 'visualizer_feedback'}
+        <VisualizerFeedbackCard
+          type={block.attrs.type}
+          reason={block.attrs.reason}
+          content={block.content}
         />
       {:else if block.name === 'pptx'}
         <PptxCard content={block.content} />

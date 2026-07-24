@@ -515,7 +515,22 @@
     "visualizerCard": {
       "title": "Визуализатор",
       "subtitle": "Интерактивная симуляция",
-      "openInPanel": "Открыть в панели"
+      "openInPanel": "Открыть в панели",
+      "reportIssue": "Сообщить о проблеме",
+      "runtimeError": "Ошибка выполнения",
+      "reportErrorTooltip": "Обнаружена ошибка выполнения. Нажмите, чтобы отправить ошибку ИИ.",
+      "reportWarningTooltip": "Сообщить о проблеме с визуализацией",
+      "runtimeErrorTitle": "Ошибка выполнения визуализатора",
+      "feedbackTitle": "Отзыв о визуализаторе",
+      "sentToAi": "Отправлено ИИ для перегенерации",
+      "optionBuggy": "Выглядит некорректно / Сбой",
+      "optionBlank": "Ничего не отображается / Пусто",
+      "optionOther": "Другое (Опишите сами)",
+      "otherPlaceholder": "Опишите, что именно работает не так...",
+      "otherEmptyFallback": "Не указано",
+      "sendAndRegenerate": "Сообщить и сгенерировать заново",
+      "sendFailed": "Ошибка отправки. Попробуйте снова.",
+      "cancel": "Отмена"
     },
     "previewPanel": {
       "close": "Закрыть",

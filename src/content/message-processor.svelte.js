@@ -334,6 +334,49 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
       }
     }
 
+    // --- VISUALIZER FEEDBACK CARD (USER) ---
+    if (rawUserText.includes("[BDS:VISUALIZER_FEEDBACK]") || rawUserText.includes("<BDS:VISUALIZER_FEEDBACK")) {
+      let type = "user_report";
+      let reason = "Visualizer Feedback";
+      let body = "";
+
+      const tagMatch = rawUserText.match(/<BDS:VISUALIZER_FEEDBACK([^>]*)>([\s\S]*?)<\/BDS:VISUALIZER_FEEDBACK>/i);
+      if (tagMatch) {
+        const attrsRaw = tagMatch[1] || "";
+        const typeMatch = attrsRaw.match(/type="([^"]*)"/i);
+        const reasonMatch = attrsRaw.match(/reason="([^"]*)"/i);
+        if (typeMatch) type = typeMatch[1];
+        if (reasonMatch) reason = reasonMatch[1];
+        body = (tagMatch[2] || "").trim();
+      } else {
+        const legacyMatch = rawUserText.match(/\[BDS:VISUALIZER_FEEDBACK\]\s*([\s\S]*?)(?:\n\n|\n[A-Z]|$)/i);
+        body = legacyMatch ? legacyMatch[1].trim() : rawUserText.replace(/\[BDS:VISUALIZER_FEEDBACK\]/g, "").trim();
+        if (body.toLowerCase().includes("runtime error")) {
+          type = "runtime_error";
+          reason = "Runtime Error";
+        }
+      }
+
+      stateData.hasControlTags = true;
+      const existing = messageOverlays.get(node);
+      const newBlocks = [{
+        name: "visualizer_feedback",
+        attrs: { type, reason },
+        content: body
+      }];
+
+      if (existing) {
+        existing.props.blocks = newBlocks;
+      } else {
+        const host = getOrCreateHost(node, "bds-overlay-host");
+        removeStaleMessageOverlays(host);
+        const props = $state({ text: "", blocks: newBlocks, loading: false });
+        const component = mount(MessageOverlay, { target: host, props });
+        messageOverlays.set(node, { component, props, host });
+      }
+      syncVisibilityState(node, false, stateData, true);
+    }
+
     if (state.settings.tokenPriceDisplay && !stateData.priceInjected) {
       const modelName = detectModelInline(null);
       
