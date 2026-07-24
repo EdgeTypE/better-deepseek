@@ -61,12 +61,45 @@ const TEXT_EXTS = new Set([
   "gitignore", "editorconfig", "eslintrc", "prettierrc",
 ]);
 
+function isPrivateOrLocal(hostname) {
+  const host = hostname.toLowerCase().trim();
+  if (host === "localhost" || host === "[::1]") {
+    return true;
+  }
+
+  // Check IPv4 addresses
+  const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+  const match = host.match(ipv4Regex);
+  if (match) {
+    const octet1 = parseInt(match[1], 10);
+    const octet2 = parseInt(match[2], 10);
+    if (octet1 === 127) return true; // loopback
+    if (octet1 === 10) return true; // private class A
+    if (octet1 === 172 && (octet2 >= 16 && octet2 <= 31)) return true; // private class B
+    if (octet1 === 192 && octet2 === 168) return true; // private class C
+    if (octet1 === 169 && octet2 === 254) return true; // link-local
+    if (octet1 === 0) return true; // local identification
+  }
+
+  // Check IPv6 unique local and link-local prefixes
+  if (host.startsWith("fe8") || host.startsWith("fe9") || host.startsWith("fea") || host.startsWith("feb")) {
+    return true; // IPv6 link-local
+  }
+  if (host.startsWith("fc") || host.startsWith("fd")) {
+    return true; // IPv6 unique local
+  }
+
+  return false;
+}
+
 /**
- * Parse a GitHub URL into { owner, repo, branch }.
+ * Parse a GitHub URL into { owner, repo, branch, hostname, proxyPrefix }.
  * Supports:
  *   https://github.com/owner/repo
  *   https://github.com/owner/repo/tree/branch
  *   owner/repo
+ *   https://hk.gh-proxy.org/https://github.com/owner/repo
+ *   https://github.com.cnpmjs.org/owner/repo
  */
 export function parseGitHubUrl(input) {
   let trimmed = input.trim().replace(/\/+$/, "");
@@ -74,12 +107,30 @@ export function parseGitHubUrl(input) {
   // owner/repo shorthand
   if (/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(trimmed)) {
     const [owner, repo] = trimmed.split("/");
-    return { owner, repo, branch: "main" };
+    return { owner, repo, branch: "main", hostname: "github.com", proxyPrefix: "" };
+  }
+
+  let proxyPrefix = "";
+  const doubleProtocolMatch = trimmed.match(/^(https?:\/\/[^\/]+\/)(https?:\/\/.*)$/i);
+  if (doubleProtocolMatch) {
+    try {
+      const proxyUrl = new URL(doubleProtocolMatch[1]);
+      if (proxyUrl.protocol !== "http:" && proxyUrl.protocol !== "https:") return null;
+      if (isPrivateOrLocal(proxyUrl.hostname)) return null;
+
+      proxyPrefix = doubleProtocolMatch[1];
+      trimmed = doubleProtocolMatch[2];
+    } catch {
+      return null;
+    }
   }
 
   try {
     const url = new URL(trimmed);
-    if (url.hostname !== "github.com") return null;
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    if (isPrivateOrLocal(url.hostname)) return null;
+
+    const hostname = url.hostname;
 
     const parts = url.pathname.split("/").filter(Boolean);
     if (parts.length < 2) return null;
@@ -96,11 +147,12 @@ export function parseGitHubUrl(input) {
       branch = parts.slice(3).join("/");
     }
 
-    return { owner, repo, branch };
+    return { owner, repo, branch, hostname, proxyPrefix };
   } catch {
     return null;
   }
 }
+
 
 /**
  * Fetch, extract, and concatenate a GitHub repo.
@@ -152,7 +204,7 @@ export async function fetchGitHubRepo(repoUrl, onStatus = () => { }, options = {
     throw new Error("Invalid GitHub URL. Use: https://github.com/owner/repo");
   }
 
-  const { owner, repo, branch } = parsed;
+  const { owner, repo, branch, hostname, proxyPrefix } = parsed;
   const token = String(
     typeof options.token === "string" ? options.token : ""
   ).trim();
@@ -163,7 +215,19 @@ export async function fetchGitHubRepo(repoUrl, onStatus = () => { }, options = {
   let resolvedBranch = branch;
   let lastFailure = null;
   for (const b of [branch, branch === "main" ? "master" : null].filter(Boolean)) {
-    const codeloadUrl = `https://codeload.github.com/${owner}/${repo}/zip/refs/heads/${b}`;
+    let codeloadUrl;
+    if (hostname === "github.com") {
+      if (proxyPrefix) {
+        codeloadUrl = `${proxyPrefix}https://github.com/${owner}/${repo}/archive/refs/heads/${b}.zip`;
+      } else {
+        codeloadUrl = `https://codeload.github.com/${owner}/${repo}/zip/refs/heads/${b}`;
+      }
+    } else {
+      codeloadUrl = `https://${hostname}/${owner}/${repo}/archive/refs/heads/${b}.zip`;
+      if (proxyPrefix) {
+        codeloadUrl = `${proxyPrefix}${codeloadUrl}`;
+      }
+    }
     onStatus(`Downloading ${owner}/${repo} (${b})...`);
 
     try {
@@ -192,6 +256,11 @@ export async function fetchGitHubRepo(repoUrl, onStatus = () => { }, options = {
   }
 
   if (!zipData) {
+    if (lastFailure && lastFailure.status === 404 && token && (proxyPrefix || hostname !== "github.com")) {
+      throw new Error(
+        "Private repositories cannot be imported using proxy or mirror URLs. Please use a direct GitHub URL to use your access token safely."
+      );
+    }
     throw buildGitHubFetchError(
       lastFailure,
       `Could not download ${owner}/${repo}/${branch}. Check the URL and make sure the repo is public.`

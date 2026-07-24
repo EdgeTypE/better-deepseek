@@ -20,10 +20,15 @@ export async function fetchServerStatus() {
   // to avoid embedding test-specific logic in production code.
   if (window.__mockDeepSeek) return;
   try {
-    const response = await fetch(STATUS_API);
-    if (!response.ok) throw new Error("Status API returned " + response.status);
+    const result = await chrome.runtime.sendMessage({
+      type: "bds-fetch-url",
+      url: STATUS_API,
+    });
+    if (!result || !result.ok) {
+      throw new Error(result?.error || "Fetch failed");
+    }
 
-    const data = await response.json();
+    const data = JSON.parse(result.html);
     const { status } = data;
 
     if (status) {
