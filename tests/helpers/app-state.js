@@ -50,6 +50,8 @@ export function resetAppState(overrides = {}) {
     pendingInjections: new Map(),
     pricingLoaded: false,
   };
+  state.mcpServers = [];
+  state.mcpToolSchemas = [];
 
   Object.assign(state, overrides);
   return state;

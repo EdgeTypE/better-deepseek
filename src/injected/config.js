@@ -60,6 +60,7 @@ export function normalizeConfig(config) {
     injectSystemDateTime: Boolean(config.injectSystemDateTime),
     deepResearch: normalizeDeepResearch(config.deepResearch),
     mcpToolSchemas,
+    mcpInlineMaxChars: Number(config.mcpInlineMaxChars) || 8000,
   };
 }
 

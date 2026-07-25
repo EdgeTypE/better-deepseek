@@ -567,7 +567,9 @@
     },
     "mcp": {
       "detailShow": "▸ Show Details",
-      "detailHide": "▾ Hide Details"
+      "detailHide": "▾ Hide Details",
+      "inlineMaxChars": "Inline Content Max Chars",
+      "inlineMaxCharsHint": "Max characters for MCP tool list and tool results sent inline. If the tool list exceeds this, extra tools are omitted with a count warning. If a result is rejected, shorter fallbacks and pure text are tried."
     },
     "expandToggle": {
       "expand": "Expand",

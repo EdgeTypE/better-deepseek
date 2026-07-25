@@ -234,6 +234,31 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
 
         mountMcpResultOverlay(node, stateData, [stateData.mcpResultBlock]);
       }
+    } else if (rawUserText.includes("[BDS:AUTO_MCP_ERROR]")) {
+      const jsonMatch = rawUserText.match(/\[BDS:AUTO_MCP_ERROR\]\s*([\s\S]*?)\s*\[\/BDS:AUTO_MCP_ERROR\]/);
+      if (jsonMatch) {
+        let parsedData = { serverName: "", toolName: "", args: "{}", error: "" };
+        try {
+          const data = JSON.parse(jsonMatch[1].trim());
+          parsedData = {
+            serverName: data.serverName || data.serverUrl || "",
+            toolName: data.toolName || "",
+            args: JSON.stringify(data.args || {}),
+            error: data.error || "",
+          };
+        } catch (e) {
+          console.error("[BDS:AUTO_MCP_ERROR] Failed to parse JSON:", e);
+        }
+
+        stateData.hasControlTags = true;
+        const errorBlock = {
+          name: "auto:mcp_error",
+          attrs: { serverName: parsedData.serverName, toolName: parsedData.toolName, args: parsedData.args },
+          content: parsedData.error,
+        };
+
+        mountMcpResultOverlay(node, stateData, [errorBlock]);
+      }
     } else {
       // --- MCP RESULT CARD (USER) — legacy format <BDS:AUTO:MCP_RESULT> ---
       const mcpResultPattern = /(?:<|&lt;)BDS:AUTO:MCP_RESULT\s+((?:[^>"']+|"[^"]*"|'[^']*')*)\s*(?:>|&gt;)([\s\S]*?)(?:<|&lt;)\/BDS:AUTO:MCP_RESULT(?:>|&gt;)/i;
@@ -472,6 +497,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
       if (!stateData.autoTwitterFetchesHandled) stateData.autoTwitterFetchesHandled = new Set();
       if (!stateData.autoYouTubeFetchesHandled) stateData.autoYouTubeFetchesHandled = new Set();
       if (!stateData.autoSearchQueriesHandled) stateData.autoSearchQueriesHandled = new Set();
+      if (!stateData.autoMcpCallsHandled) stateData.autoMcpCallsHandled = new Set();
 
       // Stray AUTO tags are treated as continuation attempts and recovered below.
       for (const url of parsed.autoRequests.webFetch) {
@@ -521,7 +547,11 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
 
       for (const mcp of parsed.autoRequests.mcpCalls) {
         if (suppressManagedAuto) continue;
-        handleAutoMcpCall(mcp.serverUrl, mcp.toolName, mcp.args);
+        const mcpKey = `${mcp.serverUrl}|${mcp.toolName}|${JSON.stringify(mcp.args)}`;
+        if (!stateData.autoMcpCallsHandled.has(mcpKey)) {
+          stateData.autoMcpCallsHandled.add(mcpKey);
+          handleAutoMcpCall(mcp.serverUrl, mcp.toolName, mcp.args);
+        }
       }
 
       if (

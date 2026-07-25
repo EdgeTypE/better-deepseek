@@ -655,10 +655,28 @@ export function buildUserDataBlock(state) {
 
 /**
  * Build the MCP tool schemas block so the AI knows what external tools are available.
+ * Truncates the tool list to stay within the configured inline character budget,
+ * appending a count of omitted tools when the budget is exceeded.
  */
 export function buildMcpBlock(state, fingerprint) {
   const schemas = state.config?.mcpToolSchemas;
   if (!Array.isArray(schemas) || !schemas.length) return "";
+
+  const maxInline = Number(state.config.mcpInlineMaxChars) || 8000;
+  const totalTools = schemas.length;
+
+  const header = [
+    `<BetterDeepSeek> <BDS:MCP fingerprint="${fingerprint}">`,
+    `You have access to the following MCP (Model Context Protocol) tools via remote servers.`,
+    `To invoke them, use: <BDS:AUTO:MCP url="SERVER_NAME_OR_URL" tool="TOOL_NAME" args='{"key":"value"}'>`,
+    `The extension will call the tool and inject the result.`,
+    `Important: Only ONE tool per response. Wait for the result before invoking another. Never invoke multiple tools at the same time.`,
+    ``,
+    `Available tools:`,
+  ].join("\n");
+
+  const footer = `</BDS:MCP> </BetterDeepSeek>`;
+
   const lines = schemas.map(s => {
     let line = `- Server: ${s.serverName} (${s.serverUrl || s.serverName}) | Tool: ${s.toolName}`;
     if (s.description) line += ` | Description: ${s.description}`;
@@ -674,16 +692,31 @@ export function buildMcpBlock(state, fingerprint) {
     }
     return line;
   });
-  return [
-    `<BetterDeepSeek> <BDS:MCP fingerprint="${fingerprint}">`,
-    `You have access to the following MCP (Model Context Protocol) tools via remote servers.`,
-    `To invoke them, use: <BDS:AUTO:MCP url="SERVER_NAME_OR_URL" tool="TOOL_NAME" args='{"key":"value"}'>`,
-    `The extension will call the tool and inject the result.`,
-    ``,
-    `Available tools:`,
-    ...lines,
-    `</BDS:MCP> </BetterDeepSeek>`,
-  ].join("\n");
+
+  const fullText = [header, ...lines, footer].join("\n");
+  if (fullText.length <= maxInline) {
+    return fullText;
+  }
+
+  const warningTemplate = (count) =>
+    `\n... and ${count} more tool(s) not shown (MCP tool list exceeds inline character limit — all tools are still available for invocation).`;
+
+  const warningText = warningTemplate(1);
+  const overhead = header.length + 1 + footer.length + warningText.length;
+  let budget = maxInline - overhead;
+
+  const keptLines = [];
+  for (const line of lines) {
+    const lineLen = line.length + 1;
+    if (budget - lineLen < 0) break;
+    budget -= lineLen;
+    keptLines.push(line);
+  }
+
+  const omitted = totalTools - keptLines.length;
+  const finalWarning = warningTemplate(omitted);
+
+  return [header, ...keptLines, finalWarning, footer].join("\n");
 }
 
 /**

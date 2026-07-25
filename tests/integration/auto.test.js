@@ -917,3 +917,61 @@ describe("auto integration", () => {
     expect(runQueries?.size).toBe(1);
   });
 });
+
+describe("handleAutoMcpCall", () => {
+  beforeEach(() => {
+    resetAppState();
+    setupAutoDom();
+    vi.useFakeTimers();
+    globalThis.chrome.runtime.sendMessage.mockReset();
+  });
+
+  it("injects file and formatted message on successful MCP call", async () => {
+    globalThis.chrome.runtime.sendMessage.mockImplementation((msg, cb) => {
+      if (cb) cb({ ok: true, result: { content: [{ text: "Hello from MCP" }] } });
+    });
+
+    state.mcpServers = [{
+      id: "s1", name: "Test Server", serverUrl: "https://mcp.example.com",
+      apiKey: "sk-test", enabled: true, tools: [], createdAt: Date.now(),
+    }];
+
+    const { handleAutoMcpCall } = await importAutoModule();
+    const callPromise = handleAutoMcpCall("https://mcp.example.com", "greet", { name: "World" });
+    await vi.advanceTimersByTimeAsync(2000);
+    await callPromise;
+
+    const editor = document.querySelector("#chat-input");
+    expect(editor.value).toContain("[BDS:AUTO_MCP_RESULT]");
+    expect(editor.value).toContain("greet");
+    expect(editor.value).toContain("Hello from MCP");
+
+    const input = document.querySelector('input[type="file"]');
+    expect(input.files).toHaveLength(1);
+    expect(input.files[0].name).toContain("mcp_result_greet.txt");
+  });
+
+  it("injects error message on failed MCP call", async () => {
+    globalThis.chrome.runtime.sendMessage.mockImplementation((msg, cb) => {
+      if (cb) cb({ ok: false, error: "Connection refused" });
+    });
+
+    state.mcpServers = [{
+      id: "s2", name: "Fail Server", serverUrl: "https://fail.example.com",
+      apiKey: "", enabled: true, tools: [], createdAt: Date.now(),
+    }];
+
+    const { handleAutoMcpCall } = await importAutoModule();
+    const callPromise = handleAutoMcpCall("https://fail.example.com", "fail_tool", {});
+    await vi.advanceTimersByTimeAsync(2000);
+    await callPromise;
+
+    const editor = document.querySelector("#chat-input");
+    expect(editor.value).toContain("[BDS:AUTO_MCP_ERROR]");
+    expect(editor.value).toContain("fail_tool");
+    expect(editor.value).toContain("Connection refused");
+
+    const input = document.querySelector('input[type="file"]');
+    expect(input.files).toHaveLength(0);
+  });
+});

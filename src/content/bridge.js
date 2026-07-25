@@ -334,6 +334,7 @@ export async function pushConfigToPage() {
           files: allFiles.map((f) => ({ name: f.name, content: f.content })),
         }
         : null,
+      mcpInlineMaxChars: Number(state.settings.mcpInlineMaxChars) || 8000,
     };
 
     window.dispatchEvent(

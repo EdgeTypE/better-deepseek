@@ -106,6 +106,7 @@
   let mcpEditorIsNew = $state(false);
   let mcpTestingIndex = $state(-1);
   let mcpServers = $state([...appState.mcpServers]);
+  let mcpInlineMaxChars = $state(Number(appState.settings.mcpInlineMaxChars) || 8000);
   let disableTipBox = $state(Boolean(appState.settings.disableTipBox));
   let advancedSearchQuery = $state("");
   let autocompleteSelectedIndex = $state(-1);
@@ -157,6 +158,7 @@
       tokenPriceDisplay, showTimestamps, projectRagEnabled, projectRagLimit,
       processGitignoreOnUpload, injectSystemDateTime, skipDeletionConfirmation,
       deepResearchDeepFetch,
+      mcpInlineMaxChars,
       locale, syncLocale, collapseLongUserMessages,
       loadAllHistoryOnSession, customCSS, disableTipBox
     });
@@ -445,7 +447,7 @@
       'settings.saveAsSnippet', 'settings.manageSnippets',
     ]},
     { key: 'subMcp', labelKey: 'MCP Servers', settingKeys: [
-      'MCP Server URLs',
+      'MCP Server URLs', 'settings.mcp.inlineMaxChars',
     ]},
     { key: 'subUtilities', labelKey: 'settings.subUtilities', settingKeys: [
       'apiPlayground.title', 'drawer.exportAll', 'drawer.importAll', 'settings.disableTipBox',
@@ -609,6 +611,7 @@
     syncLocale = Boolean(appState.settings.syncLocale);
     customCSS = appState.settings.customCSS || "";
     disableTipBox = Boolean(appState.settings.disableTipBox);
+    mcpInlineMaxChars = Number(appState.settings.mcpInlineMaxChars) || 8000;
     cssSnippets = [...appState.cssSnippets];
     if (snippetListRef) snippetListRef.refresh();
     chrome.storage.local.get("bds_locale_update_last_checked", (data) => {
@@ -842,6 +845,7 @@
     appState.settings.syncLocale = syncLocale;
     appState.settings.customCSS = customCSS;
     appState.settings.disableTipBox = disableTipBox;
+    appState.settings.mcpInlineMaxChars = Math.max(500, Math.min(100000, Math.round(Number(mcpInlineMaxChars) || 8000)));
 
     await chrome.storage.local.set({
       [STORAGE_KEYS.settings]: appState.settings,
@@ -1915,6 +1919,14 @@
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="margin-right: 4px;"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           Add MCP Server
         </button>
+
+        <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 12px;">
+          <span class="bds-toggle-label">{t('settings.mcp.inlineMaxChars')}</span>
+          <input id="bds-mcp-inline-max-chars" type="number" min="500" max="100000" step="500" class="bds-input" style="width: 120px; box-sizing: border-box;" bind:value={mcpInlineMaxChars} />
+          <p style="font-size: 10px; opacity: 0.5; margin: 0;">
+            {t('settings.mcp.inlineMaxCharsHint')}
+          </p>
+        </div>
       </div>
     </div>
     {/if}

@@ -819,6 +819,8 @@ export const DEFAULT_SETTINGS = {
   deepResearchContextStopPercent: 70,
   // Deep Research per-search fetch depth — default 1, clamped 0-5
   deepResearchDeepFetch: 1,
+  // MCP inline content max chars — tool lists & results truncated to this when inline
+  mcpInlineMaxChars: 8000,
   // Load all history — scroll to top on session open to trigger lazy-load
   loadAllHistoryOnSession: false,
   showTimestamps: false,

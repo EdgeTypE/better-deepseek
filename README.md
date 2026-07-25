@@ -51,6 +51,15 @@ Better DeepSeek introduces a set of special tags that DeepSeek can use to produc
 - `<BDS:memory_write>key: value, importance: always|called</BDS:memory_write>` – Store persistent facts about the user that are injected into future prompts.
 - `<BDS:character_create name="..." usage="...">...</BDS:character_create>` – Define a roleplay persona that DeepSeek can adopt.
 
+### MCP (Model Context Protocol) Tool Access
+Better DeepSeek supports the [Model Context Protocol](https://spec.modelcontextprotocol.io) for connecting to remote MCP servers. When configured, the AI can discover and invoke tools from these servers automatically.
+
+- **Add a server**: Open Settings → MCP Servers, enter the server URL and optional API key.
+- **Test the connection**: Click "Test" to verify the server responds and list its available tools.
+- **How it works**: Tool schemas are injected into the system prompt. When the AI outputs `<BDS:AUTO:MCP url="..." tool="..." args='...'>`, the extension calls the tool and injects the result back into the conversation as an attached file.
+
+*Note: Only HTTP/Streamable HTTP transport is supported. Stdio-based MCP servers are not supported.*
+
 ### LONG_WORK Project Mode
 When building multi-file projects, DeepSeek can use the `<BDS:LONG_WORK>` tag. All files created inside this block are collected, zipped, and presented as a single download after the block closes. During generation, the user sees only a "Working..." indicator, keeping the chat clean.
 
@@ -340,6 +349,9 @@ system image recommended).
 Better DeepSeek does not collect, transmit, or sell any personal data. All settings, memories, skills, and characters are stored locally on your device. If you configure a GitHub personal access token for private repository support, it is stored locally and only sent to GitHub when you explicitly fetch a repository. See the full [Privacy Policy](extension/PRIVACY.md) for details.
 
 ## Changelog
+
+### v0.1.11 (unreleased)
+- **New Feature**: MCP (Model Context Protocol) Server Support. Connect remote MCP servers to give DeepSeek access to external tools. Configure servers in Settings → MCP Servers. Supports HTTP POST and Streamable HTTP transport with session tracking, request timeouts, and automatic retry on session expiry. (See MCP section above for details.)
 
 ### v0.1.10 (2026-06-30)
 - **New Feature**: BDS:IMAGE Tag with Wikimedia Commons. DeepSeek can now search and display images from Wikimedia Commons directly in conversations. Supports query, count, width, category, caption attributes, fullscreen viewer with keyboard navigation, lazy loading, and result caching.

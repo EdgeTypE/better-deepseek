@@ -563,8 +563,10 @@
       "lines": "Satır {{start}}–{{end}}"
     },
     "mcp": {
-      "detailShow": "▸ Detaylı Gör",
-      "detailHide": "▾ Detaylı Gizle"
+      "detailShow": "▸ Detayları Göster",
+      "detailHide": "▾ Detayları Gizle",
+      "inlineMaxChars": "Satır İçi Maks Karakter",
+      "inlineMaxCharsHint": "MCP araç listesi ve sonuçları için satır içi maksimum karakter. Araç listesi aşarsa, fazla araçlar uyarı ile atlanır. Sonuç reddedilirse kısa sürümler ve düz metne düşer."
     },
     "expandToggle": {
       "expand": "Genişlet",

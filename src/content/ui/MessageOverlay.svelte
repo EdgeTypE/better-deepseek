@@ -20,6 +20,7 @@
   import TodoCard from "./TodoCard.svelte";
   import McpLoadingStatus from "./McpLoadingStatus.svelte";
   import McpResultCard from "./McpResultCard.svelte";
+  import McpErrorCard from "./McpErrorCard.svelte";
   import { t } from "../../lib/i18n.svelte.js";
   import { parseLooseJson } from "../parser/json-repair.js";
 
@@ -407,6 +408,13 @@
           toolName={block.attrs.toolName || ""}
           args={block.attrs.args || ""}
           content={block.content || ""}
+        />
+      {:else if block.name === 'auto:mcp_error'}
+        <McpErrorCard
+          serverName={block.attrs.serverName || ""}
+          toolName={block.attrs.toolName || ""}
+          args={block.attrs.args || ""}
+          error={block.content || ""}
         />
       {:else}
         <ToolCard name={block.name} content={block.content} />

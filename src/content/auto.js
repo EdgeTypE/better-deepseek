@@ -378,7 +378,19 @@ export async function handleAutoErrorReport(toolName, error, originalCode) {
   await injectPureTextAndSend(autoMessage);
 }
 
+let mcpQueue = Promise.resolve();
+
 export async function handleAutoMcpCall(serverUrl, toolName, args = {}) {
+  const task = async () => {
+    function stripMarkdown(url) {
+    const m = url.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+    return m ? m[2] : url;
+  }
+  function stripQuery(url) {
+    try { return url.split("?")[0]; } catch { return url; }
+  }
+  serverUrl = stripMarkdown(serverUrl.trim());
+
   const dedupeKey = `${serverUrl}|${toolName}|${JSON.stringify(args)}`;
   if (processedMcpCalls.has(dedupeKey)) return;
   processedMcpCalls.add(dedupeKey);
@@ -389,7 +401,11 @@ export async function handleAutoMcpCall(serverUrl, toolName, args = {}) {
 
   devLog("Auto", `Starting MCP call: ${toolName} @ ${serverUrl}`);
 
-  const server = appState.mcpServers.find(s => s.serverUrl === serverUrl || s.name === serverUrl);
+  const server = appState.mcpServers.find(s =>
+    s.serverUrl === serverUrl ||
+    s.name === serverUrl ||
+    stripQuery(s.serverUrl) === stripQuery(serverUrl)
+  );
   const apiKey = server?.apiKey || "";
   const actualUrl = server?.serverUrl || serverUrl;
 
@@ -398,7 +414,10 @@ export async function handleAutoMcpCall(serverUrl, toolName, args = {}) {
       chrome.runtime.sendMessage(
         { type: "bds-mcp-call", serverUrl: actualUrl, apiKey, toolName, args },
         (response) => {
-          if (response?.ok) resolve(response.result);
+          if (chrome.runtime.lastError) {
+            console.error("[BDS:AUTO:MCP] runtime.lastError:", chrome.runtime.lastError.message);
+            reject(new Error(chrome.runtime.lastError.message));
+          } else if (response?.ok) resolve(response.result);
           else reject(new Error(response?.error || "MCP call failed"));
         }
       );
@@ -444,6 +463,8 @@ export async function handleAutoMcpCall(serverUrl, toolName, args = {}) {
     ].join("\n");
     await injectPureTextAndSend(errorMessage, `MCP error ${toolName}`);
   }
+  };
+  return mcpQueue = mcpQueue.then(task, task);
 }
 
 export async function injectPureTextAndSend(autoMessage, logLabel = "Text prompt") {
