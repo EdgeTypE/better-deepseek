@@ -569,7 +569,29 @@
       "detailShow": "▸ Show Details",
       "detailHide": "▾ Hide Details",
       "inlineMaxChars": "Inline Content Max Chars",
-      "inlineMaxCharsHint": "Max characters for MCP tool list and tool results sent inline. If the tool list exceeds this, extra tools are omitted with a count warning. If a result is rejected, shorter fallbacks and pure text are tried."
+      "inlineMaxCharsHint": "Max characters for MCP tool list and tool results sent inline. If the tool list exceeds this, extra tools are omitted with a count warning. If a result is rejected, shorter fallbacks and pure text are tried.",
+      "transportNote": "Note: Only HTTP/Streamable HTTP transport is supported.",
+      "sectionTitle": "MCP Servers",
+      "description": "Add remote MCP (Model Context Protocol) servers. The AI can discover and invoke tools from these servers.",
+      "test": "Test",
+      "testLoading": "...",
+      "edit": "Edit",
+      "addServer": "Add MCP Server",
+      "addModalTitle": "Add MCP Server",
+      "editModalTitle": "Edit MCP Server",
+      "nameLabel": "Name",
+      "namePlaceholder": "My MCP Server",
+      "serverUrlLabel": "Server URL",
+      "serverUrlPlaceholder": "https://example.com/mcp",
+      "apiKeyLabel": "API Key (optional)",
+      "apiKeyPlaceholder": "sk-...",
+      "enabledLabel": "Enabled",
+      "cancel": "Cancel",
+      "save": "Save",
+      "deleteConfirm": "Delete MCP server \"{{name}}\"?",
+      "testFailed": "MCP test failed: {{message}}",
+      "toolsCount": "{{count}} tools",
+      "connected": "Connected: {{count}} tools found"
     },
     "expandToggle": {
       "expand": "Expand",
@@ -1117,7 +1139,10 @@
       "4": "Did you know you can activate Multi-System Prompt mode to use multiple system prompts at the same time, with various schedules and conditions to create your own custom workflow?",
       "5": "You can import your memories from another AI into BDS. Click \"Import memory from Another AI\" at the bottom of the Memory section.",
       "6": "Did you know Better DeepSeek also has an <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">Android app</a>?",
-      "7": "If you like the extension, share it with your friends! To request a feature, let us know on our <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub page</a>."
+      "7": "If you like the extension, share it with your friends! To request a feature, let us know on our <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub page</a>.",
+      "8": "Did you know you can connect MCP servers to Better DeepSeek? Check the Advanced Settings.",
+      "9": "You can customize the interface however you like with Custom CSS.",
+      "10": "We want to add more language support to Better DeepSeek. If you want to add your own language, check it out <a href=\"https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md\" target=\"_blank\" rel=\"noopener noreferrer\">here</a>. Also, if you notice any translation errors, you can fix them."
     }
   }
 }

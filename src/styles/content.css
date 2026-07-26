@@ -402,6 +402,9 @@ textarea.bds-input,
   padding: 12px 0;
   border-bottom: 1px solid var(--bds-border);
   gap: 12px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .bds-toggle-row:last-of-type {
@@ -423,6 +426,7 @@ textarea.bds-input,
   font-weight: 600;
   cursor: pointer;
   transition: all var(--bds-transition);
+  box-sizing: border-box;
 }
 
 .bds-advanced-toggle:hover {
@@ -444,6 +448,8 @@ textarea.bds-input,
   grid-template-rows: 0fr;
   transition: grid-template-rows var(--bds-transition), padding var(--bds-transition);
   overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .bds-advanced-content.open {
@@ -453,6 +459,9 @@ textarea.bds-input,
 
 .bds-advanced-inner {
   min-height: 0;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* ── Sub-Accordion (nested groups inside Advanced) ── */
@@ -471,6 +480,7 @@ textarea.bds-input,
   font-weight: 600;
   cursor: pointer;
   transition: color var(--bds-transition);
+  box-sizing: border-box;
 }
 
 .bds-sub-toggle:hover {
@@ -491,6 +501,8 @@ textarea.bds-input,
   grid-template-rows: 0fr;
   transition: grid-template-rows var(--bds-transition);
   overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .bds-sub-content.open {
@@ -499,6 +511,9 @@ textarea.bds-input,
 
 .bds-sub-inner {
   min-height: 0;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .bds-sub-content .bds-toggle-row {
@@ -510,7 +525,20 @@ textarea.bds-input,
   color: var(--bds-text-primary);
   user-select: none;
   line-height: 1.4;
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.bds-toggle-row .bds-select {
+  width: auto;
+  max-width: 55%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 /* The toggle switch track */
@@ -684,6 +712,7 @@ textarea.bds-input,
   justify-content: space-between;
   gap: 10px;
   min-width: 0;
+  overflow: hidden;
   transition: border-color var(--bds-transition);
 }
 
@@ -4662,8 +4691,10 @@ textarea.bds-input,
   font-size: 10px;
   opacity: 0.5;
   margin-left: auto;
-  flex-shrink: 0;
+  flex-shrink: 1;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .bds-advanced-no-results {
   padding: 8px 4px;

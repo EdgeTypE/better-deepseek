@@ -566,7 +566,29 @@
       "detailShow": "▸ Detayları Göster",
       "detailHide": "▾ Detayları Gizle",
       "inlineMaxChars": "Satır İçi Maks Karakter",
-      "inlineMaxCharsHint": "MCP araç listesi ve sonuçları için satır içi maksimum karakter. Araç listesi aşarsa, fazla araçlar uyarı ile atlanır. Sonuç reddedilirse kısa sürümler ve düz metne düşer."
+      "inlineMaxCharsHint": "MCP araç listesi ve sonuçları için satır içi maksimum karakter. Araç listesi aşarsa, fazla araçlar uyarı ile atlanır. Sonuç reddedilirse kısa sürümler ve düz metne düşer.",
+      "transportNote": "Not: Yalnızca HTTP/Streamable HTTP taşıması desteklenir.",
+      "sectionTitle": "MCP Sunucuları",
+      "description": "Uzaktan MCP (Model Context Protocol) sunucuları ekleyin. AI bu sunuculardaki araçları keşfedebilir ve kullanabilir.",
+      "test": "Test Et",
+      "testLoading": "...",
+      "edit": "Düzenle",
+      "addServer": "MCP Sunucusu Ekle",
+      "addModalTitle": "MCP Sunucusu Ekle",
+      "editModalTitle": "MCP Sunucusunu Düzenle",
+      "nameLabel": "İsim",
+      "namePlaceholder": "MCP Sunucum",
+      "serverUrlLabel": "Sunucu URL'si",
+      "serverUrlPlaceholder": "https://ornek.com/mcp",
+      "apiKeyLabel": "API Anahtarı (isteğe bağlı)",
+      "apiKeyPlaceholder": "sk-...",
+      "enabledLabel": "Aktif",
+      "cancel": "İptal",
+      "save": "Kaydet",
+      "deleteConfirm": "\"{{name}}\" MCP sunucusu silinsin mi?",
+      "testFailed": "MCP testi başarısız: {{message}}",
+      "toolsCount": "{{count}} araç",
+      "connected": "Bağlandı: {{count}} araç bulundu"
     },
     "expandToggle": {
       "expand": "Genişlet",
@@ -1114,7 +1136,10 @@
       "4": "Multi system prompt'u aktif ederek ayn\u0131 anda birden fazla system prompt kullanabilece\u011Fini, ve dilersen bunlar\u0131 \u00E7e\u015Fitli s\u0131ralar ve ko\u015Fullarla kullanarak kendine \u00F6zel bir workflow olu\u015Fturabilece\u011Fini biliyor muydun?",
       "5": "Ba\u015Fka bir AI'daki memory'ni BDS'e aktarabilirsin. Bunun i\u00E7in haf\u0131za men\u00FCs\u00FCn\u00FCn en alt\u0131ndaki \"Import memory from Another AI\" yaz\u0131s\u0131na t\u0131klaman yeterli.",
       "6": "Better DeepSeek'in bir <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">Android uygulamas\u0131</a> da oldu\u011Funu biliyor muydun?",
-      "7": "Eklentiden memnunsan arkada\u015Flar\u0131nla payla\u015F\u0131rsan \u00E7ok seviniriz. Ayr\u0131ca eklentide olmas\u0131n\u0131 istedi\u011Fin bir \u00F6zellik var ise <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub</a> sayfam\u0131zdan bildirebilirsin."
+      "7": "Eklentiden memnunsan arkada\u015Flar\u0131nla payla\u015F\u0131rsan \u00E7ok seviniriz. Ayr\u0131ca eklentide olmas\u0131n\u0131 istedi\u011Fin bir \u00F6zellik var ise <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub</a> sayfam\u0131zdan bildirebilirsin.",
+      "8": "Better DeepSeek'e MCP serverlar\u0131 ba\u011Flayabilece\u011Finizi biliyor muydunuz? Geli\u015Fmi\u015F ayarlar\u0131 ziyaret edin.",
+      "9": "Custom CSS'ler ile aray\u00FCz\u00FC diledi\u011Fin gibi \u00F6zelle\u015Ftirebilirsin.",
+      "10": "Better DeepSeek'e daha fazla dil deste\u011Fi eklemek istiyoruz. Sen de kendi dilini eklemek istersen <a href=\"https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md\" target=\"_blank\" rel=\"noopener noreferrer\">buraya</a> g\u00F6z atabilirsin. Ayr\u0131ca \u00E7eviri hatalar\u0131n\u0131n oldu\u011Funu d\u00FC\u015F\u00FCn\u00FCyorsan d\u00FCzeltebilirsin."
     }
   }
 }

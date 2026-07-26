@@ -563,7 +563,9 @@
       "detailShow": "▸ 显示详情",
       "detailHide": "▾ 隐藏详情",
       "inlineMaxChars": "内联最大字符数",
-      "inlineMaxCharsHint": "MCP工具列表和结果内联发送的最大字符数。如果工具列表超出限制，多余的工具将被省略并显示计数警告。如果结果被拒绝，将尝试更短的版本。"
+      "inlineMaxCharsHint": "MCP工具列表和结果内联发送的最大字符数。如果工具列表超出限制，多余的工具将被省略并显示计数警告。如果结果被拒绝，将尝试更短的版本。",
+      "transportNote": "注意：仅支持 HTTP/Streamable HTTP 传输。",
+      "connected": "已连接：发现 {{count}} 个工具"
     },
     "expandToggle": {
       "expand": "展开",

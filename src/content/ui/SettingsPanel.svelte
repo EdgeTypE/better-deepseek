@@ -446,8 +446,8 @@
       'settings.customCSS', 'settings.cssPresets',
       'settings.saveAsSnippet', 'settings.manageSnippets',
     ]},
-    { key: 'subMcp', labelKey: 'MCP Servers', settingKeys: [
-      'MCP Server URLs', 'settings.mcp.inlineMaxChars',
+    { key: 'subMcp', labelKey: 'mcp.sectionTitle', settingKeys: [
+      'mcp.addServer', 'mcp.inlineMaxChars',
     ]},
     { key: 'subUtilities', labelKey: 'settings.subUtilities', settingKeys: [
       'apiPlayground.title', 'drawer.exportAll', 'drawer.importAll', 'settings.disableTipBox',
@@ -976,7 +976,7 @@
 
   async function deleteMcpServer(id) {
     if (!appState.settings?.skipDeletionConfirmation) {
-      if (!(await appState.ui.showConfirm(`Delete MCP server "${mcpServers.find(s => s.id === id)?.name}"?`))) return;
+      if (!(await appState.ui.showConfirm(t('mcp.deleteConfirm', { name: mcpServers.find(s => s.id === id)?.name })))) return;
     }
     mcpServers = mcpServers.filter(s => s.id !== id);
     const plainDelete = JSON.parse(JSON.stringify(mcpServers));
@@ -1012,10 +1012,10 @@
         await chrome.storage.local.set({ [STORAGE_KEYS.mcpServers]: plainTest });
         await discoverMcpToolSchemas();
         pushConfigToPage();
-        if (appState.ui) appState.ui.showToast(`Connected: ${tools.length} tools found`);
+        if (appState.ui) appState.ui.showToast(t('mcp.connected', { count: tools.length }));
       }
     } catch (err) {
-      if (appState.ui) appState.ui.showToast(`MCP test failed: ${err.message}`);
+      if (appState.ui) appState.ui.showToast(t('mcp.testFailed', { message: err.message }));
     }
     mcpTestingIndex = -1;
   }
@@ -1457,7 +1457,7 @@
         {#if !syncLocale}
           <div class="bds-toggle-row">
             <span class="bds-toggle-label">{t('settings.selectLanguage')}</span>
-            <select class="bds-select" bind:value={locale} style="width: 140px;">
+            <select class="bds-select" bind:value={locale} style="width: 140px; max-width: 100%; box-sizing: border-box;">
               {#each availableLocaleCodes as code}
                 <option value={code}>{i18n.getNativeName(code)}</option>
               {/each}
@@ -1466,11 +1466,11 @@
         {/if}
 
         <div class="bds-toggle-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
-          <div style="display: flex; gap: 8px; width: 100%;">
-            <button type="button" class="bds-btn-outlined" style="flex: 1; font-size: 11px; padding: 6px 12px;" onclick={checkLanguageUpdates} disabled={updatingLanguages}>
+          <div class="bds-lang-btn-group">
+            <button type="button" class="bds-btn-outlined bds-lang-btn" onclick={checkLanguageUpdates} disabled={updatingLanguages}>
               {updatingLanguages ? t('common.working') : t('settings.checkUpdates')}
             </button>
-            <button type="button" class="bds-btn-outlined" style="flex: 1; font-size: 11px; padding: 6px 12px; border-color: rgba(239, 68, 68, 0.3); color: rgba(239, 68, 68, 0.8);" onclick={resetLanguageFactory}>
+            <button type="button" class="bds-btn-outlined bds-lang-btn bds-lang-reset-btn" onclick={resetLanguageFactory}>
               {t('settings.resetFactory')}
             </button>
           </div>
@@ -1890,7 +1890,7 @@
 
     {#if isSectionMatch('subMcp')}
     <button type="button" class="bds-sub-toggle" class:open={subMcpOpen} onclick={() => subMcpOpen = !subMcpOpen} aria-expanded={subMcpOpen}>
-      MCP Servers
+      {t('mcp.sectionTitle')}
       <span class="bds-chevron">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1899,32 +1899,33 @@
     </button>
     <div class="bds-sub-content" class:open={subMcpOpen}>
       <div class="bds-sub-inner">
-        <p style="font-size: 11px; opacity: 0.6; margin: 0 0 8px;">Add remote MCP (Model Context Protocol) servers. The AI can discover and invoke tools from these servers.</p>
+        <p style="font-size: 11px; opacity: 0.6; margin: 0 0 8px;">{t('mcp.description')}</p>
+        <p style="font-size: 10px; opacity: 0.5; margin: -4px 0 8px;">{t('mcp.transportNote')}</p>
         {#each mcpServers as server, i}
           <div class="bds-skill-item">
             <div class="bds-prompt-info">
               <span class="bds-prompt-name">{server.name}</span>
-              <span class="bds-prompt-status">{server.serverUrl} · {server.tools?.length || 0} tools</span>
+              <span class="bds-prompt-status">{server.serverUrl} · {t('mcp.toolsCount', { count: server.tools?.length || 0 })}</span>
             </div>
             <div class="bds-prompt-actions">
               <button class="bds-btn-outlined" style="font-size: 11px; padding: 4px 8px;" onclick={() => testMcpServer(i)} disabled={mcpTestingIndex === i}>
-                {mcpTestingIndex === i ? '...' : 'Test'}
+                {mcpTestingIndex === i ? t('mcp.testLoading') : t('mcp.test')}
               </button>
-              <button class="bds-btn-outlined" style="font-size: 11px; padding: 4px 8px;" onclick={() => openMcpEditor(server)}>Edit</button>
+              <button class="bds-btn-outlined" style="font-size: 11px; padding: 4px 8px;" onclick={() => openMcpEditor(server)}>{t('mcp.edit')}</button>
               <button class="bds-btn-danger" onclick={() => deleteMcpServer(server.id)}>×</button>
             </div>
           </div>
         {/each}
         <button class="bds-add-prompt-btn" onclick={() => openMcpEditor()}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="margin-right: 4px;"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          Add MCP Server
+          {t('mcp.addServer')}
         </button>
 
         <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 12px;">
-          <span class="bds-toggle-label">{t('settings.mcp.inlineMaxChars')}</span>
+          <span class="bds-toggle-label">{t('mcp.inlineMaxChars')}</span>
           <input id="bds-mcp-inline-max-chars" type="number" min="500" max="100000" step="500" class="bds-input" style="width: 120px; box-sizing: border-box;" bind:value={mcpInlineMaxChars} />
           <p style="font-size: 10px; opacity: 0.5; margin: 0;">
-            {t('settings.mcp.inlineMaxCharsHint')}
+            {t('mcp.inlineMaxCharsHint')}
           </p>
         </div>
       </div>
@@ -2112,24 +2113,24 @@
   <div class="bds-modal-overlay">
     <div class="bds-modal">
       <div class="bds-modal-header">
-        <span>{mcpEditorIsNew ? 'Add MCP Server' : 'Edit MCP Server'}</span>
+        <span>{mcpEditorIsNew ? t('mcp.addModalTitle') : t('mcp.editModalTitle')}</span>
         <button class="bds-modal-close" onclick={closeMcpEditor}>×</button>
       </div>
       <div class="bds-modal-body">
         <div class="bds-field">
-          <label class="bds-label">Name</label>
-          <input type="text" class="bds-input" bind:value={mcpEditorName} placeholder="My MCP Server" />
+          <label class="bds-label">{t('mcp.nameLabel')}</label>
+          <input type="text" class="bds-input" bind:value={mcpEditorName} placeholder={t('mcp.namePlaceholder')} />
         </div>
         <div class="bds-field">
-          <label class="bds-label">Server URL</label>
-          <input type="url" class="bds-input" bind:value={mcpEditorUrl} placeholder="https://example.com/mcp" />
+          <label class="bds-label">{t('mcp.serverUrlLabel')}</label>
+          <input type="url" class="bds-input" bind:value={mcpEditorUrl} placeholder={t('mcp.serverUrlPlaceholder')} />
         </div>
         <div class="bds-field">
-          <label class="bds-label">API Key (optional)</label>
-          <input type="password" class="bds-input" bind:value={mcpEditorApiKey} placeholder="sk-..." />
+          <label class="bds-label">{t('mcp.apiKeyLabel')}</label>
+          <input type="password" class="bds-input" bind:value={mcpEditorApiKey} placeholder={t('mcp.apiKeyPlaceholder')} />
         </div>
         <div class="bds-toggle-row" style="padding: 0;">
-          <span class="bds-toggle-label">Enabled</span>
+          <span class="bds-toggle-label">{t('mcp.enabledLabel')}</span>
           <label class="bds-switch">
             <input type="checkbox" bind:checked={mcpEditorEnabled} />
             <span class="bds-switch-track"></span>
@@ -2137,8 +2138,8 @@
         </div>
       </div>
       <div class="bds-modal-footer">
-        <button class="bds-btn-outlined" onclick={closeMcpEditor}>Cancel</button>
-        <button class="bds-btn" onclick={saveMcpServer} disabled={!mcpEditorName.trim() || !mcpEditorUrl.trim()}>Save</button>
+        <button class="bds-btn-outlined" onclick={closeMcpEditor}>{t('mcp.cancel')}</button>
+        <button class="bds-btn" onclick={saveMcpServer} disabled={!mcpEditorName.trim() || !mcpEditorUrl.trim()}>{t('mcp.save')}</button>
       </div>
     </div>
   </div>
@@ -2184,6 +2185,15 @@
     font-weight: 600;
     cursor: pointer;
     transition: all var(--bds-transition);
+    min-width: 0;
+    flex-shrink: 1;
+    overflow: hidden;
+  }
+
+  .bds-css-toggle-btn span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .bds-css-toggle-btn:hover, .bds-css-toggle-btn.active {
@@ -2224,11 +2234,38 @@
     cursor: pointer;
   }
 
+  .bds-lang-btn-group {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    flex-wrap: wrap;
+    box-sizing: border-box;
+  }
+
+  .bds-lang-btn {
+    flex: 1 1 120px;
+    min-width: 0;
+    font-size: 11px;
+    padding: 6px 8px;
+    text-align: center;
+    white-space: normal;
+    word-break: break-word;
+    box-sizing: border-box;
+  }
+
+  .bds-lang-reset-btn {
+    border-color: rgba(239, 68, 68, 0.3);
+    color: rgba(239, 68, 68, 0.8);
+  }
+
   .bds-token-field {
     width: 100%;
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
+    box-sizing: border-box;
+    min-width: 0;
   }
 
   .bds-token-actions {
@@ -2236,11 +2273,13 @@
     align-items: center;
     gap: 6px;
     flex-shrink: 0;
+    flex-wrap: wrap;
+    min-width: 0;
   }
 
   .bds-token-btn {
-    min-width: 58px;
-    padding-inline: 10px;
+    min-width: 0;
+    padding-inline: 8px;
   }
 
   .bds-token-btn:disabled {
@@ -2276,17 +2315,28 @@
     font-size: 13px;
     font-weight: 600;
     color: var(--bds-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    width: 100%;
   }
 
   .bds-prompt-status {
     font-size: 11px;
     color: var(--bds-text-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    width: 100%;
   }
 
   .bds-prompt-actions {
     display: flex;
     gap: 6px;
     align-items: center;
+    flex-shrink: 0;
   }
 
   .bds-add-prompt-btn {
@@ -2364,6 +2414,7 @@
     flex-direction: column;
     gap: 20px;
     overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .bds-field {
@@ -2484,7 +2535,7 @@
     align-items: center;
     gap: 10px;
     flex: 1;
-    max-width: 200px;
+    max-width: 140px;
   }
 
   .bds-slider {
