@@ -1922,9 +1922,11 @@
         </button>
 
         <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 12px;">
-          <span class="bds-toggle-label">{t('mcp.inlineMaxChars')}</span>
-          <input id="bds-mcp-inline-max-chars" type="number" min="500" max="100000" step="500" class="bds-input" style="width: 120px; box-sizing: border-box;" bind:value={mcpInlineMaxChars} />
-          <p style="font-size: 10px; opacity: 0.5; margin: 0;">
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 12px; min-width: 0; box-sizing: border-box;">
+            <span class="bds-toggle-label">{t('mcp.inlineMaxChars')}</span>
+            <input id="bds-mcp-inline-max-chars" type="number" min="500" max="100000" step="500" class="bds-input" style="width: 100px; flex-shrink: 0; box-sizing: border-box;" bind:value={mcpInlineMaxChars} />
+          </div>
+          <p style="font-size: 10px; opacity: 0.5; margin: 0; width: 100%; box-sizing: border-box;">
             {t('mcp.inlineMaxCharsHint')}
           </p>
         </div>
