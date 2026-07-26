@@ -43,6 +43,7 @@
       "importParseError": "Неверный формат файла.",
       "importDone": "Данные успешно импортированы.",
       "importFailed": "Не удалось импортировать данные.",
+      "importContextError": "Расширение было обновлено. Пожалуйста, перезагрузите страницу и повторите попытку.",
       "importPasswordPlaceholder": "Введите пароль экспорта",
       "sectionSettings": "Настройки",
       "sectionPrompts": "Пользовательские промпты",
@@ -52,7 +53,9 @@
       "sectionProjects": "Проекты",
       "sectionProjectFiles": "Файлы проектов",
       "sectionChatTags": "Теги чатов",
-      "sectionSavedItems": "Сохранённые элементы"
+      "sectionSavedItems": "Сохранённые элементы",
+      "sectionCssSnippets": "CSS фрагменты",
+      "sectionMcpServers": "MCP серверы"
     },
     "settings": {
       "generalSettings": "Основные настройки",

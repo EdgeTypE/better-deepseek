@@ -43,6 +43,7 @@
       "importParseError": "Geçersiz dosya biçimi.",
       "importDone": "Veriler başarıyla içe aktarıldı.",
       "importFailed": "Veriler içe aktarılamadı.",
+      "importContextError": "Eklenti güncellendi. Lütfen sayfayı yenileyip tekrar deneyin.",
       "importPasswordPlaceholder": "Dışa aktarma parolasını girin",
       "sectionSettings": "Ayarlar",
       "sectionPrompts": "Özel Sistem Yönergeleri",
@@ -52,7 +53,9 @@
       "sectionProjects": "Projeler",
       "sectionProjectFiles": "Proje Dosyaları",
       "sectionChatTags": "Sohbet Etiketleri",
-      "sectionSavedItems": "Kaydedilmiş Öğeler"
+      "sectionSavedItems": "Kaydedilmiş Öğeler",
+      "sectionCssSnippets": "CSS Parçacıkları",
+      "sectionMcpServers": "MCP Sunucuları"
     },
     "settings": {
       "generalSettings": "Genel Ayarlar",

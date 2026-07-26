@@ -43,6 +43,7 @@
       "importParseError": "Invalid file format.",
       "importDone": "Data imported successfully.",
       "importFailed": "Failed to import data.",
+      "importContextError": "Extension was updated. Please reload the page and try again.",
       "importPasswordPlaceholder": "Enter the export password",
       "sectionSettings": "Settings",
       "sectionPrompts": "Custom System Prompts",
@@ -52,7 +53,9 @@
       "sectionProjects": "Projects",
       "sectionProjectFiles": "Project Files",
       "sectionChatTags": "Chat Tags",
-      "sectionSavedItems": "Saved Items"
+      "sectionSavedItems": "Saved Items",
+      "sectionCssSnippets": "CSS Snippets",
+      "sectionMcpServers": "MCP Servers"
     },
     "settings": {
       "generalSettings": "General Settings",

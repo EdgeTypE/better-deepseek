@@ -140,6 +140,8 @@
     { key: "skills", label: t('drawer.sectionSkills') },
     { key: "characters", label: t('drawer.sectionCharacters') },
     { key: "memories", label: t('drawer.sectionMemories') },
+    { key: "mcpServers", label: t('drawer.sectionMcpServers') },
+    { key: "cssSnippets", label: t('drawer.sectionCssSnippets') },
     { key: "projects", label: t('drawer.sectionProjects') },
     { key: "projectFiles", label: t('drawer.sectionProjectFiles') },
     { key: "chatTags", label: t('drawer.sectionChatTags') },
@@ -185,6 +187,18 @@
     showExportAllModal = false;
   }
 
+  /**
+   * Returns true when a chrome API call fails because the extension was
+   * reloaded/updated while the page tab was still open (orphaned content script).
+   * The user must reload the page to re-establish the extension context.
+   */
+  function isExtensionContextError(e) {
+    const msg = (e && e.message) ? e.message.toLowerCase() : "";
+    return msg.includes("extension context invalidated") ||
+           msg.includes("context invalidated") ||
+           msg.includes("cannot access");
+  }
+
   async function doExportAll() {
     if (exportEncrypt) {
       if (!exportPassword || exportPassword.length < 4) {
@@ -200,15 +214,27 @@
     isExporting = true;
 
     try {
+      // Strip migration-only flags from exported settings so they don't
+      // corrupt the version-upgrade logic on the destination device.
+      const settingsToExport = { ...appState.settings, githubToken: "" };
+      delete settingsToExport.systemPromptBackupDone;
+      delete settingsToExport.systemPromptTemplateVersion;
+      delete settingsToExport.downloadBehaviorVersion;
+      // customSystemPrompts is exported as its own top-level key so it can be
+      // imported independently; remove it from the settings blob to avoid
+      // double-importing when the settings section is selected.
+      delete settingsToExport.customSystemPrompts;
+
       const data = {
         version: 1,
         exportedAt: new Date().toISOString(),
-        settings: { ...appState.settings, githubToken: "" },
+        settings: settingsToExport,
         cssSnippets: appState.cssSnippets,
         customSystemPrompts: appState.settings.customSystemPrompts || [],
         skills: appState.skills,
         characters: appState.characters,
         memories: appState.memories,
+        mcpServers: appState.mcpServers,
         projects: appState.projects,
         projectFiles: appState.projectFiles,
         chatTags: appState.chatTags,
@@ -233,7 +259,11 @@
       closeExportAllModal();
       if (appState.ui) appState.ui.showToast(t('drawer.exportDone'));
     } catch (e) {
-      if (appState.ui) appState.ui.showToast(t('drawer.exportFailed'));
+      if (isExtensionContextError(e)) {
+        if (appState.ui) appState.ui.showToast(t('drawer.importContextError'), 8000);
+      } else {
+        if (appState.ui) appState.ui.showToast(t('drawer.exportFailed'));
+      }
     }
 
     isExporting = false;
@@ -253,9 +283,9 @@
   }
 
   async function handleImportAll(event) {
-    const file = event.target.files && event.target.files[0];
+    const input = event.target;
+    const file = input.files && input.files[0];
     if (!file) return;
-    event.target.value = "";
 
     try {
       const raw = await file.text();
@@ -274,6 +304,8 @@
       }
     } catch (e) {
       if (appState.ui) appState.ui.showToast(t('drawer.importParseError'));
+    } finally {
+      input.value = "";
     }
   }
 
@@ -308,64 +340,111 @@
     if (!importData) return;
     isImporting = true;
 
+    // Toast message is deferred until after the modal closes (finally block)
+    // so it is never hidden behind the overlay or cut off by its animation.
+    let pendingToast = null;
+    let pendingToastDuration = 2880;
+
     try {
       const d = importData;
 
+      const plain = (obj) => JSON.parse(JSON.stringify(obj ?? null));
+
       if (selectedSections.has("settings") && d.settings) {
         const oldToken = appState.settings.githubToken;
-        Object.assign(appState.settings, d.settings);
-        appState.settings.githubToken = oldToken;
-        await chrome.storage.local.set({ [STORAGE_KEYS.settings]: appState.settings });
-        if (d.cssSnippets) {
-          appState.cssSnippets = d.cssSnippets;
-          await chrome.storage.local.set({ [STORAGE_KEYS.cssSnippets]: appState.cssSnippets });
-        }
+        // Preserve migration flags from the destination device so that
+        // loadStateFromStorage()'s upgrade logic remains correct after reload.
+        const migrationsToKeep = {
+          systemPromptBackupDone: appState.settings.systemPromptBackupDone,
+          systemPromptTemplateVersion: appState.settings.systemPromptTemplateVersion,
+          downloadBehaviorVersion: appState.settings.downloadBehaviorVersion,
+        };
+        // Use a reactive spread (not Object.assign) so Svelte 5 tracks the change.
+        appState.settings = {
+          ...appState.settings,
+          ...d.settings,
+          ...migrationsToKeep,
+          githubToken: oldToken,
+          // customSystemPrompts is managed by its own section below; prevent
+          // the settings blob from silently overwriting it regardless of the
+          // user's section selection.
+          customSystemPrompts: appState.settings.customSystemPrompts,
+        };
+        await chrome.storage.local.set({ [STORAGE_KEYS.settings]: plain(appState.settings) });
       }
       if (selectedSections.has("customSystemPrompts") && d.customSystemPrompts) {
-        appState.settings.customSystemPrompts = d.customSystemPrompts;
-        await chrome.storage.local.set({ [STORAGE_KEYS.settings]: appState.settings });
+        appState.settings = {
+          ...appState.settings,
+          customSystemPrompts: plain(d.customSystemPrompts),
+        };
+        await chrome.storage.local.set({ [STORAGE_KEYS.settings]: plain(appState.settings) });
+      }
+      if (selectedSections.has("cssSnippets") && d.cssSnippets) {
+        appState.cssSnippets = plain(d.cssSnippets);
+        await chrome.storage.local.set({ [STORAGE_KEYS.cssSnippets]: appState.cssSnippets });
       }
       if (selectedSections.has("skills") && d.skills) {
-        appState.skills = d.skills;
+        appState.skills = plain(d.skills);
         await chrome.storage.local.set({ [STORAGE_KEYS.skills]: appState.skills });
       }
       if (selectedSections.has("characters") && d.characters) {
-        appState.characters = d.characters;
+        appState.characters = plain(d.characters);
         await chrome.storage.local.set({ [STORAGE_KEYS.characters]: appState.characters });
       }
       if (selectedSections.has("memories") && d.memories) {
-        appState.memories = d.memories;
+        appState.memories = plain(d.memories);
         await chrome.storage.local.set({ [STORAGE_KEYS.memories]: appState.memories });
       }
+      if (selectedSections.has("mcpServers") && d.mcpServers) {
+        appState.mcpServers = plain(d.mcpServers);
+        await chrome.storage.local.set({ [STORAGE_KEYS.mcpServers]: appState.mcpServers });
+      }
       if (selectedSections.has("projects") && d.projects) {
-        appState.projects = d.projects;
+        appState.projects = plain(d.projects);
         await chrome.storage.local.set({ [STORAGE_KEYS.projects]: appState.projects });
       }
       if (selectedSections.has("projectFiles") && d.projectFiles) {
-        appState.projectFiles = d.projectFiles;
+        appState.projectFiles = plain(d.projectFiles);
         await chrome.storage.local.set({ [STORAGE_KEYS.projectFiles]: appState.projectFiles });
       }
       if (selectedSections.has("chatTags") && d.chatTags) {
-        appState.chatTags = d.chatTags;
+        appState.chatTags = plain(d.chatTags);
         await chrome.storage.local.set({ [STORAGE_KEYS.chatTags]: appState.chatTags });
       }
       if (selectedSections.has("savedItems") && d.savedItems) {
-        appState.savedItems = d.savedItems;
+        appState.savedItems = plain(d.savedItems);
         await chrome.storage.local.set({ [STORAGE_KEYS.savedItems]: appState.savedItems });
       }
+
+      // Explicitly refresh the settings form so local $state variables
+      // reflect the newly imported values without requiring a page reload.
+      refresh();
 
       pushConfigToPage();
       onimportdata?.();
 
-      if (appState.ui) appState.ui.showToast(t('drawer.importDone'));
+      pendingToast = t('drawer.importDone');
     } catch (e) {
-      if (appState.ui) appState.ui.showToast(t('drawer.importFailed'));
+      console.error("[BDS] doImportAll error:", e);
+      if (isExtensionContextError(e)) {
+        pendingToast = t('drawer.importContextError');
+        pendingToastDuration = 8000;
+      } else {
+        pendingToast = t('drawer.importFailed');
+      }
     } finally {
       showImportSelectModal = false;
       resetImportState();
       isImporting = false;
     }
+
+    // Show feedback only after the modal is fully closed so the toast is
+    // never obscured by the overlay and the user always sees the result.
+    if (pendingToast && appState.ui) {
+      appState.ui.showToast(pendingToast, pendingToastDuration);
+    }
   }
+
 
   function closeImportPasswordModal() {
     showImportPasswordModal = false;
@@ -613,6 +692,7 @@
     disableTipBox = Boolean(appState.settings.disableTipBox);
     mcpInlineMaxChars = Number(appState.settings.mcpInlineMaxChars) || 8000;
     cssSnippets = [...appState.cssSnippets];
+    mcpServers = [...appState.mcpServers];
     if (snippetListRef) snippetListRef.refresh();
     chrome.storage.local.get("bds_locale_update_last_checked", (data) => {
       lastCheckedDate = data.bds_locale_update_last_checked || "";
@@ -848,7 +928,7 @@
     appState.settings.mcpInlineMaxChars = Math.max(500, Math.min(100000, Math.round(Number(mcpInlineMaxChars) || 8000)));
 
     await chrome.storage.local.set({
-      [STORAGE_KEYS.settings]: appState.settings,
+      [STORAGE_KEYS.settings]: JSON.parse(JSON.stringify(appState.settings)),
     });
     if (!syncLocale) {
       i18n.setLocale(locale);

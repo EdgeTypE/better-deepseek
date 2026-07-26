@@ -47,13 +47,13 @@
 
   // ── Public API (called from non-Svelte code via mount.js) ──
 
-  export function showToast(message) {
+  export function showToast(message, duration = 2880) {
     const id = ++toastId;
     toasts = [...toasts, { id, message }];
 
     setTimeout(() => {
       toasts = toasts.filter((t) => t.id !== id);
-    }, 2880);
+    }, duration);
   }
 
   export function showLongWorkOverlay(_visible) {}

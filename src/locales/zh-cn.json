@@ -43,6 +43,7 @@
       "importParseError": "文件格式无效，无法解析。",
       "importDone": "数据导入成功。",
       "importFailed": "数据导入失败，请检查文件。",
+      "importContextError": "插件已更新，请刷新页面后重试。",
       "importPasswordPlaceholder": "请输入导出时设置的密码",
       "sectionSettings": "设置",
       "sectionPrompts": "自定义系统提示词",
@@ -52,7 +53,9 @@
       "sectionProjects": "项目",
       "sectionProjectFiles": "项目文件",
       "sectionChatTags": "聊天标签",
-      "sectionSavedItems": "已保存项目"
+      "sectionSavedItems": "已保存项目",
+      "sectionCssSnippets": "CSS 片段",
+      "sectionMcpServers": "MCP 服务器"
     },
     "settings": {
       "generalSettings": "常规设置",
