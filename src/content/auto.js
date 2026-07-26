@@ -378,17 +378,18 @@ export async function handleAutoErrorReport(toolName, error, originalCode) {
   await injectPureTextAndSend(autoMessage);
 }
 
+function stripMarkdown(url) {
+  const m = url.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+  return m ? m[2] : url;
+}
+function stripQuery(url) {
+  try { return url.split("?")[0]; } catch { return url; }
+}
+
 let mcpQueue = Promise.resolve();
 
 export async function handleAutoMcpCall(serverUrl, toolName, args = {}) {
   const task = async () => {
-    function stripMarkdown(url) {
-    const m = url.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-    return m ? m[2] : url;
-  }
-  function stripQuery(url) {
-    try { return url.split("?")[0]; } catch { return url; }
-  }
   serverUrl = stripMarkdown(serverUrl.trim());
 
   const dedupeKey = `${serverUrl}|${toolName}|${JSON.stringify(args)}`;
@@ -427,7 +428,7 @@ export async function handleAutoMcpCall(serverUrl, toolName, args = {}) {
       ? result.content.map(c => c.text || "").filter(Boolean).join("\n")
       : JSON.stringify(result);
 
-    const MAX_INLINE = 8000;
+    const MAX_INLINE = Number(appState.settings?.mcpInlineMaxChars) || 8000;
     const inlineContent = textContent.length > MAX_INLINE
       ? textContent.slice(0, MAX_INLINE) + "\n\n...[truncated, full content in attached file]..."
       : textContent;
@@ -455,10 +456,18 @@ export async function handleAutoMcpCall(serverUrl, toolName, args = {}) {
   } catch (err) {
     console.error("[BDS:AUTO] MCP Call Failed:", err);
     processedMcpCalls.delete(dedupeKey);
+    const errorPayload = JSON.stringify({
+      serverName: serverUrl,
+      toolName: toolName,
+      args: args,
+      error: err.message
+    });
     const errorMessage = [
       `<BetterDeepSeek>`,
       `[BDS:AUTO] MCP call failed for ${toolName} @ ${serverUrl}`,
-      `Error: ${err.message}`,
+      `[BDS:AUTO_MCP_ERROR]`,
+      errorPayload,
+      `[/BDS:AUTO_MCP_ERROR]`,
       `</BetterDeepSeek>`
     ].join("\n");
     await injectPureTextAndSend(errorMessage, `MCP error ${toolName}`);

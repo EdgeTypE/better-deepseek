@@ -715,8 +715,16 @@ export function buildMcpBlock(state, fingerprint) {
 
   const omitted = totalTools - keptLines.length;
   const finalWarning = warningTemplate(omitted);
+  let result = [header, ...keptLines, finalWarning, footer].join("\n");
 
-  return [header, ...keptLines, finalWarning, footer].join("\n");
+  while (keptLines.length > 0 && result.length > maxInline) {
+    keptLines.pop();
+    const newOmitted = totalTools - keptLines.length;
+    const newWarning = warningTemplate(newOmitted);
+    result = [header, ...keptLines, newWarning, footer].join("\n");
+  }
+
+  return result;
 }
 
 /**

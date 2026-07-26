@@ -576,9 +576,9 @@ async function mcpFetch(serverUrl, bodyObj, apiKey, { sessionId, signal, authMet
   const methodName = bodyObj?.method || "?";
   console.log(`[BDS:MCP] >> ${methodName} @ ${serverUrl} [auth=${authMethod}, sessionId=${sessionId}]`);
 
-  const ac = new AbortController();
+  const ac = !signal ? new AbortController() : null;
   const resolvedSignal = signal || ac.signal;
-  const timer = setTimeout(() => ac.abort(new DOMException("MCP server did not respond within 30s", "TimeoutError")), MCP_REQUEST_TIMEOUT_MS);
+  const timer = ac ? setTimeout(() => ac.abort(new DOMException("MCP server did not respond within 30s", "TimeoutError")), MCP_REQUEST_TIMEOUT_MS) : null;
   try {
     const resp = await fetch(serverUrl, {
       method: "POST",
