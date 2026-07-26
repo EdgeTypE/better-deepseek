@@ -61,6 +61,7 @@ export function normalizeConfig(config) {
     deepResearch: normalizeDeepResearch(config.deepResearch),
     mcpToolSchemas,
     mcpInlineMaxChars: Number(config.mcpInlineMaxChars) || 8000,
+    modelInputLimits: config.modelInputLimits || {},
   };
 }
 

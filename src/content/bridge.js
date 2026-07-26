@@ -335,6 +335,7 @@ export async function pushConfigToPage() {
         }
         : null,
       mcpInlineMaxChars: Number(state.settings.mcpInlineMaxChars) || 8000,
+      modelInputLimits: state.remoteConfig?.modelInputLimits || {},
     };
 
     window.dispatchEvent(

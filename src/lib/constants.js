@@ -972,6 +972,12 @@ export const DEFAULT_REMOTE_CONFIG = {
     "deepseek-chat": { input: 0.14, output: 0.28 },
     "deepseek-reasoner": { input: 0.435, output: 0.87 },
   },
+  modelInputLimits: {
+    instant: 2621440,
+    vision: 2621440,
+    expert: 163840,
+    deepthink: 163840,
+  },
 };
 
 export const CSS_PRESETS = {

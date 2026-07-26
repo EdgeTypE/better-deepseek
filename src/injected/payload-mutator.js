@@ -131,6 +131,51 @@ export function mutatePayload(payload, state) {
     }
   }
 
+  // ── Model input limit guard (proactive truncation) ──
+  const limits = state.config?.modelInputLimits;
+  const rawModel = payload.model || payload.data?.model || payload.chat?.model || '';
+  const model = String(rawModel).toLowerCase();
+  let modelType = 'instant';
+  let modelSource = 'payload';
+  if (model) {
+    if (model.includes('vision'))           modelType = 'vision';
+    else if (model.includes('reasoner'))     modelType = 'deepthink';
+    else if (model.includes('deepthink'))    modelType = 'deepthink';
+    else if (model.includes('r1'))           modelType = 'deepthink';
+    else if (model.includes('expert') || model.includes('pro')) modelType = 'expert';
+  } else {
+    const domType = detectModelTypeFromDom();
+    if (domType) {
+      modelType = domType;
+      modelSource = 'dom';
+    }
+  }
+
+  const limit = limits ? (limits[modelType] ?? 163840) : 163840;
+
+  if (messages && messages.length > 0) {
+    const lastUserMsg = findLastUserMessage(messages);
+    if (lastUserMsg) {
+      const text = extractMessageText(lastUserMsg);
+      console.warn(`[BDS] Guard check: model="${model}" payload.model=${payload.model} source=${modelSource} type=${modelType} limit=${limit} msgLen=${text.length} limits=${JSON.stringify(limits)}`);
+      if (text.length > limit) {
+        const suffix = "\n\n...[truncated by Better DeepSeek]...";
+        const truncated = text.slice(0, limit - suffix.length) + suffix;
+        setMessageText(lastUserMsg, truncated);
+        changed = true;
+        console.warn(`[BDS] TRUNCATED user message from ${text.length} to ${limit} chars`);
+      }
+    }
+  } else if (typeof payload.prompt === 'string') {
+    console.warn(`[BDS] Guard check (prompt): model="${model}" payload.model=${payload.model} source=${modelSource} type=${modelType} limit=${limit} msgLen=${payload.prompt.length} limits=${JSON.stringify(limits)}`);
+    if (payload.prompt.length > limit) {
+      const suffix = "\n\n...[truncated by Better DeepSeek]...";
+      payload.prompt = payload.prompt.slice(0, limit - suffix.length) + suffix;
+      changed = true;
+      console.warn(`[BDS] TRUNCATED prompt from ${payload.prompt.length} to ${limit} chars`);
+    }
+  }
+
   return { changed, payload };
 }
 
@@ -857,4 +902,23 @@ export function stripInjectedBlocks(text) {
   output = output.replace(/<BDS:PROJECT[^>]*>[\s\S]*?<\/BDS:PROJECT>/gi, "");
   output = output.replace(/<BDS:PROJECT_CONTEXT>[\s\S]*?<\/BDS:PROJECT_CONTEXT>/gi, "");
   return output.trim();
+}
+
+/**
+ * Fallback model type detection from DOM when payload.model is empty.
+ * Reads the DeepSeek model badge element (class _46a12ab).
+ */
+function detectModelTypeFromDom() {
+  try {
+    const badgeEl = document.querySelector('._46a12ab');
+    if (!badgeEl) return null;
+    const text = (badgeEl.textContent || '').toLowerCase().trim();
+    if (text.includes('vision')) return 'vision';
+    if (text.includes('expert') || text.includes('reasoner')) return 'expert';
+    if (text.includes('deepthink') || text.includes('deep think') || text.includes('r1')) return 'deepthink';
+    if (text.includes('instant') || text.includes('chat') || text.includes('flash')) return 'instant';
+    return null;
+  } catch (e) {
+    return null;
+  }
 }
