@@ -30,3 +30,17 @@ If applicable, add screenshots to help explain your problem.
 
 **Additional context**
 Add any other context about the problem here.
+
+---
+
+## Advanced Users
+
+If you are comfortable with the browser console, you can enable debug logging before reproducing the issue:
+
+1. Open the console (`F12` → Console)
+2. Run: `localStorage.setItem("bds:devlog", "true")`
+3. **Refresh the page (`F5`)** — required, value is read once at startup
+4. Reproduce the problem
+5. Copy the console output (`[BDS:MCP]`, `[BDS:Cmd]`, etc.) and paste it into your report
+
+To disable: `localStorage.removeItem("bds:devlog")` + refresh.
