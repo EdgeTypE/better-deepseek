@@ -32,7 +32,7 @@ describe("RemoteConfigManager", () => {
       expect(am.enabled).toBe(true);
       expect(am.instantMode.show).toBe(true);
       expect(am.expertMode.show).toBe(true);
-      expect(am.expertMode.showUploadFile).toBe(false);
+      expect(am.expertMode.showUploadFile).toBe(true);
       expect(am.deepthinkMode.show).toBe(true);
       expect(am.visionMode.show).toBe(true);
       expect(am.visionMode.showUploadFile).toBe(true);
@@ -54,7 +54,7 @@ describe("RemoteConfigManager", () => {
     });
 
     it("returns false for disabled flags", () => {
-      expect(getFlag("features.attachMenu.expertMode.showUploadFile")).toBe(false);
+      expect(getFlag("features.systemPromptInjection.forceDisableInExpert")).toBe(false);
     });
 
     it("returns true for enabled flags", () => {
@@ -82,11 +82,11 @@ describe("RemoteConfigManager", () => {
       const mode = getConfig("features.attachMenu.expertMode");
       expect(mode).toEqual({
         show: true,
-        showPlus: false,
-        showUploadFile: false,
-        showUploadFolder: false,
-        showGithub: false,
-        showWeb: false,
+        showPlus: true,
+        showUploadFile: true,
+        showUploadFolder: true,
+        showGithub: true,
+        showWeb: true,
         showProject: true,
         showVoice: true,
       });
@@ -563,13 +563,13 @@ describe("AttachMenu config integration (DOM model switching)", () => {
     expect(show).toBe(true);
   });
 
-  it("expert mode shows attach menu but hides upload-specific actions by default", () => {
+  it("expert mode shows attach menu and plus button by default", () => {
     expertRadio.setAttribute("aria-checked", "true");
     const model = detectModelType();
     const modelKey = getModelKey(model);
     expect(getFlag(`features.attachMenu.${modelKey}.show`)).toBe(true);
-    expect(getFlag(`features.attachMenu.${modelKey}.showPlus`)).toBe(false);
-    expect(getFlag(`features.attachMenu.${modelKey}.showUploadFile`)).toBe(false);
+    expect(getFlag(`features.attachMenu.${modelKey}.showPlus`)).toBe(true);
+    expect(getFlag(`features.attachMenu.${modelKey}.showUploadFile`)).toBe(true);
     expect(getFlag(`features.attachMenu.${modelKey}.showProject`)).toBe(true);
   });
 
@@ -584,7 +584,7 @@ describe("AttachMenu config integration (DOM model switching)", () => {
     model = detectModelType();
     modelKey = getModelKey(model);
     expect(getFlag(`features.attachMenu.${modelKey}.show`)).toBe(true);
-    expect(getFlag(`features.attachMenu.${modelKey}.showUploadFile`)).toBe(false);
+    expect(getFlag(`features.attachMenu.${modelKey}.showUploadFile`)).toBe(true);
   });
 
   it("remote config override takes effect for expert mode", () => {
@@ -600,7 +600,7 @@ describe("AttachMenu config integration (DOM model switching)", () => {
   it("partial applyRemote overrides specific model flag", () => {
     expertRadio.setAttribute("aria-checked", "true");
     remoteConfig.applyRemote({
-      features: { attachMenu: { expertMode: { showGithub: false } } },
+      features: { attachMenu: { expertMode: { showGithub: false, showWeb: false } } },
     });
     const model = detectModelType();
     const modelKey = getModelKey(model);

@@ -171,7 +171,7 @@ describe("AttachMenu integration", () => {
     cleanup();
   });
 
-  it("keeps safe Expert mode controls visible while hiding upload menu actions", async () => {
+  it("keeps Expert mode controls and plus button visible", async () => {
     document.body.insertAdjacentHTML("beforeend", `
       <div role="radiogroup">
         <div role="radio" data-model-type="instant" aria-checked="false">Instant</div>
@@ -186,7 +186,7 @@ describe("AttachMenu integration", () => {
     expect(target.querySelector(".bds-attach-wrapper")).toBeTruthy();
     expect(target.querySelector(".bds-project-btn")).toBeTruthy();
     expect(target.querySelector(".bds-mic-btn")).toBeTruthy();
-    expect(target.querySelector(".bds-plus-btn")).toBeNull();
+    expect(target.querySelector(".bds-plus-btn")).toBeTruthy();
     cleanup();
   });
 
@@ -236,12 +236,12 @@ describe("AttachMenu integration", () => {
     const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
 
     await flushModelWatcher();
-    expect(target.querySelector(".bds-plus-btn")).toBeNull();
+    expect(target.querySelector(".bds-plus-btn")).toBeTruthy();
 
     document.querySelector('[role="radiogroup"]').remove();
     await flushModelWatcher();
 
-    expect(target.querySelector(".bds-plus-btn")).toBeNull();
+    expect(target.querySelector(".bds-plus-btn")).toBeTruthy();
     cleanup();
   });
 

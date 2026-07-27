@@ -356,6 +356,7 @@
       "folderNoTextFiles": "No supported text files were found in the selected folder.",
       "pickTimeout": "The file picker did not return a result. Please try again.",
       "imagesRequireVision": "Images can only be attached in Vision mode.",
+      "expertModeWarning": "Due to DeepSeek platform limitations, these tools may not work properly in Expert mode.",
       "buttonTitle": "Advanced Upload",
       "attachProject": "Attach Project",
       "voicePrompt": "Voice Prompt",

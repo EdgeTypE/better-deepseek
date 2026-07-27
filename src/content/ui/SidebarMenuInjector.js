@@ -64,6 +64,7 @@ export function initSidebarMenuInjector() {
   // Secondary backup for menu injection on any click
   function handleBackupScan() {
     setTimeout(() => {
+      if (typeof document === "undefined") return;
       document.querySelectorAll(".ds-dropdown-menu").forEach((menu) => {
         injectOptions(menu);
         injectSettingsDrawerOptions(menu);
