@@ -5,6 +5,7 @@ import {
   GITHUB_COMMITS_PAGE_SIZE,
   normalizeGitHubCommitCount,
 } from "../lib/github-commits.js";
+import { devLog } from "../lib/dev-log.js";
 
 export {
   DEFAULT_GITHUB_COMMIT_COUNT,
@@ -574,7 +575,7 @@ function mcpHeaders(apiKey, sessionId, authMethod = "bearer") {
 async function mcpFetch(serverUrl, bodyObj, apiKey, { sessionId, signal, authMethod } = {}) {
   const startedAt = Date.now();
   const methodName = bodyObj?.method || "?";
-  console.log(`[BDS:MCP] >> ${methodName} @ ${serverUrl} [auth=${authMethod}, sessionId=${sessionId}]`);
+  devLog("MCP", `>> ${methodName} @ ${serverUrl} [auth=${authMethod}, sessionId=${sessionId}]`);
 
   const ac = !signal ? new AbortController() : null;
   const resolvedSignal = signal || ac.signal;
@@ -596,7 +597,7 @@ async function mcpFetch(serverUrl, bodyObj, apiKey, { sessionId, signal, authMet
     }
 
     const responseSessionId = resp.headers.get("Mcp-Session-Id") || null;
-    console.log(`[BDS:MCP] << ${methodName} → ${resp.status} (${Date.now() - startedAt}ms) sessionId=${responseSessionId} ct=${(resp.headers.get("content-type") || "").toLowerCase()}`);
+    devLog("MCP", `<< ${methodName} → ${resp.status} (${Date.now() - startedAt}ms) sessionId=${responseSessionId} ct=${(resp.headers.get("content-type") || "").toLowerCase()}`);
 
     const ct = (resp.headers.get("content-type") || "").toLowerCase();
     let result;
@@ -680,16 +681,16 @@ async function mcpEnsureInitialized(serverUrl, apiKey) {
     let usedMethod = "none";
 
     for (const attempt of attempts) {
-      console.log(`[BDS:MCP] Trying init with authMethod=${attempt.authMethod}`);
+      devLog("MCP", `Trying init with authMethod=${attempt.authMethod}`);
       try {
         result = await mcpFetch(serverUrl, initBody, attempt.key, { authMethod: attempt.authMethod });
         usedMethod = attempt.authMethod;
         lastError = null;
-        console.log(`[BDS:MCP] Init succeeded with authMethod=${usedMethod}, sessionId=${result.sessionId}`);
+        devLog("MCP", `Init succeeded with authMethod=${usedMethod}, sessionId=${result.sessionId}`);
         break;
       } catch (err) {
         if (err.status === 401 || err.status === 403) {
-          console.log(`[BDS:MCP] Init rejected (${err.status}) with authMethod=${attempt.authMethod}, trying next`);
+          devLog("MCP", `Init rejected (${err.status}) with authMethod=${attempt.authMethod}, trying next`);
           lastError = err;
           continue;
         }
