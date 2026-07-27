@@ -17,6 +17,7 @@ import { injectPythonRunButtons } from "./dom/python-injector.js";
 import { injectJavaScriptRunButtons } from "./dom/javascript-injector.js";
 import { injectLuaRunButtons } from "./dom/lua-injector.js";
 import { injectRubyRunButtons } from "./dom/ruby-injector.js";
+import { injectDynamicTableFeatures } from "./dom/table-injector.js";
 import { parseBdsMessage } from "./parser/index.js";
 import { cleanBdsString } from "./tags/tag-hider.js";
 import { upsertMemories } from "./parser/memory-parser.js";
@@ -177,6 +178,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
   injectJavaScriptRunButtons(node);
   injectLuaRunButtons(node);
   injectRubyRunButtons(node);
+  injectDynamicTableFeatures(node);
   injectSelectionCheckbox(node);
   injectBookmarkButton(node);
 
