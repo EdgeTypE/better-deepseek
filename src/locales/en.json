@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-05-19T00:00:00Z",
+  "updatedAt": "2026-07-27T00:00:00Z",
   "messages": {
     "common": {
       "save": "Save",
@@ -1131,6 +1131,19 @@
       "betaFeatureDescription": "Beta endpoint features (use with caution).",
       "codeGen": "Code Gen",
       "promptSuffix": "Prompt Suffix"
+    },
+    "tableInjector": {
+      "columnOptions": "Column options",
+      "hideRow": "Hide row",
+      "manageColumnsRows": "Manage columns & rows",
+      "sortAsc": "\u25B2 Sort A \u2192 Z",
+      "sortDesc": "\u25BC Sort Z \u2192 A",
+      "hideColumn": "Hide column",
+      "showColumn": "Show column",
+      "columns": "Columns",
+      "hiddenRows": "Hidden rows ({{count}})",
+      "showAll": "Show all columns & rows",
+      "columnLabel": "Column {{n}}"
     },
     "tips": {
       "title": "\uD83D\uDCA1 Tip",

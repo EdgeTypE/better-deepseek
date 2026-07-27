@@ -1,4 +1,5 @@
 import { devLog } from "../../lib/dev-log.js";
+import { i18n } from "../../lib/i18n.svelte.js";
 
 const ENHANCED_ATTR = "data-bds-table-enhanced";
 const HIDDEN_COL_ATTR = "data-bds-col-hidden";
@@ -56,7 +57,7 @@ function enhanceTable(table) {
     const menuBtn = document.createElement("span");
     menuBtn.className = "bds-col-menu-btn";
     menuBtn.textContent = "\u25BE";
-    menuBtn.title = "Column options";
+    menuBtn.title = i18n.t("tableInjector.columnOptions");
     th.appendChild(menuBtn);
 
     th.addEventListener("click", (e) => {
@@ -144,7 +145,7 @@ function enhanceTable(table) {
     const hideBtn = document.createElement("span");
     hideBtn.className = "bds-row-hide-btn";
     hideBtn.textContent = "\u2212";
-    hideBtn.title = "Hide row";
+    hideBtn.title = i18n.t("tableInjector.hideRow");
     hideBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       row.setAttribute(HIDDEN_ROW_ATTR, "");
@@ -155,7 +156,7 @@ function enhanceTable(table) {
   const gearBtn = document.createElement("span");
   gearBtn.className = "bds-table-gear";
   gearBtn.textContent = "\u2699";
-  gearBtn.title = "Manage columns & rows";
+  gearBtn.title = i18n.t("tableInjector.manageColumnsRows");
   table.classList.add("bds-table-enhanced");
   gearBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -284,7 +285,7 @@ function showColumnDropdown(event, table, colIndex, btn) {
 
   const sortAsc = document.createElement("div");
   sortAsc.className = "bds-col-dropdown-item";
-  sortAsc.textContent = "\u25B2 Sort A \u2192 Z";
+  sortAsc.textContent = i18n.t("tableInjector.sortAsc");
   sortAsc.addEventListener("click", (e) => {
     e.stopPropagation();
     dropdown.remove();
@@ -295,7 +296,7 @@ function showColumnDropdown(event, table, colIndex, btn) {
 
   const sortDesc = document.createElement("div");
   sortDesc.className = "bds-col-dropdown-item";
-  sortDesc.textContent = "\u25BC Sort Z \u2192 A";
+  sortDesc.textContent = i18n.t("tableInjector.sortDesc");
   sortDesc.addEventListener("click", (e) => {
     e.stopPropagation();
     dropdown.remove();
@@ -311,7 +312,7 @@ function showColumnDropdown(event, table, colIndex, btn) {
   const isHidden = th.hasAttribute(HIDDEN_COL_ATTR);
   const hideItem = document.createElement("div");
   hideItem.className = "bds-col-dropdown-item";
-  hideItem.textContent = isHidden ? "Show column" : "Hide column";
+  hideItem.textContent = isHidden ? i18n.t("tableInjector.showColumn") : i18n.t("tableInjector.hideColumn");
   hideItem.addEventListener("click", (e) => {
     e.stopPropagation();
     dropdown.remove();
@@ -378,7 +379,7 @@ function showManagePopover(event, table, gearBtn) {
   colSection.className = "bds-manage-section";
   const colTitle = document.createElement("div");
   colTitle.className = "bds-manage-section-title";
-  colTitle.textContent = "Columns";
+  colTitle.textContent = i18n.t("tableInjector.columns");
   colSection.appendChild(colTitle);
 
   const thead = table.querySelector("thead");
@@ -386,7 +387,7 @@ function showManagePopover(event, table, gearBtn) {
 
   for (let i = 0; i < ths.length; i++) {
     const th = ths[i];
-    const label = th.textContent.trim().replace(/[\u2195\u25BE\u2699]/g, "").trim() || "Column " + (i + 1);
+    const label = th.textContent.trim().replace(/[\u2195\u25BE\u2699]/g, "").trim() || i18n.t("tableInjector.columnLabel", { n: i + 1 });
     const row = document.createElement("label");
     row.className = "bds-manage-row";
     const cb = document.createElement("input");
@@ -415,7 +416,7 @@ function showManagePopover(event, table, gearBtn) {
     rowSection.className = "bds-manage-section";
     const rowTitle = document.createElement("div");
     rowTitle.className = "bds-manage-section-title";
-    rowTitle.textContent = "Hidden rows (" + hiddenRows.length + ")";
+    rowTitle.textContent = i18n.t("tableInjector.hiddenRows", { count: hiddenRows.length });
     rowSection.appendChild(rowTitle);
 
     for (const hr of hiddenRows) {
@@ -435,7 +436,7 @@ function showManagePopover(event, table, gearBtn) {
 
   const showAll = document.createElement("div");
   showAll.className = "bds-manage-show-all";
-  showAll.textContent = "Show all columns & rows";
+  showAll.textContent = i18n.t("tableInjector.showAll");
   showAll.addEventListener("click", () => {
     const allCells = table.querySelectorAll("[" + HIDDEN_COL_ATTR + "]");
     for (const c of allCells) c.removeAttribute(HIDDEN_COL_ATTR);

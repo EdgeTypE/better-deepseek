@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-06-30T00:00:00Z",
+  "updatedAt": "2026-07-27T00:00:00Z",
   "messages": {
     "common": {
       "save": "保存",
@@ -184,7 +184,9 @@
       "exitEditMode": "退出编辑模式",
       "noSnippets": "暂无 CSS 片段。",
       "advancedSearchPlaceholder": "搜索设置…",
-      "advancedNoResults": "未找到匹配的设置。"
+      "advancedNoResults": "未找到匹配的设置。",
+      "disableTipBox": "禁用提示框",
+      "disableTipBoxHint": "每次打开抽屉时显示随机提示。"
     },
     "skillList": {
       "title": "技能集",
@@ -568,7 +570,27 @@
       "inlineMaxChars": "内联最大字符数",
       "inlineMaxCharsHint": "MCP工具列表和结果内联发送的最大字符数。如果工具列表超出限制，多余的工具将被省略并显示计数警告。如果结果被拒绝，将尝试更短的版本。",
       "transportNote": "注意：仅支持 HTTP/Streamable HTTP 传输。",
-      "connected": "已连接：发现 {{count}} 个工具"
+      "connected": "已连接：发现 {{count}} 个工具",
+      "sectionTitle": "MCP 服务器",
+      "description": "添加远程 MCP（模型上下文协议）服务器。AI 可以发现并调用这些服务器上的工具。",
+      "test": "测试",
+      "testLoading": "测试中...",
+      "edit": "编辑",
+      "addServer": "添加 MCP 服务器",
+      "addModalTitle": "添加 MCP 服务器",
+      "editModalTitle": "编辑 MCP 服务器",
+      "nameLabel": "名称",
+      "namePlaceholder": "我的 MCP 服务器",
+      "serverUrlLabel": "服务器 URL",
+      "serverUrlPlaceholder": "https://example.com/mcp",
+      "apiKeyLabel": "API 密钥（可选）",
+      "apiKeyPlaceholder": "sk-...",
+      "enabledLabel": "启用",
+      "cancel": "取消",
+      "save": "保存",
+      "deleteConfirm": "删除 MCP 服务器“{{name}}”？",
+      "testFailed": "MCP 测试失败：{{message}}",
+      "toolsCount": "{{count}} 个工具"
     },
     "expandToggle": {
       "expand": "展开",
@@ -1105,6 +1127,34 @@
       "betaFeatureDescription": "Beta 端点功能，请谨慎使用。",
       "codeGen": "代码生成",
       "promptSuffix": "提示词后缀"
+    },
+    "tableInjector": {
+      "columnOptions": "\u5217\u9009\u9879",
+      "hideRow": "\u9690\u85CF\u884C",
+      "manageColumnsRows": "\u7BA1\u7406\u5217\u548C\u884C",
+      "sortAsc": "\u25B2 \u5347\u5E8F\u6392\u5E8F A\u2192Z",
+      "sortDesc": "\u25BC \u964D\u5E8F\u6392\u5E8F Z\u2192A",
+      "hideColumn": "\u9690\u85CF\u5217",
+      "showColumn": "\u663E\u793A\u5217",
+      "columns": "\u5217",
+      "hiddenRows": "\u9690\u85CF\u7684\u884C ({{count}})",
+      "showAll": "\u663E\u793A\u6240\u6709\u5217\u548C\u884C",
+      "columnLabel": "\u5217 {{n}}"
+    },
+    "tips": {
+      "title": "\uD83D\uDCA1 \u63D0\u793A",
+      "disableInSettings": "\u60A8\u53EF\u4EE5\u5728\u8BBE\u7F6E\u4E2D\u5173\u95ED\u6B64\u529F\u80FD\u3002",
+      "0": "\u8981\u5BFC\u51FA\u804A\u5929\u8BB0\u5F55\uFF0C\u8BF7\u70B9\u51FB\u804A\u5929\u5386\u53F2\u4E2D\u4F1A\u8BDD\u65C1\u8FB9\u7684 ... \u6309\u94AE\u3002",
+      "1": "\u60A8\u53EF\u4EE5\u5728\u8BBE\u7F6E\u4E2D\u5173\u95ED\u6B64\u63D0\u793A\u6846\u3002",
+      "2": "\u60A8\u53EF\u4EE5\u5BFC\u51FA\u5F53\u524D\u8BBE\u7F6E\u548C\u6570\u636E\u3002\u8BF7\u8BBF\u95EE\u9AD8\u7EA7\u8BBE\u7F6E\u90E8\u5206\u3002",
+      "3": "\u5C06\u5E38\u7528\u63D0\u793A\u4FDD\u5B58\u4E3A\u7247\u6BB5\uFF0C\u4EE5\u540E\u53EF\u4EE5\u8F7B\u677E\u518D\u6B21\u53D1\u9001\u3002\u60A8\u751A\u81F3\u53EF\u4EE5\u5C06\u7247\u6BB5\u5206\u914D\u7ED9 \"/\" \u547D\u4EE4\u4EE5\u52A0\u5FEB\u64CD\u4F5C\u901F\u5EA6\u3002\u8BE6\u60C5\u8BF7\u8BBF\u95EE BDS \u62BD\u5C49\u4E2D\u7684\u7247\u6BB5\u9009\u9879\u5361\u3002",
+      "4": "\u60A8\u77E5\u9053\u5417\uFF1F\u60A8\u53EF\u4EE5\u6FC0\u6D3B\u591A\u7CFB\u7EDF\u63D0\u793A\u6A21\u5F0F\uFF0C\u540C\u65F6\u4F7F\u7528\u591A\u4E2A\u7CFB\u7EDF\u63D0\u793A\uFF0C\u914D\u5408\u5404\u79CD\u65F6\u95F4\u8868\u548C\u6761\u4EF6\uFF0C\u521B\u5EFA\u81EA\u5B9A\u4E49\u5DE5\u4F5C\u6D41\u7A0B\u3002",
+      "5": "\u60A8\u53EF\u4EE5\u4ECE\u5176\u4ED6 AI \u5C06\u8BB0\u5FC6\u5BFC\u5165 BDS\u3002\u70B9\u51FB\u8BB0\u5FC6\u90E8\u5206\u5E95\u90E8\u7684\u300C\u4ECE\u5176\u4ED6 AI \u5BFC\u5165\u8BB0\u5FC6\u300D\u3002",
+      "6": "\u60A8\u77E5\u9053\u5417\uFF1FBetter DeepSeek \u4E5F\u6709 <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">Android \u5E94\u7528</a>\uFF1F",
+      "7": "\u5982\u679C\u60A8\u559C\u6B22\u8FD9\u4E2A\u6269\u5C55\uFF0C\u8BF7\u4E0E\u670B\u53CB\u5206\u4EAB\uFF01\u8981\u8BF7\u6C42\u529F\u80FD\uFF0C\u8BF7\u5728 <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub \u9875\u9762</a>\u4E0A\u544A\u8BC9\u6211\u4EEC\u3002",
+      "8": "\u60A8\u77E5\u9053\u5417\uFF1F\u60A8\u53EF\u4EE5\u5C06 MCP \u670D\u52A1\u5668\u8FDE\u63A5\u5230 Better DeepSeek\u3002\u8BF7\u67E5\u770B\u9AD8\u7EA7\u8BBE\u7F6E\u3002",
+      "9": "\u60A8\u53EF\u4EE5\u4F7F\u7528\u81EA\u5B9A\u4E49 CSS \u968F\u610F\u5B9A\u5236\u754C\u9762\u3002",
+      "10": "\u6211\u4EEC\u5E0C\u671B\u4E3A Better DeepSeek \u6DFB\u52A0\u66F4\u591A\u8BED\u8A00\u652F\u6301\u3002\u5982\u679C\u60A8\u60F3\u6DFB\u52A0\u81EA\u5DF1\u7684\u8BED\u8A00\uFF0C\u8BF7<a href=\"https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md\" target=\"_blank\" rel=\"noopener noreferrer\">\u67E5\u770B\u8FD9\u91CC</a>\u3002\u53E6\u5916\uFF0C\u5982\u679C\u60A8\u53D1\u73B0\u4EFB\u4F55\u7FFB\u8BD1\u9519\u8BEF\uFF0C\u53EF\u4EE5\u4FEE\u590D\u5B83\u4EEC\u3002"
     }
   }
 }

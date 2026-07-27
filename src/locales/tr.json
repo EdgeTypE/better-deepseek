@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-05-19T00:00:00Z",
+  "updatedAt": "2026-07-27T00:00:00Z",
   "messages": {
     "common": {
       "save": "Kaydet",
@@ -1128,6 +1128,19 @@
       "enterJsonSchema": "JSON şeması girin...",
       "useActiveKey": "Kullanılan anahtar: {{name}}",
       "noActiveKey": "Aktif API anahtarı yok"
+    },
+    "tableInjector": {
+      "columnOptions": "S\u00FCtun se\u00E7enekleri",
+      "hideRow": "Sat\u0131r\u0131 gizle",
+      "manageColumnsRows": "S\u00FCtunlar\u0131 ve sat\u0131rlar\u0131 y\u00F6net",
+      "sortAsc": "\u25B2 A'dan Z'ye s\u0131rala",
+      "sortDesc": "\u25BC Z'den A'ya s\u0131rala",
+      "hideColumn": "S\u00FCtunu gizle",
+      "showColumn": "S\u00FCtunu g\u00F6ster",
+      "columns": "S\u00FCtunlar",
+      "hiddenRows": "Gizli sat\u0131rlar ({{count}})",
+      "showAll": "T\u00FCm s\u00FCtunlar\u0131 ve sat\u0131rlar\u0131 g\u00F6ster",
+      "columnLabel": "S\u00FCtun {{n}}"
     },
     "tips": {
       "title": "\uD83D\uDCA1 \u0130pucu",
