@@ -589,7 +589,7 @@ async function mcpFetch(serverUrl, bodyObj, apiKey, { sessionId, signal, authMet
     });
     if (!resp.ok) {
       let detail = "";
-      try { detail = await resp.text(); } catch (e) {}
+      try { detail = await resp.text(); } catch (e) { }
       throw Object.assign(
         new Error(`MCP server returned ${resp.status}${detail ? ": " + detail.slice(0, 300) : ""}`),
         { status: resp.status },
@@ -665,7 +665,7 @@ async function mcpEnsureInitialized(serverUrl, apiKey) {
 
   const initBody = {
     jsonrpc: "2.0", id: 1, method: "initialize",
-    params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "better-deepseek", version: "0.1.11" } },
+    params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "better-deepseek", version: "0.1.12" } },
   };
 
   entry.initialized = (async () => {
@@ -707,7 +707,7 @@ async function mcpEnsureInitialized(serverUrl, apiKey) {
     entry.sessionId = result.sessionId;
     entry.authMethod = usedMethod;
 
-    mcpFetch(serverUrl, { jsonrpc: "2.0", method: "notifications/initialized" }, apiKey, { sessionId: result.sessionId, authMethod: usedMethod }).catch(() => {});
+    mcpFetch(serverUrl, { jsonrpc: "2.0", method: "notifications/initialized" }, apiKey, { sessionId: result.sessionId, authMethod: usedMethod }).catch(() => { });
   })().catch(err => {
     mcpInitCache.delete(key);
     throw err;

@@ -1,9 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Better DeepSeek",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "Enhanced UX layer for DeepSeek with hidden prompts, tools, memory, document generation, and long-work packaging.",
-  "permissions": ["storage"],
+  "permissions": [
+    "storage"
+  ],
   "host_permissions": [
     "https://chat.deepseek.com/*",
     "https://codeload.github.com/*",
@@ -13,23 +15,38 @@
   ],
   "content_scripts": [
     {
-      "matches": ["https://chat.deepseek.com/*"],
-      "js": ["content.js"],
-      "css": ["content.css"],
+      "matches": [
+        "https://chat.deepseek.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["injected.js", "sandbox.html", "sandbox.js", "static/loading/*.svg"],
-      "matches": ["https://chat.deepseek.com/*"]
+      "resources": [
+        "injected.js",
+        "sandbox.html",
+        "sandbox.js",
+        "static/loading/*.svg"
+      ],
+      "matches": [
+        "https://chat.deepseek.com/*"
+      ]
     }
   ],
   "background": {
     "service_worker": "background.js"
   },
   "sandbox": {
-    "pages": ["sandbox.html"]
+    "pages": [
+      "sandbox.html"
+    ]
   },
   "action": {
     "default_title": "Better DeepSeek"
