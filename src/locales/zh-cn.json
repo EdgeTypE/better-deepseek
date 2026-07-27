@@ -355,6 +355,7 @@
       "folderNoTextFiles": "所选文件夹中未找到受支持的文本文件。",
       "pickTimeout": "文件选择器未返回结果。请重试。",
       "imagesRequireVision": "图片只能在 Vision 模式下附加。",
+      "expertModeWarning": "由于 DeepSeek 平台限制，这些工具在 Expert 模式下可能无法正常工作。",
       "buttonTitle": "高级上传",
       "attachProject": "关联项目",
       "voicePrompt": "语音输入",
@@ -795,6 +796,23 @@
       "seeAllChanges": "在 GitHub 上查看 v{{version}} 的全部变更",
       "seeDetailed": "在 GitHub 上查看详细发布说明",
       "features": {
+        "v0_1_11": {
+          "title": "MCP \u670D\u52A1\u5668\u3001\u52A8\u6001\u8868\u683C\u4E0E\u7A33\u5B9A\u6027\u6539\u8FDB",
+          "features": {
+            "feat_0": {
+              "title": "MCP \u670D\u52A1\u5668\u652F\u6301",
+              "description": "\u5C06\u8FDC\u7A0B MCP \u670D\u52A1\u5668\u8FDE\u63A5\u5230 DeepSeek \u4EE5\u83B7\u53D6\u5916\u90E8\u5DE5\u5177\u8BBF\u95EE\u3002\u5728\u8BBE\u7F6E \u2192 \u9AD8\u7EA7\u8BBE\u7F6E \u2192 MCP \u670D\u52A1\u5668\u4E2D\u914D\u7F6E\u670D\u52A1\u5668\u3002"
+            },
+            "feat_1": {
+              "title": "\u52A8\u6001\u8868\u683C",
+              "description": "\u76F4\u63A5\u5728 DeepSeek \u751F\u6210\u7684\u8868\u683C\u4E2D\u6392\u5E8F\u6570\u636E\u548C\u91CD\u65B0\u6392\u5217\u5217\u3002"
+            },
+            "feat_2": {
+              "title": "\u7A33\u5B9A\u6027\u4E0E\u7528\u6237\u4F53\u9A8C\u6539\u8FDB",
+              "description": "\u6269\u5C55\u4E2D\u6570\u5341\u4E2A\u9519\u8BEF\u4FEE\u590D\u548C UI/UX \u6539\u8FDB\u3002"
+            }
+          }
+        },
         "v0_1_10": {
           "title": "稳定性与改进",
           "features": {
@@ -1154,7 +1172,8 @@
       "7": "\u5982\u679C\u60A8\u559C\u6B22\u8FD9\u4E2A\u6269\u5C55\uFF0C\u8BF7\u4E0E\u670B\u53CB\u5206\u4EAB\uFF01\u8981\u8BF7\u6C42\u529F\u80FD\uFF0C\u8BF7\u5728 <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub \u9875\u9762</a>\u4E0A\u544A\u8BC9\u6211\u4EEC\u3002",
       "8": "\u60A8\u77E5\u9053\u5417\uFF1F\u60A8\u53EF\u4EE5\u5C06 MCP \u670D\u52A1\u5668\u8FDE\u63A5\u5230 Better DeepSeek\u3002\u8BF7\u67E5\u770B\u9AD8\u7EA7\u8BBE\u7F6E\u3002",
       "9": "\u60A8\u53EF\u4EE5\u4F7F\u7528\u81EA\u5B9A\u4E49 CSS \u968F\u610F\u5B9A\u5236\u754C\u9762\u3002",
-      "10": "\u6211\u4EEC\u5E0C\u671B\u4E3A Better DeepSeek \u6DFB\u52A0\u66F4\u591A\u8BED\u8A00\u652F\u6301\u3002\u5982\u679C\u60A8\u60F3\u6DFB\u52A0\u81EA\u5DF1\u7684\u8BED\u8A00\uFF0C\u8BF7<a href=\"https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md\" target=\"_blank\" rel=\"noopener noreferrer\">\u67E5\u770B\u8FD9\u91CC</a>\u3002\u53E6\u5916\uFF0C\u5982\u679C\u60A8\u53D1\u73B0\u4EFB\u4F55\u7FFB\u8BD1\u9519\u8BEF\uFF0C\u53EF\u4EE5\u4FEE\u590D\u5B83\u4EEC\u3002"
+      "10": "\u6211\u4EEC\u5E0C\u671B\u4E3A Better DeepSeek \u6DFB\u52A0\u66F4\u591A\u8BED\u8A00\u652F\u6301\u3002\u5982\u679C\u60A8\u60F3\u6DFB\u52A0\u81EA\u5DF1\u7684\u8BED\u8A00\uFF0C\u8BF7<a href=\"https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md\" target=\"_blank\" rel=\"noopener noreferrer\">\u67E5\u770B\u8FD9\u91CC</a>\u3002\u53E6\u5916\uFF0C\u5982\u679C\u60A8\u53D1\u73B0\u4EFB\u4F55\u7FFB\u8BD1\u9519\u8BEF\uFF0C\u53EF\u4EE5\u4FEE\u590D\u5B83\u4EEC\u3002",
+      "11": "\u60A8\u53EF\u4EE5\u901A\u8FC7\u5355\u51FB\u4F1A\u8BDD\u5386\u53F2\u4E2D\u7684 ... \u6309\u94AE\u4E3A\u4EFB\u4F55\u804A\u5929\u4F1A\u8BDD\u5206\u914D\u6807\u7B7E\u3002\u7136\u540E\u4F7F\u7528\u8FD9\u4E9B\u6807\u7B7E\u5FEB\u901F\u641C\u7D22\u6216\u8FC7\u6EE4\u60A8\u7684\u5BF9\u8BDD\u3002"
     }
   }
 }

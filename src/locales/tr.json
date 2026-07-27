@@ -797,6 +797,23 @@
       "seeAllChanges": "v{{version}} sürümündeki tüm değişiklikleri GitHub'da gör",
       "seeDetailed": "Detaylı sürüm notlarını GitHub'da gör",
       "features": {
+        "v0_1_11": {
+          "title": "MCP Sunucular\u0131, Dinamik Tablolar ve Kararl\u0131l\u0131k",
+          "features": {
+            "feat_0": {
+              "title": "MCP Sunucu Deste\u011Fi",
+              "description": "Harici ara\u00E7 eri\u015Fimi i\u00E7in DeepSeek'e uzaktan MCP sunucular\u0131 ba\u011Flay\u0131n. Sunucular\u0131 Ayarlar \u2192 Geli\u015Fmi\u015F Ayarlar \u2192 MCP Sunucular\u0131 b\u00F6l\u00FCm\u00FCnden yap\u0131land\u0131r\u0131n."
+            },
+            "feat_1": {
+              "title": "Dinamik Tablolar",
+              "description": "DeepSeek taraf\u0131ndan olu\u015Fturulan tablolarda verileri do\u011Frudan s\u0131ralay\u0131n ve s\u00FCtunlar\u0131 yeniden d\u00FCzenleyin."
+            },
+            "feat_2": {
+              "title": "Kararl\u0131l\u0131k ve UX \u0130yile\u015Ftirmeleri",
+              "description": "Eklenti genelinde d\u00FCzinlerce hata d\u00FCzeltmesi ve UI/UX iyile\u015Ftirmesi."
+            }
+          }
+        },
         "v0_1_10": {
           "title": "Kararlılık ve İyileştirmeler",
           "features": {
@@ -1156,7 +1173,8 @@
       "7": "Eklentiden memnunsan arkada\u015Flar\u0131nla payla\u015F\u0131rsan \u00E7ok seviniriz. Ayr\u0131ca eklentide olmas\u0131n\u0131 istedi\u011Fin bir \u00F6zellik var ise <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub</a> sayfam\u0131zdan bildirebilirsin.",
       "8": "Better DeepSeek'e MCP serverlar\u0131 ba\u011Flayabilece\u011Finizi biliyor muydunuz? Geli\u015Fmi\u015F ayarlar\u0131 ziyaret edin.",
       "9": "Custom CSS'ler ile aray\u00FCz\u00FC diledi\u011Fin gibi \u00F6zelle\u015Ftirebilirsin.",
-      "10": "Better DeepSeek'e daha fazla dil deste\u011Fi eklemek istiyoruz. Sen de kendi dilini eklemek istersen <a href=\"https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md\" target=\"_blank\" rel=\"noopener noreferrer\">buraya</a> g\u00F6z atabilirsin. Ayr\u0131ca \u00E7eviri hatalar\u0131n\u0131n oldu\u011Funu d\u00FC\u015F\u00FCn\u00FCyorsan d\u00FCzeltebilirsin."
+      "10": "Better DeepSeek'e daha fazla dil deste\u011Fi eklemek istiyoruz. Sen de kendi dilini eklemek istersen <a href=\"https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md\" target=\"_blank\" rel=\"noopener noreferrer\">buraya</a> g\u00F6z atabilirsin. Ayr\u0131ca \u00E7eviri hatalar\u0131n\u0131n oldu\u011Funu d\u00FC\u015F\u00FCn\u00FCyorsan d\u00FCzeltebilirsin.",
+      "11": "Sohbet ge\u00E7mi\u015Finde ... butonuna t\u0131klayarak herhangi bir sohbet oturumuna etiket atayabilirsin. Ard\u0131ndan bu etiketleri kullanarak konu\u015Fmalar\u0131n\u0131 h\u0131zl\u0131ca arayabilir veya filtreleyebilirsin."
     }
   }
 }
