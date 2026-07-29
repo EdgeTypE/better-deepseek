@@ -5005,3 +5005,14 @@ tr:hover .bds-row-hide-btn:hover {
 .bds-col-drop-right {
   transition: none !important;
 }
+
+.bds-share-warning {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: rgba(245, 158, 11, 0.08);
+  border-left: 3px solid #f59e0b;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--bds-text-secondary, #6b6b6b);
+}

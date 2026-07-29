@@ -1160,6 +1160,9 @@
       "showAll": "T\u00FCm s\u00FCtunlar\u0131 ve sat\u0131rlar\u0131 g\u00F6ster",
       "columnLabel": "S\u00FCtun {{n}}"
     },
+    "shareModal": {
+      "searchEngineWarning": "Paylaşılan sohbetler, arama motorları tarafından bulunup indekslenebilir."
+    },
     "tips": {
       "title": "\uD83D\uDCA1 \u0130pucu",
       "disableInSettings": "Bu ipucunu Ayarlar'dan kapatabilirsin.",

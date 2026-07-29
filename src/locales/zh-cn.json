@@ -1159,6 +1159,9 @@
       "showAll": "\u663E\u793A\u6240\u6709\u5217\u548C\u884C",
       "columnLabel": "\u5217 {{n}}"
     },
+    "shareModal": {
+      "searchEngineWarning": "共享的对话可能会被搜索引擎发现并索引。"
+    },
     "tips": {
       "title": "\uD83D\uDCA1 \u63D0\u793A",
       "disableInSettings": "\u60A8\u53EF\u4EE5\u5728\u8BBE\u7F6E\u4E2D\u5173\u95ED\u6B64\u529F\u80FD\u3002",

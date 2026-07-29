@@ -1163,6 +1163,9 @@
       "showAll": "Show all columns & rows",
       "columnLabel": "Column {{n}}"
     },
+    "shareModal": {
+      "searchEngineWarning": "Shared conversations may be discovered and indexed by search engines."
+    },
     "tips": {
       "title": "\uD83D\uDCA1 Tip",
       "disableInSettings": "You can disable this from Settings.",
