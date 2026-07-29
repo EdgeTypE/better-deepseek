@@ -615,7 +615,8 @@
       "webFetchRequested": "Web page is being fetched",
       "githubFetchRequested": "GitHub repository is being fetched",
       "searchRequested": "Searching DuckDuckGo...",
-      "memoryStored": "Memory stored ({{count}})."
+      "memoryStored": "Memory stored ({{count}}).",
+      "downloadMd": "Download as .md"
     },
     "sidebarMenu": {
       "tags": "Tags (BDS)",
@@ -1180,7 +1181,8 @@
       "8": "Did you know you can connect MCP servers to Better DeepSeek? Check the Advanced Settings.",
       "9": "You can customize the interface however you like with Custom CSS.",
       "10": "We want to add more language support to Better DeepSeek. If you want to add your own language, check it out <a href=\"https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md\" target=\"_blank\" rel=\"noopener noreferrer\">here</a>. Also, if you notice any translation errors, you can fix them.",
-      "11": "You can assign tags to any chat session by clicking the ... button in the session history. Then use those tags to quickly search or filter your conversations."
+      "11": "You can assign tags to any chat session by clicking the ... button in the session history. Then use those tags to quickly search or filter your conversations.",
+      "12": "You can create new skills or characters just by asking DeepSeek. Simply tell it what you need."
     }
   }
 }

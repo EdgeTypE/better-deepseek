@@ -612,7 +612,8 @@
       "webFetchRequested": "Web sayfası getiriliyor",
       "githubFetchRequested": "GitHub deposu getiriliyor",
       "searchRequested": "DuckDuckGo aranıyor...",
-      "memoryStored": "Bellek kaydedildi ({{count}})."
+      "memoryStored": "Bellek kaydedildi ({{count}}).",
+      "downloadMd": ".md olarak indir"
     },
     "savedItems": {
       "title": "Kaydedilenler",
@@ -1177,7 +1178,8 @@
       "8": "Better DeepSeek'e MCP serverlar\u0131 ba\u011Flayabilece\u011Finizi biliyor muydunuz? Geli\u015Fmi\u015F ayarlar\u0131 ziyaret edin.",
       "9": "Custom CSS'ler ile aray\u00FCz\u00FC diledi\u011Fin gibi \u00F6zelle\u015Ftirebilirsin.",
       "10": "Better DeepSeek'e daha fazla dil deste\u011Fi eklemek istiyoruz. Sen de kendi dilini eklemek istersen <a href=\"https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md\" target=\"_blank\" rel=\"noopener noreferrer\">buraya</a> g\u00F6z atabilirsin. Ayr\u0131ca \u00E7eviri hatalar\u0131n\u0131n oldu\u011Funu d\u00FC\u015F\u00FCn\u00FCyorsan d\u00FCzeltebilirsin.",
-      "11": "Sohbet ge\u00E7mi\u015Finde ... butonuna t\u0131klayarak herhangi bir sohbet oturumuna etiket atayabilirsin. Ard\u0131ndan bu etiketleri kullanarak konu\u015Fmalar\u0131n\u0131 h\u0131zl\u0131ca arayabilir veya filtreleyebilirsin."
+      "11": "Sohbet ge\u00E7mi\u015Finde ... butonuna t\u0131klayarak herhangi bir sohbet oturumuna etiket atayabilirsin. Ard\u0131ndan bu etiketleri kullanarak konu\u015Fmalar\u0131n\u0131 h\u0131zl\u0131ca arayabilir veya filtreleyebilirsin.",
+      "12": "Yeni bir skill ya da karakter olu\u015Furmak i\u00E7in DeepSeek'i kullanabilirsin. \u0130stemen/sorman yeter."
     }
   }
 }

@@ -23,6 +23,7 @@
   import McpErrorCard from "./McpErrorCard.svelte";
   import { t } from "../../lib/i18n.svelte.js";
   import { parseLooseJson } from "../parser/json-repair.js";
+  import { triggerTextDownload } from "../../lib/utils/download.js";
 
 
   /** 
@@ -135,6 +136,18 @@
 
   function getRunId(block) {
     return block.attrs.runId || block.attrs.runid || "";
+  }
+
+  function downloadItemAsMd(block, type) {
+    const name = block.attrs.name || 'unnamed';
+    const usage = type === 'character'
+      ? (block.attrs.usage || block.attrs.kullanim_alani || '')
+      : (block.attrs.usage || '');
+    const content = block.content || '';
+    const title = type === 'character' ? 'Character' : 'Skill';
+    const md = `# ${title}: ${name}\n\n## Usage\n${usage}\n\n## Content\n${content}`.trim();
+    const safeName = name.replace(/[^a-zA-Z0-9_\u0080-\uffff-]/g, '_');
+    triggerTextDownload(md, `${safeName}.md`);
   }
 
   function approveDeepResearch(block) {
@@ -290,6 +303,13 @@
             <div class="bds-question-title">{t('messageOverlay.characterCreated')}</div>
             <div class="bds-question-subtitle">{@html t('messageOverlay.characterActive', { name: block.attrs.name || 'New Character' })}</div>
           </div>
+          <button type="button" class="bds-md-download-btn" title={t('messageOverlay.downloadMd')} onclick={() => downloadItemAsMd(block, 'character')}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </button>
         </div>
       {:else if block.name === 'skill_create'}
         <div class="bds-question-info-card bds-skill-card">
@@ -307,6 +327,13 @@
               {/if}
             </div>
           </div>
+          <button type="button" class="bds-md-download-btn" title={t('messageOverlay.downloadMd')} onclick={() => downloadItemAsMd(block, 'skill')}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </button>
         </div>
       {:else if block.name === 'auto:request_web_fetch'}
         <div class="bds-question-info-card bds-web-fetch-card">
@@ -1014,6 +1041,28 @@
 }
 .bds-message-overlay.rtl th:not(:is(:lang(ae),:lang(ar),:lang(arc),:lang(bcc),:lang(bqi),:lang(ckb),:lang(dv),:lang(fa),:lang(glk),:lang(he),:lang(ku),:lang(mzn),:lang(nqo),:lang(pnb),:lang(ps),:lang(sd),:lang(ug),:lang(ur),:lang(yi))) {
   text-align: left;
+}
+
+.bds-md-download-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--bds-border, #3a3b3f);
+  border-radius: 8px;
+  color: var(--bds-text-secondary, #8e8ea0);
+  cursor: pointer;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  padding: 0;
+  transition: all 0.15s ease;
+  margin-left: auto;
+}
+.bds-md-download-btn:hover {
+  background: var(--bds-bg-hover, rgba(255,255,255,0.08));
+  color: var(--bds-accent, #5b7bff);
+  border-color: var(--bds-accent, #5b7bff);
 }
 
 </style>
