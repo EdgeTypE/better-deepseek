@@ -62,7 +62,6 @@ export function normalizeTaggedCodeContent(content, tagName) {
     name === "create_file" ||
     name === "run_python_embed" ||
     name === "html" ||
-    name === "latex" ||
     name === "visualizer" ||
     name === "docx" ||
     name === "pptx" ||
