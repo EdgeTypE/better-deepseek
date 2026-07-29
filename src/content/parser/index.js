@@ -85,7 +85,10 @@ export function parseBdsMessage(rawText, isSettled = false) {
     const allTags = Array.from(text.matchAll(/<\/?BDS:([A-Za-z0-9_:]+)[^>]*>/gi))
       .filter(m => !isInsideCodeBlock(m.index));
     for (const match of allTags) {
-      const isClose = match[0].startsWith('</');
+      const tagStr = match[0];
+      if (tagStr.endsWith('/>') || tagStr.endsWith('/&gt;')) continue;
+
+      const isClose = tagStr.startsWith('</') || tagStr.startsWith('&lt;/');
       const tName = match[1].toLowerCase();
       
       // AUTO tags are background requests lacking standard rendering lifecycle
@@ -432,9 +435,15 @@ export function parseBdsMessage(rawText, isSettled = false) {
 
   for (let i = allBdsTags.length - 1; i >= 0; i--) {
     const openTag = allBdsTags[i];
+    const tagStr = openTag[0];
     const tagName = openTag[1].toLowerCase();
     
+    // Self-closing tags are already closed
+    if (tagStr.endsWith('/>') || tagStr.endsWith('/&gt;')) continue;
+
+    // AUTO tags and image inline card do not trigger global Working... lock
     if (tagName.startsWith("auto") && tagName !== "auto:code_runner") continue;
+    if (tagName === "image") continue;
 
     const hasClose = allBdsCloseTags.some(ct => 
       ct[1].toLowerCase() === tagName && ct.index > openTag.index

@@ -80,6 +80,20 @@ describe("ImageCard", () => {
     cleanup();
   });
 
+  it('renders image when src attribute is wrapped in markdown link syntax', async () => {
+    const { target, cleanup } = renderSvelte(ImageCard, {
+      content: "",
+      attrs: { src: "[https://cataas.com/cat](https://cataas.com/cat)" },
+    });
+    await flushUi();
+
+    const img = target.querySelector("img");
+    expect(img).not.toBeNull();
+    expect(img.src).toBe("https://cataas.com/cat");
+    expect(searchImagesMock).not.toHaveBeenCalled();
+    cleanup();
+  });
+
   it('renders src image with caption and no credit link', async () => {
     const { target, cleanup } = renderSvelte(ImageCard, {
       content: "",

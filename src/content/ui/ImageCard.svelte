@@ -1,11 +1,14 @@
 <script>
   import { searchImages } from "../../lib/wikimedia-commons.js";
   import { t } from "../../lib/i18n.svelte.js";
+  import { extractHttpUrl } from "../../lib/utils/url-normalizer.js";
 
   let { content, attrs = {} } = $props();
 
-  let imageUrl = $state(attrs.src || null);
-  let fullImageUrl = $state(attrs.src || null);
+  let cleanSrc = $derived(attrs.src ? (extractHttpUrl(attrs.src) || attrs.src) : null);
+
+  let imageUrl = $state(cleanSrc);
+  let fullImageUrl = $state(cleanSrc);
   let fileTitle = $state("");
   let descriptionUrl = $state("");
   let showFullscreen = $state(false);
@@ -18,7 +21,7 @@
   let imgHeight = $state(null);
 
   let query = $derived(
-    attrs.src ? "" : (attrs.query || attrs.q || content.trim() || "")
+    cleanSrc ? "" : (attrs.query || attrs.q || content.trim() || "")
   );
 
   let aspectRatio = $derived(
@@ -26,11 +29,16 @@
   );
 
   let status = $state(
-    attrs.src ? "loaded" : (query ? "searching" : "error")
+    cleanSrc ? "loaded" : (query ? "searching" : "error")
   );
 
   $effect(() => {
-    if (attrs.src) return;
+    if (cleanSrc) {
+      imageUrl = cleanSrc;
+      fullImageUrl = cleanSrc;
+      status = "loaded";
+      return;
+    }
     if (!query) return;
     const controller = new AbortController();
     searchImages({

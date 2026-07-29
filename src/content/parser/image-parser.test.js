@@ -81,6 +81,25 @@ describe("IMAGE self-closing tag", () => {
     });
   });
 
+  it("unwraps markdown-formatted link inside src attribute", () => {
+    const result = parseBdsMessage('<BDS:IMAGE src="[https://cataas.com/cat](https://cataas.com/cat)" width="500" caption="Cat"></BDS:IMAGE>');
+    expect(result.renderableBlocks).toHaveLength(1);
+    expect(result.renderableBlocks[0].attrs.src).toBe("https://cataas.com/cat");
+  });
+
+  it("does not duplicate self-closing image tag when message is settled", () => {
+    const text = '<BDS:IMAGE src="https://cataas.com/cat" caption="Here\'s a random cat for you! 🐱" width="400" />';
+    const result = parseBdsMessage(text, true);
+    expect(result.renderableBlocks).toHaveLength(1);
+    expect(result.isStreamingTool).toBe(false);
+  });
+
+  it("does not set isStreamingTool to true for image tags during streaming", () => {
+    const text = '<BDS:IMAGE src="https://cataas.com/cat" caption="Cat" width="400" />';
+    const result = parseBdsMessage(text, false);
+    expect(result.isStreamingTool).toBe(false);
+  });
+
   it("ignores empty self-closing tag with no relevant attributes", () => {
     const result = parseBdsMessage('<BDS:IMAGE style="width:100px" />');
     expect(result.renderableBlocks).toHaveLength(0);

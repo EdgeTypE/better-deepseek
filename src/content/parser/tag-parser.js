@@ -1,4 +1,5 @@
 import { devLog } from "../../lib/dev-log.js";
+import { extractHttpUrl } from "../../lib/utils/url-normalizer.js";
 
 /**
  * Parse tag attributes from a string like: fileName="test.py" content="..."
@@ -43,6 +44,8 @@ export function parseTagAttributes(rawAttrs) {
 
     if (key === "fileName") {
       attrs.fileName = value;
+    } else if (key === "src" || key === "href" || /^\[.*\]\(\s*https?:\/\//i.test(value)) {
+      attrs[key] = extractHttpUrl(value) || value;
     } else {
       attrs[key] = value;
     }
