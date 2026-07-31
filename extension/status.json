@@ -1,7 +1,7 @@
 [
   {
     "id": "expert-mode-upload-issue-v1",
-    "show": true,
+    "show": false,
     "message": "Due to issues with DeepSeek or intentional behavior, file uploading is currently unavailable in Expert mode.",
     "type": "warning"
   },
@@ -13,8 +13,14 @@
   },
   {
     "id": "idea-contributions-v1",
-    "show": true,
+    "show": false,
     "message": "Ran out of ideas for what the extension should do next? If you have a suggestion, please share it on GitHub.",
+    "type": "info"
+  },
+  {
+    "id": "deepseek-v4-flash-api-only-v1",
+    "show": true,
+    "message": "FYI, you may have seen on social media that a new version of DeepSeek V4 Flash has been released. This new version is currently API-only; the web version still has the old V4 Flash active. -BDS",
     "type": "info"
   }
 ]
