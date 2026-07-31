@@ -199,6 +199,45 @@ class WebViewBridgeTest {
     }
 
     @Test
+    fun `fetch sends a browser-like User-Agent by default`() {
+        server.enqueue(MockResponse().setBody("<html>ok</html>").setResponseCode(200))
+
+        val payload = JSONObject().apply {
+            put("type", "bds-fetch-url")
+            put("url", server.url("/ua").toString())
+        }
+        val response = JSONObject(bridge.fetch(payload.toString()))
+
+        assertTrue(response.getBoolean("ok"))
+        val request = server.takeRequest()
+        val userAgent = request.getHeader("User-Agent")
+        assertTrue(
+            "Expected a browser-like User-Agent but was: $userAgent",
+            userAgent != null && userAgent.startsWith("Mozilla/5.0")
+        )
+        assertFalse(userAgent!!.startsWith("okhttp"))
+    }
+
+    @Test
+    fun `fetch honors an explicit User-Agent from payload headers`() {
+        server.enqueue(MockResponse().setBody("<html>ok</html>").setResponseCode(200))
+
+        val payload = JSONObject().apply {
+            put("type", "bds-fetch-url")
+            put("url", server.url("/ua-explicit").toString())
+            put("options", JSONObject().apply {
+                put("headers", JSONObject().apply {
+                    put("User-Agent", "custom-test-agent/1.0")
+                })
+            })
+        }
+        val response = JSONObject(bridge.fetch(payload.toString()))
+
+        assertTrue(response.getBoolean("ok"))
+        assertEquals("custom-test-agent/1.0", server.takeRequest().getHeader("User-Agent"))
+    }
+
+    @Test
     fun `fetch is tolerant of browser-only options like redirect and credentials`() {
         server.enqueue(MockResponse().setBody("<html>ok</html>").setResponseCode(200))
 

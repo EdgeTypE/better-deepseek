@@ -771,6 +771,11 @@ class WebViewBridge(
                 builder.header(k, headersJson.optString(k))
             }
         }
+        // Present a browser fingerprint: a bare OkHttp client sends "okhttp/<version>",
+        // which search engines challenge or serve irrelevant results to (especially for
+        // non-Latin queries). An explicit User-Agent in the payload wins over the default.
+        val explicitUserAgent = headersJson?.optString("User-Agent")?.takeIf { it.isNotBlank() }
+        builder.header("User-Agent", explicitUserAgent ?: DEFAULT_FETCH_USER_AGENT)
         when (method) {
             "GET" -> builder.get()
             "HEAD" -> builder.head()
@@ -1109,6 +1114,13 @@ class WebViewBridge(
         private const val PREFS_NAME = "bds_storage"
         private const val DEFAULT_GITHUB_API_BASE_URL = "https://api.github.com"
         private const val DEFAULT_GITHUB_COMMIT_COUNT = 100
+        // Desktop Chrome UA for bds-fetch-url requests. Without it OkHttp sends
+        // "okhttp/<version>", which search engines treat as a bot: DDG responds
+        // with an anti-bot challenge (202) and Bing mishandles non-Latin queries
+        // (returns irrelevant results). This mirrors what the web extension
+        // effectively sends via Chrome's network stack.
+        private const val DEFAULT_FETCH_USER_AGENT =
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
         private const val GITHUB_COMMITS_PAGE_SIZE = 100
         // Must match STORAGE_KEYS.pageIsDark in src/lib/constants.js — the Android chrome.storage
         // polyfill routes chrome.storage.local.set({ bds_page_is_dark: ... }) through setStorage,
