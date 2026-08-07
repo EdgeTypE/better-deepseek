@@ -241,6 +241,65 @@ describe("scanner input controls", () => {
     expect(mountMock.mock.calls[0][0]).toBe(deepResearchToggleMock);
   });
 
+  it("mounts Deep Research in the composer row, not inside the send button shrink-wrap wrapper", async () => {
+    document.body.innerHTML = `
+      <div id="composer">
+        <textarea id="chat-input" placeholder="Message DeepSeek"></textarea>
+        <div id="actions">
+          <div id="send-wrap" style="width: fit-content;"><button id="send" title="Send message"></button></div>
+        </div>
+      </div>
+    `;
+    const { scanInputArea } = await import("../../src/content/scanner.js");
+
+    // Guard against layout-capable browsers resolving the computed width to
+    // pixels: the shrink-wrap detection must key off the inline style value.
+    const originalGetComputedStyle = window.getComputedStyle;
+    Object.defineProperty(window, "getComputedStyle", {
+      configurable: true,
+      value: () => ({ width: "243px" }),
+    });
+
+    try {
+      scanInputArea();
+    } finally {
+      Object.defineProperty(window, "getComputedStyle", {
+        configurable: true,
+        value: originalGetComputedStyle,
+      });
+    }
+
+    const deepResearchMount = document.querySelector(".bds-deep-research-mount");
+    const sendWrap = document.querySelector("#send-wrap");
+
+    expect(deepResearchMount).toBeTruthy();
+    expect(deepResearchMount.parentElement).toBe(document.querySelector("#actions"));
+    expect(sendWrap.querySelector(".bds-deep-research-mount")).toBeNull();
+  });
+
+  it("keeps Deep Research in the button row while generating, when the send button is replaced by a stop button", async () => {
+    document.body.innerHTML = `
+      <div id="composer">
+        <div id="editor-row">
+          <textarea id="chat-input" placeholder="Message DeepSeek"></textarea>
+        </div>
+        <div id="actions">
+          <div style="width: fit-content;"><button id="stop" title="Stop generating"></button></div>
+        </div>
+      </div>
+    `;
+    const { scanInputArea } = await import("../../src/content/scanner.js");
+
+    scanInputArea();
+
+    const deepResearchMount = document.querySelector(".bds-deep-research-mount");
+    const editorRow = document.querySelector("#editor-row");
+
+    expect(deepResearchMount).toBeTruthy();
+    expect(deepResearchMount.parentElement).toBe(document.querySelector("#actions"));
+    expect(editorRow.querySelector(".bds-deep-research-mount")).toBeNull();
+  });
+
   it("mounts Deep Research in prompt action row when DeepThink is in Turkish ('Derin Düşünme' and class/SVG match)", async () => {
     document.body.innerHTML = `
       <div id="composer">

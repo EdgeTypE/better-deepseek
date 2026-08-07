@@ -669,9 +669,17 @@ function findComposerControlsWrapper(fileInput) {
     return fileInput.parentElement;
   }
 
-  const sendButton = findDeepSeekSendButton();
+  const sendButton = findDeepSeekSendButton() || findDeepSeekStopButton();
   if (sendButton?.parentElement) {
-    return sendButton.parentElement;
+    const parent = sendButton.parentElement;
+    if (
+      parent !== document.body &&
+      (parent.style.width === "fit-content" ||
+        getComputedStyle(parent).width === "fit-content")
+    ) {
+      return parent.parentElement || parent;
+    }
+    return parent;
   }
 
   const editor = findComposerEditor();
@@ -825,6 +833,22 @@ function findDeepSeekSendButton() {
       button.title === "Send message" ||
       button.ariaLabel === "Send Message" ||
       button.getAttribute("aria-label") === "Send Message"
+    );
+  }) || null;
+}
+
+function findDeepSeekStopButton() {
+  const buttons = Array.from(document.querySelectorAll('div[role="button"], button'));
+  return buttons.find((button) => {
+    if (button.closest("#bds-root")) {
+      return false;
+    }
+    return (
+      button.querySelector?.(".ds-icon-stop-circle, .ds-icon-stop") ||
+      button.querySelector?.('svg path[d*="M3 3h10v10H3z"], svg path[d*="M6 6h12v12H6z"], svg path[d*="M2 4.88"]') ||
+      button.title === "Stop generating" ||
+      button.title === "Stop" ||
+      button.getAttribute("aria-label")?.toLowerCase().includes("stop")
     );
   }) || null;
 }
