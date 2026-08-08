@@ -2,6 +2,7 @@
   import Drawer from "./Drawer.svelte";
   import ToastStack from "./ToastStack.svelte";
   import QuestionPanel from "./QuestionPanel.svelte";
+  import QueuePanel from "./QueuePanel.svelte";
   import DeepResearchRevisionPanel from "./DeepResearchRevisionPanel.svelte";
   import WhatsNewModal from "./WhatsNewModal.svelte";
   import SelectionOverlay from "./SelectionOverlay.svelte";
@@ -144,6 +145,7 @@
 
 <ToastStack {toasts} />
 <QuestionPanel />
+<QueuePanel />
 <DeepResearchRevisionPanel />
 
 {#if whatsNewPending}

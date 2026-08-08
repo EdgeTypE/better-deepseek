@@ -1147,6 +1147,16 @@
       "codeGen": "代码生成",
       "promptSuffix": "提示词后缀"
     },
+    "queue": {
+      "title": "队列消息",
+      "waitingForAI": "等待 AI 生成...",
+      "sendingNext": "正在发送下一条...",
+      "clearAll": "清空全部",
+      "addToQueue": "加入队列",
+      "enterToQueueTip": "AI 正在生成，按 Enter 将提示词加入队列。",
+      "moveUp": "上移",
+      "moveDown": "下移"
+    },
     "tableInjector": {
       "columnOptions": "\u5217\u9009\u9879",
       "hideRow": "\u9690\u85CF\u884C",

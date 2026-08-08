@@ -1148,6 +1148,16 @@
       "useActiveKey": "Kullanılan anahtar: {{name}}",
       "noActiveKey": "Aktif API anahtarı yok"
     },
+    "queue": {
+      "title": "Kuyruktaki Mesajlar",
+      "waitingForAI": "Yapay zeka bekleniyor...",
+      "sendingNext": "Sonraki gönderiliyor...",
+      "clearAll": "Tümünü Temizle",
+      "addToQueue": "Kuyruğa Ekle",
+      "enterToQueueTip": "Yapay zeka yanıt üretiyor. Prompt'u kuyruğa eklemek için Enter'a bas.",
+      "moveUp": "Yukarı taşı",
+      "moveDown": "Aşağı taşı"
+    },
     "tableInjector": {
       "columnOptions": "S\u00FCtun se\u00E7enekleri",
       "hideRow": "Sat\u0131r\u0131 gizle",

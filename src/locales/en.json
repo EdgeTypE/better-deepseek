@@ -1151,6 +1151,16 @@
       "codeGen": "Code Gen",
       "promptSuffix": "Prompt Suffix"
     },
+    "queue": {
+      "title": "Queued Messages",
+      "waitingForAI": "Waiting for AI...",
+      "sendingNext": "Sending next...",
+      "clearAll": "Clear All",
+      "addToQueue": "Add to Queue",
+      "enterToQueueTip": "AI is generating. Press Enter to queue your prompt.",
+      "moveUp": "Move up",
+      "moveDown": "Move down"
+    },
     "tableInjector": {
       "columnOptions": "Column options",
       "hideRow": "Hide row",
