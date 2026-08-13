@@ -19,8 +19,14 @@
   },
   {
     "id": "deepseek-v4-flash-api-only-v1",
-    "show": true,
+    "show": false,
     "message": "FYI, you may have seen on social media that a new version of DeepSeek V4 Flash has been released. This new version is currently API-only; the web version still has the old V4 Flash active. -BDS",
+    "type": "info"
+  },
+  {
+    "id": "deepseek-v4-pro-released-v1",
+    "show": true,
+    "message": "DeepSeek V4 Pro has been released! You can now try it in Expert mode. Upgraded V4 models are now active on the web interface.",
     "type": "info"
   }
 ]
