@@ -45,8 +45,8 @@ export function estimateTokens(text, charsPerToken = 3.5) {
 }
 
 const PRICING = {
-  "deepseek-v4-flash": { input: 0.14, cacheHit: 0.0028, output: 0.28 },
-  "deepseek-v4-pro": { input: 0.435, cacheHit: 0.003625, output: 0.87 },
+  "deepseek-v4-flash": { input: 0.22, cacheHit: 0.007, output: 0.66 },
+  "deepseek-v4-pro": { input: 0.66, cacheHit: 0.022, output: 1.98 },
 };
 
 export function calculateCost(usage, model) {

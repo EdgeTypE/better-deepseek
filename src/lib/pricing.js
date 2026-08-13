@@ -36,9 +36,9 @@ export function getModelPricing(modelName) {
   const resolved = resolveModelName(modelName);
   const model = pricing.models[resolved] || pricing.models["deepseek-v4-flash"];
   return {
-    inputPrice: model.inputPrice || 0.14,
-    inputCacheHitPrice: model.inputCacheHitPrice || 0.0028,
-    outputPrice: model.outputPrice || 0.28,
+    inputPrice: model.inputPrice || 0.22,
+    inputCacheHitPrice: model.inputCacheHitPrice || 0.007,
+    outputPrice: model.outputPrice || 0.66,
     displayName: model.displayName || resolved,
     contextLength: model.contextLength || 1000000,
   };
@@ -175,7 +175,7 @@ function parsePricingFromHtml(html) {
     .trim();
 
   // Extract deepseek-v4-flash pricing
-  // Looking for patterns like: "deepseek-v4-flash" near "$0.14" for input, "$0.28" for output
+  // Looking for patterns like: "deepseek-v4-flash" near "$0.22" for input, "$0.66" for output
   const v4FlashMatch = extractModelPricing(text, "deepseek-v4-flash", "deepseek v4 flash", "flash");
   if (v4FlashMatch) models["deepseek-v4-flash"] = v4FlashMatch;
 
@@ -252,16 +252,16 @@ function parsePricingTableFromText(text) {
     {
       key: "deepseek-v4-flash",
       regex: /deepseek.v4.flash|v4\s*flash|flash/i,
-      inputCache: [0.0028, 0.014, 0.028],
-      inputMiss: [0.14, 0.435, 1.74],
-      output: [0.28, 0.87, 3.48],
+      inputCache: [0.007, 0.014, 0.028],
+      inputMiss: [0.22, 0.44, 1.74],
+      output: [0.66, 1.32, 3.48],
     },
     {
       key: "deepseek-v4-pro",
       regex: /deepseek.v4.pro|v4\s*pro/i,
-      inputCache: [0.003625, 0.0145],
-      inputMiss: [0.435, 1.74],
-      output: [0.87, 3.48],
+      inputCache: [0.022, 0.044],
+      inputMiss: [0.66, 1.32],
+      output: [1.98, 3.96],
     },
   ];
 

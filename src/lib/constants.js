@@ -737,34 +737,34 @@ export const DEFAULT_SYSTEM_PROMPT = [
 
 // ── Embedded Pricing (fallback when external sources unavailable) ──
 export const EMBEDDED_PRICING = {
-  updatedAt: "2026-05-05",
+  updatedAt: "2026-08-13",
   models: {
     "deepseek-v4-flash": {
       displayName: "DeepSeek V4 Flash",
-      inputPrice: 0.14,
-      inputCacheHitPrice: 0.0028,
-      outputPrice: 0.28,
+      inputPrice: 0.22,
+      inputCacheHitPrice: 0.007,
+      outputPrice: 0.66,
       contextLength: 1000000,
     },
     "deepseek-v4-pro": {
       displayName: "DeepSeek V4 Pro",
-      inputPrice: 0.435,
-      inputCacheHitPrice: 0.003625,
-      outputPrice: 0.87,
+      inputPrice: 0.66,
+      inputCacheHitPrice: 0.022,
+      outputPrice: 1.98,
       contextLength: 1000000,
     },
     "deepseek-chat": {
       displayName: "DeepSeek Chat",
-      inputPrice: 0.14,
-      inputCacheHitPrice: 0.0028,
-      outputPrice: 0.28,
+      inputPrice: 0.22,
+      inputCacheHitPrice: 0.007,
+      outputPrice: 0.66,
       contextLength: 1000000,
     },
     "deepseek-reasoner": {
       displayName: "DeepSeek Reasoner",
-      inputPrice: 0.435,
-      inputCacheHitPrice: 0.003625,
-      outputPrice: 0.87,
+      inputPrice: 0.66,
+      inputCacheHitPrice: 0.022,
+      outputPrice: 1.98,
       contextLength: 1000000,
     },
   },
@@ -967,10 +967,10 @@ export const DEFAULT_REMOTE_CONFIG = {
     fetchIntervalMs: 3600000,
   },
   embeddedPricing: {
-    "deepseek-v4-flash": { input: 0.14, output: 0.28 },
-    "deepseek-v4-pro": { input: 0.435, output: 0.87 },
-    "deepseek-chat": { input: 0.14, output: 0.28 },
-    "deepseek-reasoner": { input: 0.435, output: 0.87 },
+    "deepseek-v4-flash": { input: 0.22, output: 0.66 },
+    "deepseek-v4-pro": { input: 0.66, output: 1.98 },
+    "deepseek-chat": { input: 0.22, output: 0.66 },
+    "deepseek-reasoner": { input: 0.66, output: 1.98 },
   },
   modelInputLimits: {
     instant: 2621440,

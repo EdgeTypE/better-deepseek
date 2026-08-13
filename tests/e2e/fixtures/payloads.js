@@ -10,27 +10,27 @@ export const pricingHtml = `<!DOCTYPE html>
   <body>
     <h1>Pricing</h1>
     <table>
-      <tr><td>deepseek-v4-flash</td><td>$0.0028</td><td>$0.14</td><td>$0.28</td></tr>
-      <tr><td>deepseek-v4-pro</td><td>$0.0145</td><td>$0.435</td><td>$0.87</td></tr>
+      <tr><td>deepseek-v4-flash</td><td>$0.007</td><td>$0.22</td><td>$0.66</td></tr>
+      <tr><td>deepseek-v4-pro</td><td>$0.022</td><td>$0.66</td><td>$1.98</td></tr>
     </table>
   </body>
 </html>`;
 
 export const pricingJson = JSON.stringify({
-  updatedAt: "2026-05-06",
+  updatedAt: "2026-08-13",
   models: {
     "deepseek-v4-flash": {
       displayName: "DeepSeek V4 Flash",
-      inputPrice: 0.14,
-      inputCacheHitPrice: 0.0028,
-      outputPrice: 0.28,
+      inputPrice: 0.22,
+      inputCacheHitPrice: 0.007,
+      outputPrice: 0.66,
       contextLength: 1_000_000,
     },
     "deepseek-v4-pro": {
       displayName: "DeepSeek V4 Pro",
-      inputPrice: 0.435,
-      inputCacheHitPrice: 0.0145,
-      outputPrice: 0.87,
+      inputPrice: 0.66,
+      inputCacheHitPrice: 0.022,
+      outputPrice: 1.98,
       contextLength: 1_000_000,
     },
   },

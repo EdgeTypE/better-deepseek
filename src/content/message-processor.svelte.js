@@ -1210,7 +1210,7 @@ function calcCostInlineWithCache(inputNewTokens, inputCachedTokens, outputTokens
   const resolved = detectModelInline(modelName);
   const m = pricing.models[resolved] || pricing.models["deepseek-v4-flash"];
   const newCost = (inputNewTokens / 1e6) * m.inputPrice;
-  const cachedCost = (inputCachedTokens / 1e6) * (m.inputCacheHitPrice || 0.0028);
+  const cachedCost = (inputCachedTokens / 1e6) * (m.inputCacheHitPrice || 0.007);
   const outputCost = (outputTokens / 1e6) * m.outputPrice;
   return { inputCost: newCost + cachedCost, outputCost, totalCost: newCost + cachedCost + outputCost };
 }
