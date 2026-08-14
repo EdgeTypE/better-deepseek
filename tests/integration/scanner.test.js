@@ -5,6 +5,7 @@ import { resetAppState } from "../helpers/app-state.js";
 
 const mountMock = vi.hoisted(() => vi.fn(() => ({})));
 const deepResearchToggleMock = vi.hoisted(() => ({ name: "DeepResearchToggle" }));
+const deepCodeToggleMock = vi.hoisted(() => ({ name: "DeepCodeToggle" }));
 const attachMenuMock = vi.hoisted(() => ({ name: "AttachMenu" }));
 const expandToggleMock = vi.hoisted(() => ({ name: "ExpandToggle" }));
 const ragPreviewMock = vi.hoisted(() => ({ name: "RagPreview" }));
@@ -43,6 +44,10 @@ vi.mock("../../src/content/ui/DeepResearchToggle.svelte", () => ({
   default: deepResearchToggleMock,
 }));
 
+vi.mock("../../src/content/ui/DeepCodeToggle.svelte", () => ({
+  default: deepCodeToggleMock,
+}));
+
 vi.mock("../../src/content/ui/SidebarSearch.js", () => ({
   injectSearchInput: vi.fn(),
 }));
@@ -59,6 +64,10 @@ vi.mock("../../src/content/tags/tag-hider.js", () => ({
 
 vi.mock("../../src/content/deep-research.js", () => ({
   setDeepResearchEnabled: vi.fn(),
+}));
+
+vi.mock("../../src/content/deep-code.js", () => ({
+  setDeepCodeEnabled: vi.fn(),
 }));
 
 describe("scanner input controls", () => {

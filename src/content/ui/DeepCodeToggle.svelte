@@ -45,7 +45,16 @@
     return `DeepCode: ${cleanDir}`;
   });
 
-  onMount(async () => {
+  async function checkHarnessStatus() {
+    try {
+      const mode = await bridge.detectMode(1000);
+      harnessStatus = mode === "enhanced" ? "enhanced" : "fallback";
+    } catch {
+      harnessStatus = "fallback";
+    }
+  }
+
+  onMount(() => {
     const handler = (event) => {
       const detail = event.detail || {};
       localEnabled = Boolean(detail.enabled);
@@ -57,13 +66,6 @@
       }
     };
     window.addEventListener("bds:deep-code-toggle-state", handler);
-
-    try {
-      const mode = await bridge.detectMode(1500);
-      harnessStatus = mode === "enhanced" ? "enhanced" : "fallback";
-    } catch {
-      harnessStatus = "fallback";
-    }
 
     const handleClickOutside = (e) => {
       if (isOpen && menuRef && !menuRef.contains(e.target) && buttonRef && !buttonRef.contains(e.target)) {
@@ -116,6 +118,7 @@
     isOpen = !isOpen;
     if (isOpen) {
       updateDropdownPosition();
+      void checkHarnessStatus();
     }
   }
 

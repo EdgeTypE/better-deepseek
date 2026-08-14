@@ -189,7 +189,8 @@ export function resolveFixtureRequest(url) {
     url.startsWith("chrome-extension:") ||
     url.startsWith("moz-extension:") ||
     url.startsWith("chrome:") ||
-    url.includes("://localhost")
+    url.includes("://localhost") ||
+    url.includes("://127.0.0.1")
   ) {
     return null;
   }

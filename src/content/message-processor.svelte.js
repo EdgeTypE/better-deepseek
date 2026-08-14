@@ -1001,6 +1001,7 @@ function dispatchDeepResearchEvents(parsed, stateData) {
  * Uses the presence of the 'Stop Generation' button as a global indicator.
  */
 export function isSystemGenerating() {
+  if (typeof document === "undefined") return false;
   const selectors = remoteConfig.getConfig("selectors.stopButton.selectors") || [
     ".ds-icon-stop-circle",
     ".ds-icon-stop",

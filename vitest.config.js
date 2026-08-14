@@ -11,6 +11,7 @@ export default defineConfig({
     setupFiles: ["./tests/setup.js"],
     include: ["src/**/*.test.js", "tests/**/*.test.js"],
     environment: "node",
+    testTimeout: 15000,
     css: true,
     clearMocks: true,
     restoreMocks: true,

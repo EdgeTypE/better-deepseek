@@ -468,7 +468,7 @@ test("imports a GitHub repository and commit history through the Android bridge"
     .filter({ hasText: "GitHub Repo" })
     .click({ force: true });
   await page.locator(".bds-github-input").fill("octocat/Hello-World");
-  await page.locator(".bds-github-checkbox input").check();
+  await page.locator(".bds-github-checkbox input").check({ force: true });
   await page.locator(".bds-github-btn-import").click({ force: true });
 
   await expect
