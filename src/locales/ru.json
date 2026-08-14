@@ -490,6 +490,7 @@
       "copyPrompt": "Скопировать снова",
       "openHarness": "Открыть Harness",
       "fallbackHint": "Для полного автоматического режима установите Bridge Plugin в терминале:",
+      "pluginRepoButton": "Репозиторий Bridge Plugin (GitHub)",
       "liveHeader": "Поток выполнения ({{count}} событий)",
       "liveAssistantLabel": "Вывод ассистента:",
       "logSessionCreated": "Сессия {{sid}} создана в Harness.",
@@ -542,6 +543,15 @@
       "switchedFeedback": "Переключено на \"{{name}}\"",
       "recentNeedsPicker": "Для \"{{name}}\" нет связанного доступа к файлам. Выберите его с помощью средства выбора папок, чтобы включить чтение файлов.",
       "cancel": "Отмена"
+    },
+    "deepCodeOnboarding": {
+      "title": "Добро пожаловать в DeepCode",
+      "harnessIntro": "DeepCode работает в связке с официальным <strong>DeepSeek Harness</strong>. Для работы этой функции на вашем устройстве должен быть установлен <strong>DeepSeek Harness</strong>.",
+      "harnessLink": "Скачать DeepSeek Harness на GitHub",
+      "pluginLink": "Получить Bridge Plugin Better DeepSeek (GitHub)",
+      "pluginInfo": "Для подключения Better DeepSeek к DeepSeek Harness требуется <strong>плагин</strong>. Если плагин установлен, всё происходит полностью автоматически. Если он не установлен, потребуются ручные действия.",
+      "gotIt": "Понятно",
+      "closeAria": "Закрыть"
     },
     "downloadCard": {
       "download": "Скачать"

@@ -391,3 +391,27 @@ export async function loadDeepCodeState() {
     devLog(`[DeepCode] Failed to load state:`, err);
   }
 }
+
+/**
+ * Check whether the user has already acknowledged the DeepCode onboarding popup.
+ * @returns {Promise<boolean>}
+ */
+export async function isDeepCodeOnboarded() {
+  if (typeof chrome === "undefined" || !chrome?.storage?.local) return true;
+  try {
+    const result = await chrome.storage.local.get(STORAGE_KEYS.deepCodeOnboarded);
+    return Boolean(result[STORAGE_KEYS.deepCodeOnboarded]);
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Persist the onboarding acknowledgement so the popup is not shown again.
+ */
+export async function markDeepCodeOnboarded() {
+  if (typeof chrome === "undefined" || !chrome?.storage?.local) return;
+  try {
+    await chrome.storage.local.set({ [STORAGE_KEYS.deepCodeOnboarded]: true });
+  } catch { /* ignore */ }
+}

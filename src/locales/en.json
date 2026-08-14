@@ -493,6 +493,7 @@
       "copyPrompt": "Tekrar Kopyala",
       "openHarness": "Harness'ı Aç",
       "fallbackHint": "Tam otomatik mod için terminalde Bridge eklentisini kurun:",
+      "pluginRepoButton": "Bridge Plugin Repo (GitHub)",
       "liveHeader": "Live Execution Stream ({{count}} events)",
       "liveAssistantLabel": "Live Assistant Output:",
       "logSessionCreated": "Session {{sid}} created on Harness.",
@@ -545,6 +546,15 @@
       "switchedFeedback": "Switched to \"{{name}}\"",
       "recentNeedsPicker": "\"{{name}}\" has no linked file access. Select it with the folder picker to enable file reads.",
       "cancel": "Cancel"
+    },
+    "deepCodeOnboarding": {
+      "title": "Welcome to DeepCode",
+      "harnessIntro": "DeepCode works together with the official <strong>DeepSeek Harness</strong>. You need to have <strong>DeepSeek Harness</strong> installed on your device for this feature to work.",
+      "harnessLink": "Download DeepSeek Harness on GitHub",
+      "pluginLink": "Get the Better DeepSeek Bridge plugin (GitHub)",
+      "pluginInfo": "To connect Better DeepSeek to DeepSeek Harness, a <strong>plugin</strong> is required. If the plugin is installed, everything happens fully automatically. If it is not installed, you will need to perform manual steps.",
+      "gotIt": "Got it",
+      "closeAria": "Close"
     },
     "downloadCard": {
       "download": "Download"

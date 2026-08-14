@@ -6,6 +6,8 @@
     toggleDeepCodeEnabled,
     selectRecentDirectory,
     removeRecentDirectory,
+    isDeepCodeOnboarded,
+    markDeepCodeOnboarded,
   } from "../deep-code.js";
   import { BetterDeepSeekHarnessBridge } from "../../lib/harness-bridge.js";
   import { t } from "../../lib/i18n.svelte.js";
@@ -20,6 +22,8 @@
   let recentDirectories = $state(appState.deepCode.recentDirectories || []);
 
   let isOpen = $state(false);
+  let showOnboarding = $state(false);
+  let onboarded = $state(true);
   let menuRef = $state(null);
   let buttonRef = $state(null);
   let dropdownStyle = $state("");
@@ -55,6 +59,10 @@
   }
 
   onMount(() => {
+    void isDeepCodeOnboarded().then((done) => {
+      onboarded = done;
+    });
+
     const handler = (event) => {
       const detail = event.detail || {};
       localEnabled = Boolean(detail.enabled);
@@ -115,11 +123,29 @@
   function handleButtonClick(event) {
     event?.preventDefault?.();
     event?.stopPropagation?.();
+    if (!onboarded) {
+      showOnboarding = true;
+      return;
+    }
     isOpen = !isOpen;
     if (isOpen) {
       updateDropdownPosition();
       void checkHarnessStatus();
     }
+  }
+
+  async function handleOnboardingGotIt() {
+    await markDeepCodeOnboarded();
+    onboarded = true;
+    showOnboarding = false;
+    isOpen = true;
+    updateDropdownPosition();
+    void checkHarnessStatus();
+  }
+
+  function handleOnboardingDismiss() {
+    showOnboarding = false;
+    isOpen = false;
   }
 
   function handleToggleSwitch(event) {
@@ -194,6 +220,79 @@
 </div>
 
 <!-- POPOVER CARD (DRAWER SETTINGS & QUESTION PANEL DESIGN SYSTEM) -->
+{#if showOnboarding}
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="bds-onboarding-backdrop"
+    role="dialog"
+    tabindex="-1"
+    aria-modal="true"
+    aria-label={t("deepCodeOnboarding.title")}
+    onclick={handleOnboardingDismiss}
+    onkeydown={(e) => e.key === "Escape" && handleOnboardingDismiss()}
+  >
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <div class="bds-onboarding-card" onclick={(e) => e.stopPropagation()}>
+      <div class="bds-onboarding-header">
+        <div class="bds-onboarding-title-group">
+          <span class="bds-icon-inline" style="color: var(--bds-accent, #4d6bfe); margin-right: 6px;">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5.75 4.75L2.5 8L5.75 11.25M10.25 4.75L13.5 8L10.25 11.25M8.5 3.5L7.5 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <h3 class="ds-modal-content__title" style="font-size: 15px;">{t("deepCodeOnboarding.title")}</h3>
+        </div>
+        <button
+          id="bds-close"
+          type="button"
+          class="bds-close-btn"
+          onclick={handleOnboardingDismiss}
+          aria-label={t("deepCodeOnboarding.closeAria")}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M14.1871 13.1265L13.1265 14.1872L1.81275 2.87347L2.87341 1.81281L14.1871 13.1265Z" fill="currentColor"></path>
+            <path d="M13.1265 1.81282L14.1871 2.87348L2.8734 14.1872L1.81274 13.1265L13.1265 1.81282Z" fill="currentColor"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="bds-onboarding-body">
+        <p class="bds-onboarding-paragraph">
+          {@html t("deepCodeOnboarding.harnessIntro")}
+        </p>
+        <p class="bds-onboarding-paragraph">
+          <a
+            href="https://github.com/deepseek-ai/deepseek-harness"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="bds-onboarding-link"
+          >{t("deepCodeOnboarding.harnessLink")}</a>
+        </p>
+        <p class="bds-onboarding-paragraph">
+          {@html t("deepCodeOnboarding.pluginInfo")}
+        </p>
+        <p class="bds-onboarding-paragraph">
+          <a
+            href="https://github.com/EdgeTypE/dsh-better-deepseek"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="bds-onboarding-link"
+          >{t("deepCodeOnboarding.pluginLink")}</a>
+        </p>
+      </div>
+
+      <div class="bds-onboarding-footer">
+        <button
+          type="button"
+          class="bds-btn bds-onboarding-got-it"
+          onclick={handleOnboardingGotIt}
+        >{t("deepCodeOnboarding.gotIt")}</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 {#if isOpen}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
@@ -356,6 +455,79 @@
     display: contents !important;
   }
 
+  /* ─── ONBOARDING POPUP (ADD DIRECTORY MODAL PATTERN) ─── */
+  .bds-onboarding-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2147483647;
+    padding: 16px;
+    animation: bds-modal-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .bds-onboarding-card {
+    width: min(92vw, 440px);
+    border: 1px solid var(--bds-border, #3a3b3f);
+    border-radius: var(--bds-radius, 14px);
+    background: var(--bds-bg-panel, #1e1f23);
+    box-shadow: var(--bds-shadow, 0 12px 32px rgba(0, 0, 0, 0.45));
+    color: var(--bds-text-primary, #ececec);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    max-height: 82vh;
+    box-sizing: border-box;
+    font-family: inherit;
+  }
+
+  .bds-onboarding-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .bds-onboarding-title-group {
+    display: flex;
+    align-items: center;
+  }
+
+  .bds-onboarding-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .bds-onboarding-paragraph {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--bds-text-secondary, #b0b0bf);
+  }
+
+  .bds-onboarding-link {
+    color: var(--bds-accent, #4d6bfe);
+    text-decoration: underline;
+    font-weight: 500;
+    word-break: break-all;
+  }
+
+  .bds-onboarding-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 20px;
+  }
+
+  .bds-onboarding-got-it {
+    padding: 8px 20px;
+    font-size: 13px;
+  }
+
   .bds-deep-code-toggle {
     position: relative;
     display: inline-flex;
@@ -417,6 +589,11 @@
       opacity: 1;
       transform: translateY(0) scale(1);
     }
+  }
+
+  @keyframes bds-modal-in {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: scale(1); }
   }
 
   .bds-dc-header {

@@ -489,6 +489,7 @@
       "copyPrompt": "再次复制",
       "openHarness": "打开 Harness",
       "fallbackHint": "如需全自动模式，请在终端中安装 Bridge 插件：",
+      "pluginRepoButton": "Bridge 插件仓库（GitHub）",
       "liveHeader": "实时执行流（{{count}} 个事件）",
       "liveAssistantLabel": "实时助手输出：",
       "logSessionCreated": "会话 {{sid}} 已在 Harness 中创建。",
@@ -541,6 +542,15 @@
       "switchedFeedback": "已切换到 \"{{name}}\"",
       "recentNeedsPicker": "\"{{name}}\" 没有关联的文件访问权限。请使用文件夹选择器重新选择它，以启用文件读取。",
       "cancel": "取消"
+    },
+    "deepCodeOnboarding": {
+      "title": "欢迎使用 DeepCode",
+      "harnessIntro": "DeepCode 与官方的 <strong>DeepSeek Harness</strong> 协同工作。要在您的设备上使用此功能，必须安装 <strong>DeepSeek Harness</strong>。",
+      "harnessLink": "在 GitHub 下载 DeepSeek Harness",
+      "pluginLink": "获取 Better DeepSeek Bridge 插件（GitHub）",
+      "pluginInfo": "要将 Better DeepSeek 连接到 DeepSeek Harness，需要一个 <strong>插件</strong>。如果已安装插件，一切都会完全自动进行。如果未安装，则需要手动操作。",
+      "gotIt": "明白了",
+      "closeAria": "关闭"
     },
     "downloadCard": {
       "download": "下载"

@@ -23,6 +23,7 @@ export const STORAGE_KEYS = {
   apiPlaygroundSaved: "bds_api_playground_saved",
   deepResearchRuns: "bds_deep_research_runs",
   deepCodeState: "bds_deep_code_state",
+  deepCodeOnboarded: "bds_deep_code_onboarded",
   commandMappings: "bds_command_mappings",
   mcpServers: "bds_mcp_servers",
 };

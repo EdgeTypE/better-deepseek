@@ -490,6 +490,7 @@
       "copyPrompt": "Tekrar Kopyala",
       "openHarness": "Harness'ı Aç",
       "fallbackHint": "Tam otomatik mod için terminalde Bridge eklentisini kurun:",
+      "pluginRepoButton": "Bridge Eklentisi Deposu (GitHub)",
       "liveHeader": "Canlı Çalıştırma Akışı ({{count}} olay)",
       "liveAssistantLabel": "Canlı Asistan Çıktısı:",
       "logSessionCreated": "{{sid}} oturumu Harness'te oluşturuldu.",
@@ -542,6 +543,15 @@
       "switchedFeedback": "\"{{name}}\" klasörüne geçildi",
       "recentNeedsPicker": "\"{{name}}\" için bağlı dosya erişimi yok. Dosya okumalarını etkinleştirmek için klasör seçiciyle tekrar seçin.",
       "cancel": "İptal"
+    },
+    "deepCodeOnboarding": {
+      "title": "DeepCode'a Hoş Geldiniz",
+      "harnessIntro": "DeepCode, resmi <strong>DeepSeek Harness</strong> ile entegre çalışır. Bu özelliğin çalışması için cihazınızda <strong>DeepSeek Harness</strong> yüklü olmalıdır.",
+      "harnessLink": "DeepSeek Harness'ı GitHub'dan indirin",
+      "pluginLink": "Better DeepSeek Bridge eklentisini edinin (GitHub)",
+      "pluginInfo": "Better DeepSeek'in DeepSeek Harness'a bağlanabilmesi için bir <strong>eklenti</strong> gerekir. Eklenti yüklüyse her şey tamamen otomatik gerçekleşir. Yüklü değilse manuel adımlar uygulamanız gerekir.",
+      "gotIt": "Anladım",
+      "closeAria": "Kapat"
     },
     "downloadCard": {
       "download": "İndir"
