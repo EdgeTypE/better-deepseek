@@ -334,6 +334,18 @@ export function buildHiddenPrefix(
     blocks.push(deepCodeBlock);
   }
 
+  const harnessReportBlock = buildHarnessReportBlock(state);
+  if (harnessReportBlock) {
+    blocks.push(harnessReportBlock);
+    // Clear pending report once consumed
+    if (state.config?.deepCode) {
+      state.config.deepCode.pendingReport = null;
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("bds:clear-harness-report"));
+    }
+  }
+
   const entries = state.config.systemPromptEntries || [];
   if (entries.length > 0) {
     const userMsgCount = state.sessionUserMsgCounts[conversationId] || 1;
@@ -951,5 +963,24 @@ You have access to the following special BDS tools for codebase inspection and D
    </BDS:HARNESS_TASK>
 
 When analyzing or editing code, use these tools to inspect relevant project files and dispatch Harness tasks. Always provide the full absolute path in the cwd attribute of BDS:HARNESS_TASK.
+</BetterDeepSeek>`;
+}
+
+export function buildHarnessReportBlock(state) {
+  const dc = state && state.config && state.config.deepCode;
+  const pending = dc && dc.pendingReport;
+  if (!pending || !pending.report || !pending.report.trim()) return "";
+
+  const cwdAttr = pending.cwd ? ` cwd="${pending.cwd}"` : "";
+  const sessionAttr = pending.sessionId ? ` sessionId="${pending.sessionId}"` : "";
+
+  return `<BetterDeepSeek>
+[DEEPSEEK_HARNESS_EXECUTION_RESULT]
+The local DeepSeek Harness agent has finished executing the task${pending.cwd ? ` in "${pending.cwd}"` : ""}.
+Here is the execution report and final output:
+
+<BDS:HARNESS_RESULT${cwdAttr}${sessionAttr}>
+${pending.report.trim()}
+</BDS:HARNESS_RESULT>
 </BetterDeepSeek>`;
 }

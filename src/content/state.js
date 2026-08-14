@@ -91,6 +91,8 @@ const state = {
     fileCount: 0,
     manualPath: "",
     files: [],
+    pendingReport: null,
+    recentDirectories: [],
   },
   /** Per-conversation context budget tracking for Deep Research 128K guard */
   contextBudget: {

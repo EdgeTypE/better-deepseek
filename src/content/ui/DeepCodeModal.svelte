@@ -1,76 +1,66 @@
 <script>
+  import { onMount, onDestroy } from "svelte";
   import appState from "../state.js";
-  import { linkDirectory, supportsLocalDirectoryLinking } from "../../lib/local-directory-source.js";
-  import { setDeepCodeDirectory, getCachedPathForFolder, saveCachedPathForFolder, tryResolveHarnessWorkspacePath } from "../deep-code.js";
+  import {
+    pickAndLinkDeepCodeDirectory,
+    selectRecentDirectory,
+    removeRecentDirectory,
+  } from "../deep-code.js";
 
   let { show = false, activeDirectory = null, fileCount = 0, onclose = null } = $props();
 
   let loading = $state(false);
-  let errorMessage = $state("");
-  let successMessage = $state("");
+  let feedback = $state("");
+  let recentDirectories = $state(appState.deepCode.recentDirectories || []);
   let manualPath = $state(appState.deepCode.manualPath || "");
 
-  let prevShow = false;
+  let lastEventRecent = null;
+
+  onMount(() => {
+    const handler = (event) => {
+      const detail = event.detail || {};
+      lastEventRecent = Array.isArray(detail.recentDirectories) ? detail.recentDirectories : lastEventRecent;
+      manualPath = detail.manualPath ?? manualPath;
+      if (lastEventRecent) recentDirectories = lastEventRecent;
+    };
+    window.addEventListener("bds:deep-code-toggle-state", handler);
+    return () => window.removeEventListener("bds:deep-code-toggle-state", handler);
+  });
+
+  onDestroy(() => {
+    lastEventRecent = null;
+  });
+
   $effect(() => {
-    if (show && !prevShow) {
-      manualPath = appState.deepCode.manualPath || "";
-      if (activeDirectory && !manualPath) {
-        getCachedPathForFolder(activeDirectory).then((cached) => {
-          if (cached) manualPath = cached;
-        });
-      }
-    }
-    prevShow = show;
+    recentDirectories = appState.deepCode.recentDirectories || [];
+    manualPath = appState.deepCode.manualPath || "";
   });
 
   async function handleSelectFolder() {
-    errorMessage = "";
-    successMessage = "";
+    feedback = "";
     loading = true;
     try {
-      if (!supportsLocalDirectoryLinking()) {
-        throw new Error("File System Access API is not supported on this browser context.");
-      }
-      const res = await linkDirectory("deepcode-active-project");
-      
-      // Auto-retrieve path from cache or query Harness workspaces
-      let pathForFolder = await getCachedPathForFolder(res.rootName);
-      if (!pathForFolder) {
-        pathForFolder = await tryResolveHarnessWorkspacePath(res.rootName);
-      }
-      if (!pathForFolder && manualPath.trim()) {
-        pathForFolder = manualPath.trim();
-      }
-
-      await setDeepCodeDirectory(res.rootName, res.fileCount, pathForFolder);
-      manualPath = appState.deepCode.manualPath || pathForFolder || "";
-
-      if (pathForFolder) {
-        successMessage = `Linked "${res.rootName}" (${res.fileCount} files) — Path: ${pathForFolder}`;
-      } else {
-        successMessage = `Linked "${res.rootName}" (${res.fileCount} files indexed). Please confirm system path below.`;
-      }
+      const res = await pickAndLinkDeepCodeDirectory();
+      feedback = `Linked "${res.rootName}" (${res.fileCount} files indexed)`;
+      setTimeout(() => { feedback = ""; }, 3500);
     } catch (err) {
       if (err.name !== "AbortError") {
-        errorMessage = err.message || "Failed to select directory.";
+        feedback = err.message || "Failed to select directory.";
       }
     } finally {
       loading = false;
     }
   }
 
-  async function handleManualSubmit() {
-    const p = manualPath.trim();
-    if (!p) return;
-    errorMessage = "";
-    try {
-      const folderName = activeDirectory || p.split(/[/\\]/).pop() || p;
-      await setDeepCodeDirectory(folderName, fileCount, p);
-      await saveCachedPathForFolder(folderName, p);
-      successMessage = `Saved absolute workspace path: "${p}".`;
-    } catch (err) {
-      errorMessage = err.message || "Failed to save directory path.";
-    }
+  async function handleSelectRecent(entry) {
+    await selectRecentDirectory(entry);
+    feedback = `Switched to "${entry.name}"`;
+    setTimeout(() => { feedback = ""; }, 2500);
+  }
+
+  async function handleRemoveRecent(entry, e) {
+    e?.stopPropagation?.();
+    await removeRecentDirectory(entry.path || entry.name);
   }
 
   function handleOverlayClick() {
@@ -81,285 +71,242 @@
 {#if show}
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
-    class="bds-modal-overlay"
+    class="bds-modal-backdrop"
     role="dialog"
+    tabindex="-1"
     onclick={handleOverlayClick}
     onkeydown={(e) => e.key === 'Escape' && onclose?.()}
   >
-    <div class="bds-modal-card" onclick={(e) => e.stopPropagation()}>
-      <div class="bds-modal-header">
-        <h3>⚡ DeepCode & Harness Workspace</h3>
-        <button class="bds-close-btn" onclick={onclose}>×</button>
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <div class="bds-dc-modal" onclick={(e) => e.stopPropagation()}>
+      <div class="bds-drawer-header">
+        <div class="ds-modal-content__title">DeepCode & Harness</div>
+        <button id="bds-close" type="button" onclick={onclose} aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M14.1871 13.1265L13.1265 14.1872L1.81275 2.87347L2.87341 1.81281L14.1871 13.1265Z" fill="currentColor"></path>
+            <path d="M13.1265 1.81282L14.1871 2.87348L2.8734 14.1872L1.81274 13.1265L13.1265 1.81282Z" fill="currentColor"></path>
+          </svg>
+        </button>
       </div>
 
-      <div class="bds-modal-body">
-        <p class="bds-subtitle">
-          Select a local codebase folder for BDS tools (file reading, RAG indexing) and specify its absolute path for DeepSeek Harness execution.
+      <div class="bds-drawer-body">
+        <p class="bds-dc-subtitle">
+          Link a local codebase to empower DeepSeek with file inspection, code search, and automated Harness task execution.
         </p>
 
-        {#if activeDirectory}
-          <div class="bds-active-dir-badge">
-            <span class="bds-dot"></span>
-            <div>
-              <strong>Active Codebase:</strong> {activeDirectory} ({fileCount} indexed files)
+        {#if activeDirectory || manualPath}
+          <div class="bds-skill-item bds-active-dir-item" style="margin-bottom: 12px;">
+            <div style="flex: 1; min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="bds-active-dot"></span>
+                <strong style="font-size: 13px; color: var(--bds-text-primary);">{activeDirectory || "Active Codebase"}</strong>
+                {#if fileCount > 0}
+                  <span class="bds-count-badge">{fileCount} files indexed</span>
+                {/if}
+              </div>
               {#if manualPath}
-                <div class="bds-badge-path"><code>{manualPath}</code></div>
+                <div class="bds-path-code-text" title={manualPath}>{manualPath}</div>
               {/if}
             </div>
           </div>
-        {:else}
-          <div class="bds-active-dir-badge bds-empty">
-            No local directory currently linked.
-          </div>
         {/if}
 
-        <div class="bds-actions-group">
-          <button
-            type="button"
-            class="bds-btn-primary"
-            disabled={loading}
-            onclick={handleSelectFolder}
-          >
-            {loading ? "Indexing..." : "📁 Pick Local Folder..."}
-          </button>
+        <button
+          type="button"
+          class="bds-btn"
+          style="width: 100%; justify-content: center; padding: 9px 14px; font-size: 13px; margin-bottom: 12px;"
+          disabled={loading}
+          onclick={handleSelectFolder}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>{loading ? "Indexing Files..." : "Link Local Folder..."}</span>
+        </button>
+
+        {#if feedback}
+          <p class="bds-dc-feedback">{feedback}</p>
+        {/if}
+
+        <hr class="bds-dc-hr" />
+
+        <div class="bds-section-title">
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <span>Recent Codebases</span>
+            {#if recentDirectories.length > 0}
+              <span style="font-size: 11px; color: var(--bds-text-tertiary);">{recentDirectories.length}</span>
+            {/if}
+          </div>
         </div>
 
-        <div class="bds-divider"><span>ABSOLUTE SYSTEM PATH (FOR HARNESS CWD)</span></div>
-
-        <div class="bds-manual-section">
-          <label class="bds-input-label" for="bds-manual-path-input">
-            Full System Directory Path (Required for DeepSeek Harness):
-          </label>
-          <div class="bds-manual-input-row">
-            <input
-              id="bds-manual-path-input"
-              type="text"
-              placeholder="e.g. A:/Users/Edige/GitHub/asistan"
-              bind:value={manualPath}
-              class="bds-input-text"
-            />
-            <button type="button" class="bds-btn-secondary" onclick={handleManualSubmit}>
-              Save Path
-            </button>
-          </div>
-          <p class="bds-hint">
-            Browser security prevents web apps from reading host paths directly. Saving it once permanently attaches it to "{activeDirectory || 'your project'}".
-          </p>
+        <div class="bds-list" style="max-height: 220px; overflow-y: auto;">
+          {#if recentDirectories && recentDirectories.length > 0}
+            {#each recentDirectories as dir}
+              {@const isSelected = activeDirectory === dir.name || (manualPath && dir.path && manualPath.toLowerCase() === dir.path.toLowerCase())}
+              <div
+                class="bds-skill-item"
+                class:bds-active={isSelected}
+                role="button"
+                tabindex="0"
+                onclick={() => handleSelectRecent(dir)}
+                onkeydown={(e) => e.key === "Enter" && handleSelectRecent(dir)}
+                title={dir.path || dir.name}
+              >
+                <div style="flex: 1; min-width: 0;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-weight: 500; font-size: 13px; color: var(--bds-text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                      {dir.name}
+                    </span>
+                    {#if dir.fileCount}
+                      <span class="bds-count-badge">{dir.fileCount}f</span>
+                    {/if}
+                    {#if isSelected}
+                      <span style="color: var(--bds-accent); font-size: 12px;">✓</span>
+                    {/if}
+                  </div>
+                  {#if dir.path}
+                    <div class="bds-path-code-text" title={dir.path}>{dir.path}</div>
+                  {/if}
+                </div>
+                <button
+                  type="button"
+                  class="bds-item-remove-btn"
+                  title="Remove from history"
+                  onclick={(e) => handleRemoveRecent(dir, e)}
+                >
+                  ×
+                </button>
+              </div>
+            {/each}
+          {:else}
+            <p class="bds-empty" style="font-size: 11px; padding: 16px 0;">No recent directories. Click above to link a local folder.</p>
+          {/if}
         </div>
-
-        {#if errorMessage}
-          <div class="bds-error-msg">⚠️ {errorMessage}</div>
-        {/if}
-        {#if successMessage}
-          <div class="bds-success-msg">✅ {successMessage}</div>
-        {/if}
       </div>
 
-      <div class="bds-modal-footer">
-        <button type="button" class="bds-btn-outlined" onclick={onclose}>Done</button>
+      <div class="bds-drawer-bottom" style="display: flex; justify-content: flex-end;">
+        <button type="button" class="bds-btn-outlined" style="font-size: 12px; padding: 5px 14px;" onclick={onclose}>
+          Done
+        </button>
       </div>
     </div>
   </div>
 {/if}
 
 <style>
-  .bds-modal-overlay {
+  .bds-modal-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.65);
+    background: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 2147483647;
+    padding: 16px;
+    animation: bds-modal-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  .bds-modal-card {
-    background: var(--bds-bg-panel, #18191c);
-    border: 1px solid var(--bds-border, #333438);
-    border-radius: 16px;
+
+  @keyframes bds-modal-in {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .bds-dc-modal {
+    width: min(92vw, 400px);
+    border: 1px solid var(--bds-border);
+    border-radius: var(--bds-radius, 14px);
+    background: var(--bds-bg-panel);
+    box-shadow: var(--bds-shadow);
+    color: var(--bds-text-primary);
     padding: 24px;
-    max-width: 520px;
-    width: 90%;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
-    color: var(--bds-text-primary, #ececec);
-    font-family: inherit;
-  }
-  .bds-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-  }
-  .bds-modal-header h3 {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 600;
-  }
-  .bds-close-btn {
-    background: transparent;
-    border: none;
-    color: var(--bds-text-secondary, #9ca3af);
-    font-size: 20px;
-    cursor: pointer;
-    line-height: 1;
-  }
-  .bds-subtitle {
-    font-size: 13px;
-    color: var(--bds-text-secondary, #9ca3af);
-    margin: 0 0 16px;
-    line-height: 1.5;
-  }
-  .bds-active-dir-badge {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 10px 14px;
-    font-size: 13px;
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    margin-bottom: 16px;
-  }
-  .bds-badge-path {
-    margin-top: 4px;
-    font-size: 11px;
-    color: #60a5fa;
-  }
-  .bds-active-dir-badge.bds-empty {
-    color: #9ca3af;
-  }
-  .bds-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #10b981;
-    display: inline-block;
-    margin-top: 5px;
-    flex-shrink: 0;
-  }
-  .bds-actions-group {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 16px;
-  }
-  .bds-btn-primary {
-    background: #2563eb;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 10px 18px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .bds-btn-primary:hover:not(:disabled) {
-    background: #1d4ed8;
-  }
-  .bds-divider {
-    display: flex;
-    align-items: center;
-    text-align: center;
-    margin: 18px 0 12px;
-    color: #6b7280;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-  }
-  .bds-divider::before,
-  .bds-divider::after {
-    content: '';
-    flex: 1;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  }
-  .bds-divider span {
-    padding: 0 10px;
-  }
-  .bds-manual-section {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    max-height: 82vh;
+    box-sizing: border-box;
+    font-family: inherit;
   }
-  .bds-input-label {
-    font-size: 11px;
-    color: #9ca3af;
-    font-weight: 500;
+
+  .bds-dc-modal .bds-drawer-header {
+    margin-bottom: 24px;
   }
-  .bds-manual-input-row {
-    display: flex;
-    gap: 8px;
+
+  .bds-dc-subtitle {
+    font-size: 12px;
+    color: var(--bds-text-secondary);
+    margin: 0 0 16px;
+    line-height: 1.45;
   }
-  .bds-input-text {
-    flex: 1;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 13px;
-    color: white;
+
+  .bds-dc-hr {
+    border: none;
+    height: 1px;
+    background: var(--bds-border);
+    margin: 20px 0;
+  }
+
+  .bds-dc-feedback {
+    font-size: 11.5px;
+    color: var(--bds-accent);
+    margin: 0 0 10px;
+    text-align: center;
+  }
+
+  .bds-active-dir-item {
+    background: var(--bds-bg-elevated);
+  }
+
+  .bds-active-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+    flex-shrink: 0;
+  }
+
+  .bds-count-badge {
+    font-size: 10px;
+    background: var(--bds-bg-hover, rgba(255, 255, 255, 0.08));
+    color: var(--bds-text-secondary);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  .bds-path-code-text {
+    font-size: 10.5px;
+    color: var(--bds-text-tertiary);
     font-family: monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
   }
-  .bds-input-text:focus {
-    outline: none;
-    border-color: #2563eb;
-  }
-  .bds-btn-secondary {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-    padding: 8px 14px;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-  }
-  .bds-btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.15);
-  }
-  .bds-hint {
-    font-size: 11px;
-    color: #6b7280;
-    margin: 4px 0 0;
-    line-height: 1.4;
-  }
-  .bds-error-msg {
-    margin-top: 12px;
-    padding: 8px 12px;
-    background: rgba(239, 68, 68, 0.15);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    border-radius: 6px;
-    color: #f87171;
-    font-size: 12px;
-  }
-  .bds-success-msg {
-    margin-top: 12px;
-    padding: 8px 12px;
-    background: rgba(16, 185, 129, 0.15);
-    border: 1px solid rgba(16, 185, 129, 0.3);
-    border-radius: 6px;
-    color: #34d399;
-    font-size: 12px;
-  }
-  .bds-modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 20px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-  }
-  .bds-btn-outlined {
+
+  .bds-item-remove-btn {
+    opacity: 0;
     background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    padding: 8px 16px;
-    color: #ececec;
+    border: none;
+    color: var(--bds-text-tertiary);
+    font-size: 14px;
     cursor: pointer;
-    font-size: 13px;
+    padding: 0 4px;
+    border-radius: 4px;
+    transition: all var(--bds-transition, 0.15s ease);
+    flex-shrink: 0;
   }
-  .bds-btn-outlined:hover {
-    background: rgba(255, 255, 255, 0.05);
+
+  .bds-skill-item:hover .bds-item-remove-btn {
+    opacity: 0.8;
+  }
+
+  .bds-item-remove-btn:hover {
+    opacity: 1 !important;
+    color: #f87171;
+    background: rgba(239, 68, 68, 0.15);
   }
 </style>

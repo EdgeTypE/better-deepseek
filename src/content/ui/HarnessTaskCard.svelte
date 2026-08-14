@@ -1,15 +1,16 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import appState from "../state.js";
-  import { getCachedPathForFolder } from "../deep-code.js";
+  import { getCachedPathForFolder, setPendingHarnessReport } from "../deep-code.js";
   import { BetterDeepSeekHarnessBridge, runFallbackMode } from "../../lib/harness-bridge.js";
+  import { t } from "../../lib/i18n.svelte.js";
 
   let { attrs = {}, content = "" } = $props();
 
   let initialPath = appState.deepCode.manualPath || attrs.cwd || attrs.path || appState.deepCode.activeDirectory || "";
   let cwdInput = $state(initialPath);
   let workspaceId = $derived(attrs.workspaceId || attrs.workspaceid || "");
-  let taskPrompt = $derived(content.trim() || attrs.task || "Execute task");
+  let taskPrompt = $derived(content.trim() || attrs.task || t("harnessTaskCard.taskDefault"));
 
   $effect(() => {
     const cur = cwdInput.trim();
@@ -36,6 +37,17 @@
   let showLiveStream = $state(true);
   let copyFeedback = $state("");
   let insertFeedback = $state("");
+
+  let logsEl = $state(null);
+  let outputEl = $state(null);
+
+  $effect(() => {
+    if (liveLogs.length && logsEl) logsEl.scrollTop = logsEl.scrollHeight;
+  });
+
+  $effect(() => {
+    if (assistantOutput && outputEl) outputEl.scrollTop = outputEl.scrollHeight;
+  });
 
   onMount(async () => {
     const ping = await bridge.checkPluginActive();
@@ -73,7 +85,7 @@
         const sid = await bridge.createSession(targetCwd);
         sessionId = sid;
         status = "running";
-        liveLogs = [{ type: "info", text: `🚀 Session ${sid} created on Harness.` }];
+        liveLogs = [{ type: "info", text: t("harnessTaskCard.logSessionCreated", { sid }) }];
 
         // 2. Connect Live SSE Stream
         bridge.connectEvents((event) => {
@@ -87,14 +99,14 @@
             } else if (event.type === "tool/call") {
               const toolName = event.payload?.tool || "tool";
               const argsStr = event.payload?.args ? ` (${JSON.stringify(event.payload.args).slice(0, 60)}...)` : "";
-              liveLogs = [...liveLogs, { type: "tool-call", text: `[${timeStr}] 🛠️ Running tool: ${toolName}${argsStr}` }];
+              liveLogs = [...liveLogs, { type: "tool-call", text: t("harnessTaskCard.logToolCall", { time: timeStr, tool: toolName }) + argsStr }];
             } else if (event.type === "tool/result") {
               const toolName = event.payload?.tool || "tool";
-              liveLogs = [...liveLogs, { type: "tool-result", text: `[${timeStr}] ✅ Finished tool: ${toolName}` }];
+              liveLogs = [...liveLogs, { type: "tool-result", text: t("harnessTaskCard.logToolResult", { time: timeStr, tool: toolName }) }];
             } else if (event.type === "turn/stopping") {
               if (status === "running") {
                 status = "finishing";
-                liveLogs = [...liveLogs, { type: "info", text: `[${timeStr}] ⏳ Results compiling...` }];
+                liveLogs = [...liveLogs, { type: "info", text: t("harnessTaskCard.logCompiling", { time: timeStr }) }];
               }
             } else if (event.type === "turn/complete") {
               status = "completed";
@@ -103,7 +115,13 @@
               } else if (assistantOutput) {
                 finalMarkdownReport = assistantOutput;
               }
-              liveLogs = [...liveLogs, { type: "info", text: `[${timeStr}] ✨ Turn completed with final report.` }];
+              setPendingHarnessReport({
+                cwd: targetCwd,
+                sessionId,
+                report: finalMarkdownReport || assistantOutput,
+                completedAt: Date.now(),
+              });
+              liveLogs = [...liveLogs, { type: "info", text: t("harnessTaskCard.logComplete", { time: timeStr }) }];
             }
           }
         });
@@ -113,7 +131,7 @@
 
       } catch (err) {
         status = "error";
-        errorMessage = err.message || "Failed to execute session on Harness.";
+        errorMessage = err.message || t("harnessTaskCard.executeFailed");
         debugInfo = { url: "http://127.0.0.1:3080/api/better-deepseek/session.create", error: String(err) };
       }
     } else {
@@ -131,17 +149,17 @@
     const cancelled = await bridge.cancelSession(sessionId);
     if (cancelled) {
       status = "cancelled";
-      liveLogs = [...liveLogs, { type: "info", text: `🛑 Task cancelled by user.` }];
+      liveLogs = [...liveLogs, { type: "info", text: t("harnessTaskCard.logCancelled") }];
     }
   }
 
   async function copyPromptAgain() {
     try {
       await navigator.clipboard.writeText(taskPrompt);
-      copyFeedback = "Prompt copied to clipboard! 📋";
+      copyFeedback = t("harnessTaskCard.copyPromptFeedback");
       setTimeout(() => { copyFeedback = ""; }, 2500);
     } catch {
-      copyFeedback = "Failed to copy.";
+      copyFeedback = t("harnessTaskCard.copyFailed");
     }
   }
 
@@ -154,10 +172,10 @@
     if (!textToCopy) return;
     try {
       await navigator.clipboard.writeText(textToCopy);
-      copyFeedback = "Report copied to clipboard! 📋";
+      copyFeedback = t("harnessTaskCard.copyFeedback");
       setTimeout(() => { copyFeedback = ""; }, 2500);
     } catch {
-      copyFeedback = "Failed to copy.";
+      copyFeedback = t("harnessTaskCard.copyFailed");
     }
   }
 
@@ -170,11 +188,11 @@
       textarea.value = textToInsert;
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
       textarea.focus();
-      insertFeedback = "Inserted into chat! 💬";
+      insertFeedback = t("harnessTaskCard.insertFeedback");
       setTimeout(() => { insertFeedback = ""; }, 2500);
     } else {
       copyFinalReport();
-      insertFeedback = "Copied to clipboard (chat input not found) 📋";
+      insertFeedback = t("harnessTaskCard.insertFallback");
       setTimeout(() => { insertFeedback = ""; }, 2500);
     }
   }
@@ -187,11 +205,15 @@
 <div class="bds-harness-card">
   <div class="bds-harness-header">
     <div class="bds-harness-title">
-      <span class="bds-harness-icon">⚡</span>
+      <span class="bds-harness-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+        </svg>
+      </span>
       <div>
-        <strong>DeepSeek Harness Task</strong>
+        <strong>{t("harnessTaskCard.title")}</strong>
         {#if pluginActive}
-          <span class="bds-plugin-tag">Bridge Plugin v{pluginVersion} (Auto SSE)</span>
+          <span class="bds-plugin-tag">{t("harnessTaskCard.pluginTag", { version: pluginVersion })}</span>
         {/if}
       </div>
     </div>
@@ -204,38 +226,38 @@
       class:bds-error={status === 'error'}
     >
       {#if status === 'idle'}
-        Ready
+        {t("harnessTaskCard.statusReady")}
       {:else if status === 'connecting'}
-        Connecting...
+        {t("harnessTaskCard.statusConnecting")}
       {:else if status === 'running'}
-        Running...
+        {t("harnessTaskCard.statusRunning")}
       {:else if status === 'finishing'}
-        Compiling...
+        {t("harnessTaskCard.statusFinishing")}
       {:else if status === 'completed'}
-        Completed ✨
+        {t("harnessTaskCard.statusCompleted")}
       {:else if status === 'fallback'}
-        Manual Mode 📋
+        {t("harnessTaskCard.statusFallback")}
       {:else if status === 'cancelled'}
-        Cancelled 🛑
+        {t("harnessTaskCard.statusCancelled")}
       {:else}
-        Failed
+        {t("harnessTaskCard.statusError")}
       {/if}
     </span>
   </div>
 
   <div class="bds-harness-body">
     <div class="bds-harness-row">
-      <span class="bds-label">Absolute Codebase Path (CWD):</span>
+      <span class="bds-label bds-field-label">{t("harnessTaskCard.cwdLabel")}</span>
       <input
         type="text"
         bind:value={cwdInput}
-        placeholder="e.g. A:/Users/Edige/GitHub/asistan"
+        placeholder={t("harnessTaskCard.cwdPlaceholder")}
         class="bds-path-input"
       />
     </div>
 
     <div class="bds-harness-task-box">
-      <div class="bds-label">Task Description & Plan:</div>
+      <div class="bds-label bds-field-label">{t("harnessTaskCard.taskLabel")}</div>
       <pre class="bds-task-content">{taskPrompt}</pre>
     </div>
 
@@ -243,25 +265,46 @@
     {#if status === "fallback"}
       <div class="bds-fallback-card">
         <div class="bds-fallback-title">
-          <span>🌐 Harness Manual Execution (Bridge Plugin Not Installed)</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          <span>{t("harnessTaskCard.fallbackTitle")}</span>
         </div>
         <p class="bds-fallback-desc">
-          Görev metni panoya kopyalandı! Harness sekmesine yapıştırıp Enter'a basın.
+          {t("harnessTaskCard.fallbackDesc")}
         </p>
         <div class="bds-fallback-actions">
-          <button type="button" class="bds-btn-fallback" onclick={copyPromptAgain}>
-            Tekrar Kopyala 📋
+          <button type="button" class="bds-btn-outlined" onclick={copyPromptAgain}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>{t("harnessTaskCard.copyPrompt")}</span>
           </button>
-          <button type="button" class="bds-btn-fallback bds-primary" onclick={openHarnessTab}>
-            Harness'ı Aç 🔗
+          <button type="button" class="bds-btn" onclick={openHarnessTab}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+            <span>{t("harnessTaskCard.openHarness")}</span>
           </button>
           {#if copyFeedback}
             <span class="bds-feedback-text">{copyFeedback}</span>
           {/if}
         </div>
         <div class="bds-fallback-hint">
-          💡 <strong>Tam otomatik mod için</strong> terminalde Bridge eklentisini kurun:
-          <code>irm https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/scripts/install.ps1 | iex</code>
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="9" y1="18" x2="15" y2="18"></line>
+            <line x1="10" y1="22" x2="14" y2="22"></line>
+            <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5.76.76 1.23 1.52 1.41 2.5"></path>
+          </svg>
+          <div>
+            <strong>{t("harnessTaskCard.fallbackHint")}</strong>
+            <code>irm https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/scripts/install.ps1 | iex</code>
+          </div>
         </div>
       </div>
     {/if}
@@ -269,20 +312,36 @@
     <!-- MOD A: LIVE LOGS & OUTPUT -->
     {#if (liveLogs.length > 0 || assistantOutput) && status !== "fallback"}
       <div class="bds-harness-live-box">
-        <div class="bds-live-header" onclick={() => showLiveStream = !showLiveStream}>
-          <span>📡 Live Execution Stream ({liveLogs.length} events)</span>
-          <span class="bds-collapse-icon">{showLiveStream ? '▲' : '▼'}</span>
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="bds-live-header" role="button" tabindex="0" onclick={() => showLiveStream = !showLiveStream} onkeydown={(e) => e.key === 'Enter' && (showLiveStream = !showLiveStream)}>
+          <span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="2"></circle>
+              <path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path>
+            </svg>
+            {t("harnessTaskCard.liveHeader", { count: liveLogs.length })}
+          </span>
+          <span class="bds-collapse-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              {#if showLiveStream}
+                <polyline points="18 15 12 9 6 15"></polyline>
+              {:else}
+                <polyline points="6 9 12 15 18 9"></polyline>
+              {/if}
+            </svg>
+          </span>
         </div>
         {#if showLiveStream}
-          <div class="bds-live-logs">
+          <div class="bds-live-logs" bind:this={logsEl}>
             {#each liveLogs as item}
               <div class="bds-live-log-item {item.type}">{item.text}</div>
             {/each}
           </div>
           {#if assistantOutput && (status === 'running' || status === 'finishing')}
             <div class="bds-assistant-output">
-              <div class="bds-assistant-output-label">Live Assistant Output:</div>
-              <pre class="bds-assistant-pre">{assistantOutput}</pre>
+              <div class="bds-assistant-output-label">{t("harnessTaskCard.liveAssistantLabel")}</div>
+              <pre class="bds-assistant-pre" bind:this={outputEl}>{assistantOutput}</pre>
             </div>
           {/if}
         {/if}
@@ -294,8 +353,10 @@
       <div class="bds-final-report-card">
         <div class="bds-final-report-header">
           <div class="bds-final-report-title">
-            <span>✨</span>
-            <strong>Final Task Report / Nihai Rapor</strong>
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <strong>{t("harnessTaskCard.reportTitle")}</strong>
           </div>
           <div class="bds-report-actions">
             {#if copyFeedback}
@@ -304,16 +365,31 @@
             {#if insertFeedback}
               <span class="bds-copy-feedback">{insertFeedback}</span>
             {/if}
-            <button type="button" class="bds-btn-copy" onclick={copyFinalReport}>
-              📋 Kopyala
+            <button type="button" class="bds-btn-outlined" onclick={copyFinalReport}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>{t("harnessTaskCard.reportCopy")}</span>
             </button>
-            <button type="button" class="bds-btn-insert" onclick={insertIntoChat}>
-              💬 Chat'e Yapıştır
+            <button type="button" class="bds-btn" onclick={insertIntoChat}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+              <span>{t("harnessTaskCard.reportInsert")}</span>
             </button>
           </div>
         </div>
         <div class="bds-final-report-body">
           <pre class="bds-report-pre">{finalMarkdownReport || assistantOutput}</pre>
+        </div>
+        <div class="bds-auto-inject-notice">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          <span>{@html t("harnessTaskCard.autoInjectNotice")}</span>
         </div>
       </div>
     {/if}
@@ -322,17 +398,29 @@
     {#if errorMessage}
       <div class="bds-harness-error-container">
         <div class="bds-harness-error-title">
-          ⚠️ {errorMessage}
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <span>{errorMessage}</span>
         </div>
         {#if debugInfo}
           <button type="button" class="bds-debug-toggle-btn" onclick={toggleDebug}>
-            {showDebug ? '▲ Hide Debug Details' : '▼ Show Detailed Error Log'}
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              {#if showDebug}
+                <polyline points="18 15 12 9 6 15"></polyline>
+              {:else}
+                <polyline points="6 9 12 15 18 9"></polyline>
+              {/if}
+            </svg>
+            {showDebug ? t("harnessTaskCard.debugToggleHide") : t("harnessTaskCard.debugToggleShow")}
           </button>
           {#if showDebug}
             <div class="bds-debug-box">
-              <div class="bds-debug-row"><strong>URL:</strong> <code>{debugInfo.url || 'http://127.0.0.1:3080'}</code></div>
+              <div class="bds-debug-row"><strong>{t("harnessTaskCard.debugUrl")}</strong> <code>{debugInfo.url || 'http://127.0.0.1:3080'}</code></div>
               {#if debugInfo.error}
-                <div class="bds-debug-row"><strong>Error:</strong> <code>{debugInfo.error}</code></div>
+                <div class="bds-debug-row"><strong>{t("harnessTaskCard.debugError")}</strong> <code>{debugInfo.error}</code></div>
               {/if}
             </div>
           {/if}
@@ -343,24 +431,44 @@
 
   <div class="bds-harness-actions">
     {#if status === 'running' || status === 'connecting' || status === 'finishing'}
-      <button type="button" class="bds-btn-cancel" onclick={cancelCurrentTask}>
-        ⏹️ Durdur / İptal
+      <button type="button" class="bds-btn-outlined bds-btn-cancel" onclick={cancelCurrentTask}>
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect>
+        </svg>
+        <span>{t("harnessTaskCard.cancelBtn")}</span>
       </button>
     {/if}
     <button
       type="button"
-      class="bds-btn-run"
+      class="bds-btn bds-btn-run"
       disabled={status === 'running' || status === 'connecting' || status === 'finishing'}
       onclick={runHarnessTask}
     >
       {#if status === 'running' || status === 'connecting' || status === 'finishing'}
-        Executing on Harness...
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        <span>{t("harnessTaskCard.runExecuting")}</span>
       {:else if status === 'completed'}
-        🔄 Yeniden Çalıştır
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        <span>{t("harnessTaskCard.runAgain")}</span>
       {:else if status === 'fallback'}
-        📋 Tekrar Çalıştır
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        <span>{t("harnessTaskCard.runFallback")}</span>
       {:else}
-        ▶ Run in DeepSeek Harness
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+        <span>{t("harnessTaskCard.runDefault")}</span>
       {/if}
     </button>
   </div>
@@ -368,69 +476,84 @@
 
 <style>
   .bds-harness-card {
-    background: var(--bds-bg-panel, #1a1b1e);
-    border: 1px solid var(--bds-border, #333438);
-    border-radius: 12px;
+    background: var(--bds-bg-panel);
+    border: 1px solid var(--bds-border);
+    border-radius: var(--bds-radius);
     padding: 16px;
     margin: 12px 0;
     font-family: inherit;
-    color: var(--bds-text-primary, #ececec);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    color: var(--bds-text-primary);
+    box-shadow: var(--bds-shadow);
   }
   .bds-harness-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--bds-border);
+    gap: 8px;
   }
   .bds-harness-title {
     display: flex;
     align-items: center;
     gap: 8px;
     font-size: 14px;
+    min-width: 0;
+  }
+  .bds-harness-title > div {
+    min-width: 0;
+  }
+  .bds-harness-title strong {
+    color: var(--bds-text-primary);
   }
   .bds-plugin-tag {
     display: inline-block;
-    background: rgba(37, 99, 235, 0.2);
-    color: #60a5fa;
-    border: 1px solid rgba(37, 99, 235, 0.4);
-    border-radius: 4px;
+    background: var(--bds-accent-glow);
+    color: var(--bds-accent);
+    border: 1px solid var(--bds-border);
+    border-radius: 6px;
     font-size: 10px;
     padding: 2px 6px;
     margin-left: 6px;
     font-weight: 500;
+    vertical-align: middle;
   }
   .bds-harness-icon {
-    font-size: 16px;
+    color: var(--bds-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
   }
   .bds-harness-badge {
     font-size: 11px;
     padding: 3px 8px;
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--bds-text-secondary, #9ca3af);
+    border-radius: 999px;
+    background: var(--bds-bg-elevated);
+    color: var(--bds-text-secondary);
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .bds-harness-badge.bds-running {
-    background: rgba(59, 130, 246, 0.2);
-    color: #60a5fa;
+    background: var(--bds-accent-glow);
+    color: var(--bds-accent);
   }
   .bds-harness-badge.bds-success {
-    background: rgba(16, 185, 129, 0.2);
-    color: #34d399;
+    background: rgba(16, 185, 129, 0.14);
+    color: #10b981;
   }
   .bds-harness-badge.bds-fallback {
-    background: rgba(245, 158, 11, 0.2);
-    color: #fbbf24;
+    background: rgba(245, 158, 11, 0.14);
+    color: #f59e0b;
   }
   .bds-harness-badge.bds-error {
-    background: rgba(239, 68, 68, 0.2);
-    color: #f87171;
+    background: var(--bds-danger-border);
+    color: var(--bds-danger);
   }
   .bds-harness-badge.bds-cancelled {
-    background: rgba(107, 114, 128, 0.2);
-    color: #9ca3af;
+    background: var(--bds-bg-hover);
+    color: var(--bds-text-tertiary);
   }
   .bds-harness-body {
     display: flex;
@@ -442,25 +565,26 @@
     flex-direction: column;
     gap: 4px;
   }
-  .bds-label {
+  .bds-field-label {
     font-size: 11px;
     font-weight: 600;
-    color: var(--bds-text-secondary, #9ca3af);
+    color: var(--bds-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
   .bds-path-input {
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid var(--bds-border, #333438);
-    border-radius: 6px;
+    background: var(--bds-bg-input);
+    border: 1px solid var(--bds-border);
+    border-radius: 8px;
     padding: 8px 10px;
     font-size: 13px;
-    color: #ffffff;
+    color: var(--bds-text-primary);
     font-family: monospace;
+    transition: border-color var(--bds-transition);
   }
   .bds-path-input:focus {
     outline: none;
-    border-color: #2563eb;
+    border-color: var(--bds-accent);
   }
   .bds-harness-task-box {
     display: flex;
@@ -468,13 +592,13 @@
     gap: 4px;
   }
   .bds-task-content {
-    background: rgba(0, 0, 0, 0.35);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 6px;
+    background: var(--bds-bg-elevated);
+    border: 1px solid var(--bds-border);
+    border-radius: 8px;
     padding: 10px;
     font-size: 12px;
     line-height: 1.5;
-    color: #d1d5db;
+    color: var(--bds-text-primary);
     max-height: 160px;
     overflow-y: auto;
     white-space: pre-wrap;
@@ -485,18 +609,24 @@
   .bds-fallback-card {
     background: rgba(245, 158, 11, 0.08);
     border: 1px solid rgba(245, 158, 11, 0.3);
-    border-radius: 8px;
+    border-radius: var(--bds-radius);
     padding: 12px;
   }
   .bds-fallback-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     font-size: 12px;
     font-weight: 600;
-    color: #fbbf24;
+    color: #f59e0b;
     margin-bottom: 6px;
+  }
+  .bds-fallback-title svg {
+    flex-shrink: 0;
   }
   .bds-fallback-desc {
     font-size: 12px;
-    color: #e5e7eb;
+    color: var(--bds-text-primary);
     margin: 0 0 10px;
     line-height: 1.4;
   }
@@ -505,58 +635,72 @@
     align-items: center;
     gap: 8px;
     margin-bottom: 10px;
+    flex-wrap: wrap;
   }
-  .bds-btn-fallback {
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
+  .bds-fallback-actions button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-  }
-  .bds-btn-fallback.bds-primary {
-    background: #d97706;
-    border-color: #f59e0b;
-  }
-  .bds-btn-fallback:hover {
-    opacity: 0.9;
   }
   .bds-feedback-text {
     font-size: 11px;
-    color: #34d399;
+    color: #10b981;
   }
   .bds-fallback-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
     font-size: 11px;
-    color: #9ca3af;
+    color: var(--bds-text-secondary);
     line-height: 1.4;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    border-top: 1px solid var(--bds-border);
     padding-top: 8px;
+  }
+  .bds-fallback-hint svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .bds-fallback-hint strong {
+    color: var(--bds-text-primary);
   }
   .bds-fallback-hint code {
     display: block;
     margin-top: 4px;
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--bds-bg-input);
+    border: 1px solid var(--bds-border);
     padding: 4px 8px;
-    border-radius: 4px;
-    color: #60a5fa;
+    border-radius: 6px;
+    color: var(--bds-accent);
     font-size: 10px;
+    word-break: break-all;
   }
   .bds-harness-live-box {
-    background: rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(37, 99, 235, 0.3);
-    border-radius: 8px;
+    background: var(--bds-bg-elevated);
+    border: 1px solid var(--bds-border);
+    border-radius: var(--bds-radius);
     padding: 10px;
   }
   .bds-live-header {
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    gap: 8px;
     font-size: 12px;
     font-weight: 600;
-    color: #60a5fa;
+    color: var(--bds-accent);
     cursor: pointer;
     user-select: none;
+  }
+  .bds-live-header > span:first-child {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .bds-collapse-icon {
+    display: flex;
+    align-items: center;
+    color: var(--bds-text-tertiary);
   }
   .bds-live-logs {
     margin-top: 8px;
@@ -571,33 +715,35 @@
   .bds-live-log-item {
     padding: 3px 6px;
     border-radius: 4px;
-    background: rgba(255, 255, 255, 0.03);
-    color: #d1d5db;
+    background: var(--bds-bg-hover);
+    color: var(--bds-text-primary);
+    border-left: 2px solid transparent;
   }
   .bds-live-log-item.tool-call {
-    color: #fbbf24;
+    color: #f59e0b;
     border-left: 2px solid #f59e0b;
   }
   .bds-live-log-item.tool-result {
-    color: #34d399;
+    color: #10b981;
     border-left: 2px solid #10b981;
   }
   .bds-assistant-output {
     margin-top: 10px;
     padding-top: 8px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid var(--bds-border);
   }
   .bds-assistant-output-label {
     font-size: 11px;
-    color: #9ca3af;
+    color: var(--bds-text-secondary);
     margin-bottom: 4px;
   }
   .bds-assistant-pre {
-    background: rgba(0, 0, 0, 0.5);
-    border-radius: 6px;
+    background: var(--bds-bg-input);
+    border: 1px solid var(--bds-border);
+    border-radius: 8px;
     padding: 8px;
     font-size: 11px;
-    color: #e5e7eb;
+    color: var(--bds-text-primary);
     max-height: 120px;
     overflow-y: auto;
     white-space: pre-wrap;
@@ -605,63 +751,79 @@
     margin: 0;
   }
   .bds-final-report-card {
-    background: #181926;
-    border: 1px solid #10b981;
-    border-radius: 10px;
+    background: var(--bds-bg-elevated);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    border-radius: var(--bds-radius);
     padding: 14px;
-    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.15);
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.12);
+  }
+  .bds-auto-inject-notice {
+    margin-top: 10px;
+    padding: 8px 10px;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 8px;
+    font-size: 11px;
+    color: var(--bds-text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1.4;
+  }
+  .bds-auto-inject-notice svg {
+    flex-shrink: 0;
+    color: #10b981;
+  }
+  .bds-auto-inject-notice code {
+    background: var(--bds-bg-input);
+    border: 1px solid var(--bds-border);
+    padding: 1px 4px;
+    border-radius: 4px;
+    color: #10b981;
+    font-size: 10px;
+    font-family: monospace;
   }
   .bds-final-report-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
     margin-bottom: 10px;
     padding-bottom: 8px;
     border-bottom: 1px solid rgba(16, 185, 129, 0.2);
+    flex-wrap: wrap;
   }
   .bds-final-report-title {
     display: flex;
     align-items: center;
     gap: 6px;
-    color: #34d399;
+    color: #10b981;
     font-size: 13px;
   }
   .bds-report-actions {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
+  }
+  .bds-report-actions button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
   }
   .bds-copy-feedback {
     font-size: 11px;
-    color: #34d399;
-  }
-  .bds-btn-copy, .bds-btn-insert {
-    background: #059669;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 5px 10px;
-    font-size: 11px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
-  .bds-btn-insert {
-    background: #2563eb;
-  }
-  .bds-btn-copy:hover {
-    background: #047857;
-  }
-  .bds-btn-insert:hover {
-    background: #1d4ed8;
+    color: #10b981;
   }
   .bds-report-pre {
-    background: rgba(0, 0, 0, 0.4);
-    border-radius: 6px;
+    background: var(--bds-bg-input);
+    border: 1px solid var(--bds-border);
+    border-radius: 8px;
     padding: 12px;
     font-size: 12px;
     line-height: 1.6;
-    color: #f3f4f6;
+    color: var(--bds-text-primary);
     max-height: 320px;
     overflow-y: auto;
     white-space: pre-wrap;
@@ -670,20 +832,29 @@
     font-family: monospace;
   }
   .bds-harness-error-container {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.25);
-    border-radius: 8px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid var(--bds-danger-border);
+    border-radius: var(--bds-radius);
     padding: 10px 12px;
   }
   .bds-harness-error-title {
-    color: #f87171;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--bds-danger);
     font-size: 12px;
     font-weight: 500;
   }
+  .bds-harness-error-title svg {
+    flex-shrink: 0;
+  }
   .bds-debug-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     background: transparent;
     border: none;
-    color: #60a5fa;
+    color: var(--bds-accent);
     font-size: 11px;
     cursor: pointer;
     padding: 0;
@@ -693,15 +864,20 @@
   .bds-debug-box {
     margin-top: 8px;
     padding: 8px;
-    background: rgba(0, 0, 0, 0.4);
-    border-radius: 6px;
+    background: var(--bds-bg-input);
+    border: 1px solid var(--bds-border);
+    border-radius: 8px;
     font-size: 11px;
     display: flex;
     flex-direction: column;
     gap: 6px;
   }
   .bds-debug-row {
-    color: #d1d5db;
+    color: var(--bds-text-primary);
+    word-break: break-all;
+  }
+  .bds-debug-row code {
+    font-family: monospace;
   }
   .bds-harness-actions {
     margin-top: 12px;
@@ -709,32 +885,23 @@
     justify-content: flex-end;
     gap: 8px;
   }
-  .bds-btn-cancel {
-    background: rgba(239, 68, 68, 0.2);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.4);
-    border-radius: 8px;
+  .bds-harness-actions button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     padding: 8px 14px;
     font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
+  }
+  .bds-btn-cancel {
+    color: var(--bds-danger);
+    border-color: var(--bds-danger-border);
   }
   .bds-btn-cancel:hover {
-    background: rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.1);
+    border-color: var(--bds-danger);
   }
   .bds-btn-run {
-    background: linear-gradient(135deg, #2563eb, #1d4ed8);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 9px 18px;
-    font-size: 13px;
     font-weight: 600;
-    cursor: pointer;
-    transition: opacity 0.2s;
-  }
-  .bds-btn-run:hover:not(:disabled) {
-    opacity: 0.9;
   }
   .bds-btn-run:disabled {
     opacity: 0.6;

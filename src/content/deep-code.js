@@ -4,8 +4,11 @@
 
 import state from "./state.js";
 import { STORAGE_KEYS } from "../lib/constants.js";
-import { getLinkedDirectoryInfo, getDirectoryFiles } from "../lib/local-directory-source.js";
+import { getLinkedDirectoryInfo, getDirectoryFiles, linkDirectory, supportsLocalDirectoryLinking } from "../lib/local-directory-source.js";
 import { devLog } from "../lib/dev-log.js";
+
+const RECENT_DIRS_KEY = "bds_deepcode_recent_dirs";
+const PATH_CACHE_KEY = "bds_deepcode_path_cache";
 
 /**
  * Initialize or update DeepCode enabled state.
@@ -22,7 +25,68 @@ export function setDeepCodeEnabled(enabled) {
 }
 
 /**
- * Update the selected directory handle/path.
+ * Toggle DeepCode enabled state.
+ */
+export function toggleDeepCodeEnabled() {
+  setDeepCodeEnabled(!state.deepCode.enabled);
+}
+
+/**
+ * Trigger directory picker, auto-resolve absolute path, and activate DeepCode.
+ * @returns {Promise<{ rootName: string, fileCount: number, path: string }>}
+ */
+export async function pickAndLinkDeepCodeDirectory() {
+  const picked = await pickDeepCodeDirectory();
+  await activateDeepCodeDirectory(picked.rootName, picked.fileCount, picked.path);
+  return picked;
+}
+
+/**
+ * Pick a directory via File System Access API, auto-resolve its absolute path,
+ * and link the directory handle WITHOUT mutating DeepCode state.
+ * @returns {Promise<{ rootName: string, fileCount: number, path: string }>}
+ */
+export async function pickDeepCodeDirectory() {
+  if (!supportsLocalDirectoryLinking()) {
+    throw new Error("File System Access API is not supported on this browser context.");
+  }
+  const res = await linkDirectory("deepcode-active-project");
+  
+  // Auto-resolve system path from cache or query Harness workspaces
+  let pathForFolder = await getCachedPathForFolder(res.rootName);
+  if (!pathForFolder) {
+    pathForFolder = await tryResolveHarnessWorkspacePath(res.rootName);
+  }
+  if (!pathForFolder && state.deepCode.manualPath) {
+    // If current path matches or ends with rootName
+    const cur = state.deepCode.manualPath.replace(/\\/g, "/");
+    if (cur.toLowerCase().endsWith(res.rootName.toLowerCase())) {
+      pathForFolder = state.deepCode.manualPath;
+    }
+  }
+
+  return {
+    rootName: res.rootName,
+    fileCount: res.fileCount,
+    path: pathForFolder || "",
+  };
+}
+
+/**
+ * Activate DeepCode for a previously picked directory: set path, recent history,
+ * persist state, and enable. This is the single commit point after the user
+ * confirms the absolute path.
+ * @param {string} rootName 
+ * @param {number} fileCount 
+ * @param {string} [path] 
+ */
+export async function activateDeepCodeDirectory(rootName, fileCount = 0, path = "") {
+  await setDeepCodeDirectory(rootName, fileCount, path);
+  setDeepCodeEnabled(true);
+}
+
+/**
+ * Update the selected directory handle/path and add to recent directories.
  * @param {string} rootName 
  * @param {number} fileCount 
  * @param {string} [manualPath] 
@@ -45,10 +109,13 @@ export async function setDeepCodeDirectory(rootName, fileCount = 0, manualPath =
     }
   }
 
-  state.deepCode.manualPath = manualPath || state.deepCode.manualPath || "";
+  state.deepCode.manualPath = manualPath || "";
 
   if (rootName && state.deepCode.manualPath) {
     await saveCachedPathForFolder(rootName, state.deepCode.manualPath);
+    await addRecentDirectory(rootName, state.deepCode.manualPath, fileCount);
+  } else if (rootName) {
+    await addRecentDirectory(rootName, "", fileCount);
   }
 
   emitDeepCodeState();
@@ -57,13 +124,89 @@ export async function setDeepCodeDirectory(rootName, fileCount = 0, manualPath =
 }
 
 /**
+ * Select a directory from recent history.
+ * @param {{ name: string, path: string, fileCount: number }} entry 
+ */
+export async function selectRecentDirectory(entry) {
+  if (!entry || !entry.name) return;
+  state.deepCode.activeDirectory = entry.name;
+  state.deepCode.manualPath = entry.path || "";
+  state.deepCode.fileCount = entry.fileCount || 0;
+  state.deepCode.enabled = true;
+
+  await addRecentDirectory(entry.name, entry.path, entry.fileCount);
+  emitDeepCodeState();
+  await persistDeepCodeState();
+  await ensureDeepCodeFilesLoaded();
+}
+
+/**
+ * Add or update directory in recent history.
+ */
+export async function addRecentDirectory(name, path = "", fileCount = 0) {
+  if (!name) return;
+  const list = Array.isArray(state.deepCode.recentDirectories)
+    ? [...state.deepCode.recentDirectories]
+    : [];
+
+  const existingIdx = list.findIndex(
+    (d) => (d.name && d.name.toLowerCase() === name.toLowerCase()) || (path && d.path && d.path.toLowerCase() === path.toLowerCase())
+  );
+
+  const item = {
+    name,
+    path: path || (existingIdx >= 0 ? list[existingIdx].path : ""),
+    fileCount: fileCount || (existingIdx >= 0 ? list[existingIdx].fileCount : 0),
+    lastUsed: Date.now(),
+  };
+
+  if (existingIdx >= 0) {
+    list.splice(existingIdx, 1);
+  }
+  list.unshift(item);
+
+  // Keep top 10 recent directories
+  state.deepCode.recentDirectories = list.slice(0, 10);
+
+  if (typeof chrome !== "undefined" && chrome?.storage?.local) {
+    try {
+      await chrome.storage.local.set({ [RECENT_DIRS_KEY]: state.deepCode.recentDirectories });
+    } catch (e) {
+      devLog("[DeepCode] Failed to persist recent directories:", e);
+    }
+  }
+  emitDeepCodeState();
+}
+
+/**
+ * Remove a directory from recent history.
+ */
+export async function removeRecentDirectory(pathOrName) {
+  if (!pathOrName) return;
+  const key = String(pathOrName).toLowerCase();
+  const list = (state.deepCode.recentDirectories || []).filter(
+    (d) => d.name.toLowerCase() !== key && d.path.toLowerCase() !== key
+  );
+  state.deepCode.recentDirectories = list;
+
+  if (typeof chrome !== "undefined" && chrome?.storage?.local) {
+    try {
+      await chrome.storage.local.set({ [RECENT_DIRS_KEY]: list });
+    } catch (e) {
+      devLog("[DeepCode] Failed to remove recent directory:", e);
+    }
+  }
+  emitDeepCodeState();
+}
+
+/**
  * Get cached absolute path for a given folder name.
  */
 export async function getCachedPathForFolder(folderName) {
   if (!folderName || typeof chrome === "undefined" || !chrome?.storage?.local) return "";
   try {
-    const res = await chrome.storage.local.get("bds_deepcode_path_cache");
-    const cache = res?.bds_deepcode_path_cache || {};
+    const res = await chrome.storage.local.get(PATH_CACHE_KEY);
+    const cache = res?.[PATH_CACHE_KEY] || {};
     return cache[folderName] || "";
   } catch {
     return "";
@@ -76,10 +219,10 @@ export async function getCachedPathForFolder(folderName) {
 export async function saveCachedPathForFolder(folderName, absolutePath) {
   if (!folderName || !absolutePath || typeof chrome === "undefined" || !chrome?.storage?.local) return;
   try {
-    const res = await chrome.storage.local.get("bds_deepcode_path_cache");
-    const cache = res?.bds_deepcode_path_cache || {};
+    const res = await chrome.storage.local.get(PATH_CACHE_KEY);
+    const cache = res?.[PATH_CACHE_KEY] || {};
     cache[folderName] = absolutePath;
-    await chrome.storage.local.set({ bds_deepcode_path_cache: cache });
+    await chrome.storage.local.set({ [PATH_CACHE_KEY]: cache });
   } catch (err) {
     devLog("[DeepCode] Failed to save path cache:", err);
   }
@@ -139,10 +282,39 @@ export function emitDeepCodeState() {
         enabled: state.deepCode.enabled,
         activeDirectory: state.deepCode.activeDirectory,
         fileCount: state.deepCode.fileCount,
-        manualPath: state.deepCode.manualPath
+        manualPath: state.deepCode.manualPath,
+        pendingReport: state.deepCode.pendingReport,
+        recentDirectories: state.deepCode.recentDirectories || [],
       }
     })
   );
+}
+
+/**
+ * Store a pending Harness execution report to be injected into the next user message prompt.
+ * @param {{ cwd?: string, sessionId?: string, report: string, completedAt?: number }} reportData 
+ */
+export function setPendingHarnessReport(reportData) {
+  if (!reportData || !reportData.report) {
+    state.deepCode.pendingReport = null;
+  } else {
+    state.deepCode.pendingReport = {
+      cwd: reportData.cwd || state.deepCode.manualPath || "",
+      sessionId: reportData.sessionId || "",
+      report: reportData.report,
+      completedAt: reportData.completedAt || Date.now(),
+    };
+  }
+  emitDeepCodeState();
+  window.dispatchEvent(new CustomEvent("bds:request-config-push"));
+}
+
+/**
+ * Clear the pending Harness report once consumed.
+ */
+export function clearPendingHarnessReport() {
+  state.deepCode.pendingReport = null;
+  emitDeepCodeState();
 }
 
 /**
@@ -155,8 +327,9 @@ export async function persistDeepCodeState() {
         enabled: state.deepCode.enabled,
         activeDirectory: state.deepCode.activeDirectory,
         fileCount: state.deepCode.fileCount,
-        manualPath: state.deepCode.manualPath
-      }
+        manualPath: state.deepCode.manualPath,
+      },
+      [RECENT_DIRS_KEY]: state.deepCode.recentDirectories || [],
     });
   }
 }
@@ -167,8 +340,17 @@ export async function persistDeepCodeState() {
 export async function loadDeepCodeState() {
   if (typeof chrome === "undefined" || !chrome?.storage?.local) return;
   try {
-    const result = await chrome.storage.local.get(STORAGE_KEYS.deepCodeState);
+    const result = await chrome.storage.local.get([
+      STORAGE_KEYS.deepCodeState,
+      RECENT_DIRS_KEY,
+    ]);
     const data = result[STORAGE_KEYS.deepCodeState];
+    const recents = result[RECENT_DIRS_KEY];
+
+    if (Array.isArray(recents)) {
+      state.deepCode.recentDirectories = recents;
+    }
+
     if (data) {
       state.deepCode.enabled = Boolean(data.enabled);
       state.deepCode.activeDirectory = data.activeDirectory || null;
@@ -178,6 +360,7 @@ export async function loadDeepCodeState() {
         await ensureDeepCodeFilesLoaded();
       }
     }
+    emitDeepCodeState();
   } catch (err) {
     devLog(`[DeepCode] Failed to load state:`, err);
   }

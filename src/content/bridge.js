@@ -48,6 +48,16 @@ export function setupBridgeEvents() {
   };
   window.addEventListener("bds:deep-code-toggle-state", handlers["bds:deep-code-toggle-state"]);
 
+  handlers["bds:request-config-push"] = () => {
+    pushConfigToPage();
+  };
+  window.addEventListener("bds:request-config-push", handlers["bds:request-config-push"]);
+
+  handlers["bds:clear-harness-report"] = () => {
+    state.deepCode.pendingReport = null;
+  };
+  window.addEventListener("bds:clear-harness-report", handlers["bds:clear-harness-report"]);
+
   handlers[BRIDGE_EVENTS.networkState] = (event) => {
     let detail = event && event.detail ? event.detail : {};
     if (typeof detail === "string") {
@@ -335,6 +345,8 @@ export async function pushConfigToPage() {
       deepCode: {
         enabled: Boolean(state.deepCode.enabled),
         activeDirectory: state.deepCode.activeDirectory || "",
+        manualPath: state.deepCode.manualPath || "",
+        pendingReport: state.deepCode.pendingReport || null,
       },
       activeProject: activeProject
         ? {
