@@ -540,6 +540,7 @@
       "closeAria": "Kapat",
       "linkedFeedback": "\"{{name}}\" bağlandı ({{count}} dosya dizinlendi)",
       "switchedFeedback": "\"{{name}}\" klasörüne geçildi",
+      "recentNeedsPicker": "\"{{name}}\" için bağlı dosya erişimi yok. Dosya okumalarını etkinleştirmek için klasör seçiciyle tekrar seçin.",
       "cancel": "İptal"
     },
     "downloadCard": {

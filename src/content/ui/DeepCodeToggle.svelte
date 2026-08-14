@@ -129,9 +129,11 @@
 
   async function handleSelectRecent(entry, event) {
     event?.stopPropagation?.();
-    await selectRecentDirectory(entry);
-    actionFeedback = t("deepCodeModal.switchedFeedback", { name: entry.name });
-    setTimeout(() => { actionFeedback = ""; }, 2500);
+    const result = await selectRecentDirectory(entry);
+    actionFeedback = result.needsPicker
+      ? t("deepCodeModal.recentNeedsPicker", { name: entry.name })
+      : t("deepCodeModal.switchedFeedback", { name: entry.name });
+    setTimeout(() => { actionFeedback = ""; }, 3500);
   }
 
   async function handleRemoveRecent(entry, event) {

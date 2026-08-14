@@ -47,7 +47,7 @@
     const p = manualPath.trim().replace(/[\\/]+$/, "");
     if (!p) return;
     const folderName = p.split(/[/\\]/).pop() || "";
-    const expected = pickedRoot || activeDirectory;
+    const expected = pickedRoot;
     if (expected && folderName.toLowerCase() !== expected.toLowerCase()) {
       feedback = t("deepCodeModal.pathMismatch", { name: expected });
       setTimeout(() => { feedback = ""; }, 3500);
@@ -60,7 +60,7 @@
   async function handleCancel() {
     if (pickedRoot) {
       try {
-        await unlinkDirectory("deepcode-active-project");
+        await unlinkDirectory("deepcode-pending-project");
       } catch { /* ignore */ }
       pickedRoot = "";
     }

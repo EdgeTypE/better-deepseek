@@ -539,6 +539,7 @@
       "closeAria": "关闭",
       "linkedFeedback": "已连接 \"{{name}}\"（已索引 {{count}} 个文件）",
       "switchedFeedback": "已切换到 \"{{name}}\"",
+      "recentNeedsPicker": "\"{{name}}\" 没有关联的文件访问权限。请使用文件夹选择器重新选择它，以启用文件读取。",
       "cancel": "取消"
     },
     "downloadCard": {

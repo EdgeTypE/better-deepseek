@@ -543,6 +543,7 @@
       "closeAria": "Close",
       "linkedFeedback": "Linked \"{{name}}\" ({{count}} files indexed)",
       "switchedFeedback": "Switched to \"{{name}}\"",
+      "recentNeedsPicker": "\"{{name}}\" has no linked file access. Select it with the folder picker to enable file reads.",
       "cancel": "Cancel"
     },
     "downloadCard": {

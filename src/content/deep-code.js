@@ -4,11 +4,19 @@
 
 import state from "./state.js";
 import { STORAGE_KEYS } from "../lib/constants.js";
-import { getLinkedDirectoryInfo, getDirectoryFiles, linkDirectory, supportsLocalDirectoryLinking } from "../lib/local-directory-source.js";
+import { getLinkedDirectoryInfo, getDirectoryFiles, linkDirectory, adoptDirectoryHandle, supportsLocalDirectoryLinking } from "../lib/local-directory-source.js";
 import { devLog } from "../lib/dev-log.js";
 
 const RECENT_DIRS_KEY = "bds_deepcode_recent_dirs";
 const PATH_CACHE_KEY = "bds_deepcode_path_cache";
+
+/**
+ * Project id used while a directory is picked but not yet committed.
+ * Picking writes here so the currently linked (active) handle is untouched
+ * until the user confirms; Cancel removes only this pending record.
+ */
+const PENDING_PROJECT_ID = "deepcode-pending-project";
+const ACTIVE_PROJECT_ID = "deepcode-active-project";
 
 /**
  * Initialize or update DeepCode enabled state.
@@ -50,7 +58,7 @@ export async function pickDeepCodeDirectory() {
   if (!supportsLocalDirectoryLinking()) {
     throw new Error("File System Access API is not supported on this browser context.");
   }
-  const res = await linkDirectory("deepcode-active-project");
+  const res = await linkDirectory(PENDING_PROJECT_ID);
   
   // Auto-resolve system path from cache or query Harness workspaces
   let pathForFolder = await getCachedPathForFolder(res.rootName);
@@ -81,6 +89,7 @@ export async function pickDeepCodeDirectory() {
  * @param {string} [path] 
  */
 export async function activateDeepCodeDirectory(rootName, fileCount = 0, path = "") {
+  await adoptDirectoryHandle(PENDING_PROJECT_ID, ACTIVE_PROJECT_ID);
   await setDeepCodeDirectory(rootName, fileCount, path);
   setDeepCodeEnabled(true);
 }
@@ -126,9 +135,11 @@ export async function setDeepCodeDirectory(rootName, fileCount = 0, manualPath =
 /**
  * Select a directory from recent history.
  * @param {{ name: string, path: string, fileCount: number }} entry 
+ * @returns {Promise<{ needsPicker: boolean }>} needsPicker is true when the
+ *   selected directory has no matching linked handle (path-only mode).
  */
 export async function selectRecentDirectory(entry) {
-  if (!entry || !entry.name) return;
+  if (!entry || !entry.name) return { needsPicker: false };
   state.deepCode.activeDirectory = entry.name;
   state.deepCode.manualPath = entry.path || "";
   state.deepCode.fileCount = entry.fileCount || 0;
@@ -137,7 +148,22 @@ export async function selectRecentDirectory(entry) {
   await addRecentDirectory(entry.name, entry.path, entry.fileCount);
   emitDeepCodeState();
   await persistDeepCodeState();
-  await ensureDeepCodeFilesLoaded();
+
+  const linked = await getLinkedDirectoryInfo(ACTIVE_PROJECT_ID);
+  const handleMatches =
+    !!linked &&
+    linked.rootName &&
+    linked.rootName.toLowerCase() === entry.name.toLowerCase();
+
+  if (handleMatches) {
+    await ensureDeepCodeFilesLoaded();
+    return { needsPicker: false };
+  }
+
+  state.deepCode.files = [];
+  emitDeepCodeState();
+  await persistDeepCodeState();
+  return { needsPicker: true };
 }
 
 /**
@@ -185,7 +211,7 @@ export async function removeRecentDirectory(pathOrName) {
   if (!pathOrName) return;
   const key = String(pathOrName).toLowerCase();
   const list = (state.deepCode.recentDirectories || []).filter(
-    (d) => d.name.toLowerCase() !== key && d.path.toLowerCase() !== key
+    (d) => d.name.toLowerCase() !== key && (d.path || "").toLowerCase() !== key
   );
   state.deepCode.recentDirectories = list;
 
@@ -249,9 +275,9 @@ export async function tryResolveHarnessWorkspacePath(folderName) {
  */
 export async function ensureDeepCodeFilesLoaded() {
   try {
-    const linked = await getLinkedDirectoryInfo("deepcode-active-project");
+    const linked = await getLinkedDirectoryInfo(ACTIVE_PROJECT_ID);
     if (linked) {
-      const files = await getDirectoryFiles("deepcode-active-project");
+      const files = await getDirectoryFiles(ACTIVE_PROJECT_ID);
       state.deepCode.files = files || [];
       state.deepCode.activeDirectory = linked.rootName || state.deepCode.activeDirectory;
       state.deepCode.fileCount = files ? files.length : 0;

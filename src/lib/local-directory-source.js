@@ -108,6 +108,31 @@ export async function unlinkDirectory(projectId) {
   fileCache.delete(projectId);
 }
 
+/**
+ * Move a linked directory handle (and its file cache) from one project id to
+ * another. Used to promote a pending pick to the active project on commit.
+ * No-op when no record exists under the source id.
+ * @param {string} fromProjectId 
+ * @param {string} toProjectId 
+ */
+export async function adoptDirectoryHandle(fromProjectId, toProjectId) {
+  if (fromProjectId === toProjectId) return;
+  const db = await openDb();
+  try {
+    const record = await idbGet(db, fromProjectId);
+    if (!record) return;
+    await idbPut(db, { ...record, projectId: toProjectId });
+    await idbDelete(db, fromProjectId);
+  } finally {
+    closeDb(db);
+  }
+  const cached = fileCache.get(fromProjectId);
+  if (cached) {
+    fileCache.set(toProjectId, cached);
+    fileCache.delete(fromProjectId);
+  }
+}
+
 export async function getLinkedDirectoryInfo(projectId) {
   const db = await openDb();
   let record;
