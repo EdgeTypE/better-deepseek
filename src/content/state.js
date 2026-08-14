@@ -85,6 +85,13 @@ const state = {
     pendingRun: null,
     runs: [],
   },
+  deepCode: {
+    enabled: false,
+    activeDirectory: null,
+    fileCount: 0,
+    manualPath: "",
+    files: [],
+  },
   /** Per-conversation context budget tracking for Deep Research 128K guard */
   contextBudget: {
     /** @type {Map<string, {estimate: number, serverTokens: number, lastServerUpdate: number}>} conversationId -> budget */

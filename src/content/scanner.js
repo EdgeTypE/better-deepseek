@@ -17,11 +17,13 @@ import AttachMenu from "./ui/AttachMenu.svelte";
 import ExpandToggle from "./ui/ExpandToggle.svelte";
 import RagPreview from "./ui/RagPreview.svelte";
 import DeepResearchToggle from "./ui/DeepResearchToggle.svelte";
+import DeepCodeToggle from "./ui/DeepCodeToggle.svelte";
 import { injectSearchInput } from "./ui/SidebarSearch.js";
 import { checkPendingExport } from "./tools/pending-export.js";
 import { hideTagsInSidebar, hideTagsInHeader, hideBdsTagsInPopovers } from "./tags/tag-hider.js";
 import { injectShareDialogWarning } from "./dom/share-dialog-injector.js";
 import { setDeepResearchEnabled } from "./deep-research.js";
+import { setDeepCodeEnabled, loadDeepCodeState } from "./deep-code.js";
 import { tryExecuteRawInput } from "./commands/executor.js";
 import { checkPendingHandoff } from "./commands/context-handoff.js";
 import Autocomplete from "./commands/Autocomplete.svelte";
@@ -560,6 +562,24 @@ export function scanInputArea() {
     deepResearchMountPoint.dataset.bdsMounted = "1";
   }
 
+  const deepCodeMountPoint = ensureComposerMount(
+    deepResearchWrapper,
+    "bds-deep-code-mount",
+    ".bds-deep-code-toggle",
+    insertBeforeNode,
+  );
+  if (!deepCodeMountPoint.dataset.bdsMounted) {
+    mount(DeepCodeToggle, {
+      target: deepCodeMountPoint,
+      props: {
+        enabled: state.deepCode.enabled,
+        onToggle: (enabled) => setDeepCodeEnabled(enabled),
+        onOpenModal: () => window.dispatchEvent(new CustomEvent("bds:open-deep-code-modal")),
+      },
+    });
+    deepCodeMountPoint.dataset.bdsMounted = "1";
+  }
+
   if (!fileInput || !wrapper) {
     markComposerControlsMounted(deepResearchWrapper, wrapper);
     return;
@@ -855,6 +875,10 @@ function findDeepSeekStopButton() {
 
 function findDeepResearchInsertAnchor(wrapper, fileInput, fileInputWrapper) {
   if (fileInput && wrapper === fileInputWrapper) {
+    const attachMount = wrapper.querySelector?.(".bds-attach-menu-mount");
+    if (attachMount && attachMount.parentElement === wrapper) {
+      return attachMount;
+    }
     return fileInput;
   }
 
@@ -864,6 +888,7 @@ function findDeepResearchInsertAnchor(wrapper, fileInput, fileInputWrapper) {
 function findComposerInsertAnchor(wrapper) {
   return Array.from(wrapper.children).find((child) =>
     !child.classList?.contains("bds-deep-research-mount") &&
+    !child.classList?.contains("bds-deep-code-mount") &&
     !child.closest?.("#bds-root")
   ) || null;
 }
@@ -876,6 +901,7 @@ function findNativeFileInputTrigger(fileInput) {
 
   if (
     candidate.classList?.contains("bds-deep-research-mount") ||
+    candidate.classList?.contains("bds-deep-code-mount") ||
     candidate.classList?.contains("bds-attach-menu-mount") ||
     candidate.classList?.contains("bds-expand-toggle-mount") ||
     candidate.classList?.contains("bds-rag-preview-mount")
@@ -897,7 +923,7 @@ function ensureComposerMount(wrapper, className, descendantSelector, beforeNode)
     child.classList && child.classList.contains(className)
   );
 
-  if (!mountPoint && className === "bds-deep-research-mount") {
+  if (!mountPoint && (className === "bds-deep-research-mount" || className === "bds-deep-code-mount")) {
     mountPoint = document.querySelector(`.${className}`);
   }
 
@@ -915,7 +941,7 @@ function ensureComposerMount(wrapper, className, descendantSelector, beforeNode)
   if (mountPoint.querySelector && mountPoint.querySelector(descendantSelector)) {
     mountPoint.dataset.bdsMounted = "1";
   }
-  if (mountPoint.parentElement !== wrapper || mountPoint.nextSibling !== beforeNode) {
+  if (mountPoint.parentElement !== wrapper) {
     wrapper.insertBefore(mountPoint, beforeNode);
   }
   return mountPoint;

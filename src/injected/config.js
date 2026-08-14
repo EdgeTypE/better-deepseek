@@ -59,9 +59,20 @@ export function normalizeConfig(config) {
     projectRagLimit: Number(config.projectRagLimit) || 5,
     injectSystemDateTime: Boolean(config.injectSystemDateTime),
     deepResearch: normalizeDeepResearch(config.deepResearch),
+    deepCode: normalizeDeepCode(config.deepCode),
     mcpToolSchemas,
     mcpInlineMaxChars: Number(config.mcpInlineMaxChars) || 8000,
     modelInputLimits: config.modelInputLimits || {},
+  };
+}
+
+export function normalizeDeepCode(raw) {
+  if (!raw || typeof raw !== "object") {
+    return { enabled: false, activeDirectory: null };
+  }
+  return {
+    enabled: Boolean(raw.enabled),
+    activeDirectory: String(raw.activeDirectory || "").trim(),
   };
 }
 

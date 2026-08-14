@@ -43,6 +43,11 @@ export function setupBridgeEvents() {
   };
   window.addEventListener(BRIDGE_EVENTS.requestConfig, handlers[BRIDGE_EVENTS.requestConfig]);
 
+  handlers["bds:deep-code-toggle-state"] = () => {
+    pushConfigToPage();
+  };
+  window.addEventListener("bds:deep-code-toggle-state", handlers["bds:deep-code-toggle-state"]);
+
   handlers[BRIDGE_EVENTS.networkState] = (event) => {
     let detail = event && event.detail ? event.detail : {};
     if (typeof detail === "string") {
@@ -326,6 +331,10 @@ export async function pushConfigToPage() {
       deepResearch: {
         enabled: Boolean(state.deepResearch.enabled && state.deepResearch.pendingRun),
         runId: state.deepResearch.pendingRun?.id || "",
+      },
+      deepCode: {
+        enabled: Boolean(state.deepCode.enabled),
+        activeDirectory: state.deepCode.activeDirectory || "",
       },
       activeProject: activeProject
         ? {

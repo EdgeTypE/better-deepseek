@@ -329,6 +329,11 @@ export function buildHiddenPrefix(
     blocks.push(deepResearchBlock);
   }
 
+  const deepCodeBlock = buildDeepCodeBlock(state);
+  if (deepCodeBlock) {
+    blocks.push(deepCodeBlock);
+  }
+
   const entries = state.config.systemPromptEntries || [];
   if (entries.length > 0) {
     const userMsgCount = state.sessionUserMsgCounts[conversationId] || 1;
@@ -921,4 +926,30 @@ function detectModelTypeFromDom() {
   } catch (e) {
     return null;
   }
+}
+
+export function buildDeepCodeBlock(state) {
+  const dc = state && state.config && state.config.deepCode;
+  if (!dc || !dc.enabled) return "";
+
+  const activeDir = dc.manualPath || dc.activeDirectory || "active directory";
+  return `<BetterDeepSeek>
+[DEEP_CODE_MODE_ACTIVE]
+DeepCode mode is ENABLED for local codebase directory: "${activeDir}".
+You have access to the following special BDS tools for codebase inspection and DeepSeek Harness execution:
+
+1. READ FILE:
+   <BDS:AUTO:FILE_READ path="relative/path/to/file"/> - Reads the full content of a file.
+
+2. SEARCH CODEBASE:
+   <BDS:AUTO:SEARCH_IN_DIRECTORY queries="query terms"/> - Searches for matching code snippets with line numbers.
+
+3. DISPATCH HARNESS TASK / SESSION:
+   When requested to execute, refactor, test, or build multi-step agent coding tasks on the local codebase, emit:
+   <BDS:HARNESS_TASK cwd="${activeDir}">
+   Detailed step-by-step task plan and coding instructions to be executed by DeepSeek Harness...
+   </BDS:HARNESS_TASK>
+
+When analyzing or editing code, use these tools to inspect relevant project files and dispatch Harness tasks. Always provide the full absolute path in the cwd attribute of BDS:HARNESS_TASK.
+</BetterDeepSeek>`;
 }

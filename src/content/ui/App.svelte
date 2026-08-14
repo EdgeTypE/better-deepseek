@@ -10,11 +10,13 @@
   import AnnouncementBanner from "./AnnouncementBanner.svelte";
   import PreviewPanel from "./PreviewPanel.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
+  import DeepCodeModal from "./DeepCodeModal.svelte";
   import ApiPlayground from "../api-playground/ApiPlayground.svelte";
   import appState from "../state.js";
 
   let drawerOpen = $state(false);
   let apiPlaygroundOpen = $state(false);
+  let deepCodeModalOpen = $state(false);
   let whatsNewPending = $state(appState.whatsNewPending);
 
   let previewVisible = $state(false);
@@ -130,6 +132,10 @@
     appState.selectionMode = true;
     closeDrawer();
   });
+
+  window.addEventListener("bds:open-deep-code-modal", () => {
+    deepCodeModalOpen = true;
+  });
 </script>
 
 <button id="bds-toggle" type="button" onclick={toggleDrawer} aria-label="Better DeepSeek">
@@ -142,6 +148,13 @@
 {#if apiPlaygroundOpen}
   <ApiPlayground onclose={closeApiPlayground} />
 {/if}
+
+<DeepCodeModal
+  show={deepCodeModalOpen}
+  activeDirectory={appState.deepCode.activeDirectory}
+  fileCount={appState.deepCode.fileCount}
+  onclose={() => deepCodeModalOpen = false}
+/>
 
 <ToastStack {toasts} />
 <QuestionPanel />

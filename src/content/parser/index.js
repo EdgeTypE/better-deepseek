@@ -19,7 +19,7 @@ import { sanitizeVisibleText } from "./text-sanitizer.js";
 import { extractHttpUrl } from "../../lib/utils/url-normalizer.js";
 
 // Tool renderers that have visual cards
-const RENDERABLE_TOOLS = new Set(["html", "visualizer", "visualizer_feedback", "pptx", "excel", "docx", "ask_question", "character_create", "skill_create", "auto:code_runner", "auto_code_result", "auto:request_web_fetch", "auto:request_github_fetch", "auto:search", "auto:mcp", "auto:mcp_result", "auto:mcp_error", "deep_research_plan", "deep_research_status", "deep_research_report", "deep_research_step_done", "image", "todo"]);
+const RENDERABLE_TOOLS = new Set(["html", "visualizer", "visualizer_feedback", "pptx", "excel", "docx", "ask_question", "character_create", "skill_create", "auto:code_runner", "auto_code_result", "auto:request_web_fetch", "auto:request_github_fetch", "auto:search", "auto:mcp", "auto:mcp_result", "auto:mcp_error", "deep_research_plan", "deep_research_status", "deep_research_report", "deep_research_step_done", "image", "todo", "harness_task", "auto:harness_task"]);
 
 function normalizeAutoHttpTarget(value) {
   return extractHttpUrl(value);
@@ -133,6 +133,8 @@ export function parseBdsMessage(rawText, isSettled = false) {
       youtubeFetch: [],
       searchQueries: [],
       mcpCalls: [],
+      fileRead: [],
+      searchInDirectory: [],
     },
     visibleText: text,
   };
@@ -371,6 +373,26 @@ export function parseBdsMessage(rawText, isSettled = false) {
     let argsObj = {};
     try { argsObj = JSON.parse(rawArgs); } catch { argsObj = { _raw: rawArgs.trim() }; }
     result.autoRequests.mcpCalls.push({ serverUrl, toolName, args: argsObj });
+  }
+
+  const fileReadRegex = /<BDS:(?:AUTO:)?FILE_READ([^>]*)>(?:([\s\S]*?)<\/BDS:(?:AUTO:)?FILE_READ>)?/gi;
+  while ((match = fileReadRegex.exec(text)) !== null) {
+    if (isInsideCodeBlock(match.index)) continue;
+    const attrs = parseTagAttributes(match[1] || "");
+    const filePath = String(attrs.path || attrs.filePath || match[2] || "").trim();
+    if (filePath) {
+      result.autoRequests.fileRead.push(filePath);
+    }
+  }
+
+  const searchInDirRegex = /<BDS:(?:AUTO:)?SEARCH_IN_DIRECTORY([^>]*)>(?:([\s\S]*?)<\/BDS:(?:AUTO:)?SEARCH_IN_DIRECTORY>)?/gi;
+  while ((match = searchInDirRegex.exec(text)) !== null) {
+    if (isInsideCodeBlock(match.index)) continue;
+    const attrs = parseTagAttributes(match[1] || "");
+    const queries = String(attrs.queries || attrs.query || match[2] || "").trim();
+    if (queries) {
+      result.autoRequests.searchInDirectory.push(queries);
+    }
   }
 
   const selfClosingCreateRegex = /<BDS:create_file\s+([^>]*)\/>/gi;

@@ -10,6 +10,8 @@ import { fetchGitHubRepo } from "./files/github-reader.js";
 import { fetchTwitterTweet } from "./files/twitter-reader.js";
 import { fetchYouTubeData } from "./files/youtube-reader.js";
 import appState from "./state.js";
+import { getDeepCodeFiles } from "./deep-code.js";
+import { searchActiveProjectRAG } from "../lib/rag-engine.js";
 import { XLSX_SKILL } from "../lib/office-skills/xlsx.js";
 import { PPTX_SKILL } from "../lib/office-skills/pptx.js";
 import { DOCX_SKILL } from "../lib/office-skills/docx.js";
@@ -28,8 +30,74 @@ const processedTwitterFetches = new Set();
 const processedYouTubeFetches = new Set();
 const processedSearchQueries = new Set();
 const processedMcpCalls = new Set();
+const processedFileReads = new Set();
+const processedDirSearches = new Set();
 // Per-run search deduplication for deep research
 const processedRunSearchQueries = new Map();
+
+export async function handleAutoFileRead(filePath) {
+  const cleanPath = String(filePath || "").trim().replace(/\\/g, "/");
+  if (!cleanPath) return;
+
+  if (processedFileReads.has(cleanPath)) return;
+  processedFileReads.add(cleanPath);
+
+  devLog("Auto", `Starting automatic file read for: ${cleanPath}`);
+  const files = getDeepCodeFiles();
+  const matchedFile = files.find(f => 
+    f.name.replace(/\\/g, "/").toLowerCase().endsWith(cleanPath.toLowerCase()) ||
+    f.name.replace(/\\/g, "/").toLowerCase() === cleanPath.toLowerCase()
+  );
+
+  if (matchedFile) {
+    const blob = new Blob([matchedFile.content], { type: "text/plain" });
+    const fileName = matchedFile.name.split("/").pop() || "file.txt";
+    const fileObj = new File([blob], fileName, { type: "text/plain" });
+    await injectFileAndSend(
+      fileObj,
+      `<BetterDeepSeek>\n[BDS:AUTO] File Read Result for path: "${cleanPath}"\n</BetterDeepSeek>`
+    );
+  } else {
+    devLog("Auto", `File not found in active codebase: ${cleanPath}`);
+    await sendPromptToChat(
+      `<BetterDeepSeek>\n[BDS:AUTO] File read requested for "${cleanPath}", but file was not found in the active codebase directory.\n</BetterDeepSeek>`,
+      "File read error"
+    );
+  }
+}
+
+export async function handleAutoSearchInDirectory(queries) {
+  const cleanQueries = String(queries || "").trim();
+  if (!cleanQueries) return;
+
+  if (processedDirSearches.has(cleanQueries)) return;
+  processedDirSearches.add(cleanQueries);
+
+  devLog("Auto", `Starting directory search for: ${cleanQueries}`);
+  const files = getDeepCodeFiles();
+
+  if (!files || files.length === 0) {
+    await sendPromptToChat(
+      `<BetterDeepSeek>\n[BDS:AUTO] Directory search requested for "${cleanQueries}", but no active directory is linked in DeepCode.\n</BetterDeepSeek>`,
+      "Directory search error"
+    );
+    return;
+  }
+
+  const results = searchActiveProjectRAG(cleanQueries, files, 5);
+  let messageBody = `<BetterDeepSeek>\n[BDS:AUTO] Codebase Search Results for: "${cleanQueries}"\n\n`;
+
+  if (results.length === 0) {
+    messageBody += `No relevant code chunks found for query "${cleanQueries}".\n`;
+  } else {
+    messageBody += results.map((r, idx) => {
+      return `### Match ${idx + 1}: ${r.fileName} (Lines ${r.startLine}-${r.endLine}, Score: ${r.score.toFixed(2)})\n\`\`\`\n${r.content}\n\`\`\``;
+    }).join("\n\n");
+  }
+
+  messageBody += `\n</BetterDeepSeek>`;
+  await sendPromptToChat(messageBody, "Codebase search results");
+}
 
 function normalizeSearchKeyPart(value) {
   return String(value || "").replace(/\s+/g, " ").trim();

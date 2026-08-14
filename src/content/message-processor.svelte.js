@@ -31,7 +31,7 @@ import {
   removeAllMessageHosts,
   removeMessageHost,
 } from "./dom/host.js";
-import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun, handleAutoMcpCall } from "./auto.js";
+import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun, handleAutoMcpCall, handleAutoFileRead, handleAutoSearchInDirectory } from "./auto.js";
 import { handleManagedAutoContinuation, isManagedRunActive, trySynthesizeReport } from "./deep-research.js";
 
 import { mount, unmount } from "svelte";
@@ -483,7 +483,9 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
     parsed.autoRequests.twitterFetch.length > 0 ||
     parsed.autoRequests.youtubeFetch.length > 0 ||
     parsed.autoRequests.searchQueries.length > 0 ||
-    parsed.autoRequests.mcpCalls.length > 0;
+    parsed.autoRequests.mcpCalls.length > 0 ||
+    (parsed.autoRequests.fileRead && parsed.autoRequests.fileRead.length > 0) ||
+    (parsed.autoRequests.searchInDirectory && parsed.autoRequests.searchInDirectory.length > 0);
   const currentConversationId = getCurrentConversationIdInline();
   const managedAutoSuppressionRun = getManagedAutoSuppressionRun(parsed, currentConversationId);
   const suppressManagedAuto = Boolean(managedAutoSuppressionRun);
@@ -500,6 +502,8 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
       if (!stateData.autoYouTubeFetchesHandled) stateData.autoYouTubeFetchesHandled = new Set();
       if (!stateData.autoSearchQueriesHandled) stateData.autoSearchQueriesHandled = new Set();
       if (!stateData.autoMcpCallsHandled) stateData.autoMcpCallsHandled = new Set();
+      if (!stateData.autoFileReadsHandled) stateData.autoFileReadsHandled = new Set();
+      if (!stateData.autoDirSearchesHandled) stateData.autoDirSearchesHandled = new Set();
 
       // Stray AUTO tags are treated as continuation attempts and recovered below.
       for (const url of parsed.autoRequests.webFetch) {
@@ -553,6 +557,22 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
         if (!stateData.autoMcpCallsHandled.has(mcpKey)) {
           stateData.autoMcpCallsHandled.add(mcpKey);
           handleAutoMcpCall(mcp.serverUrl, mcp.toolName, mcp.args);
+        }
+      }
+
+      for (const filePath of (parsed.autoRequests.fileRead || [])) {
+        if (suppressManagedAuto) continue;
+        if (!stateData.autoFileReadsHandled.has(filePath)) {
+          stateData.autoFileReadsHandled.add(filePath);
+          handleAutoFileRead(filePath);
+        }
+      }
+
+      for (const queries of (parsed.autoRequests.searchInDirectory || [])) {
+        if (suppressManagedAuto) continue;
+        if (!stateData.autoDirSearchesHandled.has(queries)) {
+          stateData.autoDirSearchesHandled.add(queries);
+          handleAutoSearchInDirectory(queries);
         }
       }
 

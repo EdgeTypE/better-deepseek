@@ -25,7 +25,39 @@ export {
 };
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || !message.type) return false;
+  if (message.type === "PING_HARNESS") {
+    const baseUrl = message.baseUrl || "http://127.0.0.1:3080";
+    // Check if dedicated Cordis bridge plugin is active (Mode B)
+    fetch(`${baseUrl}/api/better-deepseek/ping`)
+      .then((res) => {
+        if (res.ok) {
+          return res.json()
+            .then((d) => ({ ok: true, available: true, mode: "plugin", pluginInfo: d }))
+            .catch(() => ({ ok: true, available: true, mode: "plugin" }));
+        }
+        throw new Error("Plugin ping returned " + res.status);
+      })
+      .catch(() => {
+        // Fallback to standard host.describe (Mode A)
+        return fetch(`${baseUrl}/api/host.describe`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "client-request", rpcId: "ping", method: "host.describe", payload: {} }),
+        })
+          .then((res) => res.json())
+          .then((data) => ({ ok: true, available: data.result?.ok ?? true, mode: "native" }))
+          .catch((err) => ({ ok: false, available: false, error: err.message }));
+      })
+      .then((data) => sendResponse(data));
+    return true;
+  }
+
+  if (message.type === "EXECUTE_HARNESS_TASK") {
+    handleHarnessTaskExecution(message.payload)
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
 
   if (message.type === "bds-get-youtube-transcript") {
     fetchTranscript(message.videoId)
@@ -753,6 +785,211 @@ async function mcpCallTool(serverUrl, toolName, args = {}, apiKey = "") {
     }
     throw err;
   }
+}
+
+function pathIsAbsolute(p) {
+  if (!p || typeof p !== "string") return false;
+  return p.startsWith("/") || p.startsWith("\\") || /^[a-zA-Z]:[/\\]/.test(p);
+}
+
+/**
+ * Handle execution of Harness tasks by calling 127.0.0.1:3080 ApiProxy endpoints.
+ */
+async function handleHarnessTaskExecution(payload = {}) {
+  const baseUrl = String(payload.baseUrl || "http://127.0.0.1:3080").replace(/\/+$/, "");
+
+  // If only querying workspaces
+  if (payload.queryWorkspacesOnly) {
+    try {
+      const wsRes = await fetch(`${baseUrl}/api/workspace.list`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "client-request",
+          rpcId: `ws-list-${Date.now()}`,
+          method: "workspace.list",
+          payload: {},
+        }),
+      });
+      if (wsRes.ok) {
+        const wsData = await wsRes.json();
+        const list = wsData?.result?.value?.list || wsData?.result?.list || wsData?.list || [];
+        const fn = String(payload.folderName || "").toLowerCase().trim();
+        const match = list.find((w) => {
+          const name = String(w.name || "").toLowerCase();
+          const p = String(w.path || w.cwd || w.uri || "").toLowerCase().replace(/\\/g, "/");
+          return name === fn || p.endsWith(`/${fn}`) || p.endsWith(`\\${fn}`) || p === fn;
+        });
+        if (match) {
+          const resPath = match.path || match.cwd || match.uri || "";
+          return { ok: true, matchedPath: resPath };
+        }
+      }
+    } catch (err) {
+      console.warn(`[BDS] Workspace list query failed:`, err);
+    }
+    return { ok: false, matchedPath: "" };
+  }
+
+  const rawCwd = String(payload.cwd || "").trim();
+  const workspaceId = String(payload.workspaceId || "").trim();
+  const promptText = String(payload.prompt || payload.task || "").trim();
+
+  if (!rawCwd && !workspaceId) {
+    throw new Error("Missing required cwd or workspaceId for Harness session creation.");
+  }
+
+  // Validate absolute path if cwd is provided
+  let cwd = rawCwd;
+  if (cwd && !pathIsAbsolute(cwd)) {
+    return {
+      ok: false,
+      error: `Absolute path is required for Harness (e.g. A:/Users/Edige/GitHub/asistan). Relative path "${cwd}" is forbidden.`,
+      debug: {
+        providedCwd: cwd,
+        recommendation: "Please enter full absolute directory path in the path field.",
+      },
+    };
+  }
+
+  // 1. Create Session via POST /api/session.create
+  const createPayload = workspaceId ? { workspaceId } : { cwd };
+  const reqBody = {
+    type: "client-request",
+    rpcId: `bd-create-${Date.now()}`,
+    method: "session.create",
+    payload: createPayload,
+  };
+
+  const targetUrl = `${baseUrl}/api/better-deepseek/session.create`;
+  let createRes = null;
+  let rawBodyText = "";
+  let resHeaders = {};
+
+  devLog(`[BDS:Harness] Sending session.create to ${targetUrl}`, reqBody);
+
+  try {
+    createRes = await fetch(targetUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify(reqBody),
+    });
+
+    resHeaders = {};
+    createRes.headers.forEach((v, k) => { resHeaders[k] = v; });
+    rawBodyText = await createRes.text().catch(() => "");
+  } catch (netErr) {
+    console.error(`[BDS:Harness] Network error for ${targetUrl}:`, netErr);
+  }
+
+  if (!createRes) {
+    return {
+      ok: false,
+      error: `Network Error: Cannot connect to Harness server at ${baseUrl}. Ensure local Harness is running on 127.0.0.1:3080.`,
+      debug: {
+        url: targetUrl,
+        requestPayload: reqBody,
+      },
+    };
+  }
+
+  console.error(`[BDS:Harness] session.create response HTTP ${createRes.status}`, {
+    url: targetUrl,
+    status: createRes.status,
+    statusText: createRes.statusText,
+    headers: resHeaders,
+    body: rawBodyText,
+  });
+
+  if (!createRes.ok) {
+    let messageDetail = "";
+    try {
+      const errJson = JSON.parse(rawBodyText);
+      messageDetail = errJson.result?.error?.message || errJson.message || errJson.error || rawBodyText;
+    } catch (e) {
+      messageDetail = rawBodyText || createRes.statusText;
+    }
+    return {
+      ok: false,
+      error: `Harness session.create HTTP ${createRes.status} (${createRes.statusText}): ${messageDetail}`,
+      debug: {
+        url: targetUrl,
+        status: createRes.status,
+        statusText: createRes.statusText,
+        headers: resHeaders,
+        requestPayload: reqBody,
+        responseBody: rawBodyText,
+      },
+    };
+  }
+
+  let createData;
+  try {
+    createData = JSON.parse(rawBodyText);
+  } catch (pErr) {
+    return {
+      ok: false,
+      error: `Failed to parse JSON response from session.create: ${rawBodyText}`,
+      debug: { url: targetUrl, responseBody: rawBodyText },
+    };
+  }
+
+  if (!createData.result || !createData.result.ok || !createData.result.value?.sessionId) {
+    const errMsg = createData.result?.error?.message || "Failed to create session on Harness (missing sessionId).";
+    return {
+      ok: false,
+      error: errMsg,
+      debug: { url: targetUrl, responseData: createData },
+    };
+  }
+
+  const sessionId = createData.result.value.sessionId;
+
+  // 2. Prompt Session via POST /api/better-deepseek/session.prompt
+  if (promptText) {
+    const promptReqBody = {
+      type: "client-request",
+      rpcId: `bd-prompt-${Date.now()}`,
+      method: "session.prompt",
+      payload: {
+        sessionId,
+        text: promptText,
+        mode: "queue",
+        content: [{ type: "text", text: promptText }],
+      },
+    };
+
+    const pUrl = `${baseUrl}/api/better-deepseek/session.prompt`;
+    let promptRes = null;
+    let pText = "";
+
+    try {
+      promptRes = await fetch(pUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify(promptReqBody),
+      });
+      pText = await promptRes.text().catch(() => "");
+    } catch (err) {
+      console.error(`[BDS:Harness] Network error for ${pUrl}:`, err);
+    }
+
+    if (!promptRes || !promptRes.ok) {
+      return {
+        ok: false,
+        error: `Harness session.prompt HTTP ${promptRes?.status || "Error"}: ${pText}`,
+        debug: {
+          url: pUrl,
+          status: promptRes?.status,
+          statusText: promptRes?.statusText,
+          requestPayload: promptReqBody,
+          responseBody: pText,
+        },
+      };
+    }
+  }
+
+  return { ok: true, sessionId, baseUrl };
 }
 
 // ── MV3 Service Worker Keepalive ──

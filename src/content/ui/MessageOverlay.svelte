@@ -21,6 +21,7 @@
   import McpLoadingStatus from "./McpLoadingStatus.svelte";
   import McpResultCard from "./McpResultCard.svelte";
   import McpErrorCard from "./McpErrorCard.svelte";
+  import HarnessTaskCard from "./HarnessTaskCard.svelte";
   import { t } from "../../lib/i18n.svelte.js";
   import { parseLooseJson } from "../parser/json-repair.js";
   import { triggerTextDownload } from "../../lib/utils/download.js";
@@ -221,6 +222,8 @@
         <ExcelCard content={block.content} />
       {:else if block.name === 'docx'}
         <DocxCard content={block.content} />
+      {:else if block.name === 'harness_task' || block.name === 'auto:harness_task'}
+        <HarnessTaskCard attrs={block.attrs} content={block.content} />
       {:else if block.name === 'auto:code_runner'}
         <AutoCodeRunnerCard language={block.attrs.language || block.attrs.lang} content={block.content} />
       {:else if block.name === 'auto_code_result'}
