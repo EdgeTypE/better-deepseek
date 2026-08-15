@@ -5,7 +5,7 @@ const STORE_NAME = "handles";
 const fileCache = new Map();
 const CACHE_TTL_MS = 5000;
 
-const SKIP_DIRS = new Set([
+export const SKIP_DIRS = new Set([
   "node_modules", ".git", ".github", "dist", "build",
   ".idea", ".vscode", ".vs", "bin", "obj", "out", "target",
   "dist-chrome", "dist-firefox", "__pycache__", ".next",
@@ -20,6 +20,7 @@ const TEXT_EXTS = new Set([
   "sql", "xml", "env", "cs", "csproj", "sln", "fs", "fsproj", "razor",
   "swift", "kt", "dart", "gradle", "kts", "proto", "cmake", "cfg",
   "conf", "pl", "pm", "r", "m", "mm", "lua", "zig", "tex", "bib",
+  "ipynb", "jsonl", "log",
 ]);
 
 function openDb() {
@@ -84,7 +85,7 @@ export async function linkDirectory(projectId) {
   const handle = await window.showDirectoryPicker();
   const rootName = handle.name;
 
-  const files = await readAllFilesFromHandle(handle);
+  const data = await readAllFilesFromHandle(handle);
 
   const db = await openDb();
   try {
@@ -93,9 +94,14 @@ export async function linkDirectory(projectId) {
     closeDb(db);
   }
 
-  fileCache.set(projectId, { files, rootName, cachedAt: Date.now() });
+  fileCache.set(projectId, {
+    files: data.files,
+    paths: data.paths,
+    rootName,
+    cachedAt: Date.now(),
+  });
 
-  return { rootName, fileCount: files.length };
+  return { rootName, fileCount: data.files.length };
 }
 
 export async function unlinkDirectory(projectId) {
@@ -162,9 +168,19 @@ export async function getLinkedDirectoryInfo(projectId) {
 }
 
 export async function getDirectoryFiles(projectId) {
+  const data = await getLinkedData(projectId);
+  return data ? data.files : null;
+}
+
+export async function getDirectoryPaths(projectId) {
+  const data = await getLinkedData(projectId);
+  return data ? data.paths : null;
+}
+
+async function getLinkedData(projectId) {
   const cached = fileCache.get(projectId);
   if (cached && Date.now() - cached.cachedAt < CACHE_TTL_MS) {
-    return cached.files;
+    return cached;
   }
 
   const db = await openDb();
@@ -196,9 +212,15 @@ export async function getDirectoryFiles(projectId) {
     }
   }
 
-  const files = await readAllFilesFromHandle(record.handle);
-  fileCache.set(projectId, { files, rootName: record.rootName, cachedAt: Date.now() });
-  return files;
+  const data = await readAllFilesFromHandle(record.handle);
+  const result = {
+    files: data.files,
+    paths: data.paths,
+    rootName: record.rootName,
+    cachedAt: Date.now(),
+  };
+  fileCache.set(projectId, result);
+  return result;
 }
 
 export async function refreshDirectoryCache(projectId) {
@@ -212,11 +234,12 @@ export function clearAllCaches() {
 
 async function readAllFilesFromHandle(dirHandle) {
   const files = [];
-  await readDirectoryHandle(dirHandle, "", files);
-  return files;
+  const paths = [];
+  await readDirectoryHandle(dirHandle, "", files, paths);
+  return { files, paths };
 }
 
-async function readDirectoryHandle(dirHandle, path, outFiles) {
+async function readDirectoryHandle(dirHandle, path, outFiles, outPaths) {
   for await (const entry of dirHandle.values()) {
     const entryPath = path ? `${path}/${entry.name}` : entry.name;
 
@@ -224,6 +247,7 @@ async function readDirectoryHandle(dirHandle, path, outFiles) {
 
     if (entry.kind === "file") {
       if (!isTextFile(entry.name)) continue;
+      outPaths.push(entryPath);
       try {
         const file = await entry.getFile();
         if (file.size > 2 * 1024 * 1024) continue;
@@ -234,7 +258,8 @@ async function readDirectoryHandle(dirHandle, path, outFiles) {
         console.warn(`[BDS:LocalDir] Skipping ${entryPath}:`, err);
       }
     } else if (entry.kind === "directory") {
-      await readDirectoryHandle(entry, entryPath, outFiles);
+      outPaths.push(`${entryPath}/`);
+      await readDirectoryHandle(entry, entryPath, outFiles, outPaths);
     }
   }
 }

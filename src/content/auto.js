@@ -32,6 +32,7 @@ const processedSearchQueries = new Set();
 const processedMcpCalls = new Set();
 const processedFileReads = new Set();
 const processedDirSearches = new Set();
+const processedDirLists = new Set();
 // Per-run search deduplication for deep research
 const processedRunSearchQueries = new Map();
 
@@ -53,14 +54,28 @@ export async function handleAutoFileRead(filePath) {
     const blob = new Blob([matchedFile.content], { type: "text/plain" });
     const fileName = matchedFile.name.split("/").pop() || "file.txt";
     const fileObj = new File([blob], fileName, { type: "text/plain" });
+    const payload = JSON.stringify({
+      path: cleanPath,
+      fileName: matchedFile.name,
+      linesCount: matchedFile.content.split("\n").length,
+      success: true,
+      content: matchedFile.content
+    });
     await injectFileAndSend(
       fileObj,
-      `<BetterDeepSeek>\n[BDS:AUTO] File Read Result for path: "${cleanPath}"\n</BetterDeepSeek>`
+      `<BetterDeepSeek>\n[BDS:AUTO_FILE_READ_RESULT]\n${payload}\n[/BDS:AUTO_FILE_READ_RESULT]\n[BDS:AUTO] File Read Result for path: "${cleanPath}"\n</BetterDeepSeek>`
     );
   } else {
     devLog("Auto", `File not found in active codebase: ${cleanPath}`);
+    const payload = JSON.stringify({
+      path: cleanPath,
+      fileName: cleanPath.split("/").pop() || cleanPath,
+      linesCount: 0,
+      success: false,
+      error: "File was not found in the active codebase directory."
+    });
     await sendPromptToChat(
-      `<BetterDeepSeek>\n[BDS:AUTO] File read requested for "${cleanPath}", but file was not found in the active codebase directory.\n</BetterDeepSeek>`,
+      `<BetterDeepSeek>\n[BDS:AUTO_FILE_READ_RESULT]\n${payload}\n[/BDS:AUTO_FILE_READ_RESULT]\n[BDS:AUTO] File read requested for "${cleanPath}", but file was not found in the active codebase directory.\n</BetterDeepSeek>`,
       "File read error"
     );
   }
@@ -77,26 +92,187 @@ export async function handleAutoSearchInDirectory(queries) {
   const files = getDeepCodeFiles();
 
   if (!files || files.length === 0) {
+    const payload = JSON.stringify({
+      query: cleanQueries,
+      count: 0,
+      results: [],
+      error: "No active directory is linked in DeepCode."
+    });
     await sendPromptToChat(
-      `<BetterDeepSeek>\n[BDS:AUTO] Directory search requested for "${cleanQueries}", but no active directory is linked in DeepCode.\n</BetterDeepSeek>`,
+      `<BetterDeepSeek>\n[BDS:AUTO_DIR_SEARCH_RESULT]\n${payload}\n[/BDS:AUTO_DIR_SEARCH_RESULT]\n[BDS:AUTO] Directory search requested for "${cleanQueries}", but no active directory is linked in DeepCode.\n</BetterDeepSeek>`,
       "Directory search error"
     );
     return;
   }
 
-  const results = searchActiveProjectRAG(cleanQueries, files, 5);
-  let messageBody = `<BetterDeepSeek>\n[BDS:AUTO] Codebase Search Results for: "${cleanQueries}"\n\n`;
+  // Split multiple search queries if separated by commas, semicolons, or newlines
+  const subQueries = cleanQueries
+    .split(/[,;\n]+/)
+    .map(q => q.trim())
+    .filter(Boolean);
 
-  if (results.length === 0) {
-    messageBody += `No relevant code chunks found for query "${cleanQueries}".\n`;
-  } else {
-    messageBody += results.map((r, idx) => {
-      return `### Match ${idx + 1}: ${r.fileName} (Lines ${r.startLine}-${r.endLine}, Score: ${r.score.toFixed(2)})\n\`\`\`\n${r.content}\n\`\`\``;
-    }).join("\n\n");
+  if (subQueries.length === 0) {
+    subQueries.push(cleanQueries);
   }
 
-  messageBody += `\n</BetterDeepSeek>`;
-  await sendPromptToChat(messageBody, "Codebase search results");
+  const allResults = [];
+  const seenChunkKeys = new Set();
+  const querySections = [];
+
+  for (const q of subQueries) {
+    const queryResults = searchActiveProjectRAG(q, files, 4);
+    const formattedQueryResults = [];
+    for (const r of queryResults) {
+      const chunkKey = `${r.fileName}:${r.startLine}:${r.endLine}`;
+      const item = {
+        query: q,
+        fileName: r.fileName,
+        startLine: r.startLine,
+        endLine: r.endLine,
+        score: r.score,
+        content: r.content
+      };
+      formattedQueryResults.push(item);
+      if (!seenChunkKeys.has(chunkKey)) {
+        seenChunkKeys.add(chunkKey);
+        allResults.push(item);
+      }
+    }
+    querySections.push({ query: q, results: formattedQueryResults });
+  }
+
+  const payload = JSON.stringify({
+    query: cleanQueries,
+    count: allResults.length,
+    results: allResults
+  });
+
+  let reportMarkdown = `## Codebase Search Results for: "${cleanQueries}"\n\n`;
+  for (const section of querySections) {
+    reportMarkdown += `### Search Query: "${section.query}"\n`;
+    if (section.results.length === 0) {
+      reportMarkdown += `No relevant code chunks found for query "${section.query}".\n\n`;
+    } else {
+      reportMarkdown += section.results.map((r, idx) => {
+        const ext = r.fileName.split('.').pop() || '';
+        return `#### Match ${idx + 1}: ${r.fileName} (Lines ${r.startLine}-${r.endLine}, Score: ${r.score.toFixed(2)})\n\`\`\`${ext}\n${r.content}\n\`\`\``;
+      }).join("\n\n") + "\n\n";
+    }
+  }
+
+  const autoMessage = `<BetterDeepSeek>\n[BDS:AUTO_DIR_SEARCH_RESULT]\n${payload}\n[/BDS:AUTO_DIR_SEARCH_RESULT]\n[BDS:AUTO] Codebase Search Results for: "${cleanQueries}"\n\n${reportMarkdown}\n</BetterDeepSeek>`;
+
+  // If results are large, attach as a markdown file so it never overflows composer limits, otherwise send inline
+  if (reportMarkdown.length > 3000) {
+    const blob = new Blob([reportMarkdown], { type: "text/markdown" });
+    const searchFile = new File([blob], `codebase_search_${Date.now()}.md`, { type: "text/markdown" });
+    const shortAutoMessage = `<BetterDeepSeek>\n[BDS:AUTO_DIR_SEARCH_RESULT]\n${payload}\n[/BDS:AUTO_DIR_SEARCH_RESULT]\n[BDS:AUTO] Codebase Search Results for: "${cleanQueries}" (Found ${allResults.length} matches across ${subQueries.length} query terms)\n</BetterDeepSeek>`;
+    await injectFileAndSend(searchFile, shortAutoMessage);
+  } else {
+    await sendPromptToChat(autoMessage, "Codebase search results");
+  }
+}
+
+export async function handleAutoListDir(path) {
+  const raw = String(path || "").trim().replace(/\\/g, "/");
+  const cleanPath = raw
+    .replace(/^\/+|(?:\/)+$/g, "")
+    .replace(/^\.\/+/, "")
+    .replace(/^\.$/, "");
+
+  if (processedDirLists.has(cleanPath)) return;
+  processedDirLists.add(cleanPath);
+
+  devLog("Auto", `Starting automatic directory listing for: ${cleanPath || "/"}`);
+  const paths = appState.deepCode.paths || [];
+
+  if (!paths || paths.length === 0) {
+    const payload = JSON.stringify({
+      path: cleanPath || "/",
+      success: false,
+      childCount: 0,
+      entries: [],
+      error: "No active directory is linked in DeepCode.",
+    });
+    await sendPromptToChat(
+      `<BetterDeepSeek>\n[BDS:AUTO_DIR_LIST_RESULT]\n${payload}\n[/BDS:AUTO_DIR_LIST_RESULT]\n[BDS:AUTO] Directory listing requested for "${cleanPath || "/"}", but no active directory is linked in DeepCode.\n</BetterDeepSeek>`,
+      "Directory listing error"
+    );
+    return;
+  }
+
+  const isFilePath = paths.some((p) => p.replace(/\\/g, "/") === cleanPath);
+  if (isFilePath) {
+    const payload = JSON.stringify({
+      path: cleanPath,
+      success: false,
+      childCount: 0,
+      entries: [],
+      error: `"${cleanPath}" is a file, not a directory.`,
+    });
+    await sendPromptToChat(
+      `<BetterDeepSeek>\n[BDS:AUTO_DIR_LIST_RESULT]\n${payload}\n[/BDS:AUTO_DIR_LIST_RESULT]\n[BDS:AUTO] Directory listing requested for "${cleanPath}", but it is a file, not a directory.\n</BetterDeepSeek>`,
+      "Directory listing error"
+    );
+    return;
+  }
+
+  const prefix = cleanPath ? `${cleanPath}/` : "";
+  const dirExists = cleanPath === "" || paths.some((p) => p.replace(/\\/g, "/").startsWith(prefix));
+  if (!dirExists) {
+    const payload = JSON.stringify({
+      path: cleanPath,
+      success: false,
+      childCount: 0,
+      entries: [],
+      error: `Directory "${cleanPath}" was not found in the active codebase.`,
+    });
+    await sendPromptToChat(
+      `<BetterDeepSeek>\n[BDS:AUTO_DIR_LIST_RESULT]\n${payload}\n[/BDS:AUTO_DIR_LIST_RESULT]\n[BDS:AUTO] Directory listing requested for "${cleanPath}", but it was not found in the active codebase.\n</BetterDeepSeek>`,
+      "Directory listing error"
+    );
+    return;
+  }
+
+  const children = new Map();
+  for (const entry of paths) {
+    const norm = entry.replace(/\\/g, "/");
+    if (prefix && !norm.startsWith(prefix)) continue;
+    const rest = norm.slice(prefix.length);
+    if (!rest) continue;
+    const segments = rest.split("/");
+    const first = segments[0];
+    if (!first) continue;
+    const isDir = entry.endsWith("/") || segments.length > 1;
+    const key = isDir ? `${first}/` : first;
+    if (!children.has(key)) children.set(key, isDir ? "dir" : "file");
+  }
+
+  const entries = Array.from(children.entries())
+    .sort((a, b) => {
+      if (a[1] !== b[1]) return a[1] === "dir" ? -1 : 1;
+      return a[0].localeCompare(b[0]);
+    })
+    .map(([name, type]) => ({ name, type }));
+
+  let listing = `## Directory Listing: "${cleanPath || "/"}"\n\n`;
+  if (entries.length === 0) {
+    listing += "This directory is empty (or contains no indexed text files).\n";
+  } else {
+    listing += entries.map((e) => `- ${e.type === "dir" ? "DIR " : "FILE"} ${e.name}`).join("\n") + "\n";
+  }
+
+  const payload = JSON.stringify({
+    path: cleanPath || "/",
+    success: true,
+    isDirectory: true,
+    childCount: entries.length,
+    entries,
+    listing,
+  });
+
+  const autoMessage = `<BetterDeepSeek>\n[BDS:AUTO_DIR_LIST_RESULT]\n${payload}\n[/BDS:AUTO_DIR_LIST_RESULT]\n[BDS:AUTO] Directory listing for path: "${cleanPath || "/"}"\n\n${listing}\n</BetterDeepSeek>`;
+  await sendPromptToChat(autoMessage, "Directory listing");
 }
 
 function normalizeSearchKeyPart(value) {

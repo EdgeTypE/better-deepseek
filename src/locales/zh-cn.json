@@ -439,6 +439,29 @@
       "resultsFor": "关于“{{query}}”的搜索结果",
       "resultCount": "共找到 {{count}} 条结果"
     },
+    "fileReadResult": {
+      "success": "文件读取成功",
+      "error": "文件读取失败",
+      "linesRead": "已读取 {{count}} 行",
+      "showContent": "显示文件内容",
+      "hideContent": "隐藏文件内容",
+      "copyCode": "复制",
+      "copied": "已复制!"
+    },
+    "directorySearchResult": {
+      "resultsFor": "代码库搜索: \"{{query}}\"",
+      "matchCount": "找到 {{count}} 个匹配项",
+      "noMatches": "未找到匹配的代码。",
+      "copySnippet": "复制",
+      "copied": "已复制!"
+    },
+    "directoryListResult": {
+      "title": "目录: {{path}}",
+      "entryCount": "{{count}} 项",
+      "folder": "文件夹",
+      "file": "文件",
+      "empty": "此目录为空。"
+    },
     "autoCodeRunner": {
       "aiWantsToRun": "AI 想要运行 {{lang}} 代码",
       "safeSandbox": "将在安全的沙盒环境中执行。",
@@ -694,6 +717,9 @@
       "webFetchRequested": "正在抓取网页",
       "githubFetchRequested": "正在抓取 GitHub 仓库",
       "searchRequested": "正在调用 DuckDuckGo 搜索…",
+      "fileReadRequested": "正在读取代码库文件…",
+      "directorySearchRequested": "正在搜索代码库…",
+      "directoryListRequested": "正在列出目录…",
       "memoryStored": "已存储记忆（{{count}} 条）。",
       "downloadMd": "下载为 .md"
     },

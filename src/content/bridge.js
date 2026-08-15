@@ -8,6 +8,7 @@ import { findLatestAssistantMessageNode, collectMessageNodes, scheduleScan } fro
 import { finalizeLongWork } from "./files/long-work.js";
 import { getActiveProject, getActiveFiles, getFilesForProject } from "./project-manager.js";
 import { getDirectoryFiles } from "../lib/local-directory-source.js";
+import { getDeepCodeFiles, buildDeepCodeFileTree } from "./deep-code.js";
 import { discoverTags } from "./tags/tag-manager.js";
 import { recordOutgoingContext, recordServerUsage } from "./context-budget.js";
 import { retainOnlyHistorySession } from "./load-all-history.js";
@@ -347,6 +348,12 @@ export async function pushConfigToPage() {
         activeDirectory: state.deepCode.activeDirectory || "",
         manualPath: state.deepCode.manualPath || "",
         pendingReport: state.deepCode.pendingReport || null,
+        fileTree: buildDeepCodeFileTree(
+          state.deepCode.paths && state.deepCode.paths.length
+            ? state.deepCode.paths
+            : getDeepCodeFiles(),
+          { rootName: state.deepCode.activeDirectory || "" },
+        ),
       },
       activeProject: activeProject
         ? {

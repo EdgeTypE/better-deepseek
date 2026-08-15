@@ -440,6 +440,29 @@
       "resultsFor": "Arama Sonuçları: {{query}}",
       "resultCount": "{{count}} sonuç bulundu"
     },
+    "fileReadResult": {
+      "success": "Dosya Başarıyla Okundu",
+      "error": "Dosya Okunamadı",
+      "linesRead": "{{count}} satır okundu",
+      "showContent": "Dosya İçeriğini Göster",
+      "hideContent": "Dosya İçeriğini Gizle",
+      "copyCode": "Kopyala",
+      "copied": "Kopyalandı!"
+    },
+    "directorySearchResult": {
+      "resultsFor": "Kod Tabanı Arama: \"{{query}}\"",
+      "matchCount": "{{count}} eşleşme bulundu",
+      "noMatches": "Eşleşen kod parçası bulunamadı.",
+      "copySnippet": "Kopyala",
+      "copied": "Kopyalandı!"
+    },
+    "directoryListResult": {
+      "title": "Dizin: {{path}}",
+      "entryCount": "{{count}} öğe",
+      "folder": "Klasör",
+      "file": "Dosya",
+      "empty": "Bu dizin boş."
+    },
     "autoCodeRunner": {
       "aiWantsToRun": "Yapay zeka {{lang}} kodu çalıştırmak istiyor",
       "safeSandbox": "Bu kod güvenli bir tarayıcı sanal alanında (sandbox) yürütülecektir.",
@@ -695,6 +718,9 @@
       "webFetchRequested": "Web sayfası getiriliyor",
       "githubFetchRequested": "GitHub deposu getiriliyor",
       "searchRequested": "DuckDuckGo aranıyor...",
+      "fileReadRequested": "Kod dosyası okunuyor...",
+      "directorySearchRequested": "Kod tabanında aranıyor...",
+      "directoryListRequested": "Dizin listeleniyor...",
       "memoryStored": "Bellek kaydedildi ({{count}}).",
       "downloadMd": ".md olarak indir"
     },

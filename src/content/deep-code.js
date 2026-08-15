@@ -4,7 +4,7 @@
 
 import state from "./state.js";
 import { STORAGE_KEYS } from "../lib/constants.js";
-import { getLinkedDirectoryInfo, getDirectoryFiles, linkDirectory, adoptDirectoryHandle, supportsLocalDirectoryLinking } from "../lib/local-directory-source.js";
+import { getLinkedDirectoryInfo, getDirectoryFiles, getDirectoryPaths, linkDirectory, adoptDirectoryHandle, supportsLocalDirectoryLinking, SKIP_DIRS } from "../lib/local-directory-source.js";
 import { devLog } from "../lib/dev-log.js";
 
 const RECENT_DIRS_KEY = "bds_deepcode_recent_dirs";
@@ -279,6 +279,7 @@ export async function ensureDeepCodeFilesLoaded() {
     if (linked) {
       const files = await getDirectoryFiles(ACTIVE_PROJECT_ID);
       state.deepCode.files = files || [];
+      state.deepCode.paths = (await getDirectoryPaths(ACTIVE_PROJECT_ID)) || [];
       state.deepCode.activeDirectory = linked.rootName || state.deepCode.activeDirectory;
       state.deepCode.fileCount = files ? files.length : 0;
       devLog(`[DeepCode] Loaded ${state.deepCode.files.length} files from linked directory.`);
@@ -296,6 +297,69 @@ export async function ensureDeepCodeFilesLoaded() {
  */
 export function getDeepCodeFiles() {
   return state.deepCode.files || [];
+}
+
+/**
+ * Build a compact, depth-limited file tree of the indexed codebase for prompt
+ * injection. Derived synchronously from the in-memory path list (directories
+ * and text files; skipped dirs like node_modules are already excluded during
+ * indexing and re-checked here as a safety net).
+ *
+ * Accepts either string paths or { name } objects. Directory entries carry a
+ * trailing slash and are always shown, so the folder structure stays visible
+ * even when a directory holds no indexable text files.
+ *
+ * Rendering is a flat indented list of relative paths, e.g.:
+ *   <BDS:DEEP_CODE_FILE_TREE root="my-project">
+ *   - README.md
+ *   - package.json
+ *   - src/
+ *   - src/index.js
+ *   - src/utils/helpers.js
+ *   </BDS:DEEP_CODE_FILE_TREE>
+ *
+ * @param {Array<string | { name: string }>} paths
+ * @param {{ maxDepth?: number, maxEntries?: number, maxChars?: number, rootName?: string }} [opts]
+ * @returns {string} Rendered tree block, or "" when there is nothing to show.
+ */
+export function buildDeepCodeFileTree(paths, opts = {}) {
+  const maxDepth = Math.max(1, Number(opts.maxDepth) || 3);
+  const maxEntries = Math.max(1, Number(opts.maxEntries) || 300);
+  const maxChars = Math.max(1, Number(opts.maxChars) || 6000);
+  const rootName = String(opts.rootName || "").trim();
+
+  if (!Array.isArray(paths) || paths.length === 0) return "";
+
+  const normalized = new Set();
+  for (const entry of paths) {
+    const raw = typeof entry === "string" ? entry : entry?.name;
+    if (typeof raw !== "string" || !raw.trim()) continue;
+    const path = raw.trim().replace(/\/+/g, "/");
+    const segments = path.split("/").filter(Boolean);
+    if (segments.length === 0) continue;
+    if (segments.length > maxDepth + 1) continue;
+    if (segments.some((segment) => SKIP_DIRS.has(segment))) continue;
+    normalized.add(path);
+  }
+
+  const sorted = Array.from(normalized).sort((a, b) => a.localeCompare(b));
+
+  const lines = [];
+  for (const path of sorted) {
+    const next = `- ${path}`;
+    if (lines.length >= maxEntries || lines.join("\n").length + next.length + 1 > maxChars) {
+      break;
+    }
+    lines.push(next);
+  }
+
+  if (lines.length === 0) return "";
+
+  const truncated = sorted.length - lines.length;
+  const body = lines.join("\n") + (truncated > 0 ? `\n... (${truncated} more files)` : "");
+  const rootAttr = rootName ? ` root="${rootName}"` : "";
+
+  return `<BDS:DEEP_CODE_FILE_TREE${rootAttr}>\n${body}\n</BDS:DEEP_CODE_FILE_TREE>`;
 }
 
 /**
@@ -350,7 +414,7 @@ export async function persistDeepCodeState() {
   if (typeof chrome !== "undefined" && chrome?.storage?.local) {
     await chrome.storage.local.set({
       [STORAGE_KEYS.deepCodeState]: {
-        enabled: state.deepCode.enabled,
+        enabled: false,
         activeDirectory: state.deepCode.activeDirectory,
         fileCount: state.deepCode.fileCount,
         manualPath: state.deepCode.manualPath,
@@ -378,13 +442,11 @@ export async function loadDeepCodeState() {
     }
 
     if (data) {
-      state.deepCode.enabled = Boolean(data.enabled);
+      // DeepCode always starts as disabled upon refresh (F5), requiring manual activation
+      state.deepCode.enabled = false;
       state.deepCode.activeDirectory = data.activeDirectory || null;
       state.deepCode.fileCount = data.fileCount || 0;
       state.deepCode.manualPath = data.manualPath || "";
-      if (state.deepCode.enabled) {
-        await ensureDeepCodeFilesLoaded();
-      }
     }
     emitDeepCodeState();
   } catch (err) {

@@ -31,7 +31,7 @@ import {
   removeAllMessageHosts,
   removeMessageHost,
 } from "./dom/host.js";
-import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun, handleAutoMcpCall, handleAutoFileRead, handleAutoSearchInDirectory } from "./auto.js";
+import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun, handleAutoMcpCall, handleAutoFileRead, handleAutoSearchInDirectory, handleAutoListDir } from "./auto.js";
 import { handleManagedAutoContinuation, isManagedRunActive, trySynthesizeReport } from "./deep-research.js";
 
 import { mount, unmount } from "svelte";
@@ -47,6 +47,8 @@ const nodeStates = new WeakMap();
 const userMsgCleaned = new WeakSet();
 const readMessages = new WeakSet();
 const processedSearchResultCards = new WeakSet();
+const processedFileReadResultCards = new WeakSet();
+const processedDirSearchResultCards = new WeakSet();
 const pricingContributions = new Map();
 
 function removePricingContribution(node) {
@@ -361,6 +363,114 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
       }
     }
 
+    // --- FILE READ RESULT CARD (USER) ---
+    if (rawUserText.includes("[BDS:AUTO_FILE_READ_RESULT]") || rawUserText.includes("[BDS:AUTO] File Read Result for path:") || rawUserText.includes("[BDS:AUTO] File read requested for")) {
+      const jsonMatch = rawUserText.match(/\[BDS:AUTO_FILE_READ_RESULT\]\s*([\s\S]*?)\s*\[\/BDS:AUTO_FILE_READ_RESULT\]/);
+      let data = null;
+      if (jsonMatch) {
+        try {
+          data = JSON.parse(jsonMatch[1].trim());
+        } catch (e) {
+          console.error("[BDS:AUTO_FILE_READ_RESULT] Failed to parse JSON:", e);
+        }
+      }
+
+      if (!data) {
+        const pathMatch = rawUserText.match(/\[BDS:AUTO\] File (?:Read Result for path|read requested for):?\s*"([^"]+)"/i);
+        const path = pathMatch ? pathMatch[1] : "";
+        const isError = rawUserText.includes("was not found");
+        data = {
+          path,
+          fileName: path.split("/").pop() || path,
+          linesCount: 0,
+          success: !isError,
+          error: isError ? "File was not found in the active codebase directory." : "",
+          content: ""
+        };
+      }
+
+      if (data && !processedFileReadResultCards.has(node)) {
+        processedFileReadResultCards.add(node);
+        stateData.hasControlTags = true;
+
+        const existing = messageOverlays.get(node);
+        const newBlocks = [{
+          name: "auto_file_read_result",
+          attrs: {
+            path: data.path || "",
+            fileName: data.fileName || data.path || "",
+            linesCount: data.linesCount || 0,
+            success: data.success !== false,
+            error: data.error || "",
+          },
+          content: data.content || ""
+        }];
+
+        if (existing) {
+          existing.props.blocks = newBlocks;
+        } else {
+          const host = getOrCreateHost(node, "bds-overlay-host");
+          removeStaleMessageOverlays(host);
+          const props = $state({ text: "", blocks: newBlocks, loading: false });
+          const component = mount(MessageOverlay, { target: host, props });
+          messageOverlays.set(node, { component, props, host });
+        }
+        syncVisibilityState(node, false, stateData, true);
+      }
+    }
+
+    // --- DIRECTORY SEARCH RESULT CARD (USER) ---
+    if (rawUserText.includes("[BDS:AUTO_DIR_SEARCH_RESULT]") || rawUserText.includes("[BDS:AUTO] Codebase Search Results for:") || rawUserText.includes("[BDS:AUTO] Directory search requested for")) {
+      const jsonMatch = rawUserText.match(/\[BDS:AUTO_DIR_SEARCH_RESULT\]\s*([\s\S]*?)\s*\[\/BDS:AUTO_DIR_SEARCH_RESULT\]/);
+      let data = null;
+      if (jsonMatch) {
+        try {
+          data = JSON.parse(jsonMatch[1].trim());
+        } catch (e) {
+          console.error("[BDS:AUTO_DIR_SEARCH_RESULT] Failed to parse JSON:", e);
+        }
+      }
+
+      if (!data) {
+        const queryMatch = rawUserText.match(/\[BDS:AUTO\] (?:Codebase Search Results for|Directory search requested for):\s*"([^"]+)"/i);
+        const query = queryMatch ? queryMatch[1] : "";
+        const isError = rawUserText.includes("no active directory is linked");
+        data = {
+          query,
+          count: 0,
+          results: [],
+          error: isError ? "No active directory is linked in DeepCode." : ""
+        };
+      }
+
+      if (data && !processedDirSearchResultCards.has(node)) {
+        processedDirSearchResultCards.add(node);
+        stateData.hasControlTags = true;
+
+        const existing = messageOverlays.get(node);
+        const newBlocks = [{
+          name: "auto_directory_search_result",
+          attrs: {
+            query: data.query || "",
+            count: String(data.count ?? data.results?.length ?? 0),
+            error: data.error || "",
+          },
+          content: typeof data.results === "string" ? data.results : JSON.stringify(data.results || [])
+        }];
+
+        if (existing) {
+          existing.props.blocks = newBlocks;
+        } else {
+          const host = getOrCreateHost(node, "bds-overlay-host");
+          removeStaleMessageOverlays(host);
+          const props = $state({ text: "", blocks: newBlocks, loading: false });
+          const component = mount(MessageOverlay, { target: host, props });
+          messageOverlays.set(node, { component, props, host });
+        }
+        syncVisibilityState(node, false, stateData, true);
+      }
+    }
+
     // --- VISUALIZER FEEDBACK CARD (USER) ---
     if (rawUserText.includes("[BDS:VISUALIZER_FEEDBACK]") || rawUserText.includes("<BDS:VISUALIZER_FEEDBACK")) {
       let type = "user_report";
@@ -485,7 +595,8 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
     parsed.autoRequests.searchQueries.length > 0 ||
     parsed.autoRequests.mcpCalls.length > 0 ||
     (parsed.autoRequests.fileRead && parsed.autoRequests.fileRead.length > 0) ||
-    (parsed.autoRequests.searchInDirectory && parsed.autoRequests.searchInDirectory.length > 0);
+    (parsed.autoRequests.searchInDirectory && parsed.autoRequests.searchInDirectory.length > 0) ||
+    (parsed.autoRequests.dirList && parsed.autoRequests.dirList.length > 0);
   const currentConversationId = getCurrentConversationIdInline();
   const managedAutoSuppressionRun = getManagedAutoSuppressionRun(parsed, currentConversationId);
   const suppressManagedAuto = Boolean(managedAutoSuppressionRun);
@@ -504,6 +615,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
       if (!stateData.autoMcpCallsHandled) stateData.autoMcpCallsHandled = new Set();
       if (!stateData.autoFileReadsHandled) stateData.autoFileReadsHandled = new Set();
       if (!stateData.autoDirSearchesHandled) stateData.autoDirSearchesHandled = new Set();
+      if (!stateData.autoDirListsHandled) stateData.autoDirListsHandled = new Set();
 
       // Stray AUTO tags are treated as continuation attempts and recovered below.
       for (const url of parsed.autoRequests.webFetch) {
@@ -573,6 +685,14 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
         if (!stateData.autoDirSearchesHandled.has(queries)) {
           stateData.autoDirSearchesHandled.add(queries);
           handleAutoSearchInDirectory(queries);
+        }
+      }
+
+      for (const dirPath of (parsed.autoRequests.dirList || [])) {
+        if (suppressManagedAuto) continue;
+        if (!stateData.autoDirListsHandled.has(dirPath)) {
+          stateData.autoDirListsHandled.add(dirPath);
+          handleAutoListDir(dirPath);
         }
       }
 

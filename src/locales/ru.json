@@ -440,6 +440,29 @@
       "resultsFor": "Результаты поиска: {{query}}",
       "resultCount": "Найдено {{count}} результатов"
     },
+    "fileReadResult": {
+      "success": "Файл успешно прочитан",
+      "error": "Ошибка чтения файла",
+      "linesRead": "Прочитано строк: {{count}}",
+      "showContent": "Показать содержимое",
+      "hideContent": "Скрыть содержимое",
+      "copyCode": "Копировать",
+      "copied": "Скопировано!"
+    },
+    "directorySearchResult": {
+      "resultsFor": "Поиск по коду: \"{{query}}\"",
+      "matchCount": "Найдено совпадений: {{count}}",
+      "noMatches": "Совпадений в коде не найдено.",
+      "copySnippet": "Копировать",
+      "copied": "Скопировано!"
+    },
+    "directoryListResult": {
+      "title": "Каталог: {{path}}",
+      "entryCount": "Элементов: {{count}}",
+      "folder": "Папка",
+      "file": "Файл",
+      "empty": "Каталог пуст."
+    },
     "autoCodeRunner": {
       "aiWantsToRun": "ИИ хочет выполнить код {{lang}}",
       "safeSandbox": "Код будет выполнен в безопасной изолированной среде.",
@@ -695,6 +718,9 @@
       "webFetchRequested": "Веб-страница загружается",
       "githubFetchRequested": "GitHub репозиторий загружается",
       "searchRequested": "Поиск DuckDuckGo...",
+      "fileReadRequested": "Чтение файла кодовой базы...",
+      "directorySearchRequested": "Поиск по кодовой базе...",
+      "directoryListRequested": "Список каталога...",
       "memoryStored": "Память сохранена ({{count}}).",
       "downloadMd": "Скачать как .md"
     },

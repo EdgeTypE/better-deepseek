@@ -19,7 +19,40 @@ import { sanitizeVisibleText } from "./text-sanitizer.js";
 import { extractHttpUrl } from "../../lib/utils/url-normalizer.js";
 
 // Tool renderers that have visual cards
-const RENDERABLE_TOOLS = new Set(["html", "visualizer", "visualizer_feedback", "pptx", "excel", "docx", "ask_question", "character_create", "skill_create", "auto:code_runner", "auto_code_result", "auto:request_web_fetch", "auto:request_github_fetch", "auto:search", "auto:mcp", "auto:mcp_result", "auto:mcp_error", "deep_research_plan", "deep_research_status", "deep_research_report", "deep_research_step_done", "image", "todo", "harness_task", "auto:harness_task"]);
+const RENDERABLE_TOOLS = new Set([
+  "html",
+  "visualizer",
+  "visualizer_feedback",
+  "pptx",
+  "excel",
+  "docx",
+  "ask_question",
+  "character_create",
+  "skill_create",
+  "auto:code_runner",
+  "auto_code_result",
+  "auto:request_web_fetch",
+  "auto:request_github_fetch",
+  "auto:search",
+  "auto_search_result",
+  "auto:mcp",
+  "auto:mcp_result",
+  "auto:mcp_error",
+  "auto:file_read",
+  "auto_file_read_result",
+  "auto:search_in_directory",
+  "auto_directory_search_result",
+  "auto:list_dir",
+  "auto_dir_list_result",
+  "deep_research_plan",
+  "deep_research_status",
+  "deep_research_report",
+  "deep_research_step_done",
+  "image",
+  "todo",
+  "harness_task",
+  "auto:harness_task",
+]);
 
 function normalizeAutoHttpTarget(value) {
   return extractHttpUrl(value);
@@ -135,18 +168,19 @@ export function parseBdsMessage(rawText, isSettled = false) {
       mcpCalls: [],
       fileRead: [],
       searchInDirectory: [],
+      dirList: [],
     },
     visibleText: text,
   };
 
-  if (!/(<BDS:|<BetterDeepSeek>|Bds create file>|\[BDS:VISUALIZER_FEEDBACK\])/i.test(text)) {
+  if (!/(<BDS:|<BetterDeepSeek>|Bds create file>|\[BDS:)/i.test(text)) {
     return result;
   }
 
   // We have BDS tags, but do we have tags that should HIDE the original message?
-  // AUTO tags should NOT hide the message, EXCEPT for AUTO:CODE_RUNNER, AUTO:REQUEST_WEB_FETCH, AUTO:REQUEST_GITHUB_FETCH, AUTO:SEARCH, AUTO:MCP, and AUTO:MCP_RESULT which have UI cards.
+  // AUTO tags should NOT hide the message, EXCEPT for AUTO:CODE_RUNNER, AUTO:REQUEST_WEB_FETCH, AUTO:REQUEST_GITHUB_FETCH, AUTO:SEARCH, AUTO:MCP, AUTO:FILE_READ, AUTO:SEARCH_IN_DIRECTORY, and AUTO:LIST_DIR which have UI cards.
   // BDS tags inside code blocks are ignored — they are documentation examples.
-  const hidingRegex = /(<BDS:(?!AUTO:(?!CODE_RUNNER|REQUEST_WEB_FETCH|REQUEST_GITHUB_FETCH|SEARCH|MCP))[a-zA-Z0-9_:]+|<BetterDeepSeek>|Bds create file>|\[BDS:VISUALIZER_FEEDBACK\])/gi;
+  const hidingRegex = /(<BDS:(?!AUTO:(?!CODE_RUNNER|REQUEST_WEB_FETCH|REQUEST_GITHUB_FETCH|SEARCH|MCP|FILE_READ|SEARCH_IN_DIRECTORY|LIST_DIR))[a-zA-Z0-9_:]+|<BetterDeepSeek>|Bds create file>|\[BDS:(?!AUTO_FILE_READ_RESULT|AUTO_DIR_SEARCH_RESULT|AUTO_DIR_LIST_RESULT)[a-zA-Z0-9_:]+\])/gi;
   const hidingMatches = Array.from(text.matchAll(hidingRegex))
     .filter(m => !isInsideCodeBlock(m.index));
   result.containsControlTags = hidingMatches.length > 0;
@@ -382,6 +416,13 @@ export function parseBdsMessage(rawText, isSettled = false) {
     const filePath = String(attrs.path || attrs.filePath || match[2] || "").trim();
     if (filePath) {
       result.autoRequests.fileRead.push(filePath);
+      const blockIdx = result.renderableBlocks.length;
+      result.renderableBlocks.push({
+        name: "auto:file_read",
+        attrs: { path: filePath, ...attrs },
+        content: filePath,
+      });
+      renderableTagMatches.push({ original: match[0], index: match.index, blockIdx });
     }
   }
 
@@ -392,7 +433,87 @@ export function parseBdsMessage(rawText, isSettled = false) {
     const queries = String(attrs.queries || attrs.query || match[2] || "").trim();
     if (queries) {
       result.autoRequests.searchInDirectory.push(queries);
+      const blockIdx = result.renderableBlocks.length;
+      result.renderableBlocks.push({
+        name: "auto:search_in_directory",
+        attrs: { queries, ...attrs },
+        content: queries,
+      });
+      renderableTagMatches.push({ original: match[0], index: match.index, blockIdx });
     }
+  }
+
+  const dirListRegex = /<BDS:(?:AUTO:)?LIST_DIR([^>]*)>(?:([\s\S]*?)<\/BDS:(?:AUTO:)?LIST_DIR>)?/gi;
+  while ((match = dirListRegex.exec(text)) !== null) {
+    if (isInsideCodeBlock(match.index)) continue;
+    const attrs = parseTagAttributes(match[1] || "");
+    const dirPath = String(attrs.path || attrs.dir || attrs.directory || match[2] || "").trim();
+    if (dirPath) {
+      result.autoRequests.dirList.push(dirPath);
+      const blockIdx = result.renderableBlocks.length;
+      result.renderableBlocks.push({
+        name: "auto:list_dir",
+        attrs: { path: dirPath, ...attrs },
+        content: dirPath,
+      });
+      renderableTagMatches.push({ original: match[0], index: match.index, blockIdx });
+    }
+  }
+
+  const fileReadResultRegex = /\[BDS:AUTO_FILE_READ_RESULT\]\s*([\s\S]*?)\s*\[\/BDS:AUTO_FILE_READ_RESULT\]/gi;
+  while ((match = fileReadResultRegex.exec(text)) !== null) {
+    if (isInsideCodeBlock(match.index)) continue;
+    let data = {};
+    try { data = JSON.parse(match[1].trim()); } catch { data = { content: match[1].trim() }; }
+    const blockIdx = result.renderableBlocks.length;
+    result.renderableBlocks.push({
+      name: "auto_file_read_result",
+      attrs: {
+        path: data.path || "",
+        fileName: data.fileName || data.path || "",
+        linesCount: data.linesCount || 0,
+        success: data.success !== false,
+        error: data.error || "",
+      },
+      content: data.content || "",
+    });
+    renderableTagMatches.push({ original: match[0], index: match.index, blockIdx });
+  }
+
+  const dirSearchResultRegex = /\[BDS:AUTO_DIR_SEARCH_RESULT\]\s*([\s\S]*?)\s*\[\/BDS:AUTO_DIR_SEARCH_RESULT\]/gi;
+  while ((match = dirSearchResultRegex.exec(text)) !== null) {
+    if (isInsideCodeBlock(match.index)) continue;
+    let data = {};
+    try { data = JSON.parse(match[1].trim()); } catch { data = { results: [], query: "" }; }
+    const blockIdx = result.renderableBlocks.length;
+    result.renderableBlocks.push({
+      name: "auto_directory_search_result",
+      attrs: {
+        query: data.query || "",
+        count: String(data.count ?? data.results?.length ?? 0),
+        error: data.error || "",
+      },
+      content: typeof data.results === "string" ? data.results : JSON.stringify(data.results || []),
+    });
+    renderableTagMatches.push({ original: match[0], index: match.index, blockIdx });
+  }
+
+  const dirListResultRegex = /\[BDS:AUTO_DIR_LIST_RESULT\]\s*([\s\S]*?)\s*\[\/BDS:AUTO_DIR_LIST_RESULT\]/gi;
+  while ((match = dirListResultRegex.exec(text)) !== null) {
+    if (isInsideCodeBlock(match.index)) continue;
+    let data = {};
+    try { data = JSON.parse(match[1].trim()); } catch { data = { entries: [], path: "" }; }
+    const blockIdx = result.renderableBlocks.length;
+    result.renderableBlocks.push({
+      name: "auto_dir_list_result",
+      attrs: {
+        path: data.path || "",
+        childCount: String(data.childCount ?? data.entries?.length ?? 0),
+        error: data.error || "",
+      },
+      content: JSON.stringify(data.entries || []),
+    });
+    renderableTagMatches.push({ original: match[0], index: match.index, blockIdx });
   }
 
   const selfClosingCreateRegex = /<BDS:create_file\s+([^>]*)\/>/gi;

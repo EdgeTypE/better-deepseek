@@ -68,12 +68,13 @@ export function normalizeConfig(config) {
 
 export function normalizeDeepCode(raw) {
   if (!raw || typeof raw !== "object") {
-    return { enabled: false, activeDirectory: null, manualPath: "", pendingReport: null };
+    return { enabled: false, activeDirectory: null, manualPath: "", pendingReport: null, fileTree: "" };
   }
   return {
     enabled: Boolean(raw.enabled),
     activeDirectory: String(raw.activeDirectory || "").trim(),
     manualPath: String(raw.manualPath || "").trim(),
+    fileTree: String(raw.fileTree || "").trim(),
     pendingReport: raw.pendingReport && typeof raw.pendingReport === "object"
       ? {
           cwd: String(raw.pendingReport.cwd || "").trim(),

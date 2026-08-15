@@ -974,4 +974,90 @@ describe("handleAutoMcpCall", () => {
     const input = document.querySelector('input[type="file"]');
     expect(input.files).toHaveLength(0);
   });
+
+  describe("handleAutoListDir", () => {
+    async function importWithPaths(paths) {
+      const autoModule = await importAutoModule();
+      const freshState = (await import("../../src/content/state.js")).default;
+      freshState.deepCode.paths = paths;
+      return autoModule;
+    }
+
+    it("injects a directory listing of the immediate children", async () => {
+      const { handleAutoListDir } = await importWithPaths([
+        "README.md",
+        "dataset/train.txt",
+        "models/encoder.js",
+        "src/index.js",
+        "src/utils/helpers.js",
+        "src/utils/parse.js",
+        "assets/",
+      ]);
+      const callPromise = handleAutoListDir("src");
+      await vi.advanceTimersByTimeAsync(600);
+      await callPromise;
+
+      const editor = document.querySelector("#chat-input");
+      expect(editor.value).toContain("[BDS:AUTO_DIR_LIST_RESULT]");
+      expect(editor.value).toContain("[/BDS:AUTO_DIR_LIST_RESULT]");
+      expect(editor.value).toContain('"path":"src"');
+      expect(editor.value).toContain('"childCount":2');
+      expect(editor.value).toContain("DIR  utils/");
+      expect(editor.value).toContain("FILE index.js");
+      expect(editor.value).not.toContain("helpers.js");
+      expect(editor.value).not.toContain("dataset/");
+    });
+
+    it("lists the root when the path is empty or '.'", async () => {
+      const { handleAutoListDir } = await importWithPaths([
+        "README.md",
+        "src/index.js",
+        "dataset/train.txt",
+        "models/encoder.js",
+      ]);
+      const callPromise = handleAutoListDir("");
+      await vi.advanceTimersByTimeAsync(600);
+      await callPromise;
+
+      const editor = document.querySelector("#chat-input");
+      expect(editor.value).toContain('[BDS:AUTO] Directory listing for path: "/"');
+      expect(editor.value).toContain("DIR  src/");
+      expect(editor.value).toContain("DIR  dataset/");
+      expect(editor.value).toContain("FILE README.md");
+    });
+
+    it("injects an error when the path is a file, not a directory", async () => {
+      const { handleAutoListDir } = await importWithPaths(["README.md", "src/index.js"]);
+      const callPromise = handleAutoListDir("README.md");
+      await vi.advanceTimersByTimeAsync(600);
+      await callPromise;
+
+      const editor = document.querySelector("#chat-input");
+      expect(editor.value).toContain('"error":"\\"README.md\\" is a file, not a directory."');
+      expect(editor.value).toContain("it is a file, not a directory");
+    });
+
+    it("injects an error when the directory is not found", async () => {
+      const { handleAutoListDir } = await importWithPaths(["src/index.js"]);
+      const callPromise = handleAutoListDir("missing");
+      await vi.advanceTimersByTimeAsync(600);
+      await callPromise;
+
+      const editor = document.querySelector("#chat-input");
+      expect(editor.value).toContain('"error":"Directory \\"missing\\" was not found in the active codebase."');
+    });
+
+    it("does not re-list the same directory twice", async () => {
+      const { handleAutoListDir } = await importWithPaths(["src/index.js", "src/utils/helpers.js"]);
+      let callPromise = handleAutoListDir("src");
+      await vi.advanceTimersByTimeAsync(600);
+      await callPromise;
+      document.querySelector("#chat-input").value = "";
+
+      await handleAutoListDir("src");
+
+      const editor = document.querySelector("#chat-input");
+      expect(editor.value).toBe("");
+    });
+  });
 });

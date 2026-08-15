@@ -105,6 +105,24 @@ describe("scanner input controls", () => {
     expect(mountMock.mock.calls[0][1].target).toBe(deepResearchMount);
   });
 
+  it("does not mount Deep Code when target is Android", async () => {
+    process.env.BDS_TARGET = "android";
+    document.body.innerHTML = `
+      <div id="composer">
+        <button id="deepthink" class="ds-toggle-button" type="button"></button>
+        <input type="file" multiple />
+      </div>
+    `;
+    const { scanInputArea } = await import("../../src/content/scanner.js");
+
+    scanInputArea();
+
+    const wrapper = document.querySelector("#composer");
+    const deepCodeMount = wrapper.querySelector(".bds-deep-code-mount");
+    expect(deepCodeMount).toBeNull();
+    delete process.env.BDS_TARGET;
+  });
+
   it("hides only the native upload trigger directly associated with the file input", async () => {
     document.body.innerHTML = `
       <div id="composer">

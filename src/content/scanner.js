@@ -562,22 +562,25 @@ export function scanInputArea() {
     deepResearchMountPoint.dataset.bdsMounted = "1";
   }
 
-  const deepCodeMountPoint = ensureComposerMount(
-    deepResearchWrapper,
-    "bds-deep-code-mount",
-    ".bds-deep-code-toggle",
-    insertBeforeNode,
-  );
-  if (!deepCodeMountPoint.dataset.bdsMounted) {
-    mount(DeepCodeToggle, {
-      target: deepCodeMountPoint,
-      props: {
-        enabled: state.deepCode.enabled,
-        onToggle: (enabled) => setDeepCodeEnabled(enabled),
-        onOpenModal: () => window.dispatchEvent(new CustomEvent("bds:open-deep-code-modal")),
-      },
-    });
-    deepCodeMountPoint.dataset.bdsMounted = "1";
+  const isAndroidTarget = process.env.BDS_TARGET === "android";
+  if (!isAndroidTarget) {
+    const deepCodeMountPoint = ensureComposerMount(
+      deepResearchWrapper,
+      "bds-deep-code-mount",
+      ".bds-deep-code-toggle",
+      insertBeforeNode,
+    );
+    if (!deepCodeMountPoint.dataset.bdsMounted) {
+      mount(DeepCodeToggle, {
+        target: deepCodeMountPoint,
+        props: {
+          enabled: state.deepCode.enabled,
+          onToggle: (enabled) => setDeepCodeEnabled(enabled),
+          onOpenModal: () => window.dispatchEvent(new CustomEvent("bds:open-deep-code-modal")),
+        },
+      });
+      deepCodeMountPoint.dataset.bdsMounted = "1";
+    }
   }
 
   if (!fileInput || !wrapper) {

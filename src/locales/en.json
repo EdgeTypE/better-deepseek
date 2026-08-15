@@ -443,6 +443,29 @@
       "resultsFor": "Search Results: {{query}}",
       "resultCount": "{{count}} results found"
     },
+    "fileReadResult": {
+      "success": "File Read Successfully",
+      "error": "File Read Failed",
+      "linesRead": "{{count}} lines read",
+      "showContent": "Show File Content",
+      "hideContent": "Hide File Content",
+      "copyCode": "Copy",
+      "copied": "Copied!"
+    },
+    "directorySearchResult": {
+      "resultsFor": "Codebase Search: \"{{query}}\"",
+      "matchCount": "{{count}} code matches found",
+      "noMatches": "No matching code found.",
+      "copySnippet": "Copy",
+      "copied": "Copied!"
+    },
+    "directoryListResult": {
+      "title": "Directory: {{path}}",
+      "entryCount": "{{count}} items",
+      "folder": "Folder",
+      "file": "File",
+      "empty": "This directory is empty."
+    },
     "autoCodeRunner": {
       "aiWantsToRun": "AI wants to run {{lang}} code",
       "safeSandbox": "This will execute in a safe sandbox.",
@@ -698,6 +721,9 @@
       "webFetchRequested": "Web page is being fetched",
       "githubFetchRequested": "GitHub repository is being fetched",
       "searchRequested": "Searching DuckDuckGo...",
+      "fileReadRequested": "Reading codebase file...",
+      "directorySearchRequested": "Searching codebase...",
+      "directoryListRequested": "Listing directory...",
       "memoryStored": "Memory stored ({{count}}).",
       "downloadMd": "Download as .md"
     },

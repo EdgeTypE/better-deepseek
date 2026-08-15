@@ -91,6 +91,7 @@ const state = {
     fileCount: 0,
     manualPath: "",
     files: [],
+    paths: [],
     pendingReport: null,
     recentDirectories: [],
   },

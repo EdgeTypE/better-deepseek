@@ -113,6 +113,7 @@ import {
   unlinkDirectory,
   getLinkedDirectoryInfo,
   getDirectoryFiles,
+  getDirectoryPaths,
   refreshDirectoryCache,
   clearAllCaches,
 } from "./local-directory-source.js";
@@ -165,8 +166,12 @@ const mockDirectory = createMockDirHandle("my-project", [
   createMockFileHandle("index.js", 'const x = 1;\nconsole.log(x);'),
   createMockFileHandle("utils.js", 'export function add(a, b) { return a + b; }'),
   createMockFileHandle("README.md", "# My Project\n\nThis is a test project."),
+  createMockFileHandle("logo.png", "\u0000binary"),
   createMockDirHandle("components", [
     createMockFileHandle("Button.svelte", "<script>let label = 'click';</script>\n<button>{label}</button>"),
+  ]),
+  createMockDirHandle("assets", [
+    createMockFileHandle("hero.png", "\u0000binary"),
   ]),
   createMockDirHandle("node_modules", [
     createMockFileHandle("dep.js", "module.exports = {};"),
@@ -251,6 +256,34 @@ describe("local-directory-source", () => {
 
       const cached = await getDirectoryFiles("proj-3");
       expect(cached.length).toBe(4);
+    });
+  });
+
+  describe("getDirectoryPaths", () => {
+    it("returns directories and text-file paths, excluding skipped dirs", async () => {
+      await linkDirectory("proj-6");
+      const paths = await getDirectoryPaths("proj-6");
+
+      expect(paths).not.toBeNull();
+      expect(paths).toContain("README.md");
+      expect(paths).toContain("components/");
+      expect(paths).toContain("components/Button.svelte");
+      expect(paths).not.toContain("node_modules/");
+      expect(paths).not.toContain("node_modules/dep.js");
+    });
+
+    it("keeps folders of binary-only files but excludes the binary files", async () => {
+      await linkDirectory("proj-7");
+      const paths = await getDirectoryPaths("proj-7");
+
+      expect(paths).toContain("assets/");
+      expect(paths).not.toContain("logo.png");
+      expect(paths).not.toContain("assets/hero.png");
+    });
+
+    it("returns null when no directory is linked", async () => {
+      const paths = await getDirectoryPaths("nonexistent");
+      expect(paths).toBeNull();
     });
   });
 

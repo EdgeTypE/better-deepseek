@@ -22,6 +22,9 @@
   import McpResultCard from "./McpResultCard.svelte";
   import McpErrorCard from "./McpErrorCard.svelte";
   import HarnessTaskCard from "./HarnessTaskCard.svelte";
+  import FileReadResultCard from "./FileReadResultCard.svelte";
+  import DirectorySearchResultCard from "./DirectorySearchResultCard.svelte";
+  import DirListResultCard from "./DirListResultCard.svelte";
   import { t } from "../../lib/i18n.svelte.js";
   import { parseLooseJson } from "../parser/json-repair.js";
   import { triggerTextDownload } from "../../lib/utils/download.js";
@@ -379,6 +382,73 @@
         </div>
       {:else if block.name === 'auto_search_result'}
         <SearchResultCard query={block.attrs.query} count={block.attrs.count} results={block.content} />
+      {:else if block.name === 'auto:file_read'}
+        <div class="bds-question-info-card bds-file-read-card">
+          <div class="bds-question-icon bds-file-read-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+          </div>
+          <div class="bds-question-content">
+            <div class="bds-question-title">{t('messageOverlay.fileReadRequested')}</div>
+            <div class="bds-question-subtitle">{block.attrs.path || block.content}</div>
+          </div>
+        </div>
+      {:else if block.name === 'auto_file_read_result'}
+        <FileReadResultCard
+          path={block.attrs.path || block.attrs.filePath || ""}
+          fileName={block.attrs.fileName || ""}
+          linesCount={block.attrs.linesCount || 0}
+          success={block.attrs.success !== false && block.attrs.success !== "false"}
+          error={block.attrs.error || ""}
+          content={block.content}
+        />
+      {:else if block.name === 'auto:search_in_directory'}
+        <div class="bds-question-info-card bds-dir-search-info-card">
+          <div class="bds-question-icon bds-dir-search-info-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              <circle cx="12" cy="14" r="3"></circle>
+              <line x1="14.5" y1="16.5" x2="17" y2="19"></line>
+            </svg>
+          </div>
+          <div class="bds-question-content">
+            <div class="bds-question-title">{t('messageOverlay.directorySearchRequested')}</div>
+            <div class="bds-question-subtitle">{block.attrs.queries || block.content}</div>
+          </div>
+        </div>
+      {:else if block.name === 'auto_directory_search_result'}
+        <DirectorySearchResultCard
+          query={block.attrs.query || ""}
+          count={block.attrs.count || 0}
+          results={block.content}
+          error={block.attrs.error || ""}
+        />
+      {:else if block.name === 'auto:list_dir'}
+        <div class="bds-question-info-card bds-dir-list-info-card">
+          <div class="bds-question-icon bds-dir-list-info-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              <line x1="12" y1="11" x2="12" y2="17"></line>
+              <polyline points="9 14 12 17 15 14"></polyline>
+            </svg>
+          </div>
+          <div class="bds-question-content">
+            <div class="bds-question-title">{t('messageOverlay.directoryListRequested')}</div>
+            <div class="bds-question-subtitle">{block.attrs.path || block.content}</div>
+          </div>
+        </div>
+      {:else if block.name === 'auto_dir_list_result'}
+        <DirListResultCard
+          path={block.attrs.path || "/"}
+          count={block.attrs.childCount || 0}
+          entries={block.content}
+          error={block.attrs.error || ""}
+        />
       {:else if block.name === 'deep_research_plan'}
         {@const parsedPlan = parseJsonBlock(block.content)}
         <DeepResearchPlanCard
@@ -553,6 +623,24 @@
 
   .bds-search-info-card {
     border-left: 3px solid #22c55e;
+  }
+
+  .bds-file-read-icon {
+    color: #3b82f6;
+    background: rgba(59, 130, 246, 0.1);
+  }
+
+  .bds-file-read-card {
+    border-left: 3px solid #3b82f6;
+  }
+
+  .bds-dir-search-info-icon {
+    color: #a855f7;
+    background: rgba(168, 85, 247, 0.1);
+  }
+
+  .bds-dir-search-info-card {
+    border-left: 3px solid #a855f7;
   }
 
   .bds-memory-icon {

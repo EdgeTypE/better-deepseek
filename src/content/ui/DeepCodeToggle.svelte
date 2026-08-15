@@ -59,9 +59,13 @@
   }
 
   onMount(() => {
-    void isDeepCodeOnboarded().then((done) => {
-      onboarded = done;
-    });
+    void Promise.resolve(isDeepCodeOnboarded?.())
+      .then((done) => {
+        if (typeof done === "boolean") onboarded = done;
+      })
+      .catch(() => {
+        onboarded = true;
+      });
 
     const handler = (event) => {
       const detail = event.detail || {};
@@ -102,14 +106,8 @@
     const rect = buttonRef.getBoundingClientRect();
     const margin = 8;
     const menuWidth = 360;
-    const menuHeight = 420;
 
-    let top = rect.top - menuHeight - margin;
     let left = rect.left;
-
-    if (top < 10) {
-      top = rect.bottom + margin;
-    }
     if (left + menuWidth > window.innerWidth - 10) {
       left = window.innerWidth - menuWidth - 10;
     }
@@ -117,7 +115,13 @@
       left = 10;
     }
 
-    dropdownStyle = `top: ${Math.max(10, top)}px; left: ${Math.max(10, left)}px;`;
+    if (rect.top >= 320) {
+      const bottom = window.innerHeight - rect.top + margin;
+      dropdownStyle = `bottom: ${bottom}px; left: ${Math.max(10, left)}px; top: auto;`;
+    } else {
+      const top = rect.bottom + margin;
+      dropdownStyle = `top: ${top}px; left: ${Math.max(10, left)}px; bottom: auto;`;
+    }
   }
 
   function handleButtonClick(event) {
@@ -188,7 +192,7 @@
   class="bds-deep-code-toggle f79352dc ds-toggle-button ds-toggle-button--m"
   class:ds-toggle-button--selected={localEnabled}
   class:bds-deep-code-toggle--selected={localEnabled}
-  style="transform: translateZ(0px); margin-left: 4px;"
+  style="transform: translateZ(0px);"
   onclick={handleButtonClick}
   onkeydown={(e) => (e.key === "Enter" || e.key === " ") && handleButtonClick(e)}
   data-testid="deep-code-toggle"
@@ -215,11 +219,15 @@
     </div>
   </div>
   <span class="_6dbc175 bds-toggle-label">{displayLabel}</span>
-  <span class="bds-toggle-chevron">{isOpen ? "▴" : "▾"}</span>
+  <span class="bds-toggle-chevron" class:bds-toggle-chevron--open={isOpen}>
+    <svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </span>
   <div class="ds-focus-ring" style="--dsl-focus-ring-offset: -1px;"></div>
 </div>
 
-<!-- POPOVER CARD (DRAWER SETTINGS & QUESTION PANEL DESIGN SYSTEM) -->
+<!-- ONBOARDING POPUP -->
 {#if showOnboarding}
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -241,7 +249,7 @@
               <path d="M5.75 4.75L2.5 8L5.75 11.25M10.25 4.75L13.5 8L10.25 11.25M8.5 3.5L7.5 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </span>
-          <h3 class="ds-modal-content__title" style="font-size: 15px;">{t("deepCodeOnboarding.title")}</h3>
+          <h3 class="bds-onboarding-title">{t("deepCodeOnboarding.title")}</h3>
         </div>
         <button
           id="bds-close"
@@ -293,13 +301,16 @@
   </div>
 {/if}
 
+<!-- FLOATING DROPDOWN PANEL -->
 {#if isOpen}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     bind:this={menuRef}
     class="bds-dc-panel"
+    role="presentation"
     style={dropdownStyle}
     onclick={(e) => e.stopPropagation()}
+    onkeydown={(e) => e.stopPropagation()}
   >
     <!-- HEADER -->
     <div class="bds-dc-header">
@@ -309,14 +320,14 @@
             <path d="M5.75 4.75L2.5 8L5.75 11.25M10.25 4.75L13.5 8L10.25 11.25M8.5 3.5L7.5 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </span>
-        <h3 class="ds-modal-content__title" style="font-size: 15px;">DeepCode</h3>
+        <h3 class="bds-dc-title">DeepCode</h3>
       </div>
 
       <button
         id="bds-close"
         type="button"
         class="bds-close-btn"
-        onclick={() => isOpen = false}
+        onclick={() => (isOpen = false)}
         aria-label="Close"
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -326,11 +337,11 @@
       </button>
     </div>
 
-    <!-- SETTING TOGGLE ROW (EXACT DRAWER SETTINGS PATTERN) -->
-    <div class="bds-toggle-row" style="padding: 8px 0 12px;">
-      <div style="flex: 1; min-width: 0;">
+    <!-- SETTING TOGGLE ROW -->
+    <div class="bds-toggle-row">
+      <div class="bds-toggle-row-info">
         <span class="bds-label">Codebase & Harness Integration</span>
-        <p style="font-size: 11px; color: var(--bds-text-tertiary, #8e8ea0); margin: 2px 0 0; line-height: 1.35;">
+        <p class="bds-toggle-row-desc">
           Inject codebase context & enable DeepSeek Harness local tasks.
         </p>
       </div>
@@ -346,11 +357,10 @@
     </div>
 
     <!-- PRIMARY ACTION: ADD NEW DIRECTORY -->
-    <div style="margin-bottom: 12px;">
+    <div class="bds-add-section">
       <button
         type="button"
-        class="bds-btn"
-        style="width: 100%; justify-content: center; padding: 9px 16px; font-size: 13px;"
+        class="bds-add-btn"
         onclick={handleAddMenuToggle}
         aria-expanded={showAddPopup}
       >
@@ -360,7 +370,7 @@
         <span>{t("deepCodeModal.addNewDirectory")}</span>
       </button>
       {#if actionFeedback}
-        <p style="font-size: 11px; color: var(--bds-accent, #4d6bfe); margin: 6px 0 0; text-align: center;">
+        <p class="bds-action-feedback">
           {actionFeedback}
         </p>
       {/if}
@@ -370,22 +380,18 @@
       show={showAddPopup}
       activeDirectory={activeDirectory}
       fileCount={fileCount}
-      onclose={() => showAddPopup = false}
+      onclose={() => (showAddPopup = false)}
     />
 
-    <!-- RECENT CODEBASES LIST (QUESTION PANEL / ELEVATED LIST STYLE) -->
-    <div class="bds-section-title" style="margin: 0 0 6px; font-size: 12px;">
-      <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-        <span style="font-weight: 600; color: var(--bds-text-secondary, #8e8ea0); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;">
-          Recent Codebases
-        </span>
-        {#if recentDirectories.length > 0}
-          <span style="font-size: 11px; color: var(--bds-text-tertiary, #6b6b7b);">{recentDirectories.length}</span>
-        {/if}
-      </div>
+    <!-- RECENT CODEBASES LIST -->
+    <div class="bds-section-title">
+      <span>Recent Codebases</span>
+      {#if recentDirectories.length > 0}
+        <span class="bds-section-count">{recentDirectories.length}</span>
+      {/if}
     </div>
 
-    <div class="bds-options-list" style="max-height: 190px; margin-bottom: 12px;">
+    <div class="bds-options-list">
       {#if recentDirectories && recentDirectories.length > 0}
         {#each recentDirectories as dir, idx}
           {@const isSelected = activeDirectory === dir.name || (manualPath && dir.path && manualPath.toLowerCase() === dir.path.toLowerCase())}
@@ -402,9 +408,9 @@
               {isSelected ? "✓" : idx + 1}
             </div>
 
-            <div class="bds-option-text" style="min-width: 0;">
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <span style="font-weight: 500; font-size: 13px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; color: var(--bds-text-primary);">
+            <div class="bds-option-text">
+              <div class="bds-option-name-row">
+                <span class="bds-option-name">
                   {dir.name}
                 </span>
                 {#if dir.fileCount}
@@ -427,17 +433,17 @@
           </div>
         {/each}
       {:else}
-        <div style="padding: 16px; text-align: center; font-size: 12px; color: var(--bds-text-tertiary);">
+        <div class="bds-empty-recents">
           No recent codebases yet. Link a local folder to start.
         </div>
       {/if}
     </div>
 
-    <!-- FOOTER STATUS (DRAWER TIP BAR PATTERN) -->
-    <div class="bds-tip-bar" style="margin: 0; padding-top: 6px; border-top: 1px solid var(--bds-border); justify-content: space-between;">
-      <div style="display: flex; align-items: center; gap: 6px;">
+    <!-- FOOTER STATUS -->
+    <div class="bds-dc-footer">
+      <div class="bds-dc-status">
         <span class="bds-status-dot" class:online={harnessStatus === 'enhanced'}></span>
-        <span style="font-size: 11px;">
+        <span class="bds-status-text">
           {#if harnessStatus === 'enhanced'}
             Harness Bridge Connected (Auto SSE)
           {:else}
@@ -445,7 +451,7 @@
           {/if}
         </span>
       </div>
-      <span style="font-size: 10px; color: var(--bds-text-tertiary);">v0.1.12</span>
+      <span class="bds-dc-version">v0.1.12</span>
     </div>
   </div>
 {/if}
@@ -455,7 +461,7 @@
     display: contents !important;
   }
 
-  /* ─── ONBOARDING POPUP (ADD DIRECTORY MODAL PATTERN) ─── */
+  /* ─── ONBOARDING POPUP ─── */
   .bds-onboarding-backdrop {
     position: fixed;
     inset: 0;
@@ -497,6 +503,14 @@
     align-items: center;
   }
 
+  .bds-onboarding-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--bds-text-primary, #ececec);
+  }
+
   .bds-onboarding-body {
     display: flex;
     flex-direction: column;
@@ -526,13 +540,24 @@
   .bds-onboarding-got-it {
     padding: 8px 20px;
     font-size: 13px;
+    font-weight: 600;
+    border-radius: 8px;
+    background: var(--bds-accent, #4d6bfe);
+    color: #ffffff;
+    border: none;
+    cursor: pointer;
+    transition: opacity var(--bds-transition, 0.18s ease);
   }
 
+  .bds-onboarding-got-it:hover {
+    opacity: 0.9;
+  }
+
+  /* ─── TOGGLE BUTTON (TOOLBAR) ─── */
   .bds-deep-code-toggle {
     position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
     flex: 0 0 auto;
     cursor: pointer;
     user-select: none;
@@ -549,20 +574,59 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    line-height: inherit;
+    vertical-align: middle;
   }
 
   .bds-toggle-chevron {
-    font-size: 10px;
-    opacity: 0.6;
-    margin-left: -2px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 2px;
+    opacity: 0.65;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+    line-height: 1;
+  }
+
+  .bds-toggle-chevron--open {
+    transform: rotate(180deg);
+    opacity: 1;
   }
 
   .bds-deep-code-toggle :global(svg) {
     display: block;
   }
 
-  /* ─── FLOATING DRAWER PANEL (QUESTION PANEL & DRAWER DESIGN TOKENS) ─── */
+  .bds-icon-inline {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  /* ─── CLOSE BUTTON ─── */
+  .bds-close-btn {
+    background: transparent;
+    border: none;
+    color: var(--bds-text-tertiary, #6b6b7b);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--bds-transition, 0.15s ease);
+    line-height: 1;
+  }
+
+  .bds-close-btn:hover {
+    background: var(--bds-bg-hover, rgba(255, 255, 255, 0.08));
+    color: var(--bds-text-primary, #ececec);
+  }
+
+  /* ─── FLOATING DRAWER PANEL ─── */
   .bds-dc-panel {
     position: fixed;
     width: 360px;
@@ -608,7 +672,45 @@
     align-items: center;
   }
 
-  /* ─── SWITCH (DRAWER SETTINGS STYLE) ─── */
+  .bds-dc-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--bds-text-primary, #ececec);
+  }
+
+  /* ─── TOGGLE ROW ─── */
+  .bds-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0 12px;
+    gap: 12px;
+    border-bottom: 1px solid var(--bds-border, #3a3b3f);
+  }
+
+  .bds-toggle-row-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .bds-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--bds-text-primary, #ececec);
+    line-height: 1.3;
+  }
+
+  .bds-toggle-row-desc {
+    font-size: 11px;
+    color: var(--bds-text-tertiary, #8e8ea0);
+    margin: 2px 0 0;
+    line-height: 1.35;
+  }
+
+  /* ─── SWITCH ─── */
   .bds-switch {
     position: relative;
     width: 36px;
@@ -640,15 +742,76 @@
     transform: translateX(16px);
   }
 
-  /* ─── OPTIONS / RECENTS LIST (QUESTION PANEL PATTERN) ─── */
+  /* ─── ADD DIRECTORY SECTION & BUTTON ─── */
+  .bds-add-section {
+    margin: 12px 0;
+  }
+
+  .bds-add-btn {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 8px;
+    background: var(--bds-accent, #4d6bfe);
+    color: #ffffff;
+    border: none;
+    cursor: pointer;
+    transition: all var(--bds-transition, 0.18s ease);
+    box-sizing: border-box;
+  }
+
+  .bds-add-btn:hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
+  }
+
+  .bds-add-btn svg {
+    flex-shrink: 0;
+  }
+
+  .bds-action-feedback {
+    font-size: 11px;
+    color: var(--bds-accent, #4d6bfe);
+    margin: 6px 0 0;
+    text-align: center;
+  }
+
+  /* ─── SECTION HEADER ─── */
+  .bds-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin: 0 0 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--bds-text-secondary, #8e8ea0);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .bds-section-count {
+    font-size: 11px;
+    color: var(--bds-text-tertiary, #6b6b7b);
+    font-weight: normal;
+  }
+
+  /* ─── OPTIONS / RECENTS LIST ─── */
   .bds-options-list {
     display: flex;
     flex-direction: column;
     background: var(--bds-bg-elevated, #2a2b30);
     border: 1px solid var(--bds-border, #3a3b3f);
     border-radius: var(--bds-radius, 12px);
+    max-height: 190px;
     overflow-y: auto;
     overflow-x: hidden;
+    margin-bottom: 12px;
   }
 
   .bds-options-list::-webkit-scrollbar {
@@ -708,12 +871,37 @@
     color: #ffffff;
   }
 
+  .bds-option-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .bds-option-name-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .bds-option-name {
+    font-weight: 500;
+    font-size: 13px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    color: var(--bds-text-primary, #ececec);
+  }
+
   .bds-file-badge {
     font-size: 10px;
     background: var(--bds-bg-hover, rgba(255, 255, 255, 0.08));
     color: var(--bds-text-secondary, #8e8ea0);
     padding: 1px 5px;
     border-radius: 4px;
+    flex-shrink: 0;
   }
 
   .bds-path-subtext {
@@ -733,10 +921,17 @@
     color: var(--bds-text-tertiary, #6b6b7b);
     font-size: 15px;
     cursor: pointer;
-    padding: 0 4px;
+    padding: 0;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 4px;
     transition: all 0.15s;
     line-height: 1;
+    flex-shrink: 0;
+    margin-left: auto;
   }
 
   .bds-option-item:hover .bds-remove-btn {
@@ -749,6 +944,29 @@
     background: rgba(239, 68, 68, 0.15);
   }
 
+  .bds-empty-recents {
+    padding: 16px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--bds-text-tertiary, #6b6b7b);
+  }
+
+  /* ─── FOOTER ─── */
+  .bds-dc-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid var(--bds-border, #3a3b3f);
+  }
+
+  .bds-dc-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
   .bds-status-dot {
     width: 6px;
     height: 6px;
@@ -759,6 +977,17 @@
 
   .bds-status-dot.online {
     background: #10b981;
+  }
+
+  .bds-status-text {
+    font-size: 11px;
+    color: var(--bds-text-secondary, #8e8ea0);
+    line-height: 1;
+  }
+
+  .bds-dc-version {
+    font-size: 10px;
+    color: var(--bds-text-tertiary, #6b6b7b);
   }
 
   @media (max-width: 560px) {
