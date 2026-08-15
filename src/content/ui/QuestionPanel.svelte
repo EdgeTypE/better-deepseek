@@ -32,9 +32,6 @@
       });
 
       visible = true;
-
-      // Inject directly into the prompt box
-      setTimeout(attachToPromptBox, 100);
     };
 
     const handleKeyDown = (e) => {
@@ -69,7 +66,7 @@
 
     // Keep checking if target changed or was replaced by framework
     const interval = setInterval(() => {
-      if (visible) attachToPromptBox();
+      attachToPromptBox();
     }, 500);
 
     return () => {
@@ -77,6 +74,13 @@
       window.removeEventListener("keydown", handleKeyDown);
       clearInterval(interval);
     };
+  });
+
+  // Pin the panel to the prompt box from mount onward (and re-pin before it
+  // becomes visible), so it never flashes in #bds-root at the top-right
+  // while waiting for the interval tick.
+  $effect(() => {
+    attachToPromptBox();
   });
 
   function focusOnMount(node) {
@@ -352,15 +356,15 @@
   }
 </script>
 
-{#if visible && questions.length > 0}
-  {@const q = questions[currentQuestionIndex]}
-  {@const key = q.id || `q_${currentQuestionIndex}`}
-  
-  <div
+<div
     class="bds-question-panel"
+    class:bds-question-panel--hidden={!visible || questions.length === 0}
     bind:this={panelElement}
     use:stopPanelPointerEvents
   >
+    {#if questions.length > 0}
+      {@const q = questions[currentQuestionIndex]}
+      {@const key = q.id || `q_${currentQuestionIndex}`}
     <div class="bds-question-header">
       <h3>{q.question}</h3>
       <div class="bds-header-controls">
@@ -538,10 +542,14 @@
         {/if}
       </div>
     </div>
+    {/if}
   </div>
-{/if}
 
 <style>
+  .bds-question-panel.bds-question-panel--hidden {
+    display: none;
+  }
+
   .bds-question-panel {
     position: relative;
     z-index: 99999;

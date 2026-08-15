@@ -38,15 +38,20 @@
     // Periodically re-check generation state & re-attach UI panel above prompt box
     const interval = setInterval(() => {
       isGenerating = isSystemGenerating();
-      if (queueState.items.length > 0) {
-        attachToPromptBox();
-      }
+      attachToPromptBox();
     }, 400);
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
       clearInterval(interval);
     };
+  });
+
+  // Keep the panel pinned to the prompt box from mount onward (and re-pin
+  // before it becomes visible), so it never flashes in #bds-root at the
+  // top-right while waiting for the interval tick.
+  $effect(() => {
+    attachToPromptBox();
   });
 
   function isChatInput(element) {
@@ -124,10 +129,10 @@
   }
 </script>
 
-{#if queueState.items.length > 0}
-  <div
+<div
     bind:this={panelElement}
     class="bds-question-panel bds-queue-panel"
+    class:bds-queue-panel--hidden={queueState.items.length === 0}
   >
     <!-- Header -->
     <div class="bds-question-header">
@@ -211,7 +216,6 @@
       </div>
     </div>
   </div>
-{/if}
 
 <style>
   .bds-queue-panel {
@@ -230,6 +234,10 @@
     width: 100%;
     margin-bottom: 12px;
     box-shadow: var(--bds-shadow, 0 12px 40px rgba(0, 0, 0, 0.4));
+  }
+
+  .bds-queue-panel.bds-queue-panel--hidden {
+    display: none;
   }
 
   .bds-question-header {

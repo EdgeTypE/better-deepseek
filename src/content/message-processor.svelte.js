@@ -10,7 +10,8 @@ import {
   isAbsoluteLastMessage,
   scheduleScan,
   scheduleMessageScan,
-  collectMessageNodes
+  collectMessageNodes,
+  findLatestAssistantMessageNode
 } from "./scanner.js";
 import { extractMessageRawText } from "./dom/message-text.js";
 import { injectPythonRunButtons } from "./dom/python-injector.js";
@@ -31,7 +32,7 @@ import {
   removeAllMessageHosts,
   removeMessageHost,
 } from "./dom/host.js";
-import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun, handleAutoMcpCall, handleAutoFileRead, handleAutoSearchInDirectory, handleAutoListDir } from "./auto.js";
+import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun, handleAutoMcpCall, handleAutoFileRead, handleAutoSearchInDirectory, handleAutoListDir, findChatEditor } from "./auto.js";
 import { handleManagedAutoContinuation, isManagedRunActive, trySynthesizeReport } from "./deep-research.js";
 
 import { mount, unmount } from "svelte";
@@ -82,6 +83,23 @@ export function resetMessagePricing() {
   state.pricing.sessionOutputTokens = 0;
   state.pricing.sessionTotals = { inputCost: 0, outputCost: 0, totalCost: 0 };
   document.querySelector(".bds-session-total")?.remove();
+}
+
+// Generation tracker state for isSystemGenerating()'s composer-text fallback.
+// DeepSeek hides the stop button while the composer has text, so the fallback
+// must only report "generating" when generation was recently observed, to avoid
+// treating an idle chat with a draft as generating (e.g. a response whose action
+// buttons have not mounted yet, or a stopped response).
+const GENERATING_GRACE_MS = 30_000;
+const STREAMING_IDLE_MS = 5_000;
+let lastGeneratingSeenAt = 0;
+let lastAssistantSig = null;
+let lastAssistantSigAt = 0;
+
+export function resetGeneratingTracker() {
+  lastGeneratingSeenAt = 0;
+  lastAssistantSig = null;
+  lastAssistantSigAt = 0;
 }
 
 /**
@@ -1172,6 +1190,13 @@ function dispatchDeepResearchEvents(parsed, stateData) {
 /**
  * Checks if DeepSeek is currently generating ANY response on the page.
  * Uses the presence of the 'Stop Generation' button as a global indicator.
+ *
+ * DeepSeek (Aug 2026) hides the stop button while the composer has text even
+ * during generation (the send button is shown instead). When the stop button
+ * is missing but the composer is non-empty, fall back to the message-level
+ * streaming signal — but only within a grace period after generation was
+ * actually observed, and only while the latest assistant message is still
+ * growing or lacks action buttons.
  */
 export function isSystemGenerating() {
   if (typeof document === "undefined") return false;
@@ -1183,7 +1208,46 @@ export function isSystemGenerating() {
     'div[role="button"] svg path[d*="M2 4.88"]',
   ]
   const selectorStr = (Array.isArray(selectors) ? selectors : [selectors]).join(", ")
-  return !!document.querySelector(selectorStr)
+  if (document.querySelector(selectorStr)) {
+    lastGeneratingSeenAt = Date.now()
+    return true
+  }
+
+  const editor = findChatEditor()
+  if (!editor) return false
+  const tagName = String(editor.tagName || "").toLowerCase()
+  const editorText = (tagName === "textarea" || tagName === "input") ? (editor.value || "") : (editor.textContent || "")
+  if (!editorText.trim()) return false
+
+  // The stop button is hidden while the composer has text. Only trust the
+  // message-level signal when generation was observed recently.
+  if (Date.now() - lastGeneratingSeenAt > GENERATING_GRACE_MS) return false
+
+  const latestAssistant = findLatestAssistantMessageNode()
+  if (!latestAssistant) return false
+  if (latestAssistant.querySelector(".ds-cursor") || latestAssistant.classList.contains("_streaming")) {
+    lastGeneratingSeenAt = Date.now()
+    return true
+  }
+  if (latestAssistant.querySelector('div[role="button"] svg, .ds-icon-copy, .ds-icon-regenerate, .ds-icon-share')) return false
+
+  // No action buttons yet: treat the response as streaming while its text
+  // keeps growing, and for a short idle window after the last growth. The
+  // first evaluation only records the signature (conservative) so a stale
+  // message (e.g. a stopped response) is never mistaken for active streaming.
+  const text = latestAssistant.textContent || ""
+  const sig = text.length + ":" + text.slice(-64)
+  if (lastAssistantSig === null) {
+    lastAssistantSig = sig
+    return false
+  }
+  if (sig !== lastAssistantSig) {
+    lastAssistantSig = sig
+    lastAssistantSigAt = Date.now()
+    lastGeneratingSeenAt = Date.now()
+    return true
+  }
+  return Date.now() - lastAssistantSigAt <= STREAMING_IDLE_MS
 }
 
 /**

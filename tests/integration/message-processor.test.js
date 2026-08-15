@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   scheduleScan: vi.fn(),
   scheduleMessageScan: vi.fn(),
   collectMessageNodes: vi.fn(() => []),
+  findLatestAssistantMessageNode: vi.fn(() => null),
+  findChatEditor: vi.fn(() => null),
   extractMessageRawText: vi.fn((node) => node.dataset.rawText || ""),
   injectPythonRunButtons: vi.fn(),
   injectJavaScriptRunButtons: vi.fn(),
@@ -46,6 +48,7 @@ vi.mock("../../src/content/scanner.js", () => ({
   scheduleScan: mocks.scheduleScan,
   scheduleMessageScan: mocks.scheduleMessageScan,
   collectMessageNodes: mocks.collectMessageNodes,
+  findLatestAssistantMessageNode: mocks.findLatestAssistantMessageNode,
 }));
 vi.mock("../../src/content/dom/message-text.js", async () => {
   const actual = await vi.importActual("../../src/content/dom/message-text.js");
@@ -82,6 +85,7 @@ vi.mock("../../src/content/auto.js", () => ({
   clearRunSearchHistory: mocks.clearRunSearchHistory,
   injectPureTextAndSend: mocks.injectPureTextAndSend,
   sendFileWithMessage: mocks.sendFileWithMessage,
+  findChatEditor: mocks.findChatEditor,
 }));
 vi.mock("svelte", async () => {
   const actual = await vi.importActual("svelte");
@@ -92,6 +96,8 @@ import {
   disposeMessageNode,
   processMessageNode,
   resetMessagePricing,
+  resetGeneratingTracker,
+  isSystemGenerating,
 } from "../../src/content/message-processor.svelte.js";
 
 function createMessageNode(rawText, role = "assistant") {
@@ -115,6 +121,7 @@ describe("message processor integration", () => {
   beforeEach(() => {
     resetAppState();
     resetMessagePricing();
+    resetGeneratingTracker();
     Object.values(mocks).forEach((mock) => {
       if (typeof mock?.mockReset === "function") mock.mockReset();
     });
@@ -454,6 +461,129 @@ describe("message processor integration", () => {
     });
 
     window.removeEventListener("bds:deep-research-step-done", listener);
+  });
+
+  describe("isSystemGenerating", () => {
+    function createTextarea(value) {
+      const editor = document.createElement("textarea");
+      editor.value = value || "";
+      document.body.appendChild(editor);
+      return editor;
+    }
+
+    function createAssistantMessage({ withButtons = false, withCursor = false } = {}) {
+      const node = document.createElement("div");
+      node.className = "ds-message";
+      if (withCursor) {
+        const cursor = document.createElement("div");
+        cursor.className = "ds-cursor";
+        node.appendChild(cursor);
+      }
+      if (withButtons) {
+        const button = document.createElement("div");
+        button.setAttribute("role", "button");
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        button.appendChild(svg);
+        node.appendChild(button);
+      }
+      document.body.appendChild(node);
+      return node;
+    }
+
+    function seeStopButton() {
+      const stopButton = document.createElement("div");
+      stopButton.className = "ds-icon-stop";
+      document.body.appendChild(stopButton);
+      expect(isSystemGenerating()).toBe(true);
+      stopButton.remove();
+    }
+
+    it("returns true when the stop button is visible", () => {
+      const stopButton = document.createElement("div");
+      stopButton.className = "ds-icon-stop";
+      document.body.appendChild(stopButton);
+
+      expect(isSystemGenerating()).toBe(true);
+    });
+
+    it("returns true while the composer has text and the latest assistant message keeps growing", () => {
+      seeStopButton();
+      mocks.findChatEditor.mockReturnValue(createTextarea("draft while generating"));
+      const message = createAssistantMessage();
+      mocks.findLatestAssistantMessageNode.mockReturnValue(message);
+
+      expect(isSystemGenerating()).toBe(false);
+
+      message.textContent = "streaming tokens...";
+      expect(isSystemGenerating()).toBe(true);
+    });
+
+    it("returns true when the composer has text and the latest assistant message has a streaming cursor", () => {
+      seeStopButton();
+      mocks.findChatEditor.mockReturnValue(createTextarea("hello"));
+      mocks.findLatestAssistantMessageNode.mockReturnValue(createAssistantMessage({ withCursor: true, withButtons: true }));
+
+      expect(isSystemGenerating()).toBe(true);
+    });
+
+    it("returns false when the composer has text and the latest assistant message has action buttons", () => {
+      seeStopButton();
+      mocks.findChatEditor.mockReturnValue(createTextarea("hello while idle"));
+      mocks.findLatestAssistantMessageNode.mockReturnValue(createAssistantMessage({ withButtons: true }));
+
+      expect(isSystemGenerating()).toBe(false);
+    });
+
+    it("returns false when the composer is empty and no stop button is visible", () => {
+      mocks.findChatEditor.mockReturnValue(createTextarea(""));
+
+      expect(isSystemGenerating()).toBe(false);
+    });
+
+    it("returns false when there is no composer and no stop button", () => {
+      mocks.findChatEditor.mockReturnValue(null);
+
+      expect(isSystemGenerating()).toBe(false);
+    });
+
+    it("returns false on the first evaluation of a buttonless message (conservative init)", () => {
+      seeStopButton();
+      mocks.findChatEditor.mockReturnValue(createTextarea("draft"));
+      mocks.findLatestAssistantMessageNode.mockReturnValue(createAssistantMessage());
+
+      expect(isSystemGenerating()).toBe(false);
+    });
+
+    it("returns false when the latest assistant message stopped growing past the idle window", () => {
+      seeStopButton();
+      mocks.findChatEditor.mockReturnValue(createTextarea("draft"));
+      const message = createAssistantMessage();
+      mocks.findLatestAssistantMessageNode.mockReturnValue(message);
+
+      expect(isSystemGenerating()).toBe(false);
+      message.textContent = "final token";
+      expect(isSystemGenerating()).toBe(true);
+
+      vi.advanceTimersByTime(6000);
+      expect(isSystemGenerating()).toBe(false);
+    });
+
+    it("returns false when the grace period after the last observed generation has expired", () => {
+      seeStopButton();
+      vi.advanceTimersByTime(31000);
+      mocks.findChatEditor.mockReturnValue(createTextarea("draft"));
+      mocks.findLatestAssistantMessageNode.mockReturnValue(createAssistantMessage());
+
+      expect(isSystemGenerating()).toBe(false);
+    });
+
+    it("returns false when there is no latest assistant message", () => {
+      seeStopButton();
+      mocks.findChatEditor.mockReturnValue(createTextarea("draft"));
+      mocks.findLatestAssistantMessageNode.mockReturnValue(null);
+
+      expect(isSystemGenerating()).toBe(false);
+    });
   });
 
   it("dispatches clarifying questions and stores them on state", () => {
