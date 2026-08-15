@@ -526,7 +526,7 @@ test("routes blob downloads through AndroidBridge.downloadBlob", async ({ page }
   );
   await expect(page.locator(".bds-download-card")).toContainText("hello.txt");
 
-  await page.locator(".bds-download-card .bds-btn").click({ force: true });
+  await page.locator(".bds-download-card").getByRole("button", { name: "Download" }).click({ force: true });
 
   await expect
     .poll(async () =>

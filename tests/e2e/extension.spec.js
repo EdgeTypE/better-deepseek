@@ -322,7 +322,7 @@ test("creates standalone download cards for create_file outputs", async ({ page 
   await expect(page.locator(".bds-download-card")).toContainText("notes.txt");
 
   const download = page.waitForEvent("download");
-  await page.locator(".bds-download-card .bds-btn").click();
+  await page.locator(".bds-download-card").getByRole("button", { name: "Download" }).click();
   await expect(await download).toBeTruthy();
 });
 
