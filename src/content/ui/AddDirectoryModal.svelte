@@ -36,7 +36,9 @@
       setTimeout(() => { feedback = ""; }, 3000);
     } catch (err) {
       if (err.name !== "AbortError") {
-        feedback = err.message || "Failed to pick folder";
+        feedback = err.message === "File System Access API is not supported on this browser context."
+          ? t("deepCodeModal.fsApiUnsupported")
+          : (err.message || t("deepCodeModal.selectFailed"));
       }
     } finally {
       loading = false;

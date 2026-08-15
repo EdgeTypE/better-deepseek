@@ -6,6 +6,7 @@
     selectRecentDirectory,
     removeRecentDirectory,
   } from "../deep-code.js";
+  import { t } from "../../lib/i18n.svelte.js";
 
   let { show = false, activeDirectory = null, fileCount = 0, onclose = null } = $props();
 
@@ -41,11 +42,11 @@
     loading = true;
     try {
       const res = await pickAndLinkDeepCodeDirectory();
-      feedback = `Linked "${res.rootName}" (${res.fileCount} files indexed)`;
+      feedback = t("deepCodeModal.linkedFeedback", { name: res.rootName, count: res.fileCount });
       setTimeout(() => { feedback = ""; }, 3500);
     } catch (err) {
       if (err.name !== "AbortError") {
-        feedback = err.message || "Failed to select directory.";
+        feedback = err.message || t("deepCodeModal.selectFailed");
       }
     } finally {
       loading = false;
@@ -54,7 +55,7 @@
 
   async function handleSelectRecent(entry) {
     await selectRecentDirectory(entry);
-    feedback = `Switched to "${entry.name}"`;
+    feedback = t("deepCodeModal.switchedFeedback", { name: entry.name });
     setTimeout(() => { feedback = ""; }, 2500);
   }
 
@@ -83,8 +84,8 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <div class="bds-dc-modal" onclick={(e) => e.stopPropagation()}>
       <div class="bds-drawer-header">
-        <div class="ds-modal-content__title">DeepCode & Harness</div>
-        <button id="bds-close" type="button" onclick={onclose} aria-label="Close">
+        <div class="ds-modal-content__title">{t("deepCodeModal.title")}</div>
+        <button id="bds-close" type="button" onclick={onclose} aria-label={t("deepCodeModal.closeAria")}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M14.1871 13.1265L13.1265 14.1872L1.81275 2.87347L2.87341 1.81281L14.1871 13.1265Z" fill="currentColor"></path>
             <path d="M13.1265 1.81282L14.1871 2.87348L2.8734 14.1872L1.81274 13.1265L13.1265 1.81282Z" fill="currentColor"></path>
@@ -94,7 +95,7 @@
 
       <div class="bds-drawer-body">
         <p class="bds-dc-subtitle">
-          Link a local codebase to empower DeepSeek with file inspection, code search, and automated Harness task execution.
+          {t("deepCodeModal.subtitle")}
         </p>
 
         {#if activeDirectory || manualPath}
@@ -102,9 +103,9 @@
             <div style="flex: 1; min-width: 0;">
               <div style="display: flex; align-items: center; gap: 6px;">
                 <span class="bds-active-dot"></span>
-                <strong style="font-size: 13px; color: var(--bds-text-primary);">{activeDirectory || "Active Codebase"}</strong>
+                <strong style="font-size: 13px; color: var(--bds-text-primary);">{activeDirectory || t("deepCodeModal.activeCodebase")}</strong>
                 {#if fileCount > 0}
-                  <span class="bds-count-badge">{fileCount} files indexed</span>
+                  <span class="bds-count-badge">{t("deepCodeModal.filesIndexed", { count: fileCount })}</span>
                 {/if}
               </div>
               {#if manualPath}
@@ -124,7 +125,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
           </svg>
-          <span>{loading ? "Indexing Files..." : "Link Local Folder..."}</span>
+          <span>{loading ? t("deepCodeModal.indexing") : t("deepCodeModal.linkFolder")}</span>
         </button>
 
         {#if feedback}
@@ -135,7 +136,7 @@
 
         <div class="bds-section-title">
           <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-            <span>Recent Codebases</span>
+            <span>{t("deepCodeModal.recentTitle")}</span>
             {#if recentDirectories.length > 0}
               <span style="font-size: 11px; color: var(--bds-text-tertiary);">{recentDirectories.length}</span>
             {/if}
@@ -174,7 +175,7 @@
                 <button
                   type="button"
                   class="bds-item-remove-btn"
-                  title="Remove from history"
+                  title={t("deepCodeModal.removeHistory")}
                   onclick={(e) => handleRemoveRecent(dir, e)}
                 >
                   ×
@@ -182,14 +183,14 @@
               </div>
             {/each}
           {:else}
-            <p class="bds-empty" style="font-size: 11px; padding: 16px 0;">No recent directories. Click above to link a local folder.</p>
+            <p class="bds-empty" style="font-size: 11px; padding: 16px 0;">{t("deepCodeModal.emptyRecent")}</p>
           {/if}
         </div>
       </div>
 
       <div class="bds-drawer-bottom" style="display: flex; justify-content: flex-end;">
         <button type="button" class="bds-btn-outlined" style="font-size: 12px; padding: 5px 14px;" onclick={onclose}>
-          Done
+          {t("deepCodeModal.done")}
         </button>
       </div>
     </div>

@@ -562,6 +562,8 @@
       "done": "完成",
       "closeAria": "关闭",
       "linkedFeedback": "已连接 \"{{name}}\"（已索引 {{count}} 个文件）",
+      "selectFailed": "无法选择目录。",
+      "fsApiUnsupported": "此浏览器环境不支持文件系统访问 API。",
       "switchedFeedback": "已切换到 \"{{name}}\"",
       "recentNeedsPicker": "\"{{name}}\" 没有关联的文件访问权限。请使用文件夹选择器重新选择它，以启用文件读取。",
       "cancel": "取消"
@@ -574,6 +576,25 @@
       "pluginInfo": "要将 Better DeepSeek 连接到 DeepSeek Harness，需要一个 <strong>插件</strong>。如果已安装插件，一切都会完全自动进行。如果未安装，则需要手动操作。",
       "gotIt": "明白了",
       "closeAria": "关闭"
+    },
+    "deepCodeToggle": {
+      "label": "DeepCode",
+      "labelActive": "DeepCode：已启用",
+      "labelWithDir": "DeepCode：{{dir}}",
+      "ariaLabel": "DeepCode：本地代码库和 Harness",
+      "titleActive": "DeepCode 已启用：{{path}}",
+      "titleDefault": "DeepCode：本地代码库和 Harness 工作区",
+      "panelTitle": "DeepCode",
+      "closeAria": "关闭",
+      "integrationTitle": "代码库和 Harness 集成",
+      "integrationDesc": "注入代码库上下文并启用 DeepSeek Harness 本地任务。",
+      "enableToggle": "启用 DeepCode",
+      "disableToggle": "禁用 DeepCode",
+      "recentTitle": "最近的代码库",
+      "removeHistory": "从历史记录中移除",
+      "emptyRecents": "还没有最近的代码库。链接一个本地文件夹即可开始。",
+      "statusEnhanced": "Harness Bridge 已连接（自动 SSE）",
+      "statusFallback": "Harness 回退模式"
     },
     "downloadCard": {
       "download": "下载"

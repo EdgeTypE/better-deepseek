@@ -42,11 +42,11 @@
   });
 
   let displayLabel = $derived.by(() => {
-    if (!localEnabled) return "DeepCode";
+    if (!localEnabled) return t("deepCodeToggle.label");
     const dir = activeDirectory || (manualPath ? manualPath.split(/[/\\]/).filter(Boolean).pop() : "");
-    if (!dir) return "DeepCode: Active";
+    if (!dir) return t("deepCodeToggle.labelActive");
     const cleanDir = dir.length > 18 ? dir.slice(0, 16) + "…" : dir;
-    return `DeepCode: ${cleanDir}`;
+    return t("deepCodeToggle.labelWithDir", { dir: cleanDir });
   });
 
   async function checkHarnessStatus() {
@@ -188,7 +188,7 @@
   tabindex="0"
   aria-pressed={localEnabled}
   aria-expanded={isOpen}
-  aria-label="DeepCode: Local Codebase & Harness"
+  aria-label={t("deepCodeToggle.ariaLabel")}
   class="bds-deep-code-toggle f79352dc ds-toggle-button ds-toggle-button--m"
   class:ds-toggle-button--selected={localEnabled}
   class:bds-deep-code-toggle--selected={localEnabled}
@@ -196,7 +196,7 @@
   onclick={handleButtonClick}
   onkeydown={(e) => (e.key === "Enter" || e.key === " ") && handleButtonClick(e)}
   data-testid="deep-code-toggle"
-  title={manualPath ? `DeepCode Active: ${manualPath}` : "DeepCode: Local Codebase & Harness Workspace"}
+  title={manualPath ? t("deepCodeToggle.titleActive", { path: manualPath }) : t("deepCodeToggle.titleDefault")}
 >
   <div class="ds-toggle-button__icon">
     <div class="ds-icon" style="font-size: inherit;">
@@ -320,7 +320,7 @@
             <path d="M5.75 4.75L2.5 8L5.75 11.25M10.25 4.75L13.5 8L10.25 11.25M8.5 3.5L7.5 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </span>
-        <h3 class="bds-dc-title">DeepCode</h3>
+        <h3 class="bds-dc-title">{t("deepCodeToggle.panelTitle")}</h3>
       </div>
 
       <button
@@ -328,7 +328,7 @@
         type="button"
         class="bds-close-btn"
         onclick={() => (isOpen = false)}
-        aria-label="Close"
+        aria-label={t("deepCodeToggle.closeAria")}
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M14.1871 13.1265L13.1265 14.1872L1.81275 2.87347L2.87341 1.81281L14.1871 13.1265Z" fill="currentColor"></path>
@@ -340,9 +340,9 @@
     <!-- SETTING TOGGLE ROW -->
     <div class="bds-toggle-row">
       <div class="bds-toggle-row-info">
-        <span class="bds-label">Codebase & Harness Integration</span>
+        <span class="bds-label">{t("deepCodeToggle.integrationTitle")}</span>
         <p class="bds-toggle-row-desc">
-          Inject codebase context & enable DeepSeek Harness local tasks.
+          {t("deepCodeToggle.integrationDesc")}
         </p>
       </div>
       <button
@@ -350,7 +350,7 @@
         class="bds-switch"
         class:bds-switch--on={localEnabled}
         onclick={handleToggleSwitch}
-        title={localEnabled ? "Disable DeepCode" : "Enable DeepCode"}
+        title={localEnabled ? t("deepCodeToggle.disableToggle") : t("deepCodeToggle.enableToggle")}
       >
         <span class="bds-switch-handle"></span>
       </button>
@@ -385,7 +385,7 @@
 
     <!-- RECENT CODEBASES LIST -->
     <div class="bds-section-title">
-      <span>Recent Codebases</span>
+      <span>{t("deepCodeToggle.recentTitle")}</span>
       {#if recentDirectories.length > 0}
         <span class="bds-section-count">{recentDirectories.length}</span>
       {/if}
@@ -425,7 +425,7 @@
             <button
               type="button"
               class="bds-remove-btn"
-              title="Remove from history"
+              title={t("deepCodeToggle.removeHistory")}
               onclick={(e) => handleRemoveRecent(dir, e)}
             >
               ×
@@ -434,7 +434,7 @@
         {/each}
       {:else}
         <div class="bds-empty-recents">
-          No recent codebases yet. Link a local folder to start.
+          {t("deepCodeToggle.emptyRecents")}
         </div>
       {/if}
     </div>
@@ -445,9 +445,9 @@
         <span class="bds-status-dot" class:online={harnessStatus === 'enhanced'}></span>
         <span class="bds-status-text">
           {#if harnessStatus === 'enhanced'}
-            Harness Bridge Connected (Auto SSE)
+            {t("deepCodeToggle.statusEnhanced")}
           {:else}
-            Harness Fallback Mode
+            {t("deepCodeToggle.statusFallback")}
           {/if}
         </span>
       </div>

@@ -563,6 +563,8 @@
       "done": "Готово",
       "closeAria": "Закрыть",
       "linkedFeedback": "Подключено: \"{{name}}\" ({{count}} файлов проиндексировано)",
+      "selectFailed": "Не удалось выбрать каталог.",
+      "fsApiUnsupported": "API File System Access не поддерживается в этом контексте браузера.",
       "switchedFeedback": "Переключено на \"{{name}}\"",
       "recentNeedsPicker": "Для \"{{name}}\" нет связанного доступа к файлам. Выберите его с помощью средства выбора папок, чтобы включить чтение файлов.",
       "cancel": "Отмена"
@@ -575,6 +577,25 @@
       "pluginInfo": "Для подключения Better DeepSeek к DeepSeek Harness требуется <strong>плагин</strong>. Если плагин установлен, всё происходит полностью автоматически. Если он не установлен, потребуются ручные действия.",
       "gotIt": "Понятно",
       "closeAria": "Закрыть"
+    },
+    "deepCodeToggle": {
+      "label": "DeepCode",
+      "labelActive": "DeepCode: Активен",
+      "labelWithDir": "DeepCode: {{dir}}",
+      "ariaLabel": "DeepCode: локальная кодовая база и Harness",
+      "titleActive": "DeepCode активен: {{path}}",
+      "titleDefault": "DeepCode: локальная кодовая база и рабочая область Harness",
+      "panelTitle": "DeepCode",
+      "closeAria": "Закрыть",
+      "integrationTitle": "Интеграция кодовой базы и Harness",
+      "integrationDesc": "Внедряйте контекст кодовой базы и включайте локальные задачи DeepSeek Harness.",
+      "enableToggle": "Включить DeepCode",
+      "disableToggle": "Отключить DeepCode",
+      "recentTitle": "Недавние кодовые базы",
+      "removeHistory": "Удалить из истории",
+      "emptyRecents": "Недавних кодовых баз пока нет. Подключите локальную папку, чтобы начать.",
+      "statusEnhanced": "Bridge Harness подключён (авто SSE)",
+      "statusFallback": "Резервный режим Harness"
     },
     "downloadCard": {
       "download": "Скачать"

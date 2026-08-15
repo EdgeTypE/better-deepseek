@@ -563,6 +563,8 @@
       "done": "Bitti",
       "closeAria": "Kapat",
       "linkedFeedback": "\"{{name}}\" bağlandı ({{count}} dosya dizinlendi)",
+      "selectFailed": "Dizin seçilemedi.",
+      "fsApiUnsupported": "Dosya Sistemi Erişim API'si bu tarayıcı bağlamında desteklenmiyor.",
       "switchedFeedback": "\"{{name}}\" klasörüne geçildi",
       "recentNeedsPicker": "\"{{name}}\" için bağlı dosya erişimi yok. Dosya okumalarını etkinleştirmek için klasör seçiciyle tekrar seçin.",
       "cancel": "İptal"
@@ -575,6 +577,25 @@
       "pluginInfo": "Better DeepSeek'in DeepSeek Harness'a bağlanabilmesi için bir <strong>eklenti</strong> gerekir. Eklenti yüklüyse her şey tamamen otomatik gerçekleşir. Yüklü değilse manuel adımlar uygulamanız gerekir.",
       "gotIt": "Anladım",
       "closeAria": "Kapat"
+    },
+    "deepCodeToggle": {
+      "label": "DeepCode",
+      "labelActive": "DeepCode: Aktif",
+      "labelWithDir": "DeepCode: {{dir}}",
+      "ariaLabel": "DeepCode: Yerel Kod Tabanı ve Harness",
+      "titleActive": "DeepCode Aktif: {{path}}",
+      "titleDefault": "DeepCode: Yerel Kod Tabanı ve Harness Çalışma Alanı",
+      "panelTitle": "DeepCode",
+      "closeAria": "Kapat",
+      "integrationTitle": "Kod Tabanı ve Harness Entegrasyonu",
+      "integrationDesc": "Kod tabanı bağlamını ekle ve DeepSeek Harness yerel görevlerini etkinleştir.",
+      "enableToggle": "DeepCode'u Etkinleştir",
+      "disableToggle": "DeepCode'u Devre Dışı Bırak",
+      "recentTitle": "Son Kod Tabanları",
+      "removeHistory": "Geçmişten kaldır",
+      "emptyRecents": "Henüz son kod tabanı yok. Başlamak için yerel bir klasör bağlayın.",
+      "statusEnhanced": "Harness Bridge Bağlı (Otomatik SSE)",
+      "statusFallback": "Harness Yedek Modu"
     },
     "downloadCard": {
       "download": "İndir"
