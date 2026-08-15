@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-27T00:00:00Z",
+  "updatedAt": "2026-08-15T00:00:00Z",
   "messages": {
     "common": {
       "save": "Сохранить",
@@ -932,6 +932,23 @@
       "seeAllChanges": "Посмотреть все изменения в v{{version}} на GitHub",
       "seeDetailed": "Посмотреть подробные примечания к выпуску на GitHub",
       "features": {
+        "v0_1_12": {
+          "title": "DeepCode, очередь сообщений и стабильность",
+          "features": {
+            "feat_0": {
+              "title": "DeepCode (Экспериментально)",
+              "description": "Режим совместной разработки с DeepSeek Harness. Планируйте задачи и отправляйте их напрямую в Harness с помощью плагина <a href='https://github.com/EdgeTypE/dsh-better-deepseek' target='_blank' style='color: #4d6bfe; text-decoration: underline;'>dsh-better-deepseek</a>."
+            },
+            "feat_1": {
+              "title": "Очередь сообщений (Queued Prompts)",
+              "description": "Отправляйте сообщения во время генерации ответа; BDS поставит их в очередь и отправит автоматически по завершении."
+            },
+            "feat_2": {
+              "title": "Улучшения стабильности и интерфейса",
+              "description": "Исправления парсера для обновленного интерфейса DeepSeek, экспорт навыков/персон и исправление ошибок."
+            }
+          }
+        },
         "v0_1_11": {
           "title": "MCP Серверы, динамические таблицы и стабильность",
           "features": {
@@ -1290,7 +1307,18 @@
       "addToQueue": "Добавить в очередь",
       "enterToQueueTip": "ИИ генерирует ответ. Нажмите Enter, чтобы добавить в очередь.",
       "moveUp": "Переместить вверх",
-      "moveDown": "Переместить вниз"
+      "moveDown": "Переместить вниз",
+      "itemCount.one": "{{count}} элемент",
+      "itemCount.other": "{{count}} элементов"
+    },
+    "deepResearchRevision": {
+      "title": "Запросить изменения плана",
+      "run": "Запуск: {{id}}",
+      "closeAria": "Закрыть ревизию Deep Research",
+      "placeholder": "Опишите, что должно измениться в исследовательском плане...",
+      "cancel": "Отмена",
+      "submit": "Отправить отзыв",
+      "cancelledToast": "Ревизия Deep Research отменена."
     },
     "tableInjector": {
       "columnOptions": "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u0442\u043E\u043B\u0431\u0446\u0430",

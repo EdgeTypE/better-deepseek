@@ -1,6 +1,7 @@
 <script>
   import { onMount, tick } from "svelte";
   import appState from "../state.js";
+  import { t } from "../../lib/i18n.svelte.js";
 
   let visible = $state(false);
   let runId = $state("");
@@ -117,7 +118,7 @@
     visible = false;
     feedbackText = "";
     if (appState.ui?.showToast) {
-      appState.ui.showToast("Deep Research revision cancelled.");
+      appState.ui.showToast(t("deepResearchRevision.cancelledToast"));
     }
   }
 
@@ -151,17 +152,17 @@
   >
     <div class="bds-dr-revision-header">
       <div>
-        <div class="bds-dr-revision-title">Request Plan Changes</div>
+        <div class="bds-dr-revision-title">{t("deepResearchRevision.title")}</div>
         {#if runId}
-          <div class="bds-dr-revision-run">Run: {runId.slice(0, 8)}</div>
+          <div class="bds-dr-revision-run">{t("deepResearchRevision.run", { id: runId.slice(0, 8) })}</div>
         {/if}
       </div>
-      <button type="button" class="bds-dr-revision-close" onclick={dismiss} aria-label="Close Deep Research revision">&times;</button>
+      <button type="button" class="bds-dr-revision-close" onclick={dismiss} aria-label={t("deepResearchRevision.closeAria")}>&times;</button>
     </div>
 
     <textarea
       class="bds-dr-revision-input"
-      placeholder="Describe what should change in the research plan..."
+      placeholder={t("deepResearchRevision.placeholder")}
       bind:value={feedbackText}
       onpointerdown={handleFeedbackPointerDown}
       onmousedown={stopNativeEvent}
@@ -173,10 +174,10 @@
 
     <div class="bds-dr-revision-actions">
       <button type="button" class="bds-dr-revision-btn" onclick={dismiss}>
-        Cancel
+        {t("deepResearchRevision.cancel")}
       </button>
       <button type="button" class="bds-dr-revision-btn bds-dr-revision-submit" onclick={submitFeedback} data-testid="deep-research-revision-submit">
-        Submit Feedback
+        {t("deepResearchRevision.submit")}
       </button>
     </div>
   </div>

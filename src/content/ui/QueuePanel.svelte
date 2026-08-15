@@ -136,22 +136,22 @@
   >
     <!-- Header -->
     <div class="bds-question-header">
-      <h3>{t("queue.title", "Queued Messages")}</h3>
+      <h3>{t("queue.title")}</h3>
       <div class="bds-header-controls">
         <span class="bds-pagination">
           {#if isGenerating}
-            {t("queue.waitingForAI", "Waiting for AI...")}
+            {t("queue.waitingForAI")}
           {:else if queueState.isAutoSending}
-            {t("queue.sendingNext", "Sending next...")}
+            {t("queue.sendingNext")}
           {:else}
-            {queueState.items.length} {queueState.items.length === 1 ? 'item' : 'items'}
+            {t(queueState.items.length === 1 ? "queue.itemCount.one" : "queue.itemCount.other", { count: queueState.items.length })}
           {/if}
         </span>
         <button
           type="button"
           class="bds-close-btn"
           onclick={clearQueue}
-          title={t("queue.clearAll", "Clear All")}
+          title={t("queue.clearAll")}
         >
           ×
         </button>
@@ -171,7 +171,7 @@
                   type="button"
                   class="bds-tool-btn"
                   onclick={() => reorderQueue(index, index - 1)}
-                  title={t("queue.moveUp", "Move up")}
+                  title={t("queue.moveUp")}
                 >
                   ↑
                 </button>
@@ -181,7 +181,7 @@
                   type="button"
                   class="bds-tool-btn"
                   onclick={() => reorderQueue(index, index + 1)}
-                  title={t("queue.moveDown", "Move down")}
+                  title={t("queue.moveDown")}
                 >
                   ↓
                 </button>
@@ -190,7 +190,7 @@
                 type="button"
                 class="bds-tool-btn danger"
                 onclick={() => removeFromQueue(item.id)}
-                title={t("common.delete", "Delete")}
+                title={t("common.delete")}
               >
                 ✕
               </button>
@@ -203,7 +203,7 @@
     <!-- Footer -->
     <div class="bds-question-footer">
       <div class="bds-keyboard-hints">
-        <span>💡 Enter: {t("queue.enterToQueueTip", "Queue prompt")}</span>
+        <span>💡 Enter: {t("queue.enterToQueueTip")}</span>
       </div>
       <div class="bds-footer-actions">
         <button
@@ -211,7 +211,7 @@
           class="bds-action-btn bds-submit-btn"
           onclick={clearQueue}
         >
-          {t("queue.clearAll", "Clear All")}
+          {t("queue.clearAll")}
         </button>
       </div>
     </div>

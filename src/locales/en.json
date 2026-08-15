@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-27T00:00:00Z",
+  "updatedAt": "2026-08-15T00:00:00Z",
   "messages": {
     "common": {
       "save": "Save",
@@ -935,6 +935,23 @@
       "seeAllChanges": "See all changes in v{{version}} on GitHub",
       "seeDetailed": "See detailed release notes on GitHub",
       "features": {
+        "v0_1_12": {
+          "title": "DeepCode, Queued Prompts & Stability",
+          "features": {
+            "feat_0": {
+              "title": "DeepCode (Experimental)",
+              "description": "Collaborative coding mode powered by DeepSeek Harness. Plan tasks in DeepSeek and send them directly to Harness using the <a href='https://github.com/EdgeTypE/dsh-better-deepseek' target='_blank' style='color: #4d6bfe; text-decoration: underline;'>dsh-better-deepseek</a> plugin."
+            },
+            "feat_1": {
+              "title": "Queued Prompts",
+              "description": "Send messages while DeepSeek is generating responses. BDS queues them and submits them automatically once generation completes."
+            },
+            "feat_2": {
+              "title": "Stability & UX Improvements",
+              "description": "Tool parser fixes for DeepSeek UI updates, export support for created skills/personas, legacy card cleanup, and Android search improvements."
+            }
+          }
+        },
         "v0_1_11": {
           "title": "MCP Servers, Dynamic Tables & Stability",
           "features": {
@@ -1293,7 +1310,18 @@
       "addToQueue": "Add to Queue",
       "enterToQueueTip": "AI is generating. Press Enter to queue your prompt.",
       "moveUp": "Move up",
-      "moveDown": "Move down"
+      "moveDown": "Move down",
+      "itemCount.one": "{{count}} item",
+      "itemCount.other": "{{count}} items"
+    },
+    "deepResearchRevision": {
+      "title": "Request Plan Changes",
+      "run": "Run: {{id}}",
+      "closeAria": "Close Deep Research revision",
+      "placeholder": "Describe what should change in the research plan...",
+      "cancel": "Cancel",
+      "submit": "Submit Feedback",
+      "cancelledToast": "Deep Research revision cancelled."
     },
     "tableInjector": {
       "columnOptions": "Column options",

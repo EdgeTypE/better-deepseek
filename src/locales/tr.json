@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-27T00:00:00Z",
+  "updatedAt": "2026-08-15T00:00:00Z",
   "messages": {
     "common": {
       "save": "Kaydet",
@@ -932,6 +932,23 @@
       "seeAllChanges": "v{{version}} sürümündeki tüm değişiklikleri GitHub'da gör",
       "seeDetailed": "Detaylı sürüm notlarını GitHub'da gör",
       "features": {
+        "v0_1_12": {
+          "title": "DeepCode, Mesaj Kuyruğu ve Kararlılık",
+          "features": {
+            "feat_0": {
+              "title": "DeepCode (Deneysel)",
+              "description": "DeepSeek Harness ile birlikte çalışan kodlama modu. Görevleri planlayın ve <a href='https://github.com/EdgeTypE/dsh-better-deepseek' target='_blank' style='color: #4d6bfe; text-decoration: underline;'>dsh-better-deepseek</a> eklentisiyle doğrudan Harness'a gönderin."
+            },
+            "feat_1": {
+              "title": "Kuyruğa Alınan İstekler (Queued Prompts)",
+              "description": "DeepSeek yanıt üretirken mesaj gönderdiğinizde, BDS mesajı kuyruğa alır ve yanıt bittiğinde otomatik olarak gönderir."
+            },
+            "feat_2": {
+              "title": "Kararlılık ve UX İyileştirmeleri",
+              "description": "DeepSeek arayüz güncellemelerine uyumlu parser düzeltmeleri, persona/skill indirme desteği ve çeşitli hata düzeltmeleri."
+            }
+          }
+        },
         "v0_1_11": {
           "title": "MCP Sunucular\u0131, Dinamik Tablolar ve Kararl\u0131l\u0131k",
           "features": {
@@ -1290,7 +1307,18 @@
       "addToQueue": "Kuyruğa Ekle",
       "enterToQueueTip": "Yapay zeka yanıt üretiyor. Prompt'u kuyruğa eklemek için Enter'a bas.",
       "moveUp": "Yukarı taşı",
-      "moveDown": "Aşağı taşı"
+      "moveDown": "Aşağı taşı",
+      "itemCount.one": "{{count}} öğe",
+      "itemCount.other": "{{count}} öğe"
+    },
+    "deepResearchRevision": {
+      "title": "Plan Değişiklikleri İste",
+      "run": "Çalıştırma: {{id}}",
+      "closeAria": "Deep Research revizyonunu kapat",
+      "placeholder": "Araştırma planında neyin değişmesi gerektiğini açıkla...",
+      "cancel": "İptal",
+      "submit": "Geri Bildirim Gönder",
+      "cancelledToast": "Deep Research revizyonu iptal edildi."
     },
     "tableInjector": {
       "columnOptions": "S\u00FCtun se\u00E7enekleri",

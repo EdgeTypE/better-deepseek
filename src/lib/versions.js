@@ -1,5 +1,27 @@
 export const VERSION_HISTORY = [
   {
+    version: "0.1.12",
+    date: "2026-08-15",
+    title: "DeepCode, Queued Prompts & Stability",
+    features: [
+      {
+        type: "developer",
+        title: "DeepCode (Experimental)",
+        description: "Collaborative coding mode powered by DeepSeek Harness. Plan tasks in DeepSeek and send them directly to Harness using the <a href='https://github.com/EdgeTypE/dsh-better-deepseek' target='_blank' style='color: #4d6bfe; text-decoration: underline;'>dsh-better-deepseek</a> plugin."
+      },
+      {
+        type: "feature",
+        title: "Queued Prompts",
+        description: "Send messages while DeepSeek is generating responses. BDS queues them and submits them automatically once generation completes."
+      },
+      {
+        type: "bugfix",
+        title: "Stability & UX Improvements",
+        description: "Tool parser fixes for DeepSeek UI updates, export support for created skills/personas, legacy card cleanup, and Android search improvements."
+      }
+    ]
+  },
+  {
     version: "0.1.11",
     date: "2026-07-27",
     title: "MCP Servers, Dynamic Tables & Stability",

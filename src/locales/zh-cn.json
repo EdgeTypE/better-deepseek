@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-07-27T00:00:00Z",
+  "updatedAt": "2026-08-15T00:00:00Z",
   "messages": {
     "common": {
       "save": "保存",
@@ -931,6 +931,23 @@
       "seeAllChanges": "在 GitHub 上查看 v{{version}} 的全部变更",
       "seeDetailed": "在 GitHub 上查看详细发布说明",
       "features": {
+        "v0_1_12": {
+          "title": "DeepCode、消息队列与稳定性",
+          "features": {
+            "feat_0": {
+              "title": "DeepCode（实验性）",
+              "description": "与 DeepSeek Harness 协作的代码模式。在 DeepSeek 中规划任务并通过 <a href='https://github.com/EdgeTypE/dsh-better-deepseek' target='_blank' style='color: #4d6bfe; text-decoration: underline;'>dsh-better-deepseek</a> 插件直接发送至 Harness。"
+            },
+            "feat_1": {
+              "title": "提示词排队（Queued Prompts）",
+              "description": "在 DeepSeek 生成内容时发送消息，BDS 将自动排队并在生成完成后立即发送。"
+            },
+            "feat_2": {
+              "title": "稳定性与体验优化",
+              "description": "修复 DeepSeek 界面更新引起的解析器问题，支持下载已创建的技能/角色，以及多项稳定性改进。"
+            }
+          }
+        },
         "v0_1_11": {
           "title": "MCP \u670D\u52A1\u5668\u3001\u52A8\u6001\u8868\u683C\u4E0E\u7A33\u5B9A\u6027\u6539\u8FDB",
           "features": {
@@ -1289,7 +1306,18 @@
       "addToQueue": "加入队列",
       "enterToQueueTip": "AI 正在生成，按 Enter 将提示词加入队列。",
       "moveUp": "上移",
-      "moveDown": "下移"
+      "moveDown": "下移",
+      "itemCount.one": "{{count}} 条消息",
+      "itemCount.other": "{{count}} 条消息"
+    },
+    "deepResearchRevision": {
+      "title": "请求修改计划",
+      "run": "运行：{{id}}",
+      "closeAria": "关闭 Deep Research 修订",
+      "placeholder": "描述研究计划中需要更改的内容...",
+      "cancel": "取消",
+      "submit": "提交反馈",
+      "cancelledToast": "Deep Research 修订已取消。"
     },
     "tableInjector": {
       "columnOptions": "\u5217\u9009\u9879",

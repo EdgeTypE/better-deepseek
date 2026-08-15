@@ -6,6 +6,7 @@ import state from "./state.js";
 import { STORAGE_KEYS } from "../lib/constants.js";
 import { getLinkedDirectoryInfo, getDirectoryFiles, getDirectoryPaths, linkDirectory, adoptDirectoryHandle, supportsLocalDirectoryLinking, SKIP_DIRS } from "../lib/local-directory-source.js";
 import { devLog } from "../lib/dev-log.js";
+import { t } from "../lib/i18n.svelte.js";
 
 const RECENT_DIRS_KEY = "bds_deepcode_recent_dirs";
 const PATH_CACHE_KEY = "bds_deepcode_path_cache";
@@ -56,7 +57,7 @@ export async function pickAndLinkDeepCodeDirectory() {
  */
 export async function pickDeepCodeDirectory() {
   if (!supportsLocalDirectoryLinking()) {
-    throw new Error("File System Access API is not supported on this browser context.");
+    throw new Error(t("deepCodeModal.fsApiUnsupported"));
   }
   const res = await linkDirectory(PENDING_PROJECT_ID);
   
