@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, tick } from "svelte";
   import appState from "../state.js";
   import { getCachedPathForFolder, setPendingHarnessReport } from "../deep-code.js";
   import { BetterDeepSeekHarnessBridge, runFallbackMode } from "../../lib/harness-bridge.js";
@@ -26,6 +26,7 @@
   let errorMessage = $state("");
   let debugInfo = $state(null);
   let showDebug = $state(false);
+  let cardEl = $state(null);
 
   let pluginActive = $state(false);
   let pluginVersion = $state("");
@@ -136,7 +137,14 @@
       }
     } else {
       // ──── MOD B: Hafif Çözüm Modu (Fallback) ────
+      // Grow the card FIRST and let DeepSeek's layout re-measure before the
+      // new tab opens: window.open steals focus and can freeze the scroll
+      // container's measurement while the card is still growing, which makes
+      // the card's bottom unreachable. (Same effect as toggling the Thinking
+      // block, which the user confirmed fixes the layout.)
       status = "fallback";
+      await tick();
+      cardEl?.scrollIntoView({ block: "end" });
       await runFallbackMode(taskPrompt);
     }
   }
@@ -202,7 +210,7 @@
   }
 </script>
 
-<div class="bds-harness-card">
+<div class="bds-harness-card" bind:this={cardEl}>
   <div class="bds-harness-header">
     <div class="bds-harness-title">
       <span class="bds-harness-icon">
@@ -624,6 +632,9 @@
     border: 1px solid rgba(245, 158, 11, 0.3);
     border-radius: var(--bds-radius);
     padding: 12px;
+    /* Never let the manual-run section push the card past the viewport. */
+    max-height: min(55vh, 440px);
+    overflow-y: auto;
   }
   .bds-fallback-title {
     display: flex;

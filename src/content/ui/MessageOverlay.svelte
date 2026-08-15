@@ -821,6 +821,7 @@
     min-width: 0;
     overflow: hidden;
     box-sizing: border-box;
+    flex-shrink: 0;
   }
 
   .bds-sanitized-text {

@@ -885,6 +885,11 @@ textarea.bds-input,
   min-width: 0;
   overflow: hidden;
   box-sizing: border-box;
+  /* Never let DeepSeek's flex-based message list shrink/clip BDS content:
+     shrunk items with overflow:hidden no longer contribute to the scroll
+     height, which makes the card's bottom unreachable. */
+  flex-shrink: 0;
+  flex-grow: 0;
 }
 
 .bds-tool-host,
