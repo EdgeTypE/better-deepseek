@@ -1,5 +1,6 @@
 import { devLog } from "../../lib/dev-log.js";
 import { extractHttpUrl } from "../../lib/utils/url-normalizer.js";
+import { stripAutoLinkArtifacts } from "./link-artifacts.js";
 
 /**
  * Parse tag attributes from a string like: fileName="test.py" content="..."
@@ -42,8 +43,23 @@ export function parseTagAttributes(rawAttrs) {
 
     keyRegex.lastIndex = i;
 
-    if (key === "fileName") {
-      attrs.fileName = value;
+    if (
+      key === "fileName" ||
+      key === "filename" ||
+      key === "path" ||
+      key === "dir" ||
+      key === "directory" ||
+      key === "filePath" ||
+      key === "queries" ||
+      key === "query"
+    ) {
+      // Path-like values never legitimately contain markdown links. DeepSeek's
+      // autolinker wraps bare filename tokens (main.rs) into fake <a> links
+      // which surface here as [main.rs](https_...). Collapse them back to plain
+      // text so tool paths survive intact. Must run before the src/href branch
+      // below, otherwise a value that starts with a bare-domain autolink
+      // (e.g. queries="[main.rs](https://main.rs)") is URL-extracted instead.
+      attrs[key] = stripAutoLinkArtifacts(value);
     } else if (key === "src" || key === "href" || /^\[.*\]\(\s*https?:\/\//i.test(value)) {
       attrs[key] = extractHttpUrl(value) || value;
     } else {

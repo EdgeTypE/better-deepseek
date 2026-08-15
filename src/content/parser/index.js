@@ -17,6 +17,7 @@ import { parseLooseJson } from "./json-repair.js";
 import { parseMemoryWrite } from "./memory-parser.js";
 import { sanitizeVisibleText } from "./text-sanitizer.js";
 import { extractHttpUrl } from "../../lib/utils/url-normalizer.js";
+import { stripAutoLinkArtifacts } from "./link-artifacts.js";
 
 // Tool renderers that have visual cards
 const RENDERABLE_TOOLS = new Set([
@@ -61,7 +62,7 @@ function normalizeAutoHttpTarget(value) {
 function normalizeAutoTextTarget(value) {
   const input = String(value || "").trim();
   const linkedUrl = extractHttpUrl(input);
-  return linkedUrl || input;
+  return linkedUrl || stripAutoLinkArtifacts(input);
 }
 
 const MARKDOWN_LINK_RE = /\[([^\]]*)\]\(\s*https?:\/\/[^)\s]+\s*\)/gi;
@@ -170,7 +171,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
       searchInDirectory: [],
       dirList: [],
     },
-    visibleText: text,
+    visibleText: stripAutoLinkArtifacts(text),
   };
 
   if (!/(<BDS:|<BetterDeepSeek>|Bds create file>|\[BDS:)/i.test(text)) {
@@ -642,7 +643,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
   visibleText = visibleText.replace(/<BDS:skill_create[^>]*>[\s\S]*?<\/BDS:skill_create>/gi, '');
 
   // Strip all remaining BDS tags; markers survive (no <BDS: prefix)
-  result.visibleText = sanitizeVisibleText(visibleText);
+  result.visibleText = stripAutoLinkArtifacts(sanitizeVisibleText(visibleText));
 
   // Summary card for memory_write if more than 3 in one message
   if (result.memoryWrites.length > 3) {

@@ -1,3 +1,5 @@
+import { isAutoLinkArtifact } from "../parser/link-artifacts.js";
+
 /**
  * Extract raw text from a message DOM node using the best available source.
  */
@@ -267,7 +269,17 @@ function htmlToMarkdown(element, depth = 0) {
           break;
         }
         case "hr": markdown += `\n---\n`; break;
-        case "a": markdown += `[${content}](${child.getAttribute("href") || "#"})`; break;
+        case "a":
+          const href = child.getAttribute("href") || "#";
+          // DeepSeek autolinks bare tokens like "main.rs" into <a> elements.
+          // Reconstruct those as plain text so BDS tag attributes
+          // (fileName="src/main.rs"), AUTO paths, and file trees survive intact.
+          if (isAutoLinkArtifact(content, href)) {
+            markdown += content;
+          } else {
+            markdown += `[${content}](${href})`;
+          }
+          break;
         case "br": markdown += `\n`; break;
         case "table": markdown += `\n\n${content}\n`; break;
         case "thead":

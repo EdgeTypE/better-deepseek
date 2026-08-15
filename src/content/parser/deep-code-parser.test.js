@@ -38,6 +38,27 @@ describe("DeepCode Tag Parser", () => {
     expect(result.renderableBlocks[0].attrs.path).toBe("src/components");
   });
 
+  it("should strip DeepSeek autolink artifacts from tag attribute paths", () => {
+    const text = `<BDS:AUTO:LIST_DIR path="src/[components](https_components)"/>`;
+    const result = parseBdsMessage(text);
+    expect(result.autoRequests.dirList).toEqual(["src/components"]);
+    expect(result.renderableBlocks[0].attrs.path).toBe("src/components");
+  });
+
+  it("should strip DeepSeek autolink artifacts from create_file fileName", () => {
+    const text = `<BDS:create_file fileName="src/[main.rs](https_main.rs)">print('x')</BDS:create_file>`;
+    const result = parseBdsMessage(text);
+    expect(result.createFiles).toEqual([
+      { fileName: "src/main.rs", content: "print('x')" },
+    ]);
+  });
+
+  it("should strip DeepSeek autolink artifacts from visible text", () => {
+    const text = `├── [main.rs](https_main.rs)\n├── [evaluator.rs](https_evaluator.rs)`;
+    const result = parseBdsMessage(text);
+    expect(result.visibleText).toBe("├── main.rs\n├── evaluator.rs");
+  });
+
   it("should parse [BDS:AUTO_DIR_LIST_RESULT] as renderable block", () => {
     const payload = JSON.stringify({
       path: "src",

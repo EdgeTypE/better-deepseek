@@ -49,6 +49,53 @@ describe("parseTagAttributes", () => {
       c: "z",
     });
   });
+
+  it("strips autolink artifacts from fileName values", () => {
+    expect(
+      parseTagAttributes('fileName="src/[main.rs](https_main.rs)"'),
+    ).toEqual({
+      fileName: "src/main.rs",
+    });
+  });
+
+  it("strips autolink artifacts from path-like values", () => {
+    expect(
+      parseTagAttributes('path="src/[evaluator.rs](https://evaluator.rs)"'),
+    ).toEqual({ path: "src/evaluator.rs" });
+  });
+
+  it("strips autolink artifacts from query values", () => {
+    expect(
+      parseTagAttributes('queries="[parser.rs](https_parser.rs)"'),
+    ).toEqual({ queries: "parser.rs" });
+  });
+
+  it("strips bare-domain autolinks that start the value", () => {
+    expect(
+      parseTagAttributes('queries="[main.rs](https://main.rs)"'),
+    ).toEqual({ queries: "main.rs" });
+  });
+
+  it("strips bare-domain autolinks with a trailing slash", () => {
+    expect(
+      parseTagAttributes('path="[evaluator.rs](https://evaluator.rs/)"'),
+    ).toEqual({ path: "evaluator.rs" });
+  });
+
+  it("does not strip artifacts from content/code values", () => {
+    const input =
+      'fileName="test.py" content="const link = \'[foo](https://bar.com)\';"';
+    expect(parseTagAttributes(input)).toEqual({
+      fileName: "test.py",
+      content: "const link = '[foo](https://bar.com)';",
+    });
+  });
+
+  it("keeps real markdown links in non-path values intact", () => {
+    expect(parseTagAttributes('desc="see [docs](https://docs.example.com)"')).toEqual({
+      desc: "see [docs](https://docs.example.com)",
+    });
+  });
 });
 
 describe("unwrapMarkdownCodeFence", () => {

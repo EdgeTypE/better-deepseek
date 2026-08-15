@@ -597,7 +597,11 @@
       "statusFallback": "Harness 回退模式"
     },
     "downloadCard": {
-      "download": "下载"
+      "download": "下载",
+      "viewFiles": "查看文件",
+      "hideFiles": "隐藏文件",
+      "showCode": "显示代码",
+      "hideCode": "隐藏代码"
     },
     "pptxCard": {
       "title": "PowerPoint 演示文稿",

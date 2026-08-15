@@ -598,7 +598,11 @@
       "statusFallback": "Harness Yedek Modu"
     },
     "downloadCard": {
-      "download": "İndir"
+      "download": "İndir",
+      "viewFiles": "Dosyaları Gör",
+      "hideFiles": "Dosyaları Gizle",
+      "showCode": "Kodu Göster",
+      "hideCode": "Kodu Gizle"
     },
     "pptxCard": {
       "title": "PowerPoint Sunumu",

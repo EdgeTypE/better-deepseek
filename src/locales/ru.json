@@ -598,7 +598,11 @@
       "statusFallback": "Резервный режим Harness"
     },
     "downloadCard": {
-      "download": "Скачать"
+      "download": "Скачать",
+      "viewFiles": "Показать файлы",
+      "hideFiles": "Скрыть файлы",
+      "showCode": "Показать код",
+      "hideCode": "Скрыть код"
     },
     "pptxCard": {
       "title": "Презентация PowerPoint",

@@ -60,6 +60,7 @@ export function emitStandaloneFiles(node, createFiles) {
         description,
         fileName: downloadName,
         blob,
+        files: [{ path: normalizedPath, content }],
       }
     });
 

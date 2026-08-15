@@ -601,7 +601,11 @@
       "statusFallback": "Harness Fallback Mode"
     },
     "downloadCard": {
-      "download": "Download"
+      "download": "Download",
+      "viewFiles": "View files",
+      "hideFiles": "Hide files",
+      "showCode": "Show code",
+      "hideCode": "Hide code"
     },
     "pptxCard": {
       "title": "PowerPoint Presentation",

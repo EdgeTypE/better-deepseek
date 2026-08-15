@@ -44,6 +44,78 @@ describe("simple ui cards", () => {
     cleanup();
   });
 
+  it("shows no browse button when files are not provided", () => {
+    const blob = new Blob(["demo"], { type: "text/plain" });
+    const { target, cleanup } = renderSvelte(DownloadCard, {
+      title: "Generated file",
+      description: "README.md",
+      fileName: "README.md",
+      blob,
+    });
+
+    expect(target.querySelectorAll("button")).toHaveLength(1);
+    cleanup();
+  });
+
+  it("shows code for a single-file card and toggles it", async () => {
+    const blob = new Blob(["print(1)"], { type: "text/plain" });
+    const { target, cleanup } = renderSvelte(DownloadCard, {
+      title: "Generated file",
+      description: "src/app.py",
+      fileName: "app.py",
+      blob,
+      files: [{ path: "src/app.py", content: "print(1)\n" }],
+    });
+
+    const buttons = target.querySelectorAll("button");
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0].textContent).toBe("Show code");
+
+    buttons[0].click();
+    await flushUi();
+
+    const code = target.querySelector("pre.bds-download-card-code");
+    expect(code).toBeTruthy();
+    expect(code.textContent).toBe("print(1)\n");
+
+    buttons[0].click();
+    await flushUi();
+    expect(target.querySelector("pre.bds-download-card-code")).toBeNull();
+    cleanup();
+  });
+
+  it("shows a file tree for a multi-file card and toggles it", async () => {
+    const blob = new Blob(["zip"], { type: "application/zip" });
+    const { target, cleanup } = renderSvelte(DownloadCard, {
+      title: "LONG_WORK project",
+      description: "2 files packaged",
+      fileName: "project.zip",
+      blob,
+      files: [
+        { path: "src/main.rs", content: "fn main() {}" },
+        { path: "Cargo.toml", content: "[package]" },
+      ],
+    });
+
+    const buttons = target.querySelectorAll("button");
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0].textContent).toBe("View files");
+
+    buttons[0].click();
+    await flushUi();
+
+    const rows = target.querySelectorAll(".bds-download-card-row");
+    expect(rows.length).toBe(3);
+    expect(rows[0].textContent).toContain("src");
+    expect(rows[1].textContent).toContain("main.rs");
+    expect(rows[2].textContent).toContain("Cargo.toml");
+
+    buttons[0].click();
+    await flushUi();
+    expect(target.querySelectorAll(".bds-download-card-row")).toHaveLength(0);
+    cleanup();
+  });
+
   it("renders steps from TodoCard content", async () => {
     const { default: TodoCard } = await import("../../../src/content/ui/TodoCard.svelte");
     const content = `

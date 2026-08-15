@@ -12,6 +12,9 @@ const svelteMocks = vi.hoisted(() => ({
   }),
 }));
 
+const mountedProps = () =>
+  svelteMocks.mount.mock.calls.map(([, args]) => args.props);
+
 const downloadMocks = vi.hoisted(() => ({
   triggerBlobDownload: vi.fn(),
 }));
@@ -75,6 +78,20 @@ describe("file emission integration", () => {
     expect(svelteMocks.mount).toHaveBeenCalledTimes(2);
   });
 
+  it("passes the file list to the standalone download card", () => {
+    const node = document.createElement("div");
+    document.body.appendChild(node);
+
+    emitStandaloneFiles(node, [{ fileName: "app.js", content: "console.log(1)" }]);
+
+    expect(mountedProps()).toEqual([
+      expect.objectContaining({
+        fileName: "app.js",
+        files: [{ path: "app.js", content: "console.log(1)" }],
+      }),
+    ]);
+  });
+
   it("auto-downloads standalone files when enabled", () => {
     const node = document.createElement("div");
     document.body.appendChild(node);
@@ -91,5 +108,24 @@ describe("file emission integration", () => {
 
     expect(emitZipForFiles(node, [{ path: "src/app.js", content: "console.log(1)" }])).toBe(true);
     expect(svelteMocks.mount).toHaveBeenCalledOnce();
+  });
+
+  it("passes the file list to the long work zip card", () => {
+    const node = document.createElement("div");
+    document.body.appendChild(node);
+
+    emitZipForFiles(node, [
+      { path: "src/app.js", content: "console.log(1)" },
+      { path: "README.md", content: "# Demo" },
+    ]);
+
+    expect(mountedProps()).toEqual([
+      expect.objectContaining({
+        files: [
+          { path: "src/app.js", content: "console.log(1)" },
+          { path: "README.md", content: "# Demo" },
+        ],
+      }),
+    ]);
   });
 });

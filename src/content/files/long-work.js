@@ -81,6 +81,7 @@ export function emitZipForFiles(node, entries) {
         description: `${entries.length} files packaged`,
         fileName: zipName,
         blob: zipBlob,
+        files: entries,
       }
     });
     return true;
