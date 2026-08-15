@@ -48,8 +48,18 @@ Better DeepSeek introduces a set of special tags that DeepSeek can use to produc
 - `<BDS:docx>...</BDS:docx>` – Generate a Word document using the docx library.
 - `<BDS:AUTO:REQUEST_WEB_FETCH>url</BDS:AUTO:REQUEST_WEB_FETCH>` – Automatically fetch and convert a web page to markdown, then inject it into the chat context.
 - `<BDS:AUTO:REQUEST_GITHUB_FETCH>url</BDS:AUTO:REQUEST_GITHUB_FETCH>` – Automatically fetch a GitHub repository and inject its codebase into the chat context.
+- `<BDS:AUTO:SEARCH_IN_DIRECTORY queries="...">` – Search codebase directories for files and symbols (active when DeepCode is enabled).
+- `<BDS:AUTO:LIST_DIR path="..." depth="...">` – Inspect directory contents in connected workspace (active when DeepCode is enabled).
+- `<BDS:AUTO:FILE_READ path="..." startLine="..." endLine="...">` – Read specific files or line ranges from the connected codebase (active when DeepCode is enabled).
 - `<BDS:memory_write>key: value, importance: always|called</BDS:memory_write>` – Store persistent facts about the user that are injected into future prompts.
 - `<BDS:character_create name="..." usage="...">...</BDS:character_create>` – Define a roleplay persona that DeepSeek can adopt.
+
+### DeepCode (Experimental) & DeepSeek Harness Integration
+Better DeepSeek introduces **DeepCode**, a collaborative code planning and inspection mode designed to work alongside [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).
+- **Interactive Code Planning**: Activate DeepCode to allow DeepSeek to explore codebases, inspect file structures with auto-tools (`FILE_READ`, `LIST_DIR`, `SEARCH_IN_DIRECTORY`), and draft structured implementation plans.
+- **DeepSeek Harness Handoff**: Once a plan is formulated, easily send tasks directly to DeepSeek Harness for automated execution and testing.
+- **Plugin Integration**: Install the [`dsh-better-deepseek`](https://github.com/EdgeTypE/dsh-better-deepseek) plugin in DeepSeek Harness for complete end-to-end integration.
+
 
 ### MCP (Model Context Protocol) Tool Access
 Better DeepSeek supports the [Model Context Protocol](https://spec.modelcontextprotocol.io) for connecting to remote MCP servers. When configured, the AI can discover and invoke tools from these servers automatically.
@@ -83,9 +93,9 @@ The DeepSeek logo and "New Chat" button have been transformed into native links,
 A sleek drawer slides out from a floating button on the DeepSeek page. Inside you can:
 - Edit the system prompt.
 - Toggle auto-download behavior for files and LONG_WORK zips.
-- Import, export, and manage skills.
+- Import, export, download, and manage skills.
 - Import, export, and manage memory entries.
-- Create, edit, and activate characters.
+- Create, edit, download, and activate characters/personas.
 - Define Claude-style Projects, define project-level instructions, and upload project files and attach them to chats.
 
 ![long work image](extension/4.png)
@@ -349,6 +359,16 @@ system image recommended).
 Better DeepSeek does not collect, transmit, or sell any personal data. All settings, memories, skills, and characters are stored locally on your device. If you configure a GitHub personal access token for private repository support, it is stored locally and only sent to GitHub when you explicitly fetch a repository. See the full [Privacy Policy](extension/PRIVACY.md) for details.
 
 ## Changelog
+
+### v0.1.12 (2026-08-15)
+- **New Feature**: DeepCode (Experimental). A collaborative coding mode that works alongside DeepSeek Harness. Enable DeepCode to plan tasks and execute multi-step code workflows with AI, then seamlessly transfer the plan to DeepSeek Harness. For full integration, install the [dsh-better-deepseek](https://github.com/EdgeTypE/dsh-better-deepseek) plugin in DeepSeek Harness.
+- **New Feature**: DeepCode Auto Tools. Added three new BDS auto tools: `<BDS:AUTO:SEARCH_IN_DIRECTORY>`, `<BDS:AUTO:LIST_DIR>`, and `<BDS:AUTO:FILE_READ>` (active when DeepCode mode is enabled) for codebase exploration.
+- **New Feature**: Queued Prompts. If you send a message while DeepSeek is still generating a response, BDS automatically queues your prompt and submits it seamlessly as soon as generation completes.
+- **New Feature**: Download Support for Created Items. Added download/export support for custom Personas and Skills directly from the drawer.
+- **Bug Fix**: Fixed a parser issue affecting Long Work and related tool blocks caused by recent DeepSeek UI changes.
+- **Codebase Cleanup**: Removed deprecated legacy tool cards from the codebase.
+- **Android Improvement**: Added User-Agent header metadata to searches performed on Android devices.
+- **Stability & UI/UX Improvements**: General bug fixes and interface refinements.
 
 ### v0.1.11 (2026-07-27)
 - **New Feature**: MCP (Model Context Protocol) Server Support. Connect remote MCP servers to give DeepSeek access to external tools. For detailed information, visit the Advanced Settings. (See MCP section above for details.)
