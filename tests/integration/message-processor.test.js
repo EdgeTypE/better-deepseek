@@ -674,4 +674,79 @@ describe("bookmark button injection", () => {
     await Promise.resolve();
     expect(btn.classList.contains("bds-bookmark-btn--active")).toBe(false);
   });
+
+  it("renders a directory list result card for user messages", () => {
+    const payload = JSON.stringify({
+      path: "src",
+      success: true,
+      isDirectory: true,
+      childCount: 2,
+      entries: [
+        { name: "utils/", type: "dir" },
+        { name: "main.js", type: "file" },
+      ],
+      listing: "- DIR  utils/\n- FILE main.js\n",
+    });
+    const rawText =
+      `<BetterDeepSeek>\n[BDS:AUTO_DIR_LIST_RESULT]\n${payload}\n[/BDS:AUTO_DIR_LIST_RESULT]\n` +
+      '[BDS:AUTO] Directory listing for path: "src"\n</BetterDeepSeek>';
+    const node = createMessageNode(rawText, "user");
+
+    processMessageNode(node);
+
+    expect(mocks.mount).toHaveBeenCalledOnce();
+    const props = mocks.mount.mock.calls[0][1].props;
+    expect(props.blocks).toHaveLength(1);
+    expect(props.blocks[0].name).toBe("auto_dir_list_result");
+    expect(props.blocks[0].attrs.path).toBe("src");
+    expect(props.blocks[0].attrs.childCount).toBe("2");
+    expect(JSON.parse(props.blocks[0].content)).toEqual([
+      { name: "utils/", type: "dir" },
+      { name: "main.js", type: "file" },
+    ]);
+  });
+
+  it("renders a directory list result card with error for failed listings", () => {
+    const payload = JSON.stringify({
+      path: "missing",
+      success: false,
+      childCount: 0,
+      entries: [],
+      error: 'Directory "missing" was not found in the active codebase.',
+    });
+    const rawText =
+      `<BetterDeepSeek>\n[BDS:AUTO_DIR_LIST_RESULT]\n${payload}\n[/BDS:AUTO_DIR_LIST_RESULT]\n` +
+      '[BDS:AUTO] Directory listing requested for "missing", but it was not found in the active codebase.\n</BetterDeepSeek>';
+    const node = createMessageNode(rawText, "user");
+
+    processMessageNode(node);
+
+    expect(mocks.mount).toHaveBeenCalledOnce();
+    const props = mocks.mount.mock.calls[0][1].props;
+    expect(props.blocks[0].name).toBe("auto_dir_list_result");
+    expect(props.blocks[0].attrs.path).toBe("missing");
+    expect(props.blocks[0].attrs.childCount).toBe("0");
+    expect(props.blocks[0].attrs.error).toBe('Directory "missing" was not found in the active codebase.');
+    expect(JSON.parse(props.blocks[0].content)).toEqual([]);
+  });
+
+  it("does not duplicate the directory list card on re-process", () => {
+    const payload = JSON.stringify({
+      path: "src",
+      success: true,
+      childCount: 1,
+      entries: [{ name: "main.js", type: "file" }],
+      listing: "- FILE main.js\n",
+    });
+    const rawText =
+      `<BetterDeepSeek>\n[BDS:AUTO_DIR_LIST_RESULT]\n${payload}\n[/BDS:AUTO_DIR_LIST_RESULT]\n` +
+      '[BDS:AUTO] Directory listing for path: "src"\n</BetterDeepSeek>';
+    const node = createMessageNode(rawText, "user");
+
+    processMessageNode(node);
+    processMessageNode(node);
+
+    expect(mocks.mount).toHaveBeenCalledOnce();
+    expect(document.querySelectorAll(".mock-overlay")).toHaveLength(1);
+  });
 });

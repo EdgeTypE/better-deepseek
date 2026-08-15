@@ -39,7 +39,7 @@ export const BRIDGE_EVENTS = {
 };
 
 // ── Versioning ──
-export const SYSTEM_PROMPT_TEMPLATE_VERSION = 14;
+export const SYSTEM_PROMPT_TEMPLATE_VERSION = 15;
 export const DOWNLOAD_BEHAVIOR_VERSION = 2;
 export const LONG_WORK_STALE_MS = 30000;
 

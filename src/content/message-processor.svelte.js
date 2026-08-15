@@ -49,6 +49,7 @@ const readMessages = new WeakSet();
 const processedSearchResultCards = new WeakSet();
 const processedFileReadResultCards = new WeakSet();
 const processedDirSearchResultCards = new WeakSet();
+const processedDirListResultCards = new WeakSet();
 const pricingContributions = new Map();
 
 function removePricingContribution(node) {
@@ -456,6 +457,58 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
             error: data.error || "",
           },
           content: typeof data.results === "string" ? data.results : JSON.stringify(data.results || [])
+        }];
+
+        if (existing) {
+          existing.props.blocks = newBlocks;
+        } else {
+          const host = getOrCreateHost(node, "bds-overlay-host");
+          removeStaleMessageOverlays(host);
+          const props = $state({ text: "", blocks: newBlocks, loading: false });
+          const component = mount(MessageOverlay, { target: host, props });
+          messageOverlays.set(node, { component, props, host });
+        }
+        syncVisibilityState(node, false, stateData, true);
+      }
+    }
+
+    // --- DIRECTORY LIST RESULT CARD (USER) ---
+    if (rawUserText.includes("[BDS:AUTO_DIR_LIST_RESULT]") || rawUserText.includes("[BDS:AUTO] Directory listing requested for") || rawUserText.includes("[BDS:AUTO] Directory listing for path:")) {
+      const jsonMatch = rawUserText.match(/\[BDS:AUTO_DIR_LIST_RESULT\]\s*([\s\S]*?)\s*\[\/BDS:AUTO_DIR_LIST_RESULT\]/);
+      let data = null;
+      if (jsonMatch) {
+        try {
+          data = JSON.parse(jsonMatch[1].trim());
+        } catch (e) {
+          console.error("[BDS:AUTO_DIR_LIST_RESULT] Failed to parse JSON:", e);
+        }
+      }
+
+      if (!data) {
+        const pathMatch = rawUserText.match(/\[BDS:AUTO\] Directory (?:listing requested for|listing for path):\s*"([^"]+)"/i);
+        const path = pathMatch ? pathMatch[1] : "";
+        const isError = rawUserText.includes("is a file, not a directory") || rawUserText.includes("was not found");
+        data = {
+          path,
+          childCount: 0,
+          entries: [],
+          error: isError ? "The requested directory could not be listed." : ""
+        };
+      }
+
+      if (data && !processedDirListResultCards.has(node)) {
+        processedDirListResultCards.add(node);
+        stateData.hasControlTags = true;
+
+        const existing = messageOverlays.get(node);
+        const newBlocks = [{
+          name: "auto_dir_list_result",
+          attrs: {
+            path: data.path || "",
+            childCount: String(data.childCount ?? data.entries?.length ?? 0),
+            error: data.error || "",
+          },
+          content: JSON.stringify(data.entries || [])
         }];
 
         if (existing) {
