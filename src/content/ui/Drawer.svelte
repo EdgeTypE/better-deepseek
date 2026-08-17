@@ -16,7 +16,7 @@
 
   let TIP_COUNT = $derived.by(() => {
     const tips = i18n.messages?.messages?.tips;
-    return tips ? Object.keys(tips).filter(k => /^\d+$/.test(k)).length : 0;
+    return tips ? Object.keys(tips).filter((k) => /^\d+$/.test(k)).length : 0;
   });
   let currentTipIndex = $state(-1);
   let disableTipBox = $state(Boolean(appState.settings.disableTipBox));
@@ -83,11 +83,11 @@
   }
 
   function insertCommand(cmdId) {
-    const editor = findChatEditor()
-    if (!editor) return
-    setChatInputText("/" + cmdId + " ")
-    editor.focus()
-    onclose()
+    const editor = findChatEditor();
+    if (!editor) return;
+    setChatInputText("/" + cmdId + " ");
+    editor.focus();
+    onclose();
   }
 
   export async function handleClose() {
@@ -102,23 +102,54 @@
 
 <aside id="bds-drawer" class={open ? "bds-open" : "bds-closed"}>
   <div class="bds-drawer-header">
-    <div class="ds-modal-content__title">{t('drawer.title')}</div>
-    <button id="bds-close" type="button" onclick={handleClose} aria-label={t('drawer.close')}>
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M14.1871 13.1265L13.1265 14.1872L1.81275 2.87347L2.87341 1.81281L14.1871 13.1265Z" fill="currentColor"></path>
-        <path d="M13.1265 1.81282L14.1871 2.87348L2.8734 14.1872L1.81274 13.1265L13.1265 1.81282Z" fill="currentColor"></path>
+    <div class="ds-modal-content__title">{t("drawer.title")}</div>
+    <button
+      id="bds-close"
+      type="button"
+      onclick={handleClose}
+      aria-label={t("drawer.close")}
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 16 16"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M14.1871 13.1265L13.1265 14.1872L1.81275 2.87347L2.87341 1.81281L14.1871 13.1265Z"
+          fill="currentColor"
+        ></path>
+        <path
+          d="M13.1265 1.81282L14.1871 2.87348L2.8734 14.1872L1.81274 13.1265L13.1265 1.81282Z"
+          fill="currentColor"
+        ></path>
       </svg>
     </button>
   </div>
 
   {#if showProjectsManager}
     <div class="bds-projects-body">
-      <ProjectsManager bind:this={projectsManagerRef} onback={closeProjectsManager} />
+      <ProjectsManager
+        bind:this={projectsManagerRef}
+        onback={closeProjectsManager}
+      />
     </div>
   {:else}
-
     <div class="bds-drawer-body">
-      <SettingsPanel bind:this={settingsRef} onsave={handleSettingsSaved} onapiplayground={openApiPlayground} onimportdata={() => { refreshSettings(); refreshSkills(); refreshCharacters(); refreshMemories(); refreshProjects(); refreshSavedItems(); }} />
+      <SettingsPanel
+        bind:this={settingsRef}
+        onsave={handleSettingsSaved}
+        onapiplayground={openApiPlayground}
+        onimportdata={() => {
+          refreshSettings();
+          refreshSkills();
+          refreshCharacters();
+          refreshMemories();
+          refreshProjects();
+          refreshSavedItems();
+        }}
+      />
 
       <hr />
 
@@ -133,7 +164,7 @@
       <MemoryList bind:this={memoryRef} />
 
       <hr />
-      
+
       <ProjectsCard onmanage={openProjectsManager} />
 
       <hr />
@@ -143,14 +174,33 @@
       <hr />
 
       <div class="bds-section-title">
-        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+        <div
+          style="display: flex; align-items: center; justify-content: space-between; width: 100%;"
+        >
           <div style="display: flex; align-items: center; gap: 8px;">
             <span class="bds-icon-inline">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><polygon
+                  points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"
+                /></svg
+              >
             </span>
             <span>{t("commands.title")}</span>
           </div>
-          <button type="button" class="bds-btn-outlined" style="font-size:11px;padding:3px 7px;" onclick={() => showCmdManager = !showCmdManager}>
+          <button
+            type="button"
+            class="bds-btn-outlined"
+            style="font-size:11px;padding:3px 7px;"
+            onclick={() => (showCmdManager = !showCmdManager)}
+          >
             {showCmdManager ? t("commands.done") : t("commands.manage")}
           </button>
         </div>
@@ -159,7 +209,11 @@
         <div class="bds-featured-list">
           <h4>{t("commands.builtinCommands")}</h4>
           {#each COMMANDS as cmd}
-            <button type="button" class="bds-featured-item" onclick={() => insertCommand(cmd.id)}>
+            <button
+              type="button"
+              class="bds-featured-item"
+              onclick={() => insertCommand(cmd.id)}
+            >
               <span class="bds-cmd-icon">{@html cmd.icon}</span>
               <span class="bds-cmd-info">
                 <span class="bds-cmd-name">/{cmd.id}</span>
@@ -171,23 +225,53 @@
         </div>
       {/if}
       {#if showCmdManager}
-        <CommandManager onclose={() => showCmdManager = false} />
+        <CommandManager onclose={() => (showCmdManager = false)} />
       {/if}
     </div>
 
     <div class="bds-drawer-bottom">
       {#if TIP_COUNT > 0 && !disableTipBox && currentTipIndex >= 0}
         <div class="bds-tip-bar">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>
-          <span>{@html t('tips.' + currentTipIndex)}</span>
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            ><path d="M9 18h6" /><path d="M10 22h4" /><path
+              d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"
+            /></svg
+          >
+          <span>{@html t("tips." + currentTipIndex)}</span>
         </div>
       {/if}
       <div class="bds-drawer-footer">
-        <a href="https://github.com/EdgeTypE/better-deepseek" target="_blank" rel="noopener noreferrer" class="bds-github-link">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+        <a
+          href="https://github.com/EdgeTypE/better-deepseek"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="bds-github-link"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="currentColor"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+            ></path>
           </svg>
-          <span>{t('drawer.github')} <small style="opacity: 0.6; font-weight: 400; margin-left: 4px;">{t('drawer.version', { version: '0.1.12' })}</small></span>
+          <span
+            >{t("drawer.github")}
+            <small style="opacity: 0.6; font-weight: 400; margin-left: 4px;"
+              >{t("drawer.version", { version: "0.1.13" })}</small
+            ></span
+          >
         </a>
       </div>
     </div>

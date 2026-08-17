@@ -697,7 +697,7 @@ async function mcpEnsureInitialized(serverUrl, apiKey) {
 
   const initBody = {
     jsonrpc: "2.0", id: 1, method: "initialize",
-    params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "better-deepseek", version: "0.1.12" } },
+    params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "better-deepseek", version: "0.1.13" } },
   };
 
   entry.initialized = (async () => {

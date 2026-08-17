@@ -43,7 +43,9 @@
 
   let displayLabel = $derived.by(() => {
     if (!localEnabled) return t("deepCodeToggle.label");
-    const dir = activeDirectory || (manualPath ? manualPath.split(/[/\\]/).filter(Boolean).pop() : "");
+    const dir =
+      activeDirectory ||
+      (manualPath ? manualPath.split(/[/\\]/).filter(Boolean).pop() : "");
     if (!dir) return t("deepCodeToggle.labelActive");
     const cleanDir = dir.length > 18 ? dir.slice(0, 16) + "…" : dir;
     return t("deepCodeToggle.labelWithDir", { dir: cleanDir });
@@ -80,7 +82,13 @@
     window.addEventListener("bds:deep-code-toggle-state", handler);
 
     const handleClickOutside = (e) => {
-      if (isOpen && menuRef && !menuRef.contains(e.target) && buttonRef && !buttonRef.contains(e.target)) {
+      if (
+        isOpen &&
+        menuRef &&
+        !menuRef.contains(e.target) &&
+        buttonRef &&
+        !buttonRef.contains(e.target)
+      ) {
         isOpen = false;
       }
     };
@@ -166,7 +174,9 @@
     actionFeedback = result.needsPicker
       ? t("deepCodeModal.recentNeedsPicker", { name: entry.name })
       : t("deepCodeModal.switchedFeedback", { name: entry.name });
-    setTimeout(() => { actionFeedback = ""; }, 3500);
+    setTimeout(() => {
+      actionFeedback = "";
+    }, 3500);
   }
 
   async function handleRemoveRecent(entry, event) {
@@ -194,9 +204,12 @@
   class:bds-deep-code-toggle--selected={localEnabled}
   style="transform: translateZ(0px);"
   onclick={handleButtonClick}
-  onkeydown={(e) => (e.key === "Enter" || e.key === " ") && handleButtonClick(e)}
+  onkeydown={(e) =>
+    (e.key === "Enter" || e.key === " ") && handleButtonClick(e)}
   data-testid="deep-code-toggle"
-  title={manualPath ? t("deepCodeToggle.titleActive", { path: manualPath }) : t("deepCodeToggle.titleDefault")}
+  title={manualPath
+    ? t("deepCodeToggle.titleActive", { path: manualPath })
+    : t("deepCodeToggle.titleDefault")}
 >
   <div class="ds-toggle-button__icon">
     <div class="ds-icon" style="font-size: inherit;">
@@ -220,8 +233,21 @@
   </div>
   <span class="_6dbc175 bds-toggle-label">{displayLabel}</span>
   <span class="bds-toggle-chevron" class:bds-toggle-chevron--open={isOpen}>
-    <svg width="10" height="10" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    <svg
+      width="10"
+      height="10"
+      viewBox="0 0 16 16"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path
+        d="M4 6L8 10L12 6"
+        stroke="currentColor"
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
     </svg>
   </span>
   <div class="ds-focus-ring" style="--dsl-focus-ring-offset: -1px;"></div>
@@ -244,9 +270,24 @@
     <div class="bds-onboarding-card" onclick={(e) => e.stopPropagation()}>
       <div class="bds-onboarding-header">
         <div class="bds-onboarding-title-group">
-          <span class="bds-icon-inline" style="color: var(--bds-accent, #4d6bfe); margin-right: 6px;">
-            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M5.75 4.75L2.5 8L5.75 11.25M10.25 4.75L13.5 8L10.25 11.25M8.5 3.5L7.5 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <span
+            class="bds-icon-inline"
+            style="color: var(--bds-accent, #4d6bfe); margin-right: 6px;"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 16 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M5.75 4.75L2.5 8L5.75 11.25M10.25 4.75L13.5 8L10.25 11.25M8.5 3.5L7.5 12.5"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             </svg>
           </span>
           <h3 class="bds-onboarding-title">{t("deepCodeOnboarding.title")}</h3>
@@ -258,9 +299,21 @@
           onclick={handleOnboardingDismiss}
           aria-label={t("deepCodeOnboarding.closeAria")}
         >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M14.1871 13.1265L13.1265 14.1872L1.81275 2.87347L2.87341 1.81281L14.1871 13.1265Z" fill="currentColor"></path>
-            <path d="M13.1265 1.81282L14.1871 2.87348L2.8734 14.1872L1.81274 13.1265L13.1265 1.81282Z" fill="currentColor"></path>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M14.1871 13.1265L13.1265 14.1872L1.81275 2.87347L2.87341 1.81281L14.1871 13.1265Z"
+              fill="currentColor"
+            ></path>
+            <path
+              d="M13.1265 1.81282L14.1871 2.87348L2.8734 14.1872L1.81274 13.1265L13.1265 1.81282Z"
+              fill="currentColor"
+            ></path>
           </svg>
         </button>
       </div>
@@ -274,8 +327,8 @@
             href="https://github.com/deepseek-ai/deepseek-harness"
             target="_blank"
             rel="noopener noreferrer"
-            class="bds-onboarding-link"
-          >{t("deepCodeOnboarding.harnessLink")}</a>
+            class="bds-onboarding-link">{t("deepCodeOnboarding.harnessLink")}</a
+          >
         </p>
         <p class="bds-onboarding-paragraph">
           {@html t("deepCodeOnboarding.pluginInfo")}
@@ -285,8 +338,8 @@
             href="https://github.com/EdgeTypE/dsh-better-deepseek"
             target="_blank"
             rel="noopener noreferrer"
-            class="bds-onboarding-link"
-          >{t("deepCodeOnboarding.pluginLink")}</a>
+            class="bds-onboarding-link">{t("deepCodeOnboarding.pluginLink")}</a
+          >
         </p>
       </div>
 
@@ -295,7 +348,8 @@
           type="button"
           class="bds-btn bds-onboarding-got-it"
           onclick={handleOnboardingGotIt}
-        >{t("deepCodeOnboarding.gotIt")}</button>
+          >{t("deepCodeOnboarding.gotIt")}</button
+        >
       </div>
     </div>
   </div>
@@ -315,9 +369,24 @@
     <!-- HEADER -->
     <div class="bds-dc-header">
       <div class="bds-dc-title-group">
-        <span class="bds-icon-inline" style="color: var(--bds-accent, #4d6bfe); margin-right: 6px;">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M5.75 4.75L2.5 8L5.75 11.25M10.25 4.75L13.5 8L10.25 11.25M8.5 3.5L7.5 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <span
+          class="bds-icon-inline"
+          style="color: var(--bds-accent, #4d6bfe); margin-right: 6px;"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M5.75 4.75L2.5 8L5.75 11.25M10.25 4.75L13.5 8L10.25 11.25M8.5 3.5L7.5 12.5"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
           </svg>
         </span>
         <h3 class="bds-dc-title">{t("deepCodeToggle.panelTitle")}</h3>
@@ -330,9 +399,21 @@
         onclick={() => (isOpen = false)}
         aria-label={t("deepCodeToggle.closeAria")}
       >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M14.1871 13.1265L13.1265 14.1872L1.81275 2.87347L2.87341 1.81281L14.1871 13.1265Z" fill="currentColor"></path>
-          <path d="M13.1265 1.81282L14.1871 2.87348L2.8734 14.1872L1.81274 13.1265L13.1265 1.81282Z" fill="currentColor"></path>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 16 16"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M14.1871 13.1265L13.1265 14.1872L1.81275 2.87347L2.87341 1.81281L14.1871 13.1265Z"
+            fill="currentColor"
+          ></path>
+          <path
+            d="M13.1265 1.81282L14.1871 2.87348L2.8734 14.1872L1.81274 13.1265L13.1265 1.81282Z"
+            fill="currentColor"
+          ></path>
         </svg>
       </button>
     </div>
@@ -350,7 +431,9 @@
         class="bds-switch"
         class:bds-switch--on={localEnabled}
         onclick={handleToggleSwitch}
-        title={localEnabled ? t("deepCodeToggle.disableToggle") : t("deepCodeToggle.enableToggle")}
+        title={localEnabled
+          ? t("deepCodeToggle.disableToggle")
+          : t("deepCodeToggle.enableToggle")}
       >
         <span class="bds-switch-handle"></span>
       </button>
@@ -364,7 +447,16 @@
         onclick={handleAddMenuToggle}
         aria-expanded={showAddPopup}
       >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
           <path d="M12 5v14M5 12h14"></path>
         </svg>
         <span>{t("deepCodeModal.addNewDirectory")}</span>
@@ -378,8 +470,8 @@
 
     <AddDirectoryModal
       show={showAddPopup}
-      activeDirectory={activeDirectory}
-      fileCount={fileCount}
+      {activeDirectory}
+      {fileCount}
       onclose={() => (showAddPopup = false)}
     />
 
@@ -394,7 +486,11 @@
     <div class="bds-options-list">
       {#if recentDirectories && recentDirectories.length > 0}
         {#each recentDirectories as dir, idx}
-          {@const isSelected = activeDirectory === dir.name || (manualPath && dir.path && manualPath.toLowerCase() === dir.path.toLowerCase())}
+          {@const isSelected =
+            activeDirectory === dir.name ||
+            (manualPath &&
+              dir.path &&
+              manualPath.toLowerCase() === dir.path.toLowerCase())}
           <div
             class="bds-option-item"
             class:selected={isSelected}
@@ -442,16 +538,17 @@
     <!-- FOOTER STATUS -->
     <div class="bds-dc-footer">
       <div class="bds-dc-status">
-        <span class="bds-status-dot" class:online={harnessStatus === 'enhanced'}></span>
+        <span class="bds-status-dot" class:online={harnessStatus === "enhanced"}
+        ></span>
         <span class="bds-status-text">
-          {#if harnessStatus === 'enhanced'}
+          {#if harnessStatus === "enhanced"}
             {t("deepCodeToggle.statusEnhanced")}
           {:else}
             {t("deepCodeToggle.statusFallback")}
           {/if}
         </span>
       </div>
-      <span class="bds-dc-version">v0.1.12</span>
+      <span class="bds-dc-version">v0.1.13</span>
     </div>
   </div>
 {/if}
@@ -586,7 +683,9 @@
     justify-content: center;
     margin-left: 2px;
     opacity: 0.65;
-    transition: transform 0.2s ease, opacity 0.2s ease;
+    transition:
+      transform 0.2s ease,
+      opacity 0.2s ease;
     line-height: 1;
   }
 
@@ -656,8 +755,14 @@
   }
 
   @keyframes bds-modal-in {
-    from { opacity: 0; transform: scale(0.98); }
-    to { opacity: 1; transform: scale(1); }
+    from {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 
   .bds-dc-header {
