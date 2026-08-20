@@ -1,10 +1,10 @@
-/**
- * Deep Research Mode V1 â€” State machine and run management.
+/*
+ * Deep Research Mode V1 — State machine and run management.
  *
  * State machine: idle -> planning -> awaiting_revision|approved -> running -> reporting -> complete
  *
  * Persists minimal run metadata under STORAGE_KEYS.deepResearchRuns.
- */
+*/
 
 import { devLog } from "../lib/dev-log.js";
 import { BRIDGE_EVENTS, STORAGE_KEYS } from "../lib/constants.js";
@@ -35,21 +35,52 @@ export const RESEARCH_STATUSES = [
   "cancelled",
 ];
 
-/** Allowed state transitions */
+/**
+ * Allowed state transitions.
+ * Includes paths used by legacy event flows (e.g. planning -> running,
+ * running -> complete) so strict enforcement does not break external callers.
+ */
 const TRANSITIONS = {
-  idle: ["planning"],
-  planning: ["awaiting_revision", "approved", "cancelled"],
+  idle: ["planning", "cancelled"],
+  planning: ["awaiting_revision", "approved", "running", "cancelled"],
   awaiting_revision: ["planning", "cancelled"],
   approved: ["running", "cancelled"],
-  running: ["reporting", "cancelled"],
-  reporting: ["complete"],
+  running: ["reporting", "complete", "cancelled"],
+  reporting: ["complete", "cancelled"],
   complete: [],
   cancelled: [],
 };
 
+const MAX_DEEP_FETCH = 5;
+const TEXT_ONLY_STEP_PROMPT_CHARS = 9_000;
+const TEXT_ONLY_FALLBACK_CHARS = 4_500;
+const TEXT_ONLY_EMERGENCY_CHARS = 2_000;
+
+const MAX_ADAPTIVE_STEPS_PER_STEP = 3;
+const MAX_TOTAL_MANAGED_STEPS = 12;
+const VALID_SOURCE_TYPES = ["general", "docs", "news", "reviews", "academic", "commerce"];
+const VALID_ADAPTIVE_ACTIONS = ["search", "fetch"];
+
+const PROMPT_DETAIL = {
+  full: { sources: 6, snippetChars: 260, excerptChars: 900, queryChars: 700, purposeChars: 400 },
+  fallback: { sources: 4, snippetChars: 140, excerptChars: 420, queryChars: 420, purposeChars: 240 },
+  emergency: { sources: 2, snippetChars: 70, excerptChars: 160, queryChars: 180, purposeChars: 120 },
+};
+
+let runtimeInitialized = false;
+let runtimeReadyPromise = null;
+
+/**
+ * Sequential persistence queue. Each persistRuns() call snapshots the run array
+ * immediately, then chains the write behind the previous write. This prevents
+ * out-of-order chrome.storage writes from older snapshots overwriting newer ones.
+ */
+let persistQueue = Promise.resolve();
+
 /**
  * Create a new deep research run object.
  * @param {string} conversationId
+ * @param {string} id
  * @returns {object} run
  */
 export function createRun(conversationId, id = makeId()) {
@@ -58,24 +89,18 @@ export function createRun(conversationId, id = makeId()) {
     conversationId,
     status: "planning",
     plan: null,
+    report: null,
     sourceLedger: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    /** Managed execution state â€” when true, BDS drives step-by-step */
     execution: {
       managed: false,
-      /** Normalized steps from the approved plan (includes adaptive steps) */
       steps: [],
       currentStepIndex: -1,
-      /** The step ID we are waiting for analysis on */
       awaitingAnalysisStepId: null,
-      /** Whether the final report prompt has been sent */
       reportRequested: false,
-      /** Monotonic counter for generating adaptive step IDs (a1, a2, ...) */
       adaptiveStepCounter: 0,
-      /** Why the budget guard stopped execution (empty string if not stopped) */
       budgetStopReason: "",
-      /** Snapshot of context budget state at stop time */
       contextBudgetSnapshot: null,
     },
   };
@@ -91,9 +116,7 @@ export function createRun(conversationId, id = makeId()) {
 export function transitionRun(run, newStatus) {
   const allowed = TRANSITIONS[run.status];
   if (!allowed || !allowed.includes(newStatus)) {
-    throw new Error(
-      `Invalid deep research transition: ${run.status} -> ${newStatus}`
-    );
+    throw new Error(`Invalid deep research transition: ${run.status} -> ${newStatus}`);
   }
   run.status = newStatus;
   run.updatedAt = Date.now();
@@ -111,13 +134,27 @@ export function setDeepResearchEnabled(enabled, conversationId = getCurrentConve
     state.deepResearch.pendingRun = createRun(conversationId);
   } else {
     state.deepResearch.pendingRun = null;
-    const activeRun = findActiveRun(state.deepResearch.runs, conversationId);
-    if (activeRun) {
-      setStatus(activeRun, "cancelled");
+    const activeRuns = state.deepResearch.runs.filter(
+      (r) =>
+        r.conversationId === conversationId &&
+        r.status !== "complete" &&
+        r.status !== "cancelled"
+    );
+    for (const activeRun of activeRuns) {
+      try {
+        setStatus(activeRun, "cancelled");
+      } catch (error) {
+        devLog("DeepResearch", `Cancel transition failed: ${error.message}`);
+        activeRun.status = "cancelled";
+        activeRun.updatedAt = Date.now();
+      }
+      activeRun.execution.managed = false;
       upsertRun(activeRun);
       clearRunSearchHistory(activeRun.id);
       clearConversationBudget(activeRun.conversationId);
       emitRunState(activeRun);
+    }
+    if (activeRuns.length > 0) {
       void persistRuns(state.deepResearch.runs);
     }
   }
@@ -130,14 +167,21 @@ export function setDeepResearchEnabled(enabled, conversationId = getCurrentConve
 
 /**
  * Persist runs array to chrome storage.
+ * Snapshots the array immediately and serializes writes sequentially.
  * @param {Array} runs
  */
 export async function persistRuns(runs) {
-  if (typeof chrome !== "undefined" && chrome.storage) {
-    await chrome.storage.local.set({
-      [STORAGE_KEYS.deepResearchRuns]: runs.map(serializeRun),
-    });
-  }
+  const snapshot = Array.isArray(runs) ? runs.map(serializeRun) : [];
+  const write = async () => {
+    if (typeof chrome !== "undefined" && chrome.storage) {
+      await chrome.storage.local.set({
+        [STORAGE_KEYS.deepResearchRuns]: snapshot,
+      });
+    }
+  };
+
+  persistQueue = persistQueue.catch(() => {}).then(write);
+  return persistQueue;
 }
 
 /**
@@ -180,23 +224,6 @@ function normalizeEventDetail(detail) {
   return detail && typeof detail === "object" ? detail : {};
 }
 
-const MAX_DEEP_FETCH = 5;
-const TEXT_ONLY_STEP_PROMPT_CHARS = 9_000;
-const TEXT_ONLY_FALLBACK_CHARS = 4_500;
-const TEXT_ONLY_EMERGENCY_CHARS = 2_000;
-
-/** Adaptive step expansion limits */
-const MAX_ADAPTIVE_STEPS_PER_STEP = 3;
-const MAX_TOTAL_MANAGED_STEPS = 12;
-const VALID_SOURCE_TYPES = ["general", "docs", "news", "reviews", "academic", "commerce"];
-const VALID_ADAPTIVE_ACTIONS = ["search", "fetch"];
-
-const PROMPT_DETAIL = {
-  full: { sources: 6, snippetChars: 260, excerptChars: 900, queryChars: 700, purposeChars: 400 },
-  fallback: { sources: 4, snippetChars: 140, excerptChars: 420, queryChars: 420, purposeChars: 240 },
-  emergency: { sources: 2, snippetChars: 70, excerptChars: 160, queryChars: 180, purposeChars: 120 },
-};
-
 function getDeepFetchSetting() {
   const val = Number(state.settings?.deepResearchDeepFetch);
   return Number.isFinite(val) ? Math.max(0, Math.min(MAX_DEEP_FETCH, val)) : 1;
@@ -204,7 +231,7 @@ function getDeepFetchSetting() {
 
 function clampDeepFetch(value) {
   const setting = getDeepFetchSetting();
-  if (value === undefined || value === null || value === '') return setting;
+  if (value === undefined || value === null || value === "") return setting;
   const num = parseInt(String(value), 10);
   if (isNaN(num) || num < 0) return setting;
   return Math.min(num, setting);
@@ -238,12 +265,45 @@ function getStepDedupeKey(step) {
 }
 
 /**
+ * Validate and normalize a single plan step (initial plan, not adaptive).
+ * Returns null if invalid or duplicate.
+ */
+function validatePlanStep(rawStep, index, existingSteps) {
+  if (!rawStep || typeof rawStep !== "object") return null;
+
+  const action = String(rawStep.action || "").trim().toLowerCase();
+  if (!VALID_ADAPTIVE_ACTIONS.includes(action)) return null;
+
+  const query = String(rawStep.query || "").trim();
+  if (!query) return null;
+
+  const normalizedQuery = action === "fetch" ? tryNormalizeFetchUrl(query) : query;
+  if (!normalizedQuery) return null;
+
+  const candidateKey = getStepDedupeKey({ action, query: normalizedQuery });
+  if (existingSteps.some((s) => getStepDedupeKey(s) === candidateKey)) {
+    return null;
+  }
+
+  return {
+    id: String(rawStep.id || index + 1),
+    action,
+    query: normalizedQuery,
+    purpose: String(rawStep.purpose || "").trim(),
+    sourceType: action === "search" ? normalizeSourceType(rawStep.sourceType) : "",
+    deepFetch: action === "search" ? clampDeepFetch(rawStep.deepFetch) : 0,
+    status: "pending",
+    outcome: null,
+    error: null,
+    resultFile: null,
+    adaptive: false,
+    parentStepId: null,
+  };
+}
+
+/**
  * Validate and normalize a single adaptive step proposal.
  * Returns null if the step is invalid, duplicate, or unsupported.
- * @param {object} rawStep - The raw adaptive step from model output
- * @param {Array} existingSteps - All current execution steps for dedup
- * @param {number} adapterCounter - Current adaptive step counter
- * @returns {object|null} Normalized adaptive step or null
  */
 function validateAdaptiveStep(rawStep, existingSteps, adapterCounter) {
   if (!rawStep || typeof rawStep !== "object") return null;
@@ -254,16 +314,12 @@ function validateAdaptiveStep(rawStep, existingSteps, adapterCounter) {
   const query = String(rawStep.query || "").trim();
   if (!query) return null;
 
-  // Fetch steps must target normalizable HTTP(S) URLs
   const normalizedQuery = action === "fetch" ? tryNormalizeFetchUrl(query) : query;
   if (!normalizedQuery) return null;
 
-  // Deduplicate against all existing steps by normalized action + query
   const candidateKey = getStepDedupeKey({ action, query: normalizedQuery });
-  for (const existing of existingSteps) {
-    if (getStepDedupeKey(existing) === candidateKey) {
-      return null;
-    }
+  if (existingSteps.some((s) => getStepDedupeKey(s) === candidateKey)) {
+    return null;
   }
 
   const purpose = String(rawStep.purpose || "").trim();
@@ -322,13 +378,16 @@ function ensureRun(runId, conversationId = getCurrentConversationId()) {
 function setStatus(run, status) {
   if (!run || !RESEARCH_STATUSES.includes(status)) return run;
   if (run.status === status) return run;
-  const allowed = TRANSITIONS[run.status] || [];
-  if (allowed.includes(status)) {
-    return transitionRun(run, status);
-  }
-  run.status = status;
-  run.updatedAt = Date.now();
-  return run;
+  return transitionRun(run, status);
+}
+
+function isRunActive(run) {
+  return Boolean(
+    run &&
+    run.execution?.managed &&
+    run.status !== "cancelled" &&
+    run.status !== "complete"
+  );
 }
 
 function emitConfigState() {
@@ -400,6 +459,7 @@ function serializeRun(run) {
     conversationId: run.conversationId,
     status: run.status,
     plan: run.plan,
+    report: run.report || null,
     sourceLedger: run.sourceLedger,
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
@@ -418,7 +478,7 @@ function serializeRun(run) {
 
 /**
  * Serialize a single execution step for storage.
- * Strips fetched file contents â€” only metadata is persisted.
+ * File contents are not persisted; only resultFile availability is recorded.
  */
 function serializeStep(step) {
   return {
@@ -428,12 +488,12 @@ function serializeStep(step) {
     purpose: step.purpose,
     sourceType: step.sourceType || "",
     deepFetch: Number(step.deepFetch) || 0,
-    // Include skipped_budget as a valid persisted status (alongside pending, tool_running, etc.)
     status: step.status || "pending",
     outcome: step.outcome || null,
     error: step.error || null,
     adaptive: Boolean(step.adaptive),
     parentStepId: step.parentStepId || null,
+    resultFileAvailable: Boolean(step.resultFile),
   };
 }
 
@@ -450,6 +510,7 @@ function deserializeRun(raw) {
     conversationId: String(raw.conversationId || ""),
     status: RESEARCH_STATUSES.includes(raw.status) ? raw.status : "cancelled",
     plan: raw.plan || null,
+    report: raw.report || null,
     sourceLedger: Array.isArray(raw.sourceLedger) ? raw.sourceLedger : [],
     createdAt: Number(raw.createdAt) || Date.now(),
     updatedAt: Number(raw.updatedAt) || Date.now(),
@@ -477,8 +538,11 @@ function deserializeRun(raw) {
 
 /**
  * Deserialize a single execution step from storage.
+ * If a resultFile existed before reload, mark the step as failed because the
+ * File object cannot be restored.
  */
 function deserializeStep(raw) {
+  const lostResultFile = Boolean(raw.resultFileAvailable && raw.status === "ready_to_send");
   return {
     id: raw.id,
     action: raw.action || "search",
@@ -486,18 +550,19 @@ function deserializeStep(raw) {
     purpose: raw.purpose || "",
     sourceType: raw.sourceType || "",
     deepFetch: Number(raw.deepFetch) || 0,
-    status: raw.status || "pending",
+    status: lostResultFile ? "send_failed" : raw.status || "pending",
     outcome: raw.outcome || null,
-    error: raw.error || null,
+    error: lostResultFile
+      ? "Evidence file was lost after reload; step cannot be re-sent."
+      : raw.error || null,
     adaptive: Boolean(raw.adaptive),
     parentStepId: raw.parentStepId || null,
+    resultFile: null,
   };
 }
 
 /**
  * Build hidden approval message to send to DeepSeek.
- * @param {object} run
- * @returns {string}
  */
 export function buildApprovalMessage(run) {
   return [
@@ -515,9 +580,6 @@ export function buildApprovalMessage(run) {
 
 /**
  * Build hidden revision message to send to DeepSeek.
- * @param {object} run
- * @param {string} feedback
- * @returns {string}
  */
 export function buildRevisionMessage(run, feedback) {
   const safeFeedback = String(feedback || "").trim() || "No specific feedback was provided. Re-check the plan for completeness, source coverage, and alignment with the user's original request.";
@@ -536,9 +598,6 @@ export function buildRevisionMessage(run, feedback) {
 
 /**
  * Build the initial planning prompt injected when deep research mode is enabled.
- * @param {string} runId
- * @param {string} userQuery - the user's research question
- * @returns {string}
  */
 export function buildPlanningPrompt(runId, userQuery) {
   return [
@@ -568,34 +627,29 @@ export function buildPlanningPrompt(runId, userQuery) {
 
 /**
  * Normalize plan steps into execution-ready step objects.
- * @param {Array} planSteps - Raw plan steps from model
- * @returns {Array} Normalized execution steps
+ * Invalid, empty, or duplicate steps are filtered.
  */
 function normalizeStepsFromPlan(planSteps) {
   if (!Array.isArray(planSteps)) return [];
-  return planSteps.map((s, i) => {
-    const action = s.action === "fetch" ? "fetch" : "search";
-    return {
-      id: String(s.id || i + 1),
-      action,
-      query: String(s.query || "").trim(),
-      purpose: String(s.purpose || "").trim(),
-      sourceType: action === "search" ? String(s.sourceType || "general").trim() : "",
-      deepFetch: action === "search" ? clampDeepFetch(s.deepFetch) : 0,
-      status: "pending",
-      outcome: null,
-      error: null,
-      resultFile: null,
-    };
-  });
+  const steps = [];
+  for (let i = 0; i < planSteps.length; i++) {
+    const step = validatePlanStep(planSteps[i], i, steps);
+    if (step) {
+      steps.push(step);
+    } else {
+      devLog("DeepResearch", `Dropped invalid/duplicate plan step at index ${i}`);
+    }
+  }
+  return steps;
 }
 
 /**
  * Initialize managed execution from an approved plan.
- * @param {object} run
+ * Duplicate approval is ignored.
  */
 function initManagedExecution(run) {
-  if (!run || !run.plan || !Array.isArray(run.plan.steps)) return;
+  if (!run || run.execution.managed) return;
+  if (!run.plan || !Array.isArray(run.plan.steps)) return;
   run.execution.managed = true;
   run.execution.steps = normalizeStepsFromPlan(run.plan.steps);
   run.execution.currentStepIndex = 0;
@@ -608,12 +662,10 @@ function initManagedExecution(run) {
 
 /**
  * Execute the current step of a managed deep research run.
- * Returns false if no step to run, true otherwise.
- * @param {object} run
- * @returns {Promise<boolean>}
+ * Returns false if no step to run, cancelled, or otherwise stopped.
  */
 async function runCurrentStep(run) {
-  if (!run || !run.execution.managed) return false;
+  if (!isRunActive(run)) return false;
   const steps = run.execution.steps;
   const idx = run.execution.currentStepIndex;
   if (idx < 0 || idx >= steps.length) return false;
@@ -633,8 +685,20 @@ async function runCurrentStep(run) {
       const file = await fetchAndConvertWebPage(url, (status) => {
         devLog("DeepResearch", `Fetch status for step ${step.id}: ${status}`);
       });
+
+      if (!isRunActive(run)) {
+        step.status = "cancelled";
+        run.updatedAt = Date.now();
+        return false;
+      }
+
       if (file) {
         const text = await readFileText(file);
+        if (!isRunActive(run)) {
+          step.status = "cancelled";
+          run.updatedAt = Date.now();
+          return false;
+        }
         step.resultFile = file;
         step.outcome = JSON.stringify({
           url,
@@ -646,7 +710,6 @@ async function runCurrentStep(run) {
         throw new Error("Fetch returned no file");
       }
     } else {
-      // Search step
       const deepFetch = clampDeepFetch(step.deepFetch);
       const result = await searchWeb(step.query, deepFetch, (status) => {
         devLog("DeepResearch", `Search status for step ${step.id}: ${status}`);
@@ -654,8 +717,20 @@ async function runCurrentStep(run) {
         purpose: step.purpose,
         sourceType: step.sourceType,
       });
+
+      if (!isRunActive(run)) {
+        step.status = "cancelled";
+        run.updatedAt = Date.now();
+        return false;
+      }
+
       if (result && result.file && result.results) {
         const text = await readFileText(result.file);
+        if (!isRunActive(run)) {
+          step.status = "cancelled";
+          run.updatedAt = Date.now();
+          return false;
+        }
         step.resultFile = result.file;
         step.outcome = JSON.stringify({
           query: result.query || step.query,
@@ -676,10 +751,22 @@ async function runCurrentStep(run) {
       }
     }
   } catch (err) {
+    if (!isRunActive(run)) {
+      step.status = "cancelled";
+      run.updatedAt = Date.now();
+      return false;
+    }
+
     console.error(`[BDS:DEEP_RESEARCH] Step ${step.id} failed:`, err);
     step.error = String(err.message || err);
     step.outcome = null;
     step.resultFile = createStepErrorFile(run, step, step.error);
+  }
+
+  if (!isRunActive(run)) {
+    step.status = "cancelled";
+    run.updatedAt = Date.now();
+    return false;
   }
 
   step.status = "ready_to_send";
@@ -691,24 +778,29 @@ async function runCurrentStep(run) {
 }
 
 function createStepErrorFile(run, step, message) {
-  const safeRunId = String(run.id || "run").replace(/[^a-z0-9_-]/gi, "_");
-  const safeStepId = String(step.id || "step").replace(/[^a-z0-9_-]/gi, "_");
-  const content = [
-    `Deep Research step failed`,
-    ``,
-    `Run ID: ${run.id}`,
-    `Step ID: ${step.id}`,
-    `Action: ${step.action}`,
-    `Query: ${step.query}`,
-    `Purpose: ${step.purpose || ""}`,
-    ``,
-    `Error: ${message || "Unknown error"}`,
-  ].join("\n");
-  return new File(
-    [content],
-    `deep-research-${safeRunId}-step-${safeStepId}-error.txt`,
-    { type: "text/plain" },
-  );
+  try {
+    const safeRunId = String(run.id || "run").replace(/[^a-z0-9_-]/gi, "_");
+    const safeStepId = String(step.id || "step").replace(/[^a-z0-9_-]/gi, "_");
+    const content = [
+      `Deep Research step failed`,
+      ``,
+      `Run ID: ${run.id}`,
+      `Step ID: ${step.id}`,
+      `Action: ${step.action}`,
+      `Query: ${step.query}`,
+      `Purpose: ${step.purpose || ""}`,
+      ``,
+      `Error: ${message || "Unknown error"}`,
+    ].join("\n");
+    return new File(
+      [content],
+      `deep-research-${safeRunId}-step-${safeStepId}-error.txt`,
+      { type: "text/plain" },
+    );
+  } catch (error) {
+    console.error("[BDS:DEEP_RESEARCH] Could not create step error file:", error);
+    return null;
+  }
 }
 
 async function readFileText(file) {
@@ -824,7 +916,7 @@ function buildStepPromptFooter(runId, stepId) {
     ``,
     `If you discover material gaps, contradictions, newly discovered named entities, missing source classes, or need recency checks, add up to 3 focused follow-up steps via an optional "nextSteps" array:`,
     `{"stepId":"${stepId}","analysis":"...","newInsights":["..."],"nextSteps":[{"action":"search","query":"specific follow-up query","purpose":"why this gap matters","sourceType":"academic","deepFetch":${getDeepFetchSetting()}}]}`,
-    `nextStep actions: "search" or "fetch". Fetch queries must be HTTP(S) URLs. sourceType for searches: general, docs, news, reviews, academic, commerce (default: general). Only add nextSteps for material gaps â€” avoid unnecessary expansion.`,
+    `nextStep actions: "search" or "fetch". Fetch queries must be HTTP(S) URLs. sourceType for searches: general, docs, news, reviews, academic, commerce (default: general). Only add nextSteps for material gaps — avoid unnecessary expansion.`,
     ``,
     `Do NOT produce the final report yet. Only analyze this step.`,
     `</BetterDeepSeek>`,
@@ -932,6 +1024,7 @@ async function sendStepResult(run, step) {
 
   if (step.resultFile) {
     const evidenceText = await readFileText(step.resultFile);
+    if (!isRunActive(run)) return false;
     return await sendFileWithMessage(step.resultFile, prompt, label, {
       inlineText: buildManagedStepResultPrompt(run, step, {
         inlineEvidenceText: evidenceText,
@@ -974,13 +1067,28 @@ function markStepSendFailed(run, step) {
 }
 
 async function sendStepForAnalysis(run, step) {
-  // Check context budget before sending â€” if the outgoing prompt would cross
-  // the threshold, stop here and request a compact final report instead.
+  if (!isRunActive(run)) return false;
+
   if (!isBudgetStopped(run)) {
-    const promptText = buildManagedStepResultPrompt(run, step);
-    const outgoingTokens = estimateDeepSeekTokens(promptText);
-    const evidenceText = step.resultFile ? await readFileText(step.resultFile).catch(() => "") : "";
-    const totalOutgoing = outgoingTokens + estimateDeepSeekTokens(evidenceText);
+    let promptTextForBudget;
+    let evidenceText = "";
+
+    if (step.resultFile) {
+      evidenceText = await readFileText(step.resultFile).catch(() => "");
+      if (!isRunActive(run)) return false;
+
+      // Budget check should reflect the largest outgoing prompt shape.
+      promptTextForBudget = buildManagedStepResultPrompt(run, step, {
+        inlineEvidenceText: evidenceText,
+        maxChars: TEXT_ONLY_STEP_PROMPT_CHARS,
+        detail: "full",
+      });
+    } else {
+      promptTextForBudget = buildManagedStepResultPrompt(run, step);
+    }
+
+    const outgoingTokens = estimateDeepSeekTokens(promptTextForBudget);
+    const totalOutgoing = outgoingTokens; // prompt already includes inline evidence digest when applicable
 
     const budgetCheck = wouldCrossDeepResearchBudget(run, totalOutgoing);
     if (budgetCheck.wouldCross) {
@@ -989,21 +1097,24 @@ async function sendStepForAnalysis(run, step) {
       emitRunState(run);
       void persistRuns(state.deepResearch.runs);
 
-      // Request a compact budget-stopped final report immediately
       void requestFinalReport(run, { budgetStopped: true });
       return true;
     }
 
-    // Record outgoing context for budget tracking
     recordOutgoingContext({
       conversationId: run.conversationId,
-      text: promptText,
+      text: promptTextForBudget,
       fileText: evidenceText || undefined,
       label: `Deep Research step ${step.id} result`,
     });
   }
 
+  if (!isRunActive(run)) return false;
+
   const sent = await sendStepResult(run, step);
+
+  if (!isRunActive(run)) return false;
+
   if (sent === false) {
     markStepSendFailed(run, step);
     return false;
@@ -1015,8 +1126,6 @@ async function sendStepForAnalysis(run, step) {
 
 /**
  * Build the final report prompt after all steps are complete.
- * @param {object} run
- * @returns {string}
  */
 function buildFinalReportPrompt(run) {
   const runId = run.id;
@@ -1024,8 +1133,9 @@ function buildFinalReportPrompt(run) {
   const stepSummaries = run.execution.steps.map((s) => {
     const adaptiveLabel = s.adaptive ? ` [adaptive follow-up from step ${s.parentStepId || "?"}]` : "";
     const header = `Step ${s.id}: ${s.action} "${s.query}" (${s.purpose})${adaptiveLabel}`;
-    if (s.error) return `${header} â€” FAILED: ${s.error}`;
-    return `${header} â€” complete`;
+    if (s.status === "send_failed") return `${header} — SEND FAILED: ${s.error || "Could not send step result"}`;
+    if (s.error) return `${header} — FAILED: ${s.error}`;
+    return `${header} — complete`;
   }).join("\n");
 
   return [
@@ -1045,10 +1155,6 @@ function buildFinalReportPrompt(run) {
 
 /**
  * Build compact final report prompt for budget-stopped runs.
- * Includes completed steps, skipped steps, and the budget-stop reason.
- * Kept compact to avoid consuming unnecessary context.
- * @param {object} run
- * @returns {string}
  */
 export function buildBudgetStoppedFinalReportPrompt(run) {
   const runId = run.id;
@@ -1060,18 +1166,18 @@ export function buildBudgetStoppedFinalReportPrompt(run) {
 
   for (const s of exec.steps) {
     if (s.status === "complete") {
-      const suffix = s.error ? ` â€” FAILED: ${s.error}` : " â€” complete";
+      const suffix = s.error ? ` — FAILED: ${s.error}` : " — complete";
       completedSteps.push(`Step ${s.id}: ${s.action} "${s.query}"${suffix}`);
     } else if (s.status === "skipped_budget") {
-      skippedSteps.push(`Step ${s.id}: ${s.action} "${s.query}" â€” skipped (budget)`);
-    } else if (s.error) {
-      failedSteps.push(`Step ${s.id}: ${s.action} "${s.query}" â€” FAILED: ${s.error}`);
+      skippedSteps.push(`Step ${s.id}: ${s.action} "${s.query}" — skipped (budget)`);
+    } else if (s.error || s.status === "send_failed") {
+      failedSteps.push(`Step ${s.id}: ${s.action} "${s.query}" — ${s.status === "send_failed" ? "SEND FAILED" : "FAILED"}: ${s.error || "unknown error"}`);
     }
   }
 
   const lines = [
     `<BetterDeepSeek>`,
-    `[BDS:DEEP_RESEARCH] Research finalized early â€” context budget threshold reached.`,
+    `[BDS:DEEP_RESEARCH] Research finalized early — context budget threshold reached.`,
     `Run ID: ${runId}`,
     `Reason: ${exec.budgetStopReason || "Context budget threshold reached"}`,
   ];
@@ -1102,9 +1208,6 @@ export function buildBudgetStoppedFinalReportPrompt(run) {
 
 /**
  * Advance to the next step after step-done is received.
- * If all steps complete, sends the final report prompt.
- * @param {object} run
- * @returns {boolean} true if advanced, false if all steps done
  */
 function advanceToNextStep(run) {
   run.execution.awaitingAnalysisStepId = null;
@@ -1115,9 +1218,7 @@ function advanceToNextStep(run) {
     return false;
   }
 
-  // Defense in depth: if budget was already stopped, do not execute more steps
   if (isBudgetStopped(run)) {
-    // Mark remaining pending steps as skipped
     for (let i = run.execution.currentStepIndex; i < run.execution.steps.length; i++) {
       if (run.execution.steps[i].status === "pending") {
         run.execution.steps[i].status = "skipped_budget";
@@ -1128,10 +1229,9 @@ function advanceToNextStep(run) {
     return false;
   }
 
-  // Advance to next step
   void persistRuns(state.deepResearch.runs);
   void runCurrentStep(run).then((ran) => {
-    if (ran) {
+    if (ran && isRunActive(run)) {
       const step = run.execution.steps[run.execution.currentStepIndex];
       void sendStepForAnalysis(run, step);
     }
@@ -1140,6 +1240,8 @@ function advanceToNextStep(run) {
 }
 
 async function requestFinalReport(run, options = {}) {
+  if (!isRunActive(run)) return false;
+
   run.execution.awaitingAnalysisStepId = null;
   emitRunState(run);
 
@@ -1151,7 +1253,6 @@ async function requestFinalReport(run, options = {}) {
     ? "Deep Research budget-stopped final report request"
     : "Deep Research final report request";
 
-  // Record outgoing context for budget tracking
   if (budgetStopped) {
     recordOutgoingContext({
       conversationId: run.conversationId,
@@ -1169,6 +1270,9 @@ async function requestFinalReport(run, options = {}) {
   const sent = await Promise.resolve(
     injectPureTextAndSend(promptText, label),
   );
+
+  if (!isRunActive(run)) return false;
+
   if (sent === false) {
     state.ui?.showToast?.("Could not request the Deep Research final report.");
     emitRunState(run);
@@ -1176,7 +1280,13 @@ async function requestFinalReport(run, options = {}) {
   }
 
   run.execution.reportRequested = true;
-  setStatus(run, "reporting");
+  try {
+    setStatus(run, "reporting");
+  } catch (error) {
+    devLog("DeepResearch", `Could not transition to reporting: ${error.message}`);
+    run.status = "reporting";
+    run.updatedAt = Date.now();
+  }
   upsertRun(run);
   emitRunState(run);
   void persistRuns(state.deepResearch.runs);
@@ -1185,25 +1295,13 @@ async function requestFinalReport(run, options = {}) {
 
 /**
  * Validate and insert adaptive follow-up steps proposed by the model.
- * Steps are validated, deduplicated, and inserted immediately after the
- * completed step. Capped at MAX_ADAPTIVE_STEPS_PER_STEP (3) per step
- * and MAX_TOTAL_MANAGED_STEPS (12) total per run.
- * @param {object} run
- * @param {Array} nextSteps - Raw adaptive step proposals from model
- * @param {string} parentStepId - The step ID that discovered these gaps
  */
 function processAdaptiveSteps(run, nextSteps, parentStepId) {
   if (!Array.isArray(nextSteps) || nextSteps.length === 0) return;
-
-  // Never insert adaptive steps after budget guard has stopped the run
   if (isBudgetStopped(run)) return;
 
   const exec = run.execution;
-
-  // Enforce total step cap
   if (exec.steps.length >= MAX_TOTAL_MANAGED_STEPS) return;
-
-  // Initialize counter if needed (backward compat with deserialized runs)
   if (exec.adaptiveStepCounter == null) exec.adaptiveStepCounter = 0;
 
   const accepted = [];
@@ -1222,11 +1320,9 @@ function processAdaptiveSteps(run, nextSteps, parentStepId) {
 
   if (accepted.length === 0) return;
 
-  // Insert adaptive steps right after the current step
   const insertIdx = exec.currentStepIndex + 1;
   exec.steps.splice(insertIdx, 0, ...accepted);
 
-  // Mirror accepted adaptive steps into run.plan.steps so UI/state reflect the evolving plan
   if (run.plan && Array.isArray(run.plan.steps)) {
     run.plan.steps.splice(insertIdx, 0, ...accepted.map((s) => ({
       id: s.id,
@@ -1245,17 +1341,9 @@ function processAdaptiveSteps(run, nextSteps, parentStepId) {
 
 /**
  * Handle a received DEEP_RESEARCH_STEP_DONE tag.
- * Only advances if the runId and stepId match the expected values.
- * Processes adaptive nextSteps if present in the analysis JSON.
- * @param {object} run
- * @param {string} stepId
- * @param {object} analysisJson
- * @returns {boolean} true if the step was handled
  */
 export function handleStepDone(run, stepId, analysisJson) {
-  if (!run || !run.execution.managed) return false;
-  // If budget already stopped, do not process further step-done events
-  if (isBudgetStopped(run)) return false;
+  if (!isRunActive(run)) return false;
   if (run.execution.awaitingAnalysisStepId !== String(stepId)) return false;
 
   const idx = run.execution.currentStepIndex;
@@ -1280,7 +1368,6 @@ export function handleStepDone(run, stepId, analysisJson) {
       insights: analysisJson.newInsights || [],
     });
 
-    // Process adaptive nextSteps proposed by the model
     if (Array.isArray(analysisJson.nextSteps) && analysisJson.nextSteps.length > 0) {
       processAdaptiveSteps(run, analysisJson.nextSteps, stepId);
     }
@@ -1297,16 +1384,11 @@ function summarizeFallbackAnalysis(text) {
 }
 
 /**
- * Recover when the model emits an old-style AUTO tag during managed execution
- * instead of the required DEEP_RESEARCH_STEP_DONE marker.
- * @param {object} run
- * @param {string} visibleAnalysisText
- * @returns {boolean} true if the awaiting step was completed
+ * Recover when the model emits an old-style AUTO tag during managed execution.
  */
 export function handleManagedAutoContinuation(run, visibleAnalysisText = "") {
-  if (!run || !run.execution?.managed) return false;
+  if (!isRunActive(run)) return false;
   if (run.status === "complete" || run.status === "cancelled") return false;
-  if (isBudgetStopped(run)) return false;
 
   const stepId = String(run.execution.awaitingAnalysisStepId || "");
   if (!stepId) return false;
@@ -1325,16 +1407,21 @@ export function handleManagedAutoContinuation(run, visibleAnalysisText = "") {
 
 /**
  * Handle a received DEEP_RESEARCH_REPORT or synthesize one from visible markdown.
- * @param {object} run
- * @param {string} markdown
  */
 export function handleManagedReport(run, markdown) {
   if (!run || !run.execution.managed) return false;
   if (!run.execution.reportRequested) return false;
   if (!areManagedStepsComplete(run)) return false;
 
-  setStatus(run, "complete");
+  run.report = String(markdown || "");
   run.updatedAt = Date.now();
+  try {
+    setStatus(run, "complete");
+  } catch (error) {
+    devLog("DeepResearch", `Could not transition to complete: ${error.message}`);
+    run.status = "complete";
+    run.updatedAt = Date.now();
+  }
   upsertRun(run);
   state.deepResearch.enabled = false;
   state.deepResearch.pendingRun = null;
@@ -1350,18 +1437,16 @@ export function handleManagedReport(run, markdown) {
 
 function areManagedStepsComplete(run) {
   const steps = run?.execution?.steps || [];
-  // Consider steps "complete" if they are either actually complete or skipped
-  // due to budget â€” in both cases the run has finished all possible work.
-  return steps.every((step) => step.status === "complete" || step.status === "skipped_budget");
+  return steps.every((step) =>
+    step.status === "complete" ||
+    step.status === "skipped_budget" ||
+    step.status === "send_failed"
+  );
 }
 
 /**
  * Check if a managed run is in the reporting phase and the latest settled
- * assistant message has no report tag â€” if so, synthesize a report.
- * Called from message-processor when a message settles during reporting phase.
- * @param {object} run
- * @param {string} visibleText - The sanitized visible text from the message
- * @returns {boolean} true if synthesis was triggered
+ * assistant message has no report tag — if so, synthesize a report.
  */
 export function trySynthesizeReport(run, visibleText) {
   if (!run || !run.execution.managed) return false;
@@ -1376,9 +1461,6 @@ export function trySynthesizeReport(run, visibleText) {
 
 /**
  * Check whether a managed deep research run is active.
- * Used to suppress AUTO tags during managed runs.
- * @param {string} runId
- * @returns {boolean}
  */
 export function isManagedRunActive(runId) {
   if (!runId) return false;
@@ -1387,182 +1469,269 @@ export function isManagedRunActive(runId) {
     run.status !== "complete" && run.status !== "cancelled");
 }
 
-let runtimeInitialized = false;
-
 export function initDeepResearchRuntime() {
   if (runtimeInitialized) return;
   runtimeInitialized = true;
 
-  loadRuns()
+  runtimeReadyPromise = loadRuns()
     .then((runs) => {
       state.deepResearch.runs = runs;
     })
     .catch((error) => {
       console.warn("[BDS:DEEP_RESEARCH] Failed to load runs:", error);
+      state.deepResearch.runs = [];
     });
 
-  window.addEventListener("bds:deep-research-started", (event) => {
-    const detail = normalizeEventDetail(event.detail);
-    const runId = String(detail.runId || state.deepResearch.pendingRun?.id || "").trim();
-    if (!runId) return;
+  const ready = () => runtimeReadyPromise;
 
-    const run =
-      state.deepResearch.pendingRun && state.deepResearch.pendingRun.id === runId
-        ? state.deepResearch.pendingRun
-        : ensureRun(runId, String(detail.conversationId || getCurrentConversationId()));
+  window.addEventListener("bds:deep-research-started", async (event) => {
+    await ready().catch(() => {});
+    try {
+      const detail = normalizeEventDetail(event.detail);
+      const runId = String(detail.runId || state.deepResearch.pendingRun?.id || "").trim();
+      if (!runId) return;
 
-    run.conversationId = String(detail.conversationId || run.conversationId || getCurrentConversationId());
-    setStatus(run, "planning");
-    upsertRun(run);
-    state.deepResearch.enabled = true;
-    state.deepResearch.pendingRun = null;
-    emitConfigState();
-    emitToggleState();
-    emitRunState(run);
-    void persistRuns(state.deepResearch.runs);
-  });
+      const run =
+        state.deepResearch.pendingRun && state.deepResearch.pendingRun.id === runId
+          ? state.deepResearch.pendingRun
+          : ensureRun(runId, String(detail.conversationId || getCurrentConversationId()));
 
-  window.addEventListener("bds:deep-research-plan-received", (event) => {
-    const detail = normalizeEventDetail(event.detail);
-    const run = ensureRun(detail.runId, detail.conversationId);
-    run.plan = detail.plan || null;
-    setStatus(run, "planning");
-    upsertRun(run);
-    emitRunState(run);
-    void persistRuns(state.deepResearch.runs);
-  });
-
-  window.addEventListener("bds:deep-research-status-received", (event) => {
-    const detail = normalizeEventDetail(event.detail);
-    const run = ensureRun(detail.runId, detail.conversationId);
-    setStatus(run, "running");
-    run.updatedAt = Date.now();
-    upsertRun(run);
-    emitRunState(run);
-    void persistRuns(state.deepResearch.runs);
-  });
-
-  window.addEventListener("bds:deep-research-report-received", (event) => {
-    const detail = normalizeEventDetail(event.detail);
-    const run = ensureRun(detail.runId, detail.conversationId);
-    if (run.execution?.managed) {
-      const handled = handleManagedReport(run, detail.markdown || "");
-      if (!handled) {
-        console.warn("[BDS:DEEP_RESEARCH] Ignored managed report before report gate opened:", {
-          runId: run.id,
-          status: run.status,
-          reportRequested: run.execution.reportRequested,
-        });
+      run.conversationId = String(detail.conversationId || run.conversationId || getCurrentConversationId());
+      try {
+        setStatus(run, "planning");
+      } catch (error) {
+        devLog("DeepResearch", `Could not transition to planning: ${error.message}`);
+        run.status = "planning";
+        run.updatedAt = Date.now();
       }
-      return;
-    }
-
-    setStatus(run, "complete");
-    run.updatedAt = Date.now();
-    upsertRun(run);
-    state.deepResearch.enabled = false;
-    state.deepResearch.pendingRun = null;
-    clearRunSearchHistory(run.id);
-    emitConfigState();
-    emitToggleState();
-    emitRunState(run);
-    void persistRuns(state.deepResearch.runs);
-  });
-
-  window.addEventListener("bds:deep-research-approve", (event) => {
-    const detail = normalizeEventDetail(event.detail);
-    const run = ensureRun(detail.runId, detail.conversationId);
-    run.plan = detail.plan || run.plan;
-
-    // Initialize managed execution from the approved plan
-    initManagedExecution(run);
-    setStatus(run, "approved");
-    setStatus(run, "running");
-    upsertRun(run);
-    emitRunState(run);
-    void persistRuns(state.deepResearch.runs);
-
-    // Record the approval message for context budget tracking
-    recordOutgoingContext({
-      conversationId: run.conversationId,
-      text: buildApprovalMessage(run),
-      label: "Deep Research plan approval",
-    });
-
-    if (run.execution.steps.length === 0) {
-      void requestFinalReport(run);
-      return;
-    }
-
-    // Run step 1 immediately
-    void runCurrentStep(run).then((ran) => {
-      if (ran) {
-        const step = run.execution.steps[0];
-        void sendStepForAnalysis(run, step).then((sent) => {
-          if (sent === false) {
-            state.ui?.showToast?.("Could not start Deep Research execution.");
-          }
-        });
-      }
-    });
-  });
-
-  window.addEventListener("bds:deep-research-revise", (event) => {
-    const detail = normalizeEventDetail(event.detail);
-    const run = ensureRun(detail.runId, detail.conversationId);
-    run.plan = detail.plan || run.plan;
-    const revisionMessage = buildRevisionMessage(run, String(detail.feedback || ""));
-    const sent = injectPureTextAndSend(
-      revisionMessage,
-      "Deep Research revision request",
-    );
-    // Record revision prompt for budget tracking
-    recordOutgoingContext({
-      conversationId: run.conversationId,
-      text: revisionMessage,
-      label: "Deep Research revision request",
-    });
-    if (sent === false) {
-      state.ui?.showToast?.("Could not submit Deep Research feedback.");
+      upsertRun(run);
+      state.deepResearch.enabled = true;
+      state.deepResearch.pendingRun = null;
+      emitConfigState();
+      emitToggleState();
       emitRunState(run);
-      return;
-    }
-    setStatus(run, "awaiting_revision");
-    upsertRun(run);
-    emitRunState(run);
-    void persistRuns(state.deepResearch.runs);
-  });
-
-  window.addEventListener("bds:deep-research-cancel", (event) => {
-    const detail = normalizeEventDetail(event.detail);
-    const run = ensureRun(detail.runId, detail.conversationId);
-    setStatus(run, "cancelled");
-    run.execution.managed = false;
-    upsertRun(run);
-    state.deepResearch.enabled = false;
-    state.deepResearch.pendingRun = null;
-    clearRunSearchHistory(run.id);
-    clearConversationBudget(run.conversationId);
-    emitConfigState();
-    emitToggleState();
-    emitRunState(run);
-    void persistRuns(state.deepResearch.runs);
-    if (state.ui) {
-      state.ui.showToast("Deep Research cancelled.");
+      void persistRuns(state.deepResearch.runs);
+    } catch (error) {
+      console.error("[BDS:DEEP_RESEARCH] started handler failed:", error);
     }
   });
 
-  window.addEventListener("bds:deep-research-step-done", (event) => {
-    const detail = normalizeEventDetail(event.detail);
-    const run = findRunById(detail.runId);
-    if (!run) return;
-    const handled = handleStepDone(run, detail.stepId, detail.analysis || {});
-    if (!handled) {
-      console.warn("[BDS:DEEP_RESEARCH] Step-done received but not handled:", {
-        runId: detail.runId,
-        stepId: detail.stepId,
-        expected: run.execution?.awaitingAnalysisStepId,
+  window.addEventListener("bds:deep-research-plan-received", async (event) => {
+    await ready().catch(() => {});
+    try {
+      const detail = normalizeEventDetail(event.detail);
+      const run = ensureRun(detail.runId, detail.conversationId);
+      run.plan = detail.plan || null;
+      try {
+        setStatus(run, "planning");
+      } catch (error) {
+        devLog("DeepResearch", `Could not transition to planning: ${error.message}`);
+        run.status = "planning";
+        run.updatedAt = Date.now();
+      }
+      upsertRun(run);
+      emitRunState(run);
+      void persistRuns(state.deepResearch.runs);
+    } catch (error) {
+      console.error("[BDS:DEEP_RESEARCH] plan-received handler failed:", error);
+    }
+  });
+
+  window.addEventListener("bds:deep-research-status-received", async (event) => {
+    await ready().catch(() => {});
+    try {
+      const detail = normalizeEventDetail(event.detail);
+      const run = ensureRun(detail.runId, detail.conversationId);
+      try {
+        setStatus(run, "running");
+      } catch (error) {
+        devLog("DeepResearch", `Could not transition to running: ${error.message}`);
+        run.status = "running";
+        run.updatedAt = Date.now();
+      }
+      run.updatedAt = Date.now();
+      upsertRun(run);
+      emitRunState(run);
+      void persistRuns(state.deepResearch.runs);
+    } catch (error) {
+      console.error("[BDS:DEEP_RESEARCH] status-received handler failed:", error);
+    }
+  });
+
+  window.addEventListener("bds:deep-research-report-received", async (event) => {
+    await ready().catch(() => {});
+    try {
+      const detail = normalizeEventDetail(event.detail);
+      const run = ensureRun(detail.runId, detail.conversationId);
+      if (run.execution?.managed) {
+        const handled = handleManagedReport(run, detail.markdown || "");
+        if (!handled) {
+          console.warn("[BDS:DEEP_RESEARCH] Ignored managed report before report gate opened:", {
+            runId: run.id,
+            status: run.status,
+            reportRequested: run.execution.reportRequested,
+          });
+        }
+        return;
+      }
+
+      try {
+        setStatus(run, "complete");
+      } catch (error) {
+        devLog("DeepResearch", `Could not transition to complete: ${error.message}`);
+        run.status = "complete";
+        run.updatedAt = Date.now();
+      }
+      run.report = String(detail.markdown || "");
+      run.updatedAt = Date.now();
+      upsertRun(run);
+      state.deepResearch.enabled = false;
+      state.deepResearch.pendingRun = null;
+      clearRunSearchHistory(run.id);
+      emitConfigState();
+      emitToggleState();
+      emitRunState(run);
+      void persistRuns(state.deepResearch.runs);
+    } catch (error) {
+      console.error("[BDS:DEEP_RESEARCH] report-received handler failed:", error);
+    }
+  });
+
+  window.addEventListener("bds:deep-research-approve", async (event) => {
+    await ready().catch(() => {});
+    try {
+      const detail = normalizeEventDetail(event.detail);
+      const run = ensureRun(detail.runId, detail.conversationId);
+
+      // Ignore duplicate approve events to avoid resetting execution.
+      if (run.execution.managed && run.status === "running") return;
+
+      run.plan = detail.plan || run.plan;
+      initManagedExecution(run);
+
+      try {
+        setStatus(run, "approved");
+        setStatus(run, "running");
+      } catch (error) {
+        devLog("DeepResearch", `Could not transition approve/running: ${error.message}`);
+        run.status = "running";
+        run.updatedAt = Date.now();
+      }
+      upsertRun(run);
+      emitRunState(run);
+      void persistRuns(state.deepResearch.runs);
+
+      recordOutgoingContext({
+        conversationId: run.conversationId,
+        text: buildApprovalMessage(run),
+        label: "Deep Research plan approval",
       });
+
+      if (run.execution.steps.length === 0) {
+        void requestFinalReport(run);
+        return;
+      }
+
+      void runCurrentStep(run).then((ran) => {
+        if (ran && isRunActive(run)) {
+          const step = run.execution.steps[0];
+          void sendStepForAnalysis(run, step).then((sent) => {
+            if (sent === false) {
+              state.ui?.showToast?.("Could not start Deep Research execution.");
+            }
+          });
+        }
+      });
+    } catch (error) {
+      console.error("[BDS:DEEP_RESEARCH] approve handler failed:", error);
+    }
+  });
+
+  window.addEventListener("bds:deep-research-revise", async (event) => {
+    await ready().catch(() => {});
+    try {
+      const detail = normalizeEventDetail(event.detail);
+      const run = ensureRun(detail.runId, detail.conversationId);
+      run.plan = detail.plan || run.plan;
+      const revisionMessage = buildRevisionMessage(run, String(detail.feedback || ""));
+
+      const sent = await Promise.resolve(
+        injectPureTextAndSend(revisionMessage, "Deep Research revision request")
+      );
+
+      recordOutgoingContext({
+        conversationId: run.conversationId,
+        text: revisionMessage,
+        label: "Deep Research revision request",
+      });
+
+      if (sent === false) {
+        state.ui?.showToast?.("Could not submit Deep Research feedback.");
+        emitRunState(run);
+        return;
+      }
+
+      try {
+        setStatus(run, "awaiting_revision");
+      } catch (error) {
+        devLog("DeepResearch", `Could not transition to awaiting_revision: ${error.message}`);
+        run.status = "awaiting_revision";
+        run.updatedAt = Date.now();
+      }
+      upsertRun(run);
+      emitRunState(run);
+      void persistRuns(state.deepResearch.runs);
+    } catch (error) {
+      console.error("[BDS:DEEP_RESEARCH] revise handler failed:", error);
+    }
+  });
+
+  window.addEventListener("bds:deep-research-cancel", async (event) => {
+    await ready().catch(() => {});
+    try {
+      const detail = normalizeEventDetail(event.detail);
+      const run = ensureRun(detail.runId, detail.conversationId);
+      try {
+        setStatus(run, "cancelled");
+      } catch (error) {
+        devLog("DeepResearch", `Could not transition to cancelled: ${error.message}`);
+        run.status = "cancelled";
+        run.updatedAt = Date.now();
+      }
+      run.execution.managed = false;
+      upsertRun(run);
+      state.deepResearch.enabled = false;
+      state.deepResearch.pendingRun = null;
+      clearRunSearchHistory(run.id);
+      clearConversationBudget(run.conversationId);
+      emitConfigState();
+      emitToggleState();
+      emitRunState(run);
+      void persistRuns(state.deepResearch.runs);
+      if (state.ui) {
+        state.ui.showToast("Deep Research cancelled.");
+      }
+    } catch (error) {
+      console.error("[BDS:DEEP_RESEARCH] cancel handler failed:", error);
+    }
+  });
+
+  window.addEventListener("bds:deep-research-step-done", async (event) => {
+    await ready().catch(() => {});
+    try {
+      const detail = normalizeEventDetail(event.detail);
+      const run = findRunById(detail.runId);
+      if (!run) return;
+      const handled = handleStepDone(run, detail.stepId, detail.analysis || {});
+      if (!handled) {
+        console.warn("[BDS:DEEP_RESEARCH] Step-done received but not handled:", {
+          runId: detail.runId,
+          stepId: detail.stepId,
+          expected: run.execution?.awaitingAnalysisStepId,
+        });
+      }
+    } catch (error) {
+      console.error("[BDS:DEEP_RESEARCH] step-done handler failed:", error);
     }
   });
 }
