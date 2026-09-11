@@ -126,7 +126,8 @@ function isTextFile(filename) {
     "js", "ts", "jsx", "tsx", "svelte", "vue", "html", "css", "scss", "json",
     "md", "txt", "py", "c", "cpp", "h", "hpp", "java", "go", "rs", "rb", "php",
     "sh", "yml", "yaml", "toml", "ini", "csv", "sql", "xml", "env",
-    "cs", "csproj", "sln", "fs", "fsproj", "razor", "swift", "kt", "dart"
+    "cs", "csproj", "sln", "fs", "fsproj", "razor", "swift", "kt", "dart",
+    "nix"
   ];
   return textExts.includes(ext);
 }

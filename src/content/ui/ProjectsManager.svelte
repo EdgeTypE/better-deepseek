@@ -328,7 +328,7 @@
       "c", "cpp", "cs",
       "rb", "php",
       "html", "css", "sh",
-      "yaml", "yml", "toml", "env",
+      "yaml", "yml", "toml", "env", "nix",
     ]);
 
     const filesToAdd = [];

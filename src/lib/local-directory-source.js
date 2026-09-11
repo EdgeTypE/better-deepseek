@@ -20,7 +20,7 @@ const TEXT_EXTS = new Set([
   "sql", "xml", "env", "cs", "csproj", "sln", "fs", "fsproj", "razor",
   "swift", "kt", "dart", "gradle", "kts", "proto", "cmake", "cfg",
   "conf", "pl", "pm", "r", "m", "mm", "lua", "zig", "tex", "bib",
-  "ipynb", "jsonl", "log",
+  "ipynb", "jsonl", "log", "nix",
 ]);
 
 function openDb() {

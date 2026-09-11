@@ -1170,7 +1170,7 @@ class WebViewBridge(
                         "json", "md", "txt", "py", "c", "cpp", "h", "hpp", "java", "go",
                         "rs", "rb", "php", "sh", "yml", "yaml", "toml", "ini", "csv", "sql",
                         "xml", "env", "cs", "csproj", "sln", "fs", "fsproj", "razor",
-                        "swift", "kt", "dart"
+                        "swift", "kt", "dart", "nix"
                 )
 
         internal val IMAGE_EXTENSIONS = setOf("png", "jpg", "jpeg", "webp", "gif", "bmp")

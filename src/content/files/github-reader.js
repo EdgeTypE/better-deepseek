@@ -57,7 +57,7 @@ const TEXT_EXTS = new Set([
   "lua", "ex", "exs", "erl", "hrl",
   "tf", "hcl",
   "proto", "graphql", "gql",
-  "dockerfile", "makefile", "cmake",
+  "dockerfile", "makefile", "cmake", "nix",
   "gitignore", "editorconfig", "eslintrc", "prettierrc",
 ]);
 
