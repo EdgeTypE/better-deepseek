@@ -20,10 +20,10 @@
   let showDownloadMenu = $state(false);
   let copyFeedback = $state(false);
   let isExpanded = $state(true);
+  let isDarkTheme = $state(false);
 
   // Internal non-reactive references (never $state to avoid reactive loops)
   let view = null;
-  let isDarkTheme = false;
   let resizeObserver = null;
   let themeObserver = null;
   let lastRenderedContent = "";
@@ -74,10 +74,11 @@
   });
 
   function detectTheme() {
+    if (typeof document === "undefined") return false;
     return (
-      document.documentElement.classList.contains("dark") ||
-      document.body.classList.contains("dark") ||
-      (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches)
+      document.documentElement?.classList.contains("dark") ||
+      document.body?.classList.contains("dark") ||
+      (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches)
     );
   }
 
