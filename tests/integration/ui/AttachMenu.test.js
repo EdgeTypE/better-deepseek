@@ -460,10 +460,31 @@ describe("AttachMenu integration", () => {
     getAttachItemByText("Upload File").click();
     await flushNativePick();
 
-    expect(window.AndroidBridge.pickFiles).toHaveBeenCalledWith("files", expect.any(String));
+    expect(window.AndroidBridge.pickFiles).toHaveBeenCalledWith("files+images", expect.any(String));
     expect(Array.from(nativeInput.files, (file) => file.name)).toEqual(["a.md"]);
     expect(changeHandler).toHaveBeenCalled();
     expect(state.ui.showToast).not.toHaveBeenCalled();
+    cleanup();
+  });
+
+  it("requests files mode when images are explicitly disabled via remote config", async () => {
+    await remoteConfig.applyRemote({
+      features: { fileUpload: { imagesEnabled: false } },
+    });
+    installAndroidBridgeMock(() => ({
+      files: [{ name: "a.md", content: "# A" }],
+      skipped: [],
+    }));
+    const nativeInput = setupNativeInput();
+    const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+
+    await flushModelWatcher();
+    target.querySelector(".bds-plus-btn").click();
+    await flushUi();
+    getAttachItemByText("Upload File").click();
+    await flushNativePick();
+
+    expect(window.AndroidBridge.pickFiles).toHaveBeenCalledWith("files", expect.any(String));
     cleanup();
   });
 

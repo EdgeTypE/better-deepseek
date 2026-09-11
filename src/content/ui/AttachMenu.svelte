@@ -568,7 +568,8 @@
     closeMenu();
     if (isAndroidTarget && isNativeFilePickerAvailable()) {
       try {
-        const wantImages = currentModelType === "vision";
+        const imagesAllowed = getFlag("features.fileUpload.imagesEnabled") ?? true;
+        const wantImages = imagesAllowed && currentModelType !== "textOnly";
         const result = await nativePickFiles(wantImages ? "files+images" : "files");
         if (result.cancelled) return;
         const files = result.files || [];

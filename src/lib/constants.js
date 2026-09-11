@@ -913,7 +913,7 @@ export const DEFAULT_REMOTE_CONFIG = {
       deepthinkMode: { show: true, showPlus: true, showUploadFile: true, showUploadFolder: true, showGithub: true, showWeb: true, showProject: true, showVoice: true },
       visionMode: { show: true, showPlus: true, showUploadFile: true, showUploadFolder: true, showGithub: true, showWeb: true, showProject: true, showVoice: true },
     },
-    fileUpload: { enabled: true, expertModeBlocked: true, dataTransfer: true, nativeInput: true },
+    fileUpload: { enabled: true, imagesEnabled: true, expertModeBlocked: true, dataTransfer: true, nativeInput: true },
     codeBlocks: { runButtons: { python: true, javascript: true, typescript: true } },
     sidebar: { tagsButton: true, search: true, exportButton: true, tagHider: true },
     systemPromptInjection: { enabled: true, forceDisableInExpert: false },

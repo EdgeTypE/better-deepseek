@@ -13,6 +13,7 @@
     },
     "fileUpload": {
       "enabled": true,
+      "imagesEnabled": true,
       "expertModeBlocked": true,
       "dataTransfer": true,
       "nativeInput": true
