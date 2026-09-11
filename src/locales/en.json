@@ -682,6 +682,20 @@
       "sendFailed": "Failed to send. Please try again.",
       "cancel": "Cancel"
     },
+    "chartCard": {
+      "defaultTitle": "Interactive Chart",
+      "defaultSubtitle": "Vega-Lite Visualization",
+      "downloadPng": "Download as PNG",
+      "downloadSvg": "Download as SVG",
+      "downloadJson": "Download Spec (JSON)",
+      "viewCode": "View Spec",
+      "hideCode": "Hide Spec",
+      "copySpec": "Copy Spec",
+      "copied": "Copied!",
+      "renderError": "Could not render chart",
+      "expand": "Expand chart",
+      "collapse": "Collapse chart"
+    },
     "previewPanel": {
       "close": "Close",
       "download": "Download .html"

@@ -678,6 +678,20 @@
       "sendFailed": "ارسال ناموفق بود. لطفاً دوباره تلاش کنید.",
       "cancel": "انصراف"
     },
+    "chartCard": {
+      "defaultTitle": "نمودار تعاملی",
+      "defaultSubtitle": "بصری‌سازی Vega-Lite",
+      "downloadPng": "دانلود به عنوان PNG",
+      "downloadSvg": "دانلود به عنوان SVG",
+      "downloadJson": "دانلود مشخصات (JSON)",
+      "viewCode": "مشاهده مشخصات",
+      "hideCode": "مخفی کردن مشخصات",
+      "copySpec": "کپی مشخصات",
+      "copied": "کپی شد!",
+      "renderError": "امکان رسم نمودار وجود ندارد",
+      "expand": "گسترش نمودار",
+      "collapse": "جمع کردن نمودار"
+    },
     "previewPanel": {
       "close": "بستن",
       "download": "دانلود .html"

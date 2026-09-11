@@ -678,6 +678,20 @@
       "sendFailed": "发送失败，请重试。",
       "cancel": "取消"
     },
+    "chartCard": {
+      "defaultTitle": "交互式图表",
+      "defaultSubtitle": "Vega-Lite 可视化",
+      "downloadPng": "下载为 PNG",
+      "downloadSvg": "下载为 SVG",
+      "downloadJson": "下载规范 (JSON)",
+      "viewCode": "查看规范",
+      "hideCode": "隐藏规范",
+      "copySpec": "复制规范",
+      "copied": "已复制！",
+      "renderError": "无法渲染图表",
+      "expand": "展开图表",
+      "collapse": "折叠图表"
+    },
     "previewPanel": {
       "close": "关闭",
       "download": "下载 .html 文件"

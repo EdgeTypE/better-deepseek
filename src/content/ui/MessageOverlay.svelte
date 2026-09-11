@@ -8,6 +8,7 @@
   import PptxCard from "./PptxCard.svelte";
   import ExcelCard from "./ExcelCard.svelte";
   import DocxCard from "./DocxCard.svelte";
+  import ChartCard from "./ChartCard.svelte";
   import AutoCodeRunnerCard from "./AutoCodeRunnerCard.svelte";
   import AutoCodeResultCard from "./AutoCodeResultCard.svelte";
   import SearchResultCard from "./SearchResultCard.svelte";
@@ -257,6 +258,8 @@
         <ExcelCard content={block.content} />
       {:else if block.name === 'docx'}
         <DocxCard content={block.content} />
+      {:else if block.name === 'chart'}
+        <ChartCard content={block.content} attrs={block.attrs} />
       {:else if block.name === 'harness_task' || block.name === 'auto:harness_task'}
         <HarnessTaskCard attrs={block.attrs} content={block.content} />
       {:else if block.name === 'auto:code_runner'}

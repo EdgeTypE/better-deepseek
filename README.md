@@ -40,12 +40,12 @@ Inject a custom system prompt that guides DeepSeek's behavior without cluttering
 ### Tool Tags for Enhanced Output
 Better DeepSeek introduces a set of special tags that DeepSeek can use to produce rich, interactive content:
 
-- `<BDS:HTML>...</BDS:HTML>` – Render a full HTML document in a preview card.
 - `<BDS:VISUALIZER>...</BDS:VISUALIZER>` – Create high-contrast, monochrome simulations and interactive diagrams using a built-in UI kit.
 - `<BDS:create_file fileName="path/to/file.ext">...</BDS:create_file>` – Generate a downloadable file with the specified name and content.
 - `<BDS:pptx>...</BDS:pptx>` – Generate a PowerPoint presentation using the PptxGenJS library.
 - `<BDS:excel>...</BDS:excel>` – Generate an Excel spreadsheet using SheetJS.
 - `<BDS:docx>...</BDS:docx>` – Generate a Word document using the docx library.
+- `<BDS:chart>...</BDS:chart>` – Generate interactive charts and data visualizations using the declarative Vega-Lite specification.
 - `<BDS:AUTO:REQUEST_WEB_FETCH>url</BDS:AUTO:REQUEST_WEB_FETCH>` – Automatically fetch and convert a web page to markdown, then inject it into the chat context.
 - `<BDS:AUTO:REQUEST_GITHUB_FETCH>url</BDS:AUTO:REQUEST_GITHUB_FETCH>` – Automatically fetch a GitHub repository and inject its codebase into the chat context.
 - `<BDS:AUTO:SEARCH_IN_DIRECTORY queries="...">` – Search codebase directories for files and symbols (active when DeepCode is enabled).

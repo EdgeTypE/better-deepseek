@@ -31,6 +31,16 @@ describe("stripAutoLinkArtifacts", () => {
     ).toBe("see [DeepSeek](https://chat.deepseek.com)");
   });
 
+  it("collapses redundant autolinks where link text equals the URL", () => {
+    expect(
+      stripAutoLinkArtifacts(
+        '"$schema": "[https://vega.github.io/schema/vega-lite/v5.json](https://vega.github.io/schema/vega-lite/v5.json)"',
+      ),
+    ).toBe(
+      '"$schema": "https://vega.github.io/schema/vega-lite/v5.json"',
+    );
+  });
+
   it("is idempotent", () => {
     const input = "├── [main.rs](https_main.rs)";
     expect(stripAutoLinkArtifacts(stripAutoLinkArtifacts(input))).toBe(
@@ -62,6 +72,15 @@ describe("isAutoLinkArtifact", () => {
         "https://github.com/acme/repo/blob/main.rs",
       ),
     ).toBe(false);
+  });
+
+  it("collapses full URL autolinks when text and href match", () => {
+    expect(
+      isAutoLinkArtifact(
+        "https://vega.github.io/schema/vega-lite/v5.json",
+        "https://vega.github.io/schema/vega-lite/v5.json",
+      ),
+    ).toBe(true);
   });
 
   it("preserves real links with distinct text", () => {

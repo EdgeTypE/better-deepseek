@@ -13,10 +13,16 @@ const SENTINEL_LINK_RE = /\[([^\]\n]*)\]\(\s*https?_[^)\s]*\s*\)/gi;
 // Matches `[text](https://text)` where text is a bare domain equal to the URL
 // host. The optional trailing "/" plus closing paren are consumed so no stray
 // ")" fragments survive. Links that point at a path on a matching host
-// (e.g. [github.com](https://github.com/acme/repo)) are real links and are NOT
 // matched — consistent with isAutoLinkArtifact below.
 const BARE_DOMAIN_LINK_RE =
   /\[([a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,})\]\(\s*https?:\/\/(?:www\.)?\1\/?\s*\)/gi;
+
+// Matches `[https://example.com/foo](https://example.com/foo)` where link text is the URL itself.
+// Markdown autolinkers turn raw URLs into <a> elements with href === textContent;
+// when reconstructed into markdown, they become redundant [url](url) links that
+// corrupt JSON payloads, tag attributes, and code blocks.
+const REDUNDANT_URL_LINK_RE =
+  /\[(https?:\/\/[^\]\n]+)\]\(\s*\1\/?\s*\)/gi;
 
 /**
  * Convert markdown autolink artifacts back to their plain link text.
@@ -25,7 +31,8 @@ const BARE_DOMAIN_LINK_RE =
 export function stripAutoLinkArtifacts(value) {
   return String(value || "")
     .replace(SENTINEL_LINK_RE, "$1")
-    .replace(BARE_DOMAIN_LINK_RE, "$1");
+    .replace(BARE_DOMAIN_LINK_RE, "$1")
+    .replace(REDUNDANT_URL_LINK_RE, "$1");
 }
 
 /**
@@ -40,6 +47,22 @@ export function isAutoLinkArtifact(linkText, href) {
   if (!h || h === "#") return true;
 
   if (/^https?_\S*$/i.test(h)) return true;
+
+  // If the link text is literally the URL itself, it's an autolinked URL, not a labelled markdown link.
+  if (text && h) {
+    if (text === h || text.replace(/\/$/, "") === h.replace(/\/$/, "")) {
+      return true;
+    }
+    if (text.startsWith("http") && h.startsWith("http")) {
+      try {
+        if (text === decodeURI(h) || text.replace(/\/$/, "") === decodeURI(h).replace(/\/$/, "")) {
+          return true;
+        }
+      } catch {
+        // malformed URI percent-encoding, ignore
+      }
+    }
+  }
 
   if (/^https?:\/\//i.test(h)) {
     try {

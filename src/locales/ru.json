@@ -679,6 +679,20 @@
       "sendFailed": "Ошибка отправки. Попробуйте снова.",
       "cancel": "Отмена"
     },
+    "chartCard": {
+      "defaultTitle": "Интерактивный график",
+      "defaultSubtitle": "Визуализация Vega-Lite",
+      "downloadPng": "Скачать как PNG",
+      "downloadSvg": "Скачать как SVG",
+      "downloadJson": "Скачать схему (JSON)",
+      "viewCode": "Показать код",
+      "hideCode": "Скрыть код",
+      "copySpec": "Копировать код",
+      "copied": "Скопировано!",
+      "renderError": "Не удалось отобразить график",
+      "expand": "Развернуть график",
+      "collapse": "Свернуть график"
+    },
     "previewPanel": {
       "close": "Закрыть",
       "download": "Скачать .html"

@@ -27,6 +27,7 @@ const RENDERABLE_TOOLS = new Set([
   "pptx",
   "excel",
   "docx",
+  "chart",
   "ask_question",
   "character_create",
   "skill_create",

@@ -679,6 +679,20 @@
       "sendFailed": "Gönderilemedi. Lütfen tekrar deneyin.",
       "cancel": "İptal"
     },
+    "chartCard": {
+      "defaultTitle": "Etkileşimli Grafik",
+      "defaultSubtitle": "Vega-Lite Görselleştirmesi",
+      "downloadPng": "PNG Olarak İndir",
+      "downloadSvg": "SVG Olarak İndir",
+      "downloadJson": "Şemayı İndir (JSON)",
+      "viewCode": "Şemayı Gör",
+      "hideCode": "Şemayı Gizle",
+      "copySpec": "Şemayı Kopyala",
+      "copied": "Kopyalandı!",
+      "renderError": "Grafik çizilemedi",
+      "expand": "Grafiği genişlet",
+      "collapse": "Grafiği daralt"
+    },
     "previewPanel": {
       "close": "Kapat",
       "download": ".html İndir"
