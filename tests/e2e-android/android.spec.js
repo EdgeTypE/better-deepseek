@@ -138,7 +138,7 @@ test("Upload File on Android uses native picker bridge and injects markdown", as
     .toContain("android-notes.md");
   await expect
     .poll(() => page.evaluate(() => window.__mockDeepSeek.nativeUploadFileMode))
-    .toBe("files");
+    .toBe("files+images");
   expect(await page.evaluate(() => window.__mockDeepSeek.uploadInputClickedDirectly)).toBe(false);
 });
 
