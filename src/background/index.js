@@ -462,12 +462,12 @@ async function fetchPageContent(url, options = {}) {
   const ac = timeoutMs > 0 ? new AbortController() : null;
   const timer = ac
     ? setTimeout(
-        () =>
-          ac.abort(
-            new DOMException(`Request timed out after ${timeoutMs}ms`, "TimeoutError")
-          ),
-        timeoutMs
-      )
+      () =>
+        ac.abort(
+          new DOMException(`Request timed out after ${timeoutMs}ms`, "TimeoutError")
+        ),
+      timeoutMs
+    )
     : null;
 
   const fetchOptions = {
@@ -730,7 +730,7 @@ async function mcpEnsureInitialized(serverUrl, apiKey) {
 
   const initBody = {
     jsonrpc: "2.0", id: 1, method: "initialize",
-    params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "better-deepseek", version: "0.1.13" } },
+    params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "better-deepseek", version: "0.1.14" } },
   };
 
   entry.initialized = (async () => {

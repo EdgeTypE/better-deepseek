@@ -269,7 +269,7 @@
           <span
             >{t("drawer.github")}
             <small style="opacity: 0.6; font-weight: 400; margin-left: 4px;"
-              >{t("drawer.version", { version: "0.1.13" })}</small
+              >{t("drawer.version", { version: "0.1.14" })}</small
             ></span
           >
         </a>
