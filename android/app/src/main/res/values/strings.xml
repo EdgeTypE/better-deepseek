@@ -3,4 +3,20 @@
     <string name="app_name">Better DeepSeek</string>
     <string name="bds_target_url">https://chat.deepseek.com/</string>
     <string name="bds_asset_authority">bds-asset.local</string>
+
+    <!-- In-app updates (#157). Native strings follow the device locale, which is what
+         applySystemLocaleCookie() already assumes when it seeds NEXT_LOCALE. -->
+    <string name="bds_update_title">Update available</string>
+    <string name="bds_update_message">Better DeepSeek %1$s is available. You have %2$s.</string>
+    <string name="bds_update_message_beta">A newer beta build is available. You have %1$s.</string>
+    <string name="bds_update_download">Download</string>
+    <string name="bds_update_later">Later</string>
+    <string name="bds_update_channel">Channel</string>
+    <string name="bds_update_channel_title">Update channel</string>
+    <string name="bds_update_channel_release">Stable releases</string>
+    <string name="bds_update_channel_beta">Beta builds</string>
+    <string name="bds_update_downloading">Downloading the update...</string>
+    <string name="bds_update_download_failed">Download failed (%1$s).</string>
+    <string name="bds_update_need_permission">Grant the install unknown apps permission for Better DeepSeek, then try again.</string>
+    <string name="bds_update_install_failed">Could not open the package installer.</string>
 </resources>

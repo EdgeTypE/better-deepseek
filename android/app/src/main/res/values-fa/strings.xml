@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bds_update_title">به‌روزرسانی موجود است</string>
+    <string name="bds_update_message">نسخه %1$s از Better DeepSeek موجود است. نسخه شما %2$s است.</string>
+    <string name="bds_update_message_beta">یک نسخه بتای جدیدتر موجود است. نسخه شما %1$s است.</string>
+    <string name="bds_update_download">دانلود</string>
+    <string name="bds_update_later">بعداً</string>
+    <string name="bds_update_channel">کانال</string>
+    <string name="bds_update_channel_title">کانال به‌روزرسانی</string>
+    <string name="bds_update_channel_release">نسخه‌های پایدار</string>
+    <string name="bds_update_channel_beta">نسخه‌های بتا</string>
+    <string name="bds_update_downloading">در حال دانلود به‌روزرسانی...</string>
+    <string name="bds_update_download_failed">دانلود ناموفق بود (%1$s).</string>
+    <string name="bds_update_need_permission">برای Better DeepSeek اجازه نصب برنامه‌های ناشناس را بدهید و دوباره تلاش کنید.</string>
+    <string name="bds_update_install_failed">باز کردن نصب‌کننده ممکن نشد.</string>
+</resources>

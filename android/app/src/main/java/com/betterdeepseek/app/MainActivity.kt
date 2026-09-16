@@ -7,6 +7,7 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
@@ -24,6 +25,9 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import android.widget.FrameLayout
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -32,6 +36,8 @@ import androidx.webkit.UserAgentMetadata
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewFeature
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import java.io.File
 
 internal fun applyRootWindowInsets(view: View, windowInsets: WindowInsetsCompat): WindowInsetsCompat {
     val systemBars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
@@ -299,6 +305,26 @@ class MainActivity : ComponentActivity() {
                 }.start()
             }
 
+    // ── In-app updates ───────────────────────────────────────────────────
+
+    private lateinit var updateChecker: UpdateChecker
+    private var updateProgressDialog: AlertDialog? = null
+
+    /** APK already downloaded and waiting for the "install unknown apps" grant to be given. */
+    private var pendingInstallFile: File? = null
+
+    private val unknownSourcesLauncher: ActivityResultLauncher<Intent> =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+                val apk = pendingInstallFile ?: return@registerForActivityResult
+                // Coming back from the settings screen proves nothing on its own; the grant is
+                // what decides whether the installer will actually run.
+                if (packageManager.canRequestPackageInstalls()) {
+                    launchInstaller(apk)
+                } else {
+                    pendingInstallFile = null
+                }
+            }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -399,6 +425,12 @@ class MainActivity : ComponentActivity() {
         }
         webView.loadUrl(getString(R.string.bds_target_url))
 
+        // Startup update check. Started after the page begins loading so it never delays the
+        // WebView; the check is throttled, failures stay silent, and the dialog only appears when
+        // a genuinely newer build exists.
+        updateChecker = UpdateChecker(applicationContext)
+        maybeCheckForUpdates()
+
         onBackPressedDispatcher.addCallback(
                 this,
                 object : OnBackPressedCallback(true) {
@@ -492,6 +524,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         popupWebView?.let { closePopup(it) }
+        // A non-cancelable download dialog would leak the Activity window if it outlived us.
+        updateProgressDialog?.dismiss()
+        updateProgressDialog = null
         bridge.onThemeChanged = null
         bridge.evaluateJs = null
         bridge.onPickFiles = null
@@ -685,6 +720,177 @@ class MainActivity : ComponentActivity() {
                 .isSuccess
     }
 
+    // ── In-app updates ───────────────────────────────────────────────────
+
+    /**
+     * Start a background update check.
+     *
+     * Automatic checks are spaced out by [UpdateChecker.isAutoCheckDue] so relaunching the app
+     * cannot exhaust the unauthenticated GitHub API budget, and every failure is swallowed: a
+     * failed check must never interrupt the user.
+     */
+    private fun maybeCheckForUpdates() {
+        if (!updateChecker.isAutoCheckDue()) return
+
+        Thread {
+            val result = updateChecker.check(installedApp())
+            updateChecker.markChecked()
+            if (result is UpdateCheckResult.Available) {
+                runOnUiThread { showUpdateDialog(result.info) }
+            }
+        }.start()
+    }
+
+    private fun installedApp(): InstalledApp =
+            try {
+                val info = packageManager.getPackageInfo(packageName, 0)
+                // BUILD_ID is baked in by the release workflow from the CI run number. It is 0 for
+                // a build made outside CI, which makes the checker fall back to its timestamp
+                // heuristic instead of comparing against nothing.
+                InstalledApp(info.versionName, info.lastUpdateTime, BuildConfig.BUILD_ID)
+            } catch (t: Throwable) {
+                Log.w(TAG, "Could not read the installed package info", t)
+                InstalledApp(null, 0L, 0L)
+            }
+
+    private fun showUpdateDialog(info: UpdateInfo) {
+        if (isFinishing || isDestroyed) return
+        val installedVersion = installedApp().versionName.orEmpty()
+
+        // The beta channel's tag is literally "latest", so there is no version to show. Fall back
+        // to a message that names only what the user is running.
+        val message =
+                if (parseVersion(info.versionName) != null) {
+                    getString(R.string.bds_update_message, info.versionName, installedVersion)
+                } else {
+                    getString(R.string.bds_update_message_beta, installedVersion)
+                }
+
+        MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.bds_update_title)
+                .setMessage(message)
+                .setPositiveButton(R.string.bds_update_download) { _, _ ->
+                    startUpdateDownload(info)
+                }
+                .setNegativeButton(R.string.bds_update_later) { _, _ ->
+                    // Remembering the digest keeps "Later" from being re-asked on every launch
+                    // while this same build is still the newest one on the beta channel.
+                    updateChecker.rememberDeclined(info.digest)
+                }
+                .setNeutralButton(R.string.bds_update_channel) { _, _ -> showChannelDialog() }
+                .show()
+    }
+
+    /** Lets the user move between the stable and beta channels. The choice persists. */
+    private fun showChannelDialog() {
+        val channels = UpdateChannel.values()
+        val labels = channels.map { channelLabel(it) }.toTypedArray()
+        val selected = channels.indexOf(updateChecker.getChannel())
+
+        MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.bds_update_channel_title)
+                .setSingleChoiceItems(labels, selected) { dialog, which ->
+                    updateChecker.setChannel(channels[which])
+                    dialog.dismiss()
+                }
+                .setNegativeButton(R.string.bds_update_later, null)
+                .show()
+    }
+
+    private fun channelLabel(channel: UpdateChannel): String =
+            getString(
+                    when (channel) {
+                        UpdateChannel.RELEASE -> R.string.bds_update_channel_release
+                        UpdateChannel.BETA -> R.string.bds_update_channel_beta
+                    }
+            )
+
+    /**
+     * Download the APK off the main thread, then hand it to the package installer.
+     *
+     * The sha256 published by the releases API is verified while writing, so a truncated or
+     * substituted download is discarded instead of being offered for installation.
+     */
+    private fun startUpdateDownload(info: UpdateInfo) {
+        if (isFinishing || isDestroyed) return
+
+        updateProgressDialog =
+                MaterialAlertDialogBuilder(this)
+                        .setTitle(R.string.bds_update_title)
+                        .setMessage(R.string.bds_update_downloading)
+                        .setCancelable(false)
+                        .show()
+
+        val target = File(cacheDir, UPDATE_APK_NAME)
+        Thread {
+            val failure = updateChecker.downloadApk(info, target)
+            runOnUiThread {
+                updateProgressDialog?.dismiss()
+                updateProgressDialog = null
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (failure != null) {
+                    Log.w(TAG, "Update download failed: $failure")
+                    Toast.makeText(
+                                    this,
+                                    getString(R.string.bds_update_download_failed, failure),
+                                    Toast.LENGTH_LONG,
+                            )
+                            .show()
+                    return@runOnUiThread
+                }
+                requestInstall(target)
+            }
+        }.start()
+    }
+
+    /**
+     * Android 8+ refuses an APK handed over by ACTION_VIEW until the user grants this app the
+     * "install unknown apps" permission. Ask for it, then resume when the user returns.
+     */
+    private fun requestInstall(apk: File) {
+        if (packageManager.canRequestPackageInstalls()) {
+            launchInstaller(apk)
+            return
+        }
+
+        pendingInstallFile = apk
+        Toast.makeText(this, R.string.bds_update_need_permission, Toast.LENGTH_LONG).show()
+        try {
+            unknownSourcesLauncher.launch(
+                    Intent(
+                            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                            Uri.parse("package:$packageName"),
+                    )
+            )
+        } catch (t: Throwable) {
+            Log.w(TAG, "Could not open the unknown-sources settings screen", t)
+            pendingInstallFile = null
+        }
+    }
+
+    /** Hand the verified APK to the system installer through FileProvider. */
+    private fun launchInstaller(apk: File) {
+        pendingInstallFile = null
+        try {
+            val uri =
+                    FileProvider.getUriForFile(
+                            this,
+                            "${packageName}.fileprovider",
+                            apk,
+                    )
+            startActivity(
+                    Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, APK_MIME_TYPE)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+            )
+        } catch (t: Throwable) {
+            Log.e(TAG, "Could not launch the package installer", t)
+            Toast.makeText(this, R.string.bds_update_install_failed, Toast.LENGTH_LONG).show()
+        }
+    }
+
     // ── BDS script injection ─────────────────────────────────────────────
 
     /**
@@ -763,6 +969,11 @@ class MainActivity : ComponentActivity() {
         // have no matching JS listener, but the JS-side timeout bounds any surviving wait.
         private const val STATE_PENDING_PICK_REQUEST_ID = "bds_pending_pick_request_id"
         private const val STATE_PENDING_PICK_MODE = "bds_pending_pick_mode"
+
+        /** Staged APK for an in-app update, inside cacheDir so FileProvider can hand it out. */
+        private const val UPDATE_APK_NAME = "bds-update.apk"
+
+        private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
 
         // Default WebView background colours used in the inset-padding area behind transparent
         // system bars. Approximates DeepSeek's own page backgrounds so the status/nav bar region

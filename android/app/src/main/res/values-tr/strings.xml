@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bds_update_title">Güncelleme var</string>
+    <string name="bds_update_message">Better DeepSeek %1$s hazır. Sizde %2$s yüklü.</string>
+    <string name="bds_update_message_beta">Daha yeni bir beta sürümü hazır. Sizde %1$s yüklü.</string>
+    <string name="bds_update_download">İndir</string>
+    <string name="bds_update_later">Sonra</string>
+    <string name="bds_update_channel">Kanal</string>
+    <string name="bds_update_channel_title">Güncelleme kanalı</string>
+    <string name="bds_update_channel_release">Kararlı sürümler</string>
+    <string name="bds_update_channel_beta">Beta sürümleri</string>
+    <string name="bds_update_downloading">Güncelleme indiriliyor...</string>
+    <string name="bds_update_download_failed">İndirme başarısız (%1$s).</string>
+    <string name="bds_update_need_permission">Better DeepSeek için bilinmeyen uygulama kurma iznini verin, sonra tekrar deneyin.</string>
+    <string name="bds_update_install_failed">Paket yükleyici açılamadı.</string>
+</resources>

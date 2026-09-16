@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bds_update_title">Доступно обновление</string>
+    <string name="bds_update_message">Доступна версия Better DeepSeek %1$s. У вас установлена %2$s.</string>
+    <string name="bds_update_message_beta">Доступна новая бета-сборка. У вас установлена %1$s.</string>
+    <string name="bds_update_download">Скачать</string>
+    <string name="bds_update_later">Позже</string>
+    <string name="bds_update_channel">Канал</string>
+    <string name="bds_update_channel_title">Канал обновлений</string>
+    <string name="bds_update_channel_release">Стабильные выпуски</string>
+    <string name="bds_update_channel_beta">Бета-сборки</string>
+    <string name="bds_update_downloading">Загрузка обновления...</string>
+    <string name="bds_update_download_failed">Не удалось скачать (%1$s).</string>
+    <string name="bds_update_need_permission">Разрешите установку из неизвестных источников для Better DeepSeek и повторите попытку.</string>
+    <string name="bds_update_install_failed">Не удалось открыть установщик пакетов.</string>
+</resources>

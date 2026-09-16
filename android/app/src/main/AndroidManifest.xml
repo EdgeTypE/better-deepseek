@@ -3,6 +3,12 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- In-app updates (#157). The APK is downloaded from this project's own GitHub releases and
+         handed to the system installer, which is what requires this declaration. It is a
+         signature permission: it cannot be requested at runtime, the user instead grants this app
+         "install unknown apps" in Settings, and MainActivity routes them there when the grant is
+         missing. Without the declaration the installer intent is refused outright. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Mic button uses SpeechRecognition (browser API). The permission is
          declared so future native fallbacks remain possible. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />

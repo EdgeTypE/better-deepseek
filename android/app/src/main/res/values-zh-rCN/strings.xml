@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bds_update_title">有可用更新</string>
+    <string name="bds_update_message">Better DeepSeek %1$s 已发布，当前版本为 %2$s。</string>
+    <string name="bds_update_message_beta">有更新的测试版可用，当前版本为 %1$s。</string>
+    <string name="bds_update_download">下载</string>
+    <string name="bds_update_later">稍后</string>
+    <string name="bds_update_channel">渠道</string>
+    <string name="bds_update_channel_title">更新渠道</string>
+    <string name="bds_update_channel_release">稳定版</string>
+    <string name="bds_update_channel_beta">测试版</string>
+    <string name="bds_update_downloading">正在下载更新...</string>
+    <string name="bds_update_download_failed">下载失败（%1$s）。</string>
+    <string name="bds_update_need_permission">请为 Better DeepSeek 允许安装未知应用，然后重试。</string>
+    <string name="bds_update_install_failed">无法打开安装程序。</string>
+</resources>

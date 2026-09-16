@@ -1136,7 +1136,9 @@ class WebViewBridge(
 
     companion object {
         private const val TAG = "BdsWebViewBridge"
-        private const val PREFS_NAME = "bds_storage"
+        // Shared with UpdateChecker, which keeps the update channel and the dismissed-build
+        // digest alongside the JS storage keys.
+        internal const val PREFS_NAME = "bds_storage"
         private const val DEFAULT_GITHUB_API_BASE_URL = "https://api.github.com"
         private const val DEFAULT_GITHUB_COMMIT_COUNT = 100
         // Desktop Chrome UA for bds-fetch-url requests. Without it OkHttp sends

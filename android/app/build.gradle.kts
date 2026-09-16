@@ -3,6 +3,13 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Monotonic identity for every build, supplied by the release workflow as the GitHub Actions run
+// number. versionCode/versionName only change when a release is cut, so the beta channel — which
+// rebuilds on every push to `main` — would otherwise have no way to tell two builds of the same
+// version apart. Left at 0 for local builds, which the updater reads as "not a CI build" and
+// falls back to its timestamp heuristic for.
+val bdsBuildId: Long = (project.findProperty("BdsBuildId") as String?)?.toLongOrNull() ?: 0L
+
 android {
     namespace = "com.betterdeepseek.app"
     compileSdk = 34
@@ -18,6 +25,7 @@ android {
         versionCode = 10
         // Keep in sync with package.json "version" and static/manifest.json "version".
         versionName = "0.1.14"
+        buildConfigField("long", "BUILD_ID", "${bdsBuildId}L")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

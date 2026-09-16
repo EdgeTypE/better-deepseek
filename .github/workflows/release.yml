@@ -83,7 +83,7 @@ jobs:
 
       - name: Build Android APK
         working-directory: android
-        run: ./gradlew --no-daemon assembleRelease
+        run: ./gradlew --no-daemon assembleRelease -PbdsBuildId=${{ github.run_number }}
         env:
           BDS_KEYSTORE_PASSWORD: ${{ secrets.BDS_KEYSTORE_PASSWORD }}
           BDS_KEY_ALIAS: ${{ secrets.BDS_KEY_ALIAS }}
@@ -129,6 +129,8 @@ jobs:
             This release contains the latest automated build from the `main` branch.
 
             The Android APK is now **digitally signed**. You can install it directly without Play Protect warnings (though you may still need to allow "Unknown Sources" in your browser).
+
+            <!-- bds-build-id: ${{ github.run_number }} -->
           files: |
             better-deepseek-chrome-latest.zip
             better-deepseek-firefox-latest.zip
