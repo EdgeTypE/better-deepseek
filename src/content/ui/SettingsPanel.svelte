@@ -1157,7 +1157,9 @@
         const plainTest = JSON.parse(JSON.stringify(mcpServers));
         appState.mcpServers = plainTest;
         await chrome.storage.local.set({ [STORAGE_KEYS.mcpServers]: plainTest });
-        await discoverMcpToolSchemas();
+        // Explicit "test connection": bypass the discovery cache so the schema
+        // list reflects the server we just reached rather than a stale entry.
+        await discoverMcpToolSchemas({ force: true });
         pushConfigToPage();
         if (appState.ui) appState.ui.showToast(t('mcp.connected', { count: tools.length }));
       }

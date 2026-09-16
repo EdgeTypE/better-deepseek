@@ -12,6 +12,11 @@ import { getDeepCodeFiles, buildDeepCodeFileTree } from "./deep-code.js";
 import { discoverTags } from "./tags/tag-manager.js";
 import { recordOutgoingContext, recordServerUsage } from "./context-budget.js";
 import { retainOnlyHistorySession } from "./load-all-history.js";
+import {
+  coalesceMcpDiscovery,
+  evictMcpDiscovery,
+  mcpDiscoveryKey,
+} from "./mcp-discovery-cache.js";
 
 /**
  * Extract the current conversation ID from the URL for budget tracking.
@@ -431,46 +436,66 @@ export function handleNetworkState(detail) {
 /**
  * Discover MCP tool schemas by querying all enabled servers in parallel.
  * Populates state.mcpToolSchemas for use by payload-mutator.js.
+ *
+ * Concurrent and closely-spaced calls are coalesced and cached — see
+ * mcp-discovery-cache.js for why. Callers that represent an explicit user
+ * intent (the "Test" button on a server entry) pass `{ force: true }` so the
+ * result really reflects a fresh round trip.
+ *
+ * @param {{ force?: boolean }} [options]
+ * @returns {Promise<Array<object>>}
  */
-export async function discoverMcpToolSchemas() {
+export async function discoverMcpToolSchemas({ force = false } = {}) {
   const enabledServers = state.mcpServers.filter(s => s.enabled);
   if (!enabledServers.length) {
     state.mcpToolSchemas = [];
     return [];
   }
 
-  const results = await Promise.allSettled(
-    enabledServers.map(server =>
-      new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage(
-          { type: "bds-mcp-list-tools", serverUrl: server.serverUrl, apiKey: server.apiKey || "" },
-          (response) => {
-            if (response?.ok) resolve({ serverName: server.name, serverUrl: server.serverUrl, tools: response.tools });
-            else reject(new Error(response?.error || "Failed to list tools"));
-          }
-        );
-      })
-    )
-  );
+  const key = mcpDiscoveryKey(enabledServers);
+  let allServersAnswered = true;
 
-  const schemas = [];
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      const { serverName, serverUrl, tools } = result.value;
-      const toolList = Array.isArray(tools) ? tools : (tools?.tools || []);
-      for (const tool of toolList) {
-        schemas.push({
-          serverName,
-          serverUrl,
-          toolName: tool.name,
-          description: tool.description || "",
-          inputSchema: tool.inputSchema || {},
-        });
+  const schemas = await coalesceMcpDiscovery(key, async () => {
+    const results = await Promise.allSettled(
+      enabledServers.map(server =>
+        new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage(
+            { type: "bds-mcp-list-tools", serverUrl: server.serverUrl, apiKey: server.apiKey || "" },
+            (response) => {
+              if (response?.ok) resolve({ serverName: server.name, serverUrl: server.serverUrl, tools: response.tools });
+              else reject(new Error(response?.error || "Failed to list tools"));
+            }
+          );
+        })
+      )
+    );
+
+    const collected = [];
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        const { serverName, serverUrl, tools } = result.value;
+        const toolList = Array.isArray(tools) ? tools : (tools?.tools || []);
+        for (const tool of toolList) {
+          collected.push({
+            serverName,
+            serverUrl,
+            toolName: tool.name,
+            description: tool.description || "",
+            inputSchema: tool.inputSchema || {},
+          });
+        }
+      } else {
+        allServersAnswered = false;
+        console.warn(`[BDS] MCP discovery failed: ${result.reason?.message || "unknown error"}`);
       }
-    } else {
-      console.warn(`[BDS] MCP discovery failed: ${result.reason?.message || "unknown error"}`);
     }
-  }
+    return collected;
+  }, { force });
+
+  // A partial result (some server unreachable) must not be reused for the full
+  // TTL, or a server that just came back would stay invisible. Drop it so the
+  // next call retries instead of serving an incomplete tool list.
+  if (!allServersAnswered) evictMcpDiscovery(key);
 
   state.mcpToolSchemas = schemas;
   return schemas;
