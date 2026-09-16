@@ -336,6 +336,14 @@ class MainActivity : ComponentActivity() {
         cookieManager = CookieManager.getInstance()
         pendingPickFilesRequestId = savedInstanceState?.getString(STATE_PENDING_PICK_REQUEST_ID)
         pendingPickFilesMode = savedInstanceState?.getString(STATE_PENDING_PICK_MODE)
+        // A downloaded APK waiting on the "install unknown apps" grant has to survive recreation
+        // too, or returning from the settings screen finds nothing to install and the user has to
+        // download it again. The file itself lives in cacheDir and is still there; a path the
+        // system has since cleared is dropped rather than handed to the installer.
+        pendingInstallFile =
+                savedInstanceState
+                        ?.getString(STATE_PENDING_INSTALL_PATH)
+                        ?.let { path -> File(path).takeIf { it.isFile } }
 
         bridge.onPickFiles = { mode, requestId ->
             runOnUiThread {
@@ -520,6 +528,7 @@ class MainActivity : ComponentActivity() {
         super.onSaveInstanceState(outState)
         pendingPickFilesRequestId?.let { outState.putString(STATE_PENDING_PICK_REQUEST_ID, it) }
         pendingPickFilesMode?.let { outState.putString(STATE_PENDING_PICK_MODE, it) }
+        pendingInstallFile?.let { outState.putString(STATE_PENDING_INSTALL_PATH, it.absolutePath) }
     }
 
     override fun onDestroy() {
@@ -969,6 +978,13 @@ class MainActivity : ComponentActivity() {
         // have no matching JS listener, but the JS-side timeout bounds any surviving wait.
         private const val STATE_PENDING_PICK_REQUEST_ID = "bds_pending_pick_request_id"
         private const val STATE_PENDING_PICK_MODE = "bds_pending_pick_mode"
+
+        /**
+         * Absolute path of an APK staged for install while the "install unknown apps" grant is
+         * being requested. The install result launcher survives recreation, so the path it needs
+         * has to as well.
+         */
+        private const val STATE_PENDING_INSTALL_PATH = "bds_pending_install_path"
 
         /** Staged APK for an in-app update, inside cacheDir so FileProvider can hand it out. */
         private const val UPDATE_APK_NAME = "bds-update.apk"
