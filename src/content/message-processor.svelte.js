@@ -213,7 +213,10 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
   injectSelectionCheckbox(node);
   injectBookmarkButton(node);
 
-  const rawText = extractMessageRawText(node);
+  // Keep already-rendered KaTeX/mermaid markup intact: this text is re-rendered
+  // by MessageOverlay, and flattening rich output here duplicated every formula
+  // and leaked mermaid's viewer stylesheet into the message body (#169, #170).
+  const rawText = extractMessageRawText(node, { preserveRichHtml: true });
   if (!rawText.trim()) {
     return;
   }

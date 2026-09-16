@@ -1,7 +1,174 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from "vitest";
-import { extractMessageMarkdown } from "./message-text.js";
+import {
+  extractMessageMarkdown,
+  extractMessageRawText,
+} from "./message-text.js";
+
+/** KaTeX's real output shape: MathML tokens + LaTeX annotation + visual glyphs. */
+const INLINE_KATEX = `<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>a</mi><mn>2</mn></msup><mo>+</mo><msup><mi>b</mi><mn>2</mn></msup><mo>=</mo><msup><mi>c</mi><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">a^2 + b^2 = c^2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="mord"><span class="mord mathnormal">a</span><span class="msupsub"><span class="mord mtight">2</span></span></span><span class="mbin">+</span><span class="mord"><span class="mord mathnormal">b</span><span class="msupsub"><span class="mord mtight">2</span></span></span><span class="mrel">=</span><span class="mord"><span class="mord mathnormal">c</span><span class="msupsub"><span class="mord mtight">2</span></span></span></span></span></span>`;
+
+const DISPLAY_KATEX = `<span class="katex-display"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><mi>x</mi></mrow><annotation encoding="application/x-tex">x = \\frac{1}{2}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base">x</span></span></span></span>`;
+
+const MERMAID_SVG = `<div class="mermaid" data-processed="true"><svg id="mermaid-svg-27" width="100%" xmlns="http://www.w3.org/2000/svg"><style>#mermaid-svg-27{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#ccc;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}</style><g class="node"><rect/><text>X</text></g></svg></div>`;
+
+const MERMAID_CSS_MARKERS = ["trebuchet", "edge-animation-frame", "stroke-dashoffset"];
+
+/** Text that a reader can actually see — excludes <style>/<script> payloads. */
+function visibleTextOf(html) {
+  const doc = new DOMParser().parseFromString(
+    `<body>${html}</body>`,
+    "text/html",
+  );
+  doc.querySelectorAll("style, script").forEach((el) => el.remove());
+  return doc.body.textContent || "";
+}
+
+function messageNode(innerHtml) {
+  const node = document.createElement("div");
+  node.innerHTML = `<div class="ds-markdown">${innerHtml}</div>`;
+  return node;
+}
+
+describe("message-text - rich renderer fidelity (issues #169 / #170)", () => {
+  describe("KaTeX", () => {
+    it("emits an inline formula exactly once instead of concatenating its three renderings", () => {
+      const md = extractMessageMarkdown(
+        messageNode(`<p>Output ${INLINE_KATEX} once.</p>`),
+      );
+
+      expect(md).toBe("Output $a^2 + b^2 = c^2$ once.");
+      expect(md).not.toContain("a2+b2=c2");
+    });
+
+    it("emits a display formula as a $$ block", () => {
+      const md = extractMessageMarkdown(messageNode(DISPLAY_KATEX));
+
+      expect(md).toBe("$$x = \\frac{1}{2}$$");
+    });
+
+    it("preserves the rendered KaTeX markup when preserveRichHtml is set", () => {
+      const md = extractMessageMarkdown(
+        messageNode(`<p>Output ${INLINE_KATEX} once.</p>`),
+        { preserveRichHtml: true },
+      );
+
+      expect(md).toContain('class="katex"');
+      expect(md).toContain("annotation");
+      expect(md.startsWith("Output <span")).toBe(true);
+      // Exactly one KaTeX root, not one per rendering pass.
+      expect(md.match(/class="katex"/g)).toHaveLength(1);
+    });
+
+    it("keeps text-based candidates free of duplicated formula glyphs", () => {
+      const raw = extractMessageRawText(
+        messageNode(`<p>Output ${INLINE_KATEX} once.</p>`),
+      );
+
+      expect(raw).not.toContain("a2+b2=c2");
+      expect((raw.match(/a\^2 \+ b\^2 = c\^2/g) || [])).toHaveLength(1);
+    });
+  });
+
+  describe("mermaid", () => {
+    it("never surfaces the viewer stylesheet as visible text", () => {
+      const md = extractMessageMarkdown(
+        messageNode(`<p>Diagram:</p>${MERMAID_SVG}`),
+      );
+
+      for (const marker of MERMAID_CSS_MARKERS) {
+        expect(md).not.toContain(marker);
+      }
+    });
+
+    it("keeps the rendered diagram (and its scoped CSS) when preserveRichHtml is set", () => {
+      const md = extractMessageMarkdown(
+        messageNode(`<p>Diagram:</p>${MERMAID_SVG}`),
+        { preserveRichHtml: true },
+      );
+
+      expect(md).toContain("<svg");
+      expect(md).toContain('id="mermaid-svg-27"');
+
+      // The stylesheet must stay inside the SVG, where it is applied rather
+      // than displayed. Nothing may leak into the visible text.
+      const visible = visibleTextOf(md);
+      for (const marker of MERMAID_CSS_MARKERS) {
+        expect(visible).not.toContain(marker);
+      }
+    });
+
+    it("drops the rendered diagram from plain markdown without leaking CSS", () => {
+      const md = extractMessageMarkdown(
+        messageNode(`<p>Diagram:</p>${MERMAID_SVG}`),
+      );
+
+      expect(md).not.toContain("<svg");
+      expect(md).not.toContain("mermaid-svg-27{");
+    });
+
+    it("also drops a bare mermaid SVG that has no .mermaid wrapper", () => {
+      const bare = `<svg id="mermaid-svg-42" xmlns="http://www.w3.org/2000/svg"><style>#mermaid-svg-42{fill:#ccc;}</style><text>X</text></svg>`;
+
+      const plain = extractMessageMarkdown(messageNode(`<p>D:</p>${bare}`));
+      expect(plain).not.toContain("fill:#ccc");
+      expect(plain).not.toContain("X");
+
+      const raw = extractMessageRawText(messageNode(`<p>D:</p>${bare}`));
+      expect(raw).not.toContain("fill:#ccc");
+    });
+  });
+
+  describe("interaction with code block handling", () => {
+    it("still converts a plain code block into a fence", () => {
+      const md = extractMessageMarkdown(
+        messageNode(
+          `<div class="md-code-block"><div class="md-code-block-banner">Copy</div><pre><code class="language-js">const a = 1;</code></pre></div>`,
+        ),
+      );
+
+      expect(md).toBe("```js\nconst a = 1;\n```");
+    });
+
+    it("keeps a rendered diagram inside .md-code-block instead of fencing its source", () => {
+      const md = extractMessageMarkdown(
+        messageNode(
+          `<div class="md-code-block"><div class="md-code-block-banner">Mermaid</div>${MERMAID_SVG}<pre><code class="language-mermaid">graph LR\n  X --&gt; Y</code></pre></div>`,
+        ),
+        { preserveRichHtml: true },
+      );
+
+      expect(md).toContain("<svg");
+      expect(md).not.toContain("graph LR");
+      expect(visibleTextOf(md)).not.toContain("trebuchet");
+    });
+
+    it("falls back to the mermaid source for plain markdown exports", () => {
+      const md = extractMessageMarkdown(
+        messageNode(
+          `<div class="md-code-block">${MERMAID_SVG}<pre><code class="language-mermaid">graph LR\n  X --&gt; Y</code></pre></div>`,
+        ),
+      );
+
+      expect(md).toContain("```mermaid");
+      expect(md).toContain("graph LR");
+      expect(md).not.toContain("trebuchet");
+    });
+  });
+
+  describe("non-content elements", () => {
+    it("never serializes stray <style> or <script> payloads", () => {
+      const md = extractMessageMarkdown(
+        messageNode(
+          `<style>.leak{color:red}</style><p>Hello</p><script>var leak = 1;</script>`,
+        ),
+      );
+
+      expect(md).toBe("Hello");
+    });
+  });
+});
 
 describe("extractMessageMarkdown - autolink artifacts", () => {
   it("collapses sentinel autolinks (https_...) to plain text", () => {
