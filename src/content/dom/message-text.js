@@ -65,36 +65,45 @@ function isRichHtmlElement(el) {
 
 /**
  * Recover the LaTeX source of a KaTeX subtree. KaTeX always emits the original
- * source in <annotation encoding="application/x-tex">; the MathML token text is
- * only a fallback for malformed output.
+ * source in <annotation encoding="application/x-tex">.
  */
 function extractKatexSource(el) {
   const annotation = el.querySelector('annotation[encoding="application/x-tex"]');
-  const tex = annotation ? String(annotation.textContent || "").trim() : "";
-  if (tex) return tex;
+  return annotation ? String(annotation.textContent || "").trim() : "";
+}
+
+/** Render a KaTeX subtree as markdown text (no markup). */
+function katexToMarkdown(el) {
+  const tex = extractKatexSource(el);
+  if (tex) {
+    return el.classList.contains("katex-display") ? `\n$$${tex}$$\n` : `$${tex}$`;
+  }
+
+  // No LaTeX source to recover: emit the MathML token text as plain text rather
+  // than wrapping a garbled formula in math delimiters.
   const math = el.querySelector("math");
   return math ? String(math.textContent || "").trim() : "";
 }
+
+/** Marker kept so a diagram-only message is not dropped as empty content. */
+const MERMAID_PLACEHOLDER = "<!-- mermaid diagram -->";
 
 /**
  * Render a rich element as faithful markdown text (no markup).
  * Used by the plain/export path and by the text-based candidates.
  */
 function richElementToMarkdown(el) {
-  if (isKatexElement(el)) {
-    const tex = extractKatexSource(el);
-    if (!tex) return "";
-    return el.classList.contains("katex-display") ? `\n$$${tex}$$\n` : `$${tex}$`;
-  }
+  if (isKatexElement(el)) return katexToMarkdown(el);
 
-  // A rendered mermaid diagram cannot be rebuilt from its SVG. Fall back to the
-  // original ```mermaid source when the renderer kept it beside the SVG.
-  const source = el.closest?.(".md-code-block")?.querySelector("pre code");
-  if (source) {
-    const lang = (source.className || "").match(/language-([\w-]+)/)?.[1] || "mermaid";
-    return `\n\`\`\`${lang}\n${String(source.textContent || "").trim()}\n\`\`\`\n`;
-  }
-  return "";
+  // A rendered mermaid diagram cannot be rebuilt from its SVG. When the renderer
+  // kept the ```mermaid source beside the SVG, the normal <pre> handling emits
+  // it — emitting a fence here as well produced the block twice. Only fall back
+  // to a marker when there is no source to recover, so that a message whose
+  // entire body is a diagram is not treated as empty by the exporters.
+  const hasSource = Boolean(
+    el.closest?.(".md-code-block")?.querySelector("pre code"),
+  );
+  return hasSource ? "" : MERMAID_PLACEHOLDER;
 }
 
 /**
@@ -110,13 +119,7 @@ function flattenRichContentForText(root) {
   // descendants, and detached nodes are skipped by the parentNode guard below.
   root.querySelectorAll(".katex-display, .katex").forEach((el) => {
     if (!el.parentNode) return;
-    const tex = extractKatexSource(el);
-    const text = tex
-      ? el.classList.contains("katex-display")
-        ? `$$${tex}$$`
-        : `$${tex}$`
-      : "";
-    el.replaceWith(doc.createTextNode(text));
+    el.replaceWith(doc.createTextNode(katexToMarkdown(el)));
   });
 
   root.querySelectorAll(MERMAID_SELECTOR).forEach((el) => {
@@ -125,7 +128,7 @@ function flattenRichContentForText(root) {
     // Unrendered mermaid blocks still hold their source as text — keep it.
     const rendered = isMermaidSvg(container) || Boolean(container.querySelector("svg"));
     if (!rendered) return;
-    container.replaceWith(doc.createTextNode(""));
+    container.remove();
   });
 }
 
@@ -200,7 +203,91 @@ function replaceCodeBlocksWithFences(root) {
  *   formula or diagram. Omit it for plain-text consumers (exports, bookmarks).
  */
 export function extractMessageRawText(node, options = {}) {
-  return parseNodeWithBestTextSource(node, options);
+  const sets = buildCandidateSets(node);
+  return pickBestCandidate(options.preserveRichHtml ? sets.rich : sets.plain);
+}
+
+/**
+ * Extract a message in both flavours from a single DOM pass.
+ *
+ * `plain` is markup-free and must drive everything that measures or speaks the
+ * text: change hashing, RTL detection, token accounting and read-aloud. `rich`
+ * carries live KaTeX/mermaid markup and is meant only for the message overlay,
+ * which re-renders it. Letting `rich` reach the measuring consumers inflated
+ * token counts by the size of the markup, and made read-aloud output recite
+ * KaTeX internals plus mermaid's stylesheet.
+ *
+ * @param {Node} node
+ * @returns {{ plain: string, rich: string }}
+ */
+export function extractMessageTexts(node) {
+  const sets = buildCandidateSets(node);
+  return {
+    plain: pickBestCandidate(sets.plain),
+    rich: pickBestCandidate(sets.rich),
+  };
+}
+
+function pickBestCandidate(candidates) {
+  if (!candidates.length) {
+    return "";
+  }
+
+  const tagCandidates = candidates.filter((c) =>
+    /<BDS:|<BetterDeepSeek>/i.test(c.value)
+  );
+  const pool = tagCandidates.length ? tagCandidates : candidates;
+
+  const selected = [...pool].sort(
+    (a, b) => scoreRawTextCandidate(b) - scoreRawTextCandidate(a)
+  )[0];
+  return selected ? selected.value : "";
+}
+
+/**
+ * Build the candidate texts once, in both flavours.
+ *
+ * `htmlToMarkdown` is read-only, so the plain and rich markdown variants share
+ * a single prepared clone rather than paying for an extra cloneNode each.
+ */
+function buildCandidateSets(node) {
+  // Instead of innerText (which fails on detached clones), 
+  // we'll filter out thinking blocks and then use textContent.
+
+  const clone = node.cloneNode(true);
+  stripMessageNoise(clone);
+  replaceCodeBlocksWithFences(clone);
+
+  // The text-based candidates cannot carry markup, so collapse already-rendered
+  // rich output (KaTeX, mermaid) to a single textual form first. Without this
+  // every formula would appear three times over and mermaid's viewer stylesheet
+  // would surface as literal text (issues #169, #170).
+  const textClone = clone.cloneNode(true);
+  flattenRichContentForText(textClone);
+
+  // decodeNodeHtmlText already uses textContent internally but handles line breaks
+  const shared = [
+    { type: "htmlDecoded", value: decodeNodeHtmlText(textClone.innerHTML || "") },
+    { type: "textContent", value: String(textClone.textContent || "") },
+  ].filter((c) => c.value && c.value.trim());
+
+  const container = clone.querySelector(".ds-markdown") || clone;
+
+  const withMarkdown = (preserveRichHtml) =>
+    [
+      ...shared,
+      {
+        type: "markdownReconstructed",
+        value: renderMarkdown(container, preserveRichHtml),
+      },
+    ].filter((c) => c.value && c.value.trim());
+
+  return { plain: withMarkdown(false), rich: withMarkdown(true) };
+}
+
+/** Render an already-prepared message container to markdown. */
+function renderMarkdown(container, preserveRichHtml) {
+  return htmlToMarkdown(container, 0, Boolean(preserveRichHtml)).trim();
 }
 
 /**
@@ -238,53 +325,6 @@ export function extractCodeFromDomNode(node) {
   }
 
   return best;
-}
-
-function parseNodeWithBestTextSource(node, options = {}) {
-  const candidates = getNodeTextCandidates(node, options);
-  if (!candidates.length) {
-    return "";
-  }
-
-  const tagCandidates = candidates.filter((c) =>
-    /<BDS:|<BetterDeepSeek>/i.test(c.value)
-  );
-  const pool = tagCandidates.length ? tagCandidates : candidates;
-
-  const selected =
-    pool.sort(
-      (a, b) => scoreRawTextCandidate(b) - scoreRawTextCandidate(a)
-    )[0];
-  return selected ? selected.value : "";
-}
-
-function getNodeTextCandidates(node, options = {}) {
-  // Instead of innerText (which fails on detached clones), 
-  // we'll filter out thinking blocks and then use textContent.
-
-  const clone = node.cloneNode(true);
-  stripMessageNoise(clone);
-  replaceCodeBlocksWithFences(clone);
-
-  // The text-based candidates cannot carry markup, so collapse already-rendered
-  // rich output (KaTeX, mermaid) to a single textual form first. Without this
-  // every formula would appear three times over and mermaid's viewer stylesheet
-  // would surface as literal text (issues #169, #170).
-  const textClone = clone.cloneNode(true);
-  flattenRichContentForText(textClone);
-
-  // decodeNodeHtmlText already uses textContent internally but handles line breaks
-  const htmlDecoded = decodeNodeHtmlText(textClone.innerHTML || "");
-  const textContent = String(textClone.textContent || "");
-  const markdownReconstructed = extractMessageMarkdown(clone, options);
-
-  return [
-    { type: "htmlDecoded", value: htmlDecoded },
-    { type: "textContent", value: textContent },
-    { type: "markdownReconstructed", value: markdownReconstructed }
-  ].filter(
-    (c) => c.value && c.value.trim()
-  );
 }
 
 function decodeNodeHtmlText(html) {
@@ -326,8 +366,6 @@ function scoreRawTextCandidate(candidate) {
 export function extractMessageMarkdown(node, options = {}) {
   if (!node) return "";
 
-  const preserveRichHtml = Boolean(options.preserveRichHtml);
-
   const clone = node.cloneNode(true);
 
   // Remove noise first
@@ -335,7 +373,7 @@ export function extractMessageMarkdown(node, options = {}) {
 
   // Find the markdown container
   const container = clone.querySelector(".ds-markdown") || clone;
-  return htmlToMarkdown(container, 0, preserveRichHtml).trim();
+  return renderMarkdown(container, options.preserveRichHtml);
 }
 
 const HTML_TO_MARKDOWN_MAX_DEPTH_FLOOR = 10;
@@ -352,11 +390,26 @@ export function setHtmlToMarkdownMaxDepth(value) {
   HTML_TO_MARKDOWN_MAX_DEPTH = Math.max(HTML_TO_MARKDOWN_MAX_DEPTH_FLOOR, Math.floor(raw));
 }
 
+/**
+ * Text-only fallback used past the recursion cap. Non-content elements are
+ * dropped so their payload (e.g. a stylesheet) cannot reach the message body.
+ */
+function fallbackText(element) {
+  if (!element.querySelector(NON_CONTENT_SELECTOR)) {
+    return element.textContent || "";
+  }
+  const clone = element.cloneNode(true);
+  clone.querySelectorAll(NON_CONTENT_SELECTOR).forEach((el) => el.remove());
+  return clone.textContent || "";
+}
+
 function htmlToMarkdown(element, depth = 0, preserveRichHtml = false) {
   // Hard depth cap so deeply-nested DOM (nested lists/blockquotes/KaTeX,
-  // streamed long messages) cannot blow V8's stack. Falls back to plain text.
+  // streamed long messages) cannot blow V8's stack. The fallback still has to
+  // drop non-content elements, otherwise a stylesheet nested deeper than the
+  // cap leaks back into the message as prose.
   if (depth > HTML_TO_MARKDOWN_MAX_DEPTH) {
-    return element.textContent || "";
+    return fallbackText(element);
   }
 
   let markdown = "";
@@ -413,7 +466,7 @@ function htmlToMarkdown(element, depth = 0, preserveRichHtml = false) {
           }
           break;
         case "pre":
-          const lang = child.querySelector("code")?.className?.match(/language-(\w+)/)?.[1] || "";
+          const lang = child.querySelector("code")?.className?.match(/language-([\w-]+)/)?.[1] || "";
           markdown += `\n\`\`\`${lang}\n${child.textContent.trim()}\n\`\`\`\n`;
           break;
         case "p": markdown += `\n${content}\n`; break;

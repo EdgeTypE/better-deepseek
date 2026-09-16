@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractMessageMarkdown,
   extractMessageRawText,
+  extractMessageTexts,
 } from "./message-text.js";
 
 /** KaTeX's real output shape: MathML tokens + LaTeX annotation + visual glyphs. */
@@ -151,9 +152,70 @@ describe("message-text - rich renderer fidelity (issues #169 / #170)", () => {
         ),
       );
 
-      expect(md).toContain("```mermaid");
+      // Exactly one fence: the rich element must not also emit the source that
+      // the sibling <pre> already emits.
+      expect(md.match(/```mermaid/g)).toHaveLength(1);
       expect(md).toContain("graph LR");
       expect(md).not.toContain("trebuchet");
+    });
+
+    it("keeps a diagram-only message from collapsing to empty content", () => {
+      const md = extractMessageMarkdown(
+        messageNode(`<div class="md-code-block">${MERMAID_SVG}</div>`),
+      );
+
+      expect(md.trim()).not.toBe("");
+      expect(md).toContain("mermaid");
+      expect(md).not.toContain("trebuchet");
+    });
+  });
+
+  describe("recursion cap", () => {
+    it("does not leak a stylesheet nested deeper than the depth cap", () => {
+      let deep = "";
+      for (let i = 0; i < 230; i++) deep += "<div>";
+      const md = extractMessageMarkdown(
+        messageNode(`${deep}${MERMAID_SVG}`),
+      );
+
+      expect(md).not.toContain("fill:#ccc");
+      expect(md).not.toContain("trebuchet");
+    });
+  });
+
+  describe("plain vs rich extraction", () => {
+    const node = () =>
+      messageNode(
+        `<p>Output ${INLINE_KATEX} once.</p><p>D:</p>${MERMAID_SVG}`,
+      );
+
+    it("keeps measuring/speaking consumers free of markup", () => {
+      const { plain } = extractMessageTexts(node());
+
+      // Change hashing, RTL detection, token accounting and read-aloud all use
+      // this string, so it must contain no markup and no duplicated formula.
+      expect(plain).not.toContain("<span");
+      expect(plain).not.toContain("<svg");
+      expect(plain).not.toContain("<style");
+      expect(plain).not.toContain("a2+b2=c2");
+      expect(plain).toContain("$a^2 + b^2 = c^2$");
+    });
+
+    it("gives the overlay live markup to re-render", () => {
+      const { rich } = extractMessageTexts(node());
+
+      expect(rich).toContain('class="katex"');
+      expect(rich).toContain('id="mermaid-svg-27"');
+      expect(rich).not.toContain("a2+b2=c2");
+    });
+
+    it("returns the same text in both flavours when nothing is rich", () => {
+      const { plain, rich } = extractMessageTexts(
+        messageNode("<p>Just text.</p>"),
+      );
+
+      expect(plain).toBe("Just text.");
+      expect(rich).toBe("Just text.");
     });
   });
 

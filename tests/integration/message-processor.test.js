@@ -14,6 +14,12 @@ const mocks = vi.hoisted(() => ({
   findLatestAssistantMessageNode: vi.fn(() => null),
   findChatEditor: vi.fn(() => null),
   extractMessageRawText: vi.fn((node) => node.dataset.rawText || ""),
+  // The processor takes plain (measuring/speaking) and rich (overlay) text in
+  // one call; the harness drives both from the node's dataset.
+  extractMessageTexts: vi.fn((node) => {
+    const plain = node.dataset.rawText || "";
+    return { plain, rich: node.dataset.richText || plain };
+  }),
   injectPythonRunButtons: vi.fn(),
   injectJavaScriptRunButtons: vi.fn(),
   upsertMemories: vi.fn(),
@@ -52,7 +58,11 @@ vi.mock("../../src/content/scanner.js", () => ({
 }));
 vi.mock("../../src/content/dom/message-text.js", async () => {
   const actual = await vi.importActual("../../src/content/dom/message-text.js");
-  return { ...actual, extractMessageRawText: mocks.extractMessageRawText };
+  return {
+    ...actual,
+    extractMessageRawText: mocks.extractMessageRawText,
+    extractMessageTexts: mocks.extractMessageTexts,
+  };
 });
 vi.mock("../../src/content/dom/python-injector.js", () => ({
   injectPythonRunButtons: mocks.injectPythonRunButtons,
@@ -130,6 +140,10 @@ describe("message processor integration", () => {
     mocks.isAbsoluteLastMessage.mockImplementation((node) => node.dataset.absoluteLast === "1");
     mocks.collectMessageNodes.mockImplementation(() => []);
     mocks.extractMessageRawText.mockImplementation((node) => node.dataset.rawText || "");
+    mocks.extractMessageTexts.mockImplementation((node) => {
+      const plain = node.dataset.rawText || "";
+      return { plain, rich: node.dataset.richText || plain };
+    });
     mocks.mount.mockImplementation((component, { target, props }) => {
       const marker = document.createElement("div");
       marker.className = "mock-overlay";
@@ -705,6 +719,54 @@ describe("message processor integration", () => {
     expect(speak).toHaveBeenCalledOnce();
     expect(speak.mock.calls[0][0].text).toBe("Hello there");
   });
+
+  it("reads aloud the plain text, never the overlay's rich markup", () => {
+    const speak = vi.fn();
+    window.speechSynthesis = {
+      cancel: vi.fn(),
+      getVoices: () => [{ lang: "en-US" }],
+      speak,
+    };
+    state.settings.voiceMode = true;
+    const node = createMessageNode(
+      "Formula\n<BDS:VISUALIZER><div>viz</div></BDS:VISUALIZER>",
+    );
+    node.dataset.rawText =
+      "Formula $a^2 + b^2$ here\n<BDS:VISUALIZER><div>viz</div></BDS:VISUALIZER>";
+    node.dataset.richText =
+      'Formula <span class="katex"><style>#mermaid-svg-1{fill:#ccc;}</style>a2+b2</span> here\n<BDS:VISUALIZER><div>viz</div></BDS:VISUALIZER>';
+
+    processMessageNode(node);
+    vi.advanceTimersByTime(3000);
+    processMessageNode(node);
+
+    expect(speak).toHaveBeenCalledOnce();
+    const spoken = speak.mock.calls[0][0].text;
+    expect(spoken).not.toContain("katex");
+    expect(spoken).not.toContain("fill:#ccc");
+    expect(spoken).not.toContain("a2+b2");
+    expect(spoken).toContain("Formula $a^2 + b^2$ here");
+  });
+
+  it("does not re-parse when only the rich markup changes", () => {
+    const node = createMessageNode(
+      "Intro\n<BDS:VISUALIZER><div>viz</div></BDS:VISUALIZER>",
+    );
+    const plain = "Intro\n<BDS:VISUALIZER><div>viz</div></BDS:VISUALIZER>";
+    node.dataset.rawText = plain;
+    node.dataset.richText = `<span class="katex">v1</span>${plain}`;
+
+    processMessageNode(node);
+    expect(mocks.mount).toHaveBeenCalledOnce();
+
+    // A page-side re-render can churn ids inside the rich markup (mermaid
+    // numbers its SVGs); the change hash must not react to that alone.
+    node.dataset.richText = `<span class="katex">v2</span>${plain}`;
+    processMessageNode(node);
+
+    expect(mocks.mount).toHaveBeenCalledOnce();
+    expect(mocks.mount.mock.calls[0][1].props.text).toContain("v1");
+  });
 });
 
 describe("bookmark button injection", () => {
@@ -718,6 +780,10 @@ describe("bookmark button injection", () => {
     mocks.isAbsoluteLastMessage.mockImplementation((node) => node.dataset.absoluteLast === "1");
     mocks.collectMessageNodes.mockImplementation(() => []);
     mocks.extractMessageRawText.mockImplementation((node) => node.dataset.rawText || "");
+    mocks.extractMessageTexts.mockImplementation((node) => {
+      const plain = node.dataset.rawText || "";
+      return { plain, rich: node.dataset.richText || plain };
+    });
     mocks.mount.mockImplementation((component, { target, props }) => {
       const marker = document.createElement("div");
       marker.className = "mock-overlay";

@@ -13,7 +13,7 @@ import {
   collectMessageNodes,
   findLatestAssistantMessageNode
 } from "./scanner.js";
-import { extractMessageRawText } from "./dom/message-text.js";
+import { extractMessageRawText, extractMessageTexts } from "./dom/message-text.js";
 import { injectPythonRunButtons } from "./dom/python-injector.js";
 import { injectJavaScriptRunButtons } from "./dom/javascript-injector.js";
 import { injectLuaRunButtons } from "./dom/lua-injector.js";
@@ -213,10 +213,13 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
   injectSelectionCheckbox(node);
   injectBookmarkButton(node);
 
-  // Keep already-rendered KaTeX/mermaid markup intact: this text is re-rendered
-  // by MessageOverlay, and flattening rich output here duplicated every formula
-  // and leaked mermaid's viewer stylesheet into the message body (#169, #170).
-  const rawText = extractMessageRawText(node, { preserveRichHtml: true });
+  // `plain` drives everything that measures or speaks the text (change hash, RTL
+  // detection, token/price accounting, read-aloud). `rich` keeps already-rendered
+  // KaTeX/mermaid markup and is fed only to the overlay, which re-renders it.
+  // Flattening rich output for the overlay duplicated every formula and leaked
+  // mermaid's stylesheet (#169, #170); letting that markup reach the measuring
+  // consumers inflated token counts and made read-aloud recite it verbatim.
+  const { plain: rawText, rich: richText } = extractMessageTexts(node);
   if (!rawText.trim()) {
     return;
   }
@@ -664,7 +667,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
   stateData.hash = signature;
   stateData.forceClosedTags = shouldForceCloseTags;
 
-  const parsed = parseBdsMessage(rawText, shouldForceCloseTags);
+  const parsed = parseBdsMessage(richText, shouldForceCloseTags);
   const preGateBlocks = parsed.renderableBlocks;
 
   // --- RTL DETECTION ---

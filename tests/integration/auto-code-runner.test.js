@@ -11,6 +11,10 @@ const mocks = vi.hoisted(() => ({
   isLatestAssistantMessage: vi.fn((node) => node.dataset.latest === "1"),
   isAbsoluteLastMessage: vi.fn((node) => node.dataset.absoluteLast === "1"),
   extractMessageRawText: vi.fn((node) => node.dataset.rawText || ""),
+  extractMessageTexts: vi.fn((node) => {
+    const plain = node.dataset.rawText || "";
+    return { plain, rich: node.dataset.richText || plain };
+  }),
   mount: vi.fn((component, { target, props }) => {
     const marker = document.createElement("div");
     marker.className = "mock-overlay";
@@ -31,6 +35,7 @@ vi.mock("../../src/content/scanner.js", () => ({
 
 vi.mock("../../src/content/dom/message-text.js", () => ({
   extractMessageRawText: mocks.extractMessageRawText,
+  extractMessageTexts: mocks.extractMessageTexts,
 }));
 
 vi.mock("svelte", async (importOriginal) => {
