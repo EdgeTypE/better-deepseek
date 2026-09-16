@@ -153,7 +153,17 @@ const ROUTES = [
     response: () => ({
       statusCode: 200,
       mediaType: "application/json; charset=utf-8",
-      body: '{"status":"ok"}',
+      body: JSON.stringify({
+        schema_version: "1.0",
+        generated_at: new Date().toISOString(),
+        poll_after_seconds: 30,
+        max_stale_seconds: 120,
+        page: { name: "DeepSeek", url: "https://status.deepseek.com" },
+        overall: { status: "operational" },
+        ongoing_incidents: [],
+        in_progress_maintenances: [],
+        scheduled_maintenances: [],
+      }),
     }),
   },
   {

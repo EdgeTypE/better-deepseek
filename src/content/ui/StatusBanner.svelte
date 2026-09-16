@@ -8,8 +8,16 @@
     status = event.detail;
   });
 
-  const isOutage = $derived(status.indicator && status.indicator !== 'none');
+  const isOutage = $derived(Boolean(status.indicator) && status.indicator !== 'none');
   const bannerClass = $derived(`ds-status-banner ds-status-${status.indicator}`);
+  const statusLabel = $derived(status.label || status.description || status.indicator);
+  const message = $derived(
+    status.detail
+      ? status.detail
+      : status.indicator === 'maintenance'
+        ? t('statusBanner.maintenanceMessage')
+        : t('statusBanner.message')
+  );
 </script>
 
 {#if isOutage}
@@ -17,16 +25,18 @@
   <div class="ds-status-icon">
     {#if status.indicator === 'critical'}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+    {:else if status.indicator === 'maintenance'}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     {:else}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
     {/if}
   </div>
   <div class="ds-status-content">
     <div class="ds-status-title">
-      {t('statusBanner.title', { indicator: status.indicator, description: status.description })}
+      {t('statusBanner.title', { status: statusLabel })}
     </div>
     <div class="ds-status-message">
-      {t('statusBanner.message')}
+      {message}
     </div>
   </div>
 </div>
@@ -80,9 +90,15 @@
   .ds-status-minor .ds-status-icon { color: var(--ds-warning-color, #eab308); }
   .ds-status-major .ds-status-icon { color: var(--ds-warning-color, #f97316); }
   .ds-status-critical .ds-status-icon { color: var(--ds-error-color, #ef4444); }
+  .ds-status-maintenance .ds-status-icon { color: var(--ds-warning-color, #eab308); }
 
   .ds-status-critical {
     border-color: var(--ds-error-color, rgba(239, 68, 68, 0.4));
+  }
+
+  .ds-status-major,
+  .ds-status-maintenance {
+    border-color: var(--ds-warning-color, rgba(234, 179, 8, 0.4));
   }
 
   .ds-status-content {

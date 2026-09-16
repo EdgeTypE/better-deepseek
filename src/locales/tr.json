@@ -353,8 +353,9 @@
       "noInputField": "DeepSeek giriş alanı bulunamadı."
     },
     "statusBanner": {
-      "title": "DeepSeek {{indicator}} sorun tespit edildi | {{description}}",
-      "message": "Sorun sizden kaynaklı değil, DeepSeek sunucularından kaynaklanmaktadır. Sunucular yüksek yük veya bakım nedeniyle sorun yaşıyor olabilir."
+      "title": "DeepSeek: {{status}}",
+      "message": "Sorun sizden kaynaklı değil, DeepSeek sunucularından kaynaklanmaktadır. Sunucular yüksek yük veya bakım nedeniyle sorun yaşıyor olabilir.",
+      "maintenanceMessage": "DeepSeek planlı bakım gerçekleştiriyor. Bazı özellikler geçici olarak kullanılamayabilir."
     },
     "announcementBanner": {
       "dismiss": "Kapat"

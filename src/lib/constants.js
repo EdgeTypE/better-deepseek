@@ -1022,7 +1022,7 @@ export const DEFAULT_REMOTE_CONFIG = {
   api: {
     chatCompletionPaths: ["/api/v0/chat/completion", "/api/v0/chat/edit_message"],
     sessionFetchPath: "/api/v0/chat_session/fetch_page",
-    statusUrl: "https://status.deepseek.com/api/v2/status.json",
+    statusUrl: "https://status.deepseek.com/api/widget/v1/summary.json",
     pricing: {
       officialUrl: "https://api-docs.deepseek.com/quick_start/pricing/",
       githubUrl: "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/extension/pricing.json",

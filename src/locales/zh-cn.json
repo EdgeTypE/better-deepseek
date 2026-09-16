@@ -352,8 +352,9 @@
       "noInputField": "找不到 DeepSeek 输入框。"
     },
     "statusBanner": {
-      "title": "检测到 DeepSeek {{indicator}} 异常 | {{description}}",
-      "message": "问题不在你这边，是 DeepSeek 服务端的问题。服务器可能因高负载或维护中而暂时不可用。"
+      "title": "DeepSeek：{{status}}",
+      "message": "问题不在你这边，是 DeepSeek 服务端的问题。服务器可能因高负载或维护中而暂时不可用。",
+      "maintenanceMessage": "DeepSeek 正在进行计划维护，部分功能可能暂时不可用。"
     },
     "announcementBanner": {
       "dismiss": "关闭"

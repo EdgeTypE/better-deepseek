@@ -72,10 +72,30 @@ const state = {
   commands: {
     customMappings: {},
   },
-  /** @type {{indicator: 'none'|'minor'|'major'|'critical', description: string, lastChecked: number}} */
+  /**
+   * Normalized DeepSeek status. `indicator` drives the banner severity,
+   * `status` is the raw `overall.status` from the widget summary endpoint.
+   * @type {{
+   *   indicator: 'none'|'minor'|'major'|'critical'|'maintenance',
+   *   status: string,
+   *   label: string,
+   *   description: string,
+   *   detail: string|null,
+   *   incidentCount: number,
+   *   maintenanceCount: number,
+   *   stale: boolean,
+   *   lastChecked: number
+   * }}
+   */
   serverStatus: {
     indicator: 'none',
+    status: 'operational',
+    label: 'Operational',
     description: 'All Systems Operational',
+    detail: null,
+    incidentCount: 0,
+    maintenanceCount: 0,
+    stale: false,
     lastChecked: 0
   },
   remoteAnnouncements: [],

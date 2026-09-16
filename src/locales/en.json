@@ -353,8 +353,9 @@
       "noInputField": "Could not find DeepSeek input field."
     },
     "statusBanner": {
-      "title": "DeepSeek {{indicator}} issue detected | {{description}}",
-      "message": "The problem is not on your end, it's on DeepSeek's side. Servers may be experiencing issues due to high load or maintenance."
+      "title": "DeepSeek: {{status}}",
+      "message": "The problem is not on your end, it's on DeepSeek's side. Servers may be experiencing issues due to high load or maintenance.",
+      "maintenanceMessage": "DeepSeek is performing scheduled maintenance. Some features may be temporarily unavailable."
     },
     "announcementBanner": {
       "dismiss": "Dismiss"

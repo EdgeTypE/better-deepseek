@@ -63,7 +63,7 @@ export const remoteConfigFixture = {
     fileUpload: { enabled: true },
   },
   selectors: {},
-  api: { statusUrl: "https://status.deepseek.com/api/v1/status" },
+  api: { statusUrl: "https://status.deepseek.com/api/widget/v1/summary.json" },
   modelMappings: {},
   meta: { version: 1 },
 };
