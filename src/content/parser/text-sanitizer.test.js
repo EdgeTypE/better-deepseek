@@ -21,4 +21,35 @@ describe("sanitizeVisibleText", () => {
   it("removes unclosed tag fragments", () => {
     expect(sanitizeVisibleText("Hello <BDS:VISUALIZER>world")).toBe("Hello world");
   });
+
+  // Regression: a `>` inside a quoted attribute value used to end the stray-tag
+  // capture early, leaving the tail of the tag visible to the user. The scanner
+  // reads attribute values as quoted strings, so the whole tag is removed.
+  it("removes stray tags whose attributes contain '>'", () => {
+    expect(sanitizeVisibleText('A<BDS:memory_calls args="a>b">B')).toBe("AB");
+    expect(sanitizeVisibleText('A<BDS:foo x="1 > 2">B')).toBe("AB");
+  });
+
+  it("removes self-closing tags whose attributes contain '>'", () => {
+    expect(sanitizeVisibleText('A<BDS:create_file fileName="a>b.py"/>B')).toBe("AB");
+    expect(
+      sanitizeVisibleText('A<BDS:create_file fileName="x.js" content="if (a > b) {}"/>B')
+    ).toBe("AB");
+  });
+
+  // The paired strips are anchored by the matching close tag, so a truncated
+  // attribute capture still removes the same span. These guard that reasoning:
+  // if someone rewrites them into self-contained strips, these fail.
+  it("still strips paired tags whose attributes contain '>'", () => {
+    expect(sanitizeVisibleText('A<BDS:memory_calls args="a>b">body</BDS:memory_calls>B')).toBe("AB");
+    expect(
+      sanitizeVisibleText('A<BDS:create_file fileName="x.js">if (a > b) {}</BDS:create_file>B')
+    ).toBe("AB");
+  });
+
+  it("keeps an unterminated tag instead of swallowing the rest of the message", () => {
+    expect(sanitizeVisibleText("Hello <BDS:VISUALIZER still typing")).toBe(
+      "Hello <BDS:VISUALIZER still typing"
+    );
+  });
 });

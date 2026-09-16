@@ -670,6 +670,9 @@ export function parseBdsMessage(rawText, isSettled = false) {
 
   // Remove skill_create tags not captured by pairTagRegex (fallback cleanup)
   // Tags inside code blocks are already escaped and won't match.
+  // `[^>]*` is safe here because the removal region is anchored by the matching
+  // `</BDS:skill_create>` close tag, so a capture truncated at a quoted `>` still
+  // removes the same span. Self-contained strips need the quote-aware scanner.
   visibleText = visibleText.replace(/<BDS:skill_create[^>]*>[\s\S]*?<\/BDS:skill_create>/gi, '');
 
   // Strip all remaining BDS tags; markers survive (no <BDS: prefix)

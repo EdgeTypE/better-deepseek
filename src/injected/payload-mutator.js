@@ -912,6 +912,11 @@ export function stripInjectedBlocks(text) {
   );
 
   output = output.replace(/<BDS:SKILLS>[\s\S]*?<\/BDS:SKILLS>/gi, "");
+  // `[^>]*` is safe in the paired strips below: the removal region is anchored by
+  // the matching `</BDS:...>` close tag, so a capture truncated at a quoted `>`
+  // still removes the same span. Self-contained strips would need the
+  // quote-aware scanner in `src/content/parser/tag-parser.js`, which this bundle
+  // (injected/MAIN world) deliberately does not import.
   output = output.replace(
     /<BDS:memory_calls[^>]*>[\s\S]*?<\/BDS:memory_calls>/gi,
     ""
