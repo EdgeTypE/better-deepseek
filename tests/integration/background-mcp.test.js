@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("youtube-transcript", () => ({
   fetchTranscript: vi.fn(),
@@ -15,6 +15,7 @@ import {
   mcpClearInit,
   MCP_REQUEST_TIMEOUT_MS,
 } from "../../src/background/index.js";
+import shippedManifest from "../../static/manifest.json";
 
 function jsonResponse(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), {
@@ -314,5 +315,63 @@ describe("listMcpTools and mcpCallTool - session expiry retry", () => {
       .mockImplementationOnce(() => errResp2);
 
     await expect(listMcpTools("https://mcp.example.com", "")).rejects.toThrow();
+  });
+});
+
+describe("mcpEnsureInitialized clientInfo", () => {
+  const serverUrl = "https://clientinfo.example.com";
+  // Captured at module scope, after tests/setup.js installed the mock. Tests
+  // below swap in their own getManifest, and this puts the shared one back —
+  // `vi.restoreAllMocks()` would not, since the swap is a plain assignment.
+  const originalGetManifest = globalThis.chrome.runtime.getManifest;
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    globalThis.fetch = vi.fn();
+    mcpClearInit(serverUrl, "");
+  });
+
+  afterEach(() => {
+    globalThis.chrome.runtime.getManifest = originalGetManifest;
+  });
+
+  function initializeBody() {
+    const call = fetch.mock.calls.find(
+      ([, init]) => JSON.parse(init.body).method === "initialize"
+    );
+    return JSON.parse(call[1].body);
+  }
+
+  it("reports whatever the running manifest says, not a compiled-in literal", async () => {
+    // A version that appears nowhere in the source: if the client reported a
+    // hardcoded string, this would not come back.
+    globalThis.chrome.runtime.getManifest = () => ({ version: "7.3.1" });
+    fetch.mockImplementation(() => jsonResponse({ jsonrpc: "2.0", result: {} }));
+
+    await mcpEnsureInitialized(serverUrl, "");
+
+    expect(initializeBody().params.clientInfo).toEqual({
+      name: "better-deepseek",
+      version: "7.3.1",
+    });
+  });
+
+  it("reports the shipped manifest version by default", async () => {
+    fetch.mockImplementation(() => jsonResponse({ jsonrpc: "2.0", result: {} }));
+
+    await mcpEnsureInitialized(serverUrl, "");
+
+    // Guards the "keep in sync" invariant: bumping static/manifest.json must
+    // change what MCP servers see, with no source edit.
+    expect(initializeBody().params.clientInfo.version).toBe(shippedManifest.version);
+  });
+
+  it("keeps the handshake protocol version independent of the client version", async () => {
+    globalThis.chrome.runtime.getManifest = () => ({ version: "7.3.1" });
+    fetch.mockImplementation(() => jsonResponse({ jsonrpc: "2.0", result: {} }));
+
+    await mcpEnsureInitialized(serverUrl, "");
+
+    expect(initializeBody().params.protocolVersion).toBe("2024-11-05");
   });
 });

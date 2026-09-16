@@ -11,8 +11,12 @@
   import { findChatEditor, setChatInputText } from "../auto.js";
   import appState from "../state.js";
   import { i18n, t } from "../../lib/i18n.svelte.js";
+  import { getExtensionVersion } from "../../lib/extension-version.js";
 
   let { open = false, onclose, onopenapiplayground } = $props();
+
+  // Resolved from the running manifest, so this never needs a manual bump.
+  const extensionVersion = getExtensionVersion();
 
   let TIP_COUNT = $derived.by(() => {
     const tips = i18n.messages?.messages?.tips;
@@ -269,7 +273,7 @@
           <span
             >{t("drawer.github")}
             <small style="opacity: 0.6; font-weight: 400; margin-left: 4px;"
-              >{t("drawer.version", { version: "0.1.14" })}</small
+              >{t("drawer.version", { version: extensionVersion })}</small
             ></span
           >
         </a>

@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 import { deepEqual } from "../../src/lib/deep-equal.js";
+import shippedManifest from "../../static/manifest.json";
 
 const listeners = new Set();
 
@@ -146,6 +147,10 @@ export const chromeMock = {
   runtime: {
     sendMessage: vi.fn(async () => undefined),
     getURL: vi.fn((path = "") => `${chromeMockState.extensionBaseUrl}${path}`),
+    // Backed by the real shipped manifest, so tests that read the version see
+    // the same value a live extension reports. A fresh copy is returned so a
+    // caller cannot mutate the shared import.
+    getManifest: vi.fn(() => ({ ...shippedManifest })),
     onMessage: {
       addListener: vi.fn(),
       removeListener: vi.fn(),
@@ -211,6 +216,7 @@ export function resetChromeMock() {
   chromeMock.storage.onChanged.hasListener.mockClear();
   chromeMock.runtime.sendMessage.mockClear();
   chromeMock.runtime.getURL.mockClear();
+  chromeMock.runtime.getManifest.mockClear();
   chromeMock.runtime.onMessage.addListener.mockClear();
   chromeMock.runtime.onMessage.removeListener.mockClear();
   chromeMock.runtime.onMessage.hasListener.mockClear();

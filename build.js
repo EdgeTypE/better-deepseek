@@ -35,9 +35,17 @@ const sharedResolve = {
   },
 };
 
+// package.json is the single source of truth for the version. static/manifest.json
+// and android/app/build.gradle.kts both carry a copy for their own toolchains, but
+// the value compiled into the bundles always comes from here.
+const pkg = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8"));
+
 const sharedDefine = {
   "process.env.NODE_ENV": '"production"',
   "process.env.BDS_TARGET": JSON.stringify(target),
+  // Read back by src/lib/extension-version.js. Needed on targets with no
+  // extension manifest — the Android WebView shell has no getManifest().
+  __BDS_VERSION__: JSON.stringify(pkg.version),
 };
 
 /** @type {Array<import('vite').InlineConfig>} */

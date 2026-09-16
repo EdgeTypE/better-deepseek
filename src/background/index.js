@@ -6,6 +6,7 @@ import {
   normalizeGitHubCommitCount,
 } from "../lib/github-commits.js";
 import { devLog } from "../lib/dev-log.js";
+import { getExtensionVersion } from "../lib/extension-version.js";
 
 export {
   DEFAULT_GITHUB_COMMIT_COUNT,
@@ -730,7 +731,11 @@ async function mcpEnsureInitialized(serverUrl, apiKey) {
 
   const initBody = {
     jsonrpc: "2.0", id: 1, method: "initialize",
-    params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "better-deepseek", version: "0.1.14" } },
+    params: {
+      protocolVersion: "2024-11-05",
+      capabilities: {},
+      clientInfo: { name: "better-deepseek", version: getExtensionVersion() },
+    },
   };
 
   entry.initialized = (async () => {

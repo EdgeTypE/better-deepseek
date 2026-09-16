@@ -11,9 +11,13 @@
   } from "../deep-code.js";
   import { BetterDeepSeekHarnessBridge } from "../../lib/harness-bridge.js";
   import { t } from "../../lib/i18n.svelte.js";
+  import { getExtensionVersion } from "../../lib/extension-version.js";
   import AddDirectoryModal from "./AddDirectoryModal.svelte";
 
   let { enabled = false, onToggle = null } = $props();
+
+  // Resolved from the running manifest, so this never needs a manual bump.
+  const extensionVersion = getExtensionVersion();
 
   let localEnabled = $state(false);
   let activeDirectory = $state(appState.deepCode.activeDirectory || "");
@@ -548,7 +552,7 @@
           {/if}
         </span>
       </div>
-      <span class="bds-dc-version">v0.1.13</span>
+      <span class="bds-dc-version">v{extensionVersion}</span>
     </div>
   </div>
 {/if}
