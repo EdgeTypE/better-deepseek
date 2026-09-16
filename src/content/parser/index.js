@@ -120,22 +120,41 @@ export function parseBdsMessage(rawText, isSettled = false) {
   // This prevents infinite "Working..." animations and lost tool output.
   if (isSettled) {
     const unclosedTags = [];
-    const allTags = Array.from(text.matchAll(/<\/?BDS:([A-Za-z0-9_:]+)[^>]*>/gi))
-      .filter(m => !isInsideCodeBlock(m.index));
-    for (const match of allTags) {
-      const tagStr = match[0];
-      if (tagStr.endsWith('/>') || tagStr.endsWith('/&gt;')) continue;
 
-      const isClose = tagStr.startsWith('</') || tagStr.startsWith('&lt;/');
-      const tName = match[1].toLowerCase();
-      
+    // Openings come from the scanner so a `>` inside an attribute value does
+    // not end the tag early. Close tags carry no attributes, so a plain
+    // pattern is unambiguous there. This is a balance check, so both kinds are
+    // merged back into document order.
+    //
+    // Names are lowercased here; the generated close tags are matched
+    // case-insensitively downstream, so the original casing does not matter.
+    const scannedTags = [
+      ...scanBdsTagOpenings(text, "*").map(tag => ({
+        index: tag.index,
+        name: tag.name,
+        selfClosing: tag.selfClosing,
+        isClose: false,
+      })),
+      ...Array.from(text.matchAll(/<\/BDS:([A-Za-z0-9_:]+)>/gi)).map(m => ({
+        index: m.index,
+        name: m[1].toLowerCase(),
+        selfClosing: false,
+        isClose: true,
+      })),
+    ]
+      .filter(tag => !isInsideCodeBlock(tag.index))
+      .sort((a, b) => a.index - b.index);
+
+    for (const tag of scannedTags) {
+      if (tag.selfClosing) continue;
+
       // AUTO tags are background requests lacking standard rendering lifecycle
-      if (tName.startsWith("auto") && tName !== "auto:code_runner") continue;
+      if (tag.name.startsWith("auto") && tag.name !== "auto:code_runner") continue;
 
-      if (!isClose) {
-        unclosedTags.push(match[1]);
+      if (!tag.isClose) {
+        unclosedTags.push(tag.name);
       } else {
-        const idx = unclosedTags.map(t => t.toLowerCase()).lastIndexOf(tName);
+        const idx = unclosedTags.lastIndexOf(tag.name);
         if (idx !== -1) {
           unclosedTags.splice(idx, 1);
         }
@@ -577,28 +596,31 @@ export function parseBdsMessage(rawText, isSettled = false) {
   // UNIVERSAL INTERFACE LOCK: Detect if ANY BDS tag is currently open (not closed)
   // This handles streaming for all tools (Visualizer, LongWork, etc.)
   // BDS tags inside code blocks are excluded — they are documentation examples.
-  const allBdsTags = Array.from(text.matchAll(/<BDS:([A-Za-z0-9_:]+)[^>]*>/gi))
-    .filter(m => !isInsideCodeBlock(m.index));
+  // Openings come from the scanner so a `>` inside an attribute value does not
+  // end the tag early, which would make a self-closing tag look unclosed and
+  // hold the Working... lock open.
+  const allBdsTags = scanBdsTagOpenings(text, "*")
+    .filter(tag => !isInsideCodeBlock(tag.index));
   const allBdsCloseTags = Array.from(text.matchAll(/<\/BDS:([A-Za-z0-9_:]+)>/gi))
-    .filter(m => !isInsideCodeBlock(m.index));
+    .filter(m => !isInsideCodeBlock(m.index))
+    .map(m => ({ name: m[1].toLowerCase(), index: m.index }));
 
   let streamingTagName = null;
   let streamingTagStartIdx = -1;
 
   for (let i = allBdsTags.length - 1; i >= 0; i--) {
     const openTag = allBdsTags[i];
-    const tagStr = openTag[0];
-    const tagName = openTag[1].toLowerCase();
-    
+    const tagName = openTag.name;
+
     // Self-closing tags are already closed
-    if (tagStr.endsWith('/>') || tagStr.endsWith('/&gt;')) continue;
+    if (openTag.selfClosing) continue;
 
     // AUTO tags and image inline card do not trigger global Working... lock
     if (tagName.startsWith("auto") && tagName !== "auto:code_runner") continue;
     if (tagName === "image") continue;
 
-    const hasClose = allBdsCloseTags.some(ct => 
-      ct[1].toLowerCase() === tagName && ct.index > openTag.index
+    const hasClose = allBdsCloseTags.some(ct =>
+      ct.name === tagName && ct.index > openTag.index
     );
 
     if (!hasClose) {

@@ -20,6 +20,7 @@ import { injectLuaRunButtons } from "./dom/lua-injector.js";
 import { injectRubyRunButtons } from "./dom/ruby-injector.js";
 import { injectDynamicTableFeatures } from "./dom/table-injector.js";
 import { parseBdsMessage } from "./parser/index.js";
+import { parseTagAttributes, scanBdsTagPairs } from "./parser/tag-parser.js";
 import { cleanBdsString } from "./tags/tag-hider.js";
 import { upsertMemories } from "./parser/memory-parser.js";
 import { upsertCharacters } from "./parser/character-parser.js";
@@ -568,14 +569,15 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
       let reason = "Visualizer Feedback";
       let body = "";
 
-      const tagMatch = rawUserText.match(/<BDS:VISUALIZER_FEEDBACK([^>]*)>([\s\S]*?)<\/BDS:VISUALIZER_FEEDBACK>/i);
-      if (tagMatch) {
-        const attrsRaw = tagMatch[1] || "";
-        const typeMatch = attrsRaw.match(/type="([^"]*)"/i);
-        const reasonMatch = attrsRaw.match(/reason="([^"]*)"/i);
-        if (typeMatch) type = typeMatch[1];
-        if (reasonMatch) reason = reasonMatch[1];
-        body = (tagMatch[2] || "").trim();
+      // Scanned rather than regex-matched: `reason` is free text and may
+      // contain `>`, which a `[^>]*` capture truncates at.
+      const feedbackTag = scanBdsTagPairs(rawUserText, "visualizer_feedback")
+        .find((tag) => tag.paired);
+      if (feedbackTag) {
+        const attrs = parseTagAttributes(feedbackTag.attrsRaw);
+        if (attrs.type !== undefined) type = attrs.type;
+        if (attrs.reason !== undefined) reason = attrs.reason;
+        body = feedbackTag.body.trim();
       } else {
         const legacyMatch = rawUserText.match(/\[BDS:VISUALIZER_FEEDBACK\]\s*([\s\S]*?)(?:\n\n|\n[A-Z]|$)/i);
         body = legacyMatch ? legacyMatch[1].trim() : rawUserText.replace(/\[BDS:VISUALIZER_FEEDBACK\]/g, "").trim();
