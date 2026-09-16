@@ -39,10 +39,21 @@
         android:supportsRtl="true"
         android:usesCleartextTraffic="false"
         android:theme="@style/Theme.BetterDeepSeek">
+        <!-- configChanges must cover every input-peripheral configuration change.
+             MainActivity is a single-WebView host whose onCreate always calls
+             loadUrl(bds_target_url), so any unhandled config change destroys and
+             recreates the Activity, reloads the WebView and drops the user back to
+             the DeepSeek home screen mid-conversation.
+
+             "keyboard" is the flag Android raises when an external keyboard is
+             attached or detached; "touchscreen" is raised when an input peripheral
+             is connected or disconnected, and "navigation" when a pointing device
+             appears. All three are listed so plugging a keyboard in or out leaves
+             the session untouched and only the soft IME reacts. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|uiMode|density|fontScale"
+            android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation|touchscreen|smallestScreenSize|uiMode|density|fontScale"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.BetterDeepSeek.NoActionBar">
