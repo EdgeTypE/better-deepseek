@@ -8,48 +8,15 @@
  * (`'[^']*'`) failed to match such tags at all, which dropped the tool call
  * silently: no card, no error, no result (issue #149).
  *
- * Tags are located with a quote-aware scanner instead, and a `base64Args`
- * transport is accepted for payloads that must survive byte-for-byte.
+ * Tags are located with the shared quote-aware scanner in tag-parser.js, and a
+ * `base64Args` transport is accepted for payloads that must survive
+ * byte-for-byte.
  */
 
-import { closesAttributeValue } from "./tag-parser.js";
+import { scanBdsTagOpenings } from "./tag-parser.js";
 import { parseLooseJson } from "./json-repair.js";
 
-const OPEN_TAG = "<BDS:AUTO:MCP";
-const CLOSE_TAG = "</BDS:AUTO:MCP>";
-
-/**
- * Find the `>` that terminates the opening tag, skipping any `>` that sits
- * inside a quoted attribute value.
- *
- * @param {string} source
- * @param {number} from Index just past the tag name.
- * @returns {number} Index of the terminating `>`, or -1 when unterminated.
- */
-function findOpeningTagEnd(source, from) {
-  let quote = null;
-
-  for (let i = from; i < source.length; i++) {
-    const char = source[i];
-
-    if (quote) {
-      if (char === "\\" && source[i + 1] === quote) {
-        i++;
-        continue;
-      }
-      if (char === quote && closesAttributeValue(source, i + 1)) quote = null;
-      continue;
-    }
-
-    if (char === '"' || char === "'") {
-      quote = char;
-      continue;
-    }
-    if (char === ">") return i;
-  }
-
-  return -1;
-}
+const CLOSE_TAG_RE = /<\/BDS:AUTO:MCP>/gi;
 
 /**
  * Locate every `<BDS:AUTO:MCP ...>` tag in a message, in document order.
@@ -59,35 +26,30 @@ function findOpeningTagEnd(source, from) {
  */
 export function scanMcpTags(text) {
   const source = String(text || "");
-  const haystack = source.toLowerCase();
-  const openToken = OPEN_TAG.toLowerCase();
-  const closeToken = CLOSE_TAG.toLowerCase();
   const tags = [];
-  let cursor = 0;
+  let consumedTo = 0;
 
-  while (cursor < source.length) {
-    const start = haystack.indexOf(openToken, cursor);
-    if (start === -1) break;
+  for (const opening of scanBdsTagOpenings(source, ["mcp", "auto:mcp"])) {
+    // Skip an opening nested inside a span already claimed by an earlier tag,
+    // so a payload that quotes the tag cannot produce a second call.
+    if (opening.index < consumedTo) continue;
 
-    const attrsStart = start + OPEN_TAG.length;
-    const openEnd = findOpeningTagEnd(source, attrsStart);
+    // An unterminated opening means the tag is still streaming. No unquoted `>`
+    // remains after it, so no later tag can be well formed either, and the
+    // attribute list may still be incomplete — do not emit a call for it.
+    if (!opening.closed) continue;
 
-    // An unterminated opening tag means no unquoted `>` remains anywhere after
-    // it, so no later tag can be well formed either.
-    if (openEnd === -1) break;
-
-    const bodyStart = openEnd + 1;
-    const closeIndex = haystack.indexOf(closeToken, bodyStart);
-    const hasClose = closeIndex !== -1;
+    CLOSE_TAG_RE.lastIndex = opening.openEnd;
+    const close = CLOSE_TAG_RE.exec(source);
 
     tags.push({
-      attrsRaw: source.slice(attrsStart, openEnd),
-      body: hasClose ? source.slice(bodyStart, closeIndex) : "",
-      index: start,
-      endIndex: hasClose ? closeIndex + CLOSE_TAG.length : bodyStart,
+      attrsRaw: opening.attrsRaw,
+      body: close ? source.slice(opening.openEnd, close.index) : "",
+      index: opening.index,
+      endIndex: close ? close.index + close[0].length : opening.openEnd,
     });
 
-    cursor = hasClose ? closeIndex + CLOSE_TAG.length : bodyStart;
+    consumedTo = tags[tags.length - 1].endIndex;
   }
 
   return tags;

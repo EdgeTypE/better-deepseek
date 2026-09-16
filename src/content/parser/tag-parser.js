@@ -51,6 +51,220 @@ function findLastClosingQuote(source, from, quoteChar) {
 }
 
 /**
+ * Characters allowed in a BDS tag name.
+ */
+const NAME_CHAR_RE = /[A-Za-z0-9_:]/;
+
+/**
+ * Index of the `>` that ends the opening tag whose attributes start at `from`,
+ * or -1 when the tag is not terminated yet.
+ *
+ * A delimiter-based pattern (`[^>]*`) stops at the first `>` anywhere in the
+ * attribute list, but a `>` inside a quoted value is payload, not a
+ * terminator: `caption="a > b"`, a chart title, a mermaid edge. Walking the
+ * list and applying the same quote rule as parseTagAttributes keeps the whole
+ * value. Quoted values may also contain the delimiter character itself, so a
+ * quote only closes where the attribute list is still valid.
+ */
+function findOpeningTagEnd(source, from) {
+  const strict = scanForTagEnd(source, from, true);
+  if (strict !== -1) return strict;
+
+  // The strict pass found no `>` at all. That happens when a stray attribute
+  // follows the last quoted value — `fileName="x" extra>` — because no closing
+  // boundary is ever valid, so the quote never closes. Read it the way
+  // parseTagAttributes does: when no valid delimiter exists, the first
+  // matching quote is the delimiter.
+  return scanForTagEnd(source, from, false);
+}
+
+/**
+ * @param {boolean} strictQuotes Close a quote only at a valid attribute
+ *   boundary. When false, the first matching quote closes.
+ */
+function scanForTagEnd(source, from, strictQuotes) {
+  let quote = null;
+
+  for (let i = from; i < source.length; i++) {
+    const char = source[i];
+
+    if (quote) {
+      if (char === "\\" && source[i + 1] === quote) {
+        i++;
+        continue;
+      }
+      if (char === quote && (!strictQuotes || closesAttributeValue(source, i + 1))) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+
+    if (char === ">") return i;
+  }
+
+  return -1;
+}
+
+/**
+ * True when a lowercased tag name is one of `names`.
+ *
+ * Matching is exact — a tag that legitimately appears both bare and
+ * `AUTO:`-prefixed lists both spellings, so no caller silently starts matching
+ * tags it used to ignore. `"*"` or a nullish `names` matches any name, for the
+ * generic sweeps that walk every tag.
+ */
+function tagNameMatches(name, names) {
+  if (names === undefined || names === null || names === "*") return true;
+
+  const wanted = Array.isArray(names) ? names : [names];
+
+  for (const candidate of wanted) {
+    if (name === String(candidate).toLowerCase()) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Locate opening BDS tags without relying on a delimiter-based pattern.
+ *
+ * Returns one entry per opening tag, in document order:
+ *
+ *   { name, attrsRaw, index, openEnd, selfClosing, closed, raw }
+ *
+ * `index` is the `<`, `openEnd` is just past the `>` (or `/>`), `raw` is that
+ * whole slice, and `attrsRaw` is the raw attribute list — still unparsed, so
+ * callers keep full control over whether an empty list means "no attributes"
+ * or "not this tag".
+ *
+ * Unterminated openings are reported with `closed: false` and `attrsRaw`
+ * running to the end of the text. That is what a streaming message looks like
+ * mid-tag, and the attributes seen so far are still worth reading.
+ *
+ * @param {string} text
+ * @param {string|string[]} names Tag name(s), case-insensitive.
+ */
+export function scanBdsTagOpenings(text, names) {
+  const source = String(text ?? "");
+  const openings = [];
+  const prefixRe = /<BDS:/gi;
+  let cursor = 0;
+
+  while (cursor < source.length) {
+    prefixRe.lastIndex = cursor;
+    const prefix = prefixRe.exec(source);
+    if (!prefix) break;
+
+    const index = prefix.index;
+    let nameEnd = index + 5;
+    while (nameEnd < source.length && NAME_CHAR_RE.test(source[nameEnd])) nameEnd++;
+
+    const name = source.slice(index + 5, nameEnd).toLowerCase();
+    if (!name || !tagNameMatches(name, names)) {
+      cursor = index + 5;
+      continue;
+    }
+
+    const end = findOpeningTagEnd(source, nameEnd);
+
+    if (end === -1) {
+      openings.push({
+        name,
+        attrsRaw: source.slice(nameEnd),
+        index,
+        openEnd: source.length,
+        selfClosing: false,
+        closed: false,
+        raw: source.slice(index),
+      });
+      break;
+    }
+
+    const selfClosing = source[end - 1] === "/";
+    openings.push({
+      name,
+      attrsRaw: source.slice(nameEnd, selfClosing ? end - 1 : end),
+      index,
+      openEnd: end + 1,
+      selfClosing,
+      closed: true,
+      raw: source.slice(index, end + 1),
+    });
+
+    cursor = end + 1;
+  }
+
+  return openings;
+}
+
+/**
+ * Locate complete `<BDS:NAME ...>body</BDS:NAME>` spans.
+ *
+ * Pairing is first-close-wins, matching the lazy `([\s\S]*?)<\/BDS:\1>`
+ * pattern this replaces. An opening with no close tag is still returned, with
+ * `paired: false` and an empty body, because several callers accept a bare
+ * opening and fall back to its attributes.
+ *
+ * Each entry extends an opening with:
+ *
+ *   { body, paired, endIndex, raw }
+ *
+ * Self-closing openings are skipped by default — they have no body, and the
+ * callers that sweep every tag would otherwise see one tag twice. Pass
+ * `includeSelfClosing` for the tags that legitimately appear in either form
+ * (`<BDS:AUTO:FILE_READ path="x"/>` and `<BDS:AUTO:FILE_READ path="x">` both
+ * mean the same thing); those entries carry an empty body and `paired: false`.
+ *
+ * @param {string} text
+ * @param {string|string[]} names Tag name(s), case-insensitive.
+ * @param {{ includeSelfClosing?: boolean }} [options]
+ */
+export function scanBdsTagPairs(text, names, options = {}) {
+  const source = String(text ?? "");
+  const { includeSelfClosing = false } = options;
+  const pairs = [];
+
+  for (const opening of scanBdsTagOpenings(source, names)) {
+    if (opening.selfClosing) {
+      if (includeSelfClosing) {
+        pairs.push({ ...opening, body: "", paired: false, endIndex: opening.openEnd, raw: opening.raw });
+      }
+      continue;
+    }
+
+    if (!opening.closed) {
+      pairs.push({ ...opening, body: "", paired: false, endIndex: opening.openEnd, raw: source.slice(opening.index) });
+      continue;
+    }
+
+    // `opening.name` is restricted to [A-Za-z0-9_:], so it needs no escaping.
+    const closeRe = new RegExp(`</BDS:${opening.name}>`, "gi");
+    closeRe.lastIndex = opening.openEnd;
+    const close = closeRe.exec(source);
+
+    if (!close) {
+      pairs.push({ ...opening, body: "", paired: false, endIndex: opening.openEnd, raw: source.slice(opening.index, opening.openEnd) });
+      continue;
+    }
+
+    pairs.push({
+      ...opening,
+      body: source.slice(opening.openEnd, close.index),
+      paired: true,
+      endIndex: close.index + close[0].length,
+      raw: source.slice(opening.index, close.index + close[0].length),
+    });
+  }
+
+  return pairs;
+}
+
+/**
  * Parse tag attributes from a string like: fileName="test.py" content="..."
  * Handles escaped quotes (\" ) inside attribute values.
  * Only \" is treated as an escape — other \X sequences (e.g. \p, \t)

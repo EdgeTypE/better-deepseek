@@ -12,6 +12,8 @@
 import {
   parseTagAttributes,
   normalizeTaggedCodeContent,
+  scanBdsTagOpenings,
+  scanBdsTagPairs,
 } from "./tag-parser.js";
 import { parseLooseJson } from "./json-repair.js";
 import { parseMemoryWrite } from "./memory-parser.js";
@@ -195,17 +197,14 @@ export function parseBdsMessage(rawText, isSettled = false) {
   // Parse create_file pair tags using position-based matching.
   // This correctly handles content that literally contains </BDS:create_file>
   // by pairing each opening with the last closing before the next opening.
-  // Also requires whitespace between tag name and attributes.
-  const openCreateRegex = /<BDS:create_file\s+([^>]*)>/gi;
   const closeCreateRegex = /<\/BDS:create_file>/gi;
 
   const openEnds = [];
   const openAttrsList = [];
-  let openMatch;
-  while ((openMatch = openCreateRegex.exec(text)) !== null) {
-    if (isInsideCodeBlock(openMatch.index)) continue;
-    openEnds.push(openMatch.index + openMatch[0].length);
-    openAttrsList.push(openMatch[1] || "");
+  for (const tag of scanBdsTagOpenings(text, "create_file")) {
+    if (isInsideCodeBlock(tag.index)) continue;
+    openEnds.push(tag.openEnd);
+    openAttrsList.push(tag.attrsRaw);
   }
 
   const closeStarts = [];
@@ -237,10 +236,18 @@ export function parseBdsMessage(rawText, isSettled = false) {
     result.createFiles.push({ fileName, content });
   }
 
-  const pairTagRegex =
-    /<BDS:([A-Za-z0-9_:]+)([^>]*)>([\s\S]*?)<\/BDS:\1>/gi;
+  // Scanned rather than regex-matched: an attribute value may legitimately
+  // contain `>` — a caption like "a > b", a chart title — and a `[^>]*` capture
+  // truncates at the first one, corrupting the attributes. Each tag is
+  // presented in the shape the previous regex produced, so the body of this
+  // loop is unchanged: [0] whole tag, [1] name, [2] raw attributes, [3] body,
+  // plus `.index`.
   let match;
-  while ((match = pairTagRegex.exec(text)) !== null) {
+  for (const tag of scanBdsTagPairs(text, "*")) {
+    if (!tag.paired) continue;
+
+    match = [tag.raw, tag.name, tag.attrsRaw, tag.body];
+    match.index = tag.index;
     if (isInsideCodeBlock(match.index)) continue;
     const name = String(match[1] || "").toLowerCase();
     const attrs = parseTagAttributes(match[2] || "");
@@ -385,13 +392,13 @@ export function parseBdsMessage(rawText, isSettled = false) {
     }
   }
 
-  const autoSearchRegex = /<BDS:AUTO:SEARCH([^>]*)>([\s\S]*?)<\/BDS:AUTO:SEARCH>/gi;
-  while ((match = autoSearchRegex.exec(text)) !== null) {
-    if (isInsideCodeBlock(match.index)) continue;
-    const rawQuery = String(match[2] || "").trim();
+  for (const tag of scanBdsTagPairs(text, ["search", "auto:search"])) {
+    if (!tag.paired) continue;
+    if (isInsideCodeBlock(tag.index)) continue;
+    const rawQuery = tag.body.trim();
     const query = stripMarkdownLinks(rawQuery);
     if (!query) continue;
-    const attrs = parseTagAttributes(match[1] || "");
+    const attrs = parseTagAttributes(tag.attrsRaw);
     const deepFetch = Math.max(0, parseInt(attrs.deepFetch, 10) || 0);
     const runId = attrs.runId || attrs.runid || "";
     const purpose = String(attrs.purpose || "").trim();
@@ -414,11 +421,10 @@ export function parseBdsMessage(rawText, isSettled = false) {
     });
   }
 
-  const fileReadRegex = /<BDS:(?:AUTO:)?FILE_READ([^>]*)>(?:([\s\S]*?)<\/BDS:(?:AUTO:)?FILE_READ>)?/gi;
-  while ((match = fileReadRegex.exec(text)) !== null) {
-    if (isInsideCodeBlock(match.index)) continue;
-    const attrs = parseTagAttributes(match[1] || "");
-    const filePath = String(attrs.path || attrs.filePath || match[2] || "").trim();
+  for (const tag of scanBdsTagPairs(text, ["file_read", "auto:file_read"], { includeSelfClosing: true })) {
+    if (isInsideCodeBlock(tag.index)) continue;
+    const attrs = parseTagAttributes(tag.attrsRaw);
+    const filePath = String(attrs.path || attrs.filePath || tag.body || "").trim();
     if (filePath) {
       result.autoRequests.fileRead.push(filePath);
       const blockIdx = result.renderableBlocks.length;
@@ -427,15 +433,14 @@ export function parseBdsMessage(rawText, isSettled = false) {
         attrs: { path: filePath, ...attrs },
         content: filePath,
       });
-      renderableTagMatches.push({ original: match[0], index: match.index, blockIdx });
+      renderableTagMatches.push({ original: tag.raw, index: tag.index, blockIdx });
     }
   }
 
-  const searchInDirRegex = /<BDS:(?:AUTO:)?SEARCH_IN_DIRECTORY([^>]*)>(?:([\s\S]*?)<\/BDS:(?:AUTO:)?SEARCH_IN_DIRECTORY>)?/gi;
-  while ((match = searchInDirRegex.exec(text)) !== null) {
-    if (isInsideCodeBlock(match.index)) continue;
-    const attrs = parseTagAttributes(match[1] || "");
-    const queries = String(attrs.queries || attrs.query || match[2] || "").trim();
+  for (const tag of scanBdsTagPairs(text, ["search_in_directory", "auto:search_in_directory"], { includeSelfClosing: true })) {
+    if (isInsideCodeBlock(tag.index)) continue;
+    const attrs = parseTagAttributes(tag.attrsRaw);
+    const queries = String(attrs.queries || attrs.query || tag.body || "").trim();
     if (queries) {
       result.autoRequests.searchInDirectory.push(queries);
       const blockIdx = result.renderableBlocks.length;
@@ -444,15 +449,14 @@ export function parseBdsMessage(rawText, isSettled = false) {
         attrs: { queries, ...attrs },
         content: queries,
       });
-      renderableTagMatches.push({ original: match[0], index: match.index, blockIdx });
+      renderableTagMatches.push({ original: tag.raw, index: tag.index, blockIdx });
     }
   }
 
-  const dirListRegex = /<BDS:(?:AUTO:)?LIST_DIR([^>]*)>(?:([\s\S]*?)<\/BDS:(?:AUTO:)?LIST_DIR>)?/gi;
-  while ((match = dirListRegex.exec(text)) !== null) {
-    if (isInsideCodeBlock(match.index)) continue;
-    const attrs = parseTagAttributes(match[1] || "");
-    const dirPath = String(attrs.path || attrs.dir || attrs.directory || match[2] || "").trim();
+  for (const tag of scanBdsTagPairs(text, ["list_dir", "auto:list_dir"], { includeSelfClosing: true })) {
+    if (isInsideCodeBlock(tag.index)) continue;
+    const attrs = parseTagAttributes(tag.attrsRaw);
+    const dirPath = String(attrs.path || attrs.dir || attrs.directory || tag.body || "").trim();
     if (dirPath) {
       result.autoRequests.dirList.push(dirPath);
       const blockIdx = result.renderableBlocks.length;
@@ -461,7 +465,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
         attrs: { path: dirPath, ...attrs },
         content: dirPath,
       });
-      renderableTagMatches.push({ original: match[0], index: match.index, blockIdx });
+      renderableTagMatches.push({ original: tag.raw, index: tag.index, blockIdx });
     }
   }
 
@@ -521,10 +525,10 @@ export function parseBdsMessage(rawText, isSettled = false) {
     renderableTagMatches.push({ original: match[0], index: match.index, blockIdx });
   }
 
-  const selfClosingCreateRegex = /<BDS:create_file\s+([^>]*)\/>/gi;
-  while ((match = selfClosingCreateRegex.exec(text)) !== null) {
-    if (isInsideCodeBlock(match.index)) continue;
-    const attrs = parseTagAttributes(match[1] || "");
+  for (const tag of scanBdsTagOpenings(text, "create_file")) {
+    if (!tag.selfClosing) continue;
+    if (isInsideCodeBlock(tag.index)) continue;
+    const attrs = parseTagAttributes(tag.attrsRaw);
     const fileName = attrs.fileName || attrs.filename || attrs.path;
     if (!fileName) {
       continue;
@@ -536,21 +540,21 @@ export function parseBdsMessage(rawText, isSettled = false) {
     result.createFiles.push({ fileName, content });
   }
 
-  const selfClosingImageRegex = /<BDS:IMAGE\s*([^>]*)\/>/gi;
-  while ((match = selfClosingImageRegex.exec(text)) !== null) {
-    if (isInsideCodeBlock(match.index)) continue;
-    const attrs = parseTagAttributes(match[1] || "");
+  for (const tag of scanBdsTagOpenings(text, "image")) {
+    if (!tag.selfClosing) continue;
+    if (isInsideCodeBlock(tag.index)) continue;
+    const attrs = parseTagAttributes(tag.attrsRaw);
     if (!attrs.src && !attrs.query && !attrs.q && !attrs.search) continue;
     const query = attrs.src ? "" : (attrs.query || attrs.q || attrs.search || "");
     const blockIdx = result.renderableBlocks.length;
     result.renderableBlocks.push({ name: "image", attrs, content: query });
-    renderableTagMatches.push({ original: match[0], index: match.index, blockIdx });
+    renderableTagMatches.push({ original: tag.raw, index: tag.index, blockIdx });
   }
 
-  const selfClosingMemoryRegex = /<BDS:memory_write([^>]*)\/>/gi;
-  while ((match = selfClosingMemoryRegex.exec(text)) !== null) {
-    if (isInsideCodeBlock(match.index)) continue;
-    const attrs = parseTagAttributes(match[1] || "");
+  for (const tag of scanBdsTagOpenings(text, "memory_write")) {
+    if (!tag.selfClosing) continue;
+    if (isInsideCodeBlock(tag.index)) continue;
+    const attrs = parseTagAttributes(tag.attrsRaw);
     const parsedMemory = parseMemoryWrite("", attrs);
     if (parsedMemory) {
       result.memoryWrites.push(parsedMemory);
