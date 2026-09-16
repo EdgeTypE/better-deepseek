@@ -16,6 +16,7 @@ import { XLSX_SKILL } from "../lib/office-skills/xlsx.js";
 import { PPTX_SKILL } from "../lib/office-skills/pptx.js";
 import { DOCX_SKILL } from "../lib/office-skills/docx.js";
 import { extractHttpUrl, normalizeHttpUrl } from "../lib/utils/url-normalizer.js";
+import { extractMcpResultText } from "../lib/mcp-result.js";
 
 const TOOL_TO_SKILL = {
   PPTX: { tag: "pptx", skill: PPTX_SKILL },
@@ -690,9 +691,7 @@ export async function handleAutoMcpCall(serverUrl, toolName, args = {}) {
       );
     });
 
-    const textContent = Array.isArray(result?.content)
-      ? result.content.map(c => c.text || "").filter(Boolean).join("\n")
-      : JSON.stringify(result);
+    const textContent = extractMcpResultText(result);
 
     const MAX_INLINE = Number(appState.settings?.mcpInlineMaxChars) || 8000;
     const inlineContent = textContent.length > MAX_INLINE
