@@ -3,6 +3,54 @@ import { extractHttpUrl } from "../../lib/utils/url-normalizer.js";
 import { stripAutoLinkArtifacts } from "./link-artifacts.js";
 
 /**
+ * Attribute-list continuation: the next `name=` pair of the same tag.
+ */
+const NEXT_ATTRIBUTE_RE = /^\s*[A-Za-z0-9_:-]+\s*=/;
+
+/**
+ * Tag terminators: `>`, a self-closing `/>`, or a bare `/` when the caller
+ * passes the attribute list without the closing bracket.
+ */
+const TAG_END_RE = /^\s*(?:\/?>|\/|$)/;
+
+/**
+ * True when the text at `index` continues the attribute list — either the tag
+ * ends there, or another `name=` pair follows.
+ *
+ * @param {string} source Attribute string, or a full tag.
+ * @param {number} index Position just past a candidate closing quote.
+ */
+export function closesAttributeValue(source, index) {
+  if (index >= source.length) return true;
+  const rest = source.slice(index);
+  return TAG_END_RE.test(rest) || NEXT_ATTRIBUTE_RE.test(rest);
+}
+
+/**
+ * Index of the last delimiter that genuinely ends the value, or -1 when there
+ * is none.
+ *
+ * A payload may contain the delimiter character itself — an apostrophe in
+ * prose, a nested `"hi"` — so "the first matching quote wins" is wrong. The
+ * real delimiter is the last one that still leaves the attribute list valid;
+ * anything before it is payload. Truncating at the first match produced invalid
+ * JSON that reached MCP servers as `_raw` (issue #149).
+ */
+function findLastClosingQuote(source, from, quoteChar) {
+  let last = -1;
+
+  for (let i = from; i < source.length; i++) {
+    if (source[i] === "\\" && source[i + 1] === quoteChar) {
+      i++;
+      continue;
+    }
+    if (source[i] === quoteChar && closesAttributeValue(source, i + 1)) last = i;
+  }
+
+  return last;
+}
+
+/**
  * Parse tag attributes from a string like: fileName="test.py" content="..."
  * Handles escaped quotes (\" ) inside attribute values.
  * Only \" is treated as an escape — other \X sequences (e.g. \p, \t)
@@ -24,6 +72,7 @@ export function parseTagAttributes(rawAttrs) {
 
     // Walk character-by-character to find the closing quote,
     // respecting escaped quotes: \" and \' only
+    const lastClose = findLastClosingQuote(rawAttrs, start + 1, quoteChar);
     let value = "";
     let i = start + 1;
     while (i < rawAttrs.length) {
@@ -34,8 +83,14 @@ export function parseTagAttributes(rawAttrs) {
         continue;
       }
       if (ch === quoteChar) {
+        if (closesAttributeValue(rawAttrs, i + 1) || i >= lastClose) {
+          i++;
+          break;
+        }
+        // Inner quote: part of the payload, keep walking.
+        value += ch;
         i++;
-        break;
+        continue;
       }
       value += ch;
       i++;

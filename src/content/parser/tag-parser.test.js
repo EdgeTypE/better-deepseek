@@ -50,6 +50,43 @@ describe("parseTagAttributes", () => {
     });
   });
 
+  it("keeps an inner quote instead of truncating the value (issue #149)", () => {
+    // Previously the walk stopped at the first matching quote, so the value
+    // became `{"content":"it` and the JSON was rejected downstream.
+    expect(parseTagAttributes(`args='{"content":"it's fine"}'`)).toEqual({
+      args: `{"content":"it's fine"}`,
+    });
+  });
+
+  it("keeps nested double quotes inside a double-quoted value", () => {
+    expect(parseTagAttributes('content="he said "hi" loudly"')).toEqual({
+      content: 'he said "hi" loudly',
+    });
+  });
+
+  it("keeps an inner quote when the value is followed by another attribute", () => {
+    expect(parseTagAttributes(`args='{"a":"it's"}' tool="t"`)).toEqual({
+      args: `{"a":"it's"}`,
+      tool: "t",
+    });
+  });
+
+  it("keeps a > inside a quoted value", () => {
+    expect(parseTagAttributes(`args='{"content":"a > b"}'`)).toEqual({
+      args: '{"content":"a > b"}',
+    });
+  });
+
+  it("still closes on a quote that precedes the next attribute", () => {
+    expect(parseTagAttributes('a="x" b="y"')).toEqual({ a: "x", b: "y" });
+  });
+
+  it("closes on a self-closing slash", () => {
+    expect(parseTagAttributes(' search="ocean" /')).toEqual({ search: "ocean" });
+    expect(parseTagAttributes(' search="ocean"/>')).toEqual({ search: "ocean" });
+    expect(parseTagAttributes(' search="ocean" />')).toEqual({ search: "ocean" });
+  });
+
   it("strips autolink artifacts from fileName values", () => {
     expect(
       parseTagAttributes('fileName="src/[main.rs](https_main.rs)"'),

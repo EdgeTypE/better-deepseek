@@ -731,6 +731,7 @@ export function buildMcpBlock(state, fingerprint) {
     `<BetterDeepSeek> <BDS:MCP fingerprint="${fingerprint}">`,
     `You have access to the following MCP (Model Context Protocol) tools via remote servers.`,
     `To invoke them, use: <BDS:AUTO:MCP url="SERVER_NAME_OR_URL" tool="TOOL_NAME" args='{"key":"value"}'>`,
+    `If the arguments contain quotation marks, apostrophes, angle brackets or newlines, send them as base64Args="<url-safe base64 of the JSON>" instead of args.`,
     `The extension will call the tool and inject the result.`,
     `Important: Only ONE tool per response. Wait for the result before invoking another. Never invoke multiple tools at the same time.`,
     ``,

@@ -18,6 +18,7 @@ import { parseMemoryWrite } from "./memory-parser.js";
 import { sanitizeVisibleText } from "./text-sanitizer.js";
 import { extractHttpUrl } from "../../lib/utils/url-normalizer.js";
 import { stripAutoLinkArtifacts } from "./link-artifacts.js";
+import { resolveMcpArgs, scanMcpTags } from "./mcp-args.js";
 
 // Tool renderers that have visual cards
 const RENDERABLE_TOOLS = new Set([
@@ -398,17 +399,19 @@ export function parseBdsMessage(rawText, isSettled = false) {
     result.autoRequests.searchQueries.push({ query, deepFetch, runId, purpose, sourceType });
   }
 
-  const autoMcpRegex = /<BDS:AUTO:MCP\s+((?:[^>"']+|"[^"]*"|'[^']*')*)\s*>([\s\S]*?)<\/BDS:AUTO:MCP>/gi;
-  while ((match = autoMcpRegex.exec(text)) !== null) {
-    if (isInsideCodeBlock(match.index)) continue;
-    const attrs = parseTagAttributes(match[1] || "");
+  // Scanned rather than regex-matched: the args payload may contain the quote
+  // characters and `>` that a delimiter-based pattern relies on (issue #149).
+  for (const mcpTag of scanMcpTags(text)) {
+    if (isInsideCodeBlock(mcpTag.index)) continue;
+    const attrs = parseTagAttributes(mcpTag.attrsRaw);
     const serverUrl = attrs.url || attrs.serverUrl || "";
     const toolName = attrs.tool || attrs.toolName || "";
-    const rawArgs = attrs.args || match[2] || "";
     if (!serverUrl || !toolName) continue;
-    let argsObj = {};
-    try { argsObj = JSON.parse(rawArgs); } catch { argsObj = { _raw: rawArgs.trim() }; }
-    result.autoRequests.mcpCalls.push({ serverUrl, toolName, args: argsObj });
+    result.autoRequests.mcpCalls.push({
+      serverUrl,
+      toolName,
+      args: resolveMcpArgs(attrs, mcpTag.body),
+    });
   }
 
   const fileReadRegex = /<BDS:(?:AUTO:)?FILE_READ([^>]*)>(?:([\s\S]*?)<\/BDS:(?:AUTO:)?FILE_READ>)?/gi;
