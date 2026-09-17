@@ -1,4 +1,5 @@
 import { isAutoLinkArtifact } from "../parser/link-artifacts.js";
+import { scanBdsTagOpenings } from "../parser/tag-parser.js";
 
 /**
  * Selectors for elements that are already-rendered rich output rather than
@@ -162,15 +163,67 @@ function stripMessageNoise(root) {
 }
 
 /**
+ * Does this text hold a BDS closing tag whose opening lies outside it?
+ *
+ * The page renderer can swallow a message's tail into its last code block: when
+ * a file body is wrapped in its own fence and itself contains fenced blocks,
+ * markdown re-pairs the fences, the outermost one is left open, and everything
+ * after it — `</BDS:create_file>`, `</BDS:LONG_WORK>` and the trailing prose —
+ * lands inside that block.
+ *
+ * Fencing such a block puts one fence *inside* the tag pair and one *outside*
+ * it, so removing the pair later orphans a fence, which survives into the
+ * visible text as a stray ``` (issue #120).
+ *
+ * Only a *dangling close* counts — a close seen before its opening. That is the
+ * renderer's signature: a swallowed tail starts with the closings. A block that
+ * merely holds an unmatched *opening* is the opposite case — a model showing a
+ * tag inside a fence — and stays fenced, so its tag is still escaped and never
+ * executed. Widening this to any imbalance made such an example go live and
+ * swallow the surrounding prose as the new file's content.
+ */
+function hasDanglingBdsClose(text) {
+  const source = String(text || "");
+  const depth = new Map();
+
+  const events = [
+    ...scanBdsTagOpenings(source, "*")
+      .filter((tag) => !tag.selfClosing)
+      .map((tag) => ({ index: tag.index, name: tag.name, delta: 1 })),
+    ...Array.from(source.matchAll(/<\/BDS:([A-Za-z0-9_:]+)>/gi)).map((match) => ({
+      index: match.index,
+      name: match[1].toLowerCase(),
+      delta: -1,
+    })),
+  ].sort((a, b) => a.index - b.index);
+
+  for (const event of events) {
+    const next = (depth.get(event.name) || 0) + event.delta;
+    if (next < 0) return true;
+    depth.set(event.name, next);
+  }
+
+  return false;
+}
+
+/**
  * Replace markdown code blocks with fenced text so whitespace and banner UI
  * cannot corrupt the extracted content.
  *
  * Blocks that contain already-rendered rich output (a KaTeX formula or a
  * mermaid diagram) are left untouched — replacing them would destroy the
  * rendered result that the overlay is about to re-display.
+ *
+ * A block that carries a dangling BDS close is emitted as plain text instead,
+ * so no fence ends up straddling the tag pair (see `hasDanglingBdsClose`).
  */
 function replaceCodeBlocksWithFences(root) {
   const doc = root.ownerDocument;
+
+  const asText = (codeText) =>
+    hasDanglingBdsClose(codeText)
+      ? `\n${codeText}\n`
+      : `\n\`\`\`\n${codeText}\n\`\`\`\n`;
 
   const mdCodeBlocks = root.querySelectorAll(".md-code-block");
   for (const block of mdCodeBlocks) {
@@ -178,7 +231,7 @@ function replaceCodeBlocksWithFences(root) {
     const codeEl = block.querySelector("pre code") || block.querySelector("pre");
     if (codeEl) {
       const codeText = codeEl.textContent || "";
-      const textNode = doc.createTextNode(`\n\`\`\`\n${codeText}\n\`\`\`\n`);
+      const textNode = doc.createTextNode(asText(codeText));
       block.replaceWith(textNode);
     }
   }
@@ -189,7 +242,7 @@ function replaceCodeBlocksWithFences(root) {
     if (pre.querySelector(RICH_HTML_SELECTOR)) continue;
     const codeEl = pre.querySelector("code");
     const codeText = (codeEl || pre).textContent || "";
-    const textNode = doc.createTextNode(`\n\`\`\`\n${codeText}\n\`\`\`\n`);
+    const textNode = doc.createTextNode(asText(codeText));
     pre.replaceWith(textNode);
   }
 }
