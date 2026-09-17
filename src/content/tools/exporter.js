@@ -5,6 +5,7 @@
 
 import { collectMessageNodes, detectMessageRole } from "../scanner.js";
 import { extractMessageMarkdown, extractMessageRawText } from "../dom/message-text.js";
+import { sanitizeVisibleText } from "../parser/text-sanitizer.js";
 import { triggerTextDownload, triggerBlobDownload } from "../../lib/utils/download.js";
 import { simpleHash } from "../../lib/utils/hash.js";
 import { t } from "../../lib/i18n.svelte.js";
@@ -156,9 +157,14 @@ export function formatMarkdown(messages) {
  * This is an extra safety layer.
  */
 function formatAssistantContent(content) {
-  // Replace internal BDS tags if they somehow leaked through
-  let text = content.replace(/<(BDS|BetterDeepSeek):[\s\S]*?<\/(BDS|BetterDeepSeek):[\s\S]*?>/gi, "").trim();
-  
+  // Strip surviving BDS tags with the same pass the overlay uses. A
+  // `<(BDS|BetterDeepSeek):[\s\S]*?<\/(BDS|BetterDeepSeek):[\s\S]*?>` pattern
+  // requires an *opening* tag, so it left orphaned closes in the export — a
+  // LONG_WORK block exported a stray `</BDS:LONG_WORK>` — and it swallowed
+  // everything from an opening to the first close it could find, which may
+  // belong to a different tag entirely.
+  let text = sanitizeVisibleText(content);
+
   // Extra layer: remove DeepSeek UI artifacts that might have survived extraction
   const noisePatterns = [
     /Thought for \d+ seconds/gi,
