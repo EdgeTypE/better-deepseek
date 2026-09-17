@@ -692,11 +692,25 @@ describe("parseBdsMessage — visibleText output", () => {
     expect(result.visibleText).toBe("Check this:\n\x00BLOCK:0\x00\nCool right?");
   });
 
-  it("strips LONG_WORK wrappers from visibleText", () => {
+  it("replaces LONG_WORK wrappers with a block marker in visibleText", () => {
     const raw =
       "Files:\n<BDS:LONG_WORK><BDS:create_file fileName=\"a.py\">```py\nx=1\n```</BDS:create_file></BDS:LONG_WORK>\nDone!";
     const result = parseBdsMessage(raw);
-    expect(result.visibleText).toBe("Files:\n\nDone!");
+    // The card renders at the tag's own position, so the span becomes a marker
+    // instead of vanishing: a LONG_WORK in the middle of a message must not push
+    // its card to the end of the message.
+    expect(result.visibleText).toBe("Files:\n\x00BLOCK:0\x00\nDone!");
+    expect(result.renderableBlocks.map((b) => b.name)).toEqual(["long_work"]);
+  });
+
+  it("keeps the text after a LONG_WORK that contains another renderable tag", () => {
+    const raw =
+      "Files:\n<BDS:LONG_WORK><BDS:create_file fileName=\"a.py\">x</BDS:create_file><BDS:chart>{\"type\":\"bar\"}</BDS:chart></BDS:LONG_WORK>\nDone!";
+    const result = parseBdsMessage(raw);
+    // Only the outer span gets a marker. A nested match would shrink the text
+    // inside the outer span, and the outer splice's now-stale end index would
+    // run past it and eat "Done!".
+    expect(result.visibleText).toBe("Files:\n\x00BLOCK:0\x00\nDone!");
   });
 
   it("removes BetterDeepSeek blocks from visibleText", () => {

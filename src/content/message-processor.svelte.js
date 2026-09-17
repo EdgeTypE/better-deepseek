@@ -25,7 +25,7 @@ import { cleanBdsString } from "./tags/tag-hider.js";
 import { upsertMemories } from "./parser/memory-parser.js";
 import { upsertCharacters } from "./parser/character-parser.js";
 import { upsertSkills } from "./parser/skill-parser.js";
-import { collectLongWorkFiles, finalizeLongWork, emitZipForFiles } from "./files/long-work.js";
+import { collectLongWorkFiles, finalizeLongWork } from "./files/long-work.js";
 import { emitStandaloneFiles } from "./files/standalone.js";
 import {
   getOrCreateHost,
@@ -50,7 +50,8 @@ import { mount, unmount } from "svelte";
 import MessageOverlay from "./ui/MessageOverlay.svelte";
 import { i18n } from "../lib/i18n.svelte.js";
 import { remoteConfig } from "../lib/remote-config.svelte.js";
-import { makeId } from "../lib/utils/helpers.js";
+import { makeId, buildTimestamp } from "../lib/utils/helpers.js";
+import { buildZip } from "../lib/zip.js";
 import { STORAGE_KEYS } from "../lib/constants.js";
 import { isPredominantlyRtl } from '../lib/utils/rtl-detector.js';
 
@@ -933,18 +934,30 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
         ? Array.from(state.longWork.files.entries()).map(([path, content]) => ({ path, content }))
         : parsed.createFiles.map(f => ({ path: f.fileName, content: f.content }));
 
-      const fileHost = node.querySelector('.bds-file-host');
-      const isMounted = fileHost && fileHost.querySelector('.bds-download-card');
-      
-      const needsEmit = !stateData.longWorkClosed || 
-                        stateData.lastFinalizedCount !== filesToZip.length || 
-                        !isMounted;
+      // The card is rendered by MessageOverlay at the tag's own position, so the
+      // block carries the packaged files rather than a host receiving a mount.
+      // The ZIP is built once per message and cached: the scan runs on every DOM
+      // mutation, and re-deflating every file on each pass is pure waste.
+      const longWorkBlock = parsed.renderableBlocks.find((b) => b.name === "long_work");
+      if (longWorkBlock && filesToZip.length > 0) {
+        if (!stateData.longWorkZip) {
+          stateData.longWorkZip = {
+            fileName: `better-deepseek-${buildTimestamp()}.zip`,
+            blob: buildZip(filesToZip),
+          };
+        }
+        longWorkBlock.files = filesToZip;
+        longWorkBlock.fileName = stateData.longWorkZip.fileName;
+        longWorkBlock.blob = stateData.longWorkZip.blob;
+      }
+
+      const needsEmit =
+        !stateData.longWorkClosed ||
+        stateData.lastFinalizedCount !== filesToZip.length;
 
       if (needsEmit && filesToZip.length > 0) {
         stateData.longWorkClosed = true;
         stateData.lastFinalizedCount = filesToZip.length;
-
-        emitZipForFiles(node, filesToZip);
 
         if (isLatestAssistant) {
           state.longWork.active = false;

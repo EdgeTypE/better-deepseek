@@ -57,6 +57,7 @@ const RENDERABLE_TOOLS = new Set([
   "todo",
   "harness_task",
   "auto:harness_task",
+  "long_work",
 ]);
 
 function normalizeAutoHttpTarget(value) {
@@ -277,7 +278,14 @@ export function parseBdsMessage(rawText, isSettled = false) {
 
     if (RENDERABLE_TOOLS.has(name)) {
       const blockIdx = result.renderableBlocks.length;
-      result.renderableBlocks.push({ name, attrs, content });
+      result.renderableBlocks.push({
+        name,
+        attrs,
+        // The LONG_WORK card lists the packaged files, and the parser already
+        // reports those in `createFiles`. Carrying the raw body here as well
+        // would duplicate every file's content on every parse.
+        content: name === "long_work" ? "" : content,
+      });
       renderableTagMatches.push({ original: match[0], index: match.index, blockIdx });
     }
 
@@ -643,9 +651,26 @@ export function parseBdsMessage(rawText, isSettled = false) {
 
   // Replace renderable block tags with inline position markers
   // Process in reverse index order so earlier replacements don't shift later ones
-  const sortedMatches = [...renderableTagMatches]
-    .filter(m => m.index + m.original.length <= visibleText.length)
-    .sort((a, b) => b.index - a.index);
+  const inRange = renderableTagMatches
+    .filter(m => m.index + m.original.length <= visibleText.length);
+
+  // A renderable tag nested inside another — a chart inside LONG_WORK, say —
+  // must not get a marker of its own. The reverse-order splice below assumes the
+  // spans are disjoint; a nested match shrinks the text inside the outer span,
+  // so the outer splice's stale end index runs past it and eats whatever
+  // follows. Replacing the outer span whole takes the inner tag with it, which
+  // is right: its body belongs to the block being replaced.
+  const outermost = [];
+  for (const match of [...inRange].sort((a, b) => a.index - b.index)) {
+    const previous = outermost[outermost.length - 1];
+    const contained =
+      previous &&
+      match.index + match.original.length <= previous.index + previous.original.length;
+    if (contained) continue;
+    outermost.push(match);
+  }
+
+  const sortedMatches = outermost.sort((a, b) => b.index - a.index);
 
   for (const { original, index, blockIdx } of sortedMatches) {
     const marker = `\x00BLOCK:${blockIdx}\x00`;

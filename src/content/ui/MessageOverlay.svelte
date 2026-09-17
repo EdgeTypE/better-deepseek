@@ -26,6 +26,7 @@
   import FileReadResultCard from "./FileReadResultCard.svelte";
   import DirectorySearchResultCard from "./DirectorySearchResultCard.svelte";
   import DirListResultCard from "./DirListResultCard.svelte";
+  import DownloadCard from "./DownloadCard.svelte";
   import { t } from "../../lib/i18n.svelte.js";
   import { parseLooseJson } from "../parser/json-repair.js";
   import { triggerTextDownload } from "../../lib/utils/download.js";
@@ -262,6 +263,16 @@
         <ChartCard content={block.content} attrs={block.attrs} />
       {:else if block.name === 'harness_task' || block.name === 'auto:harness_task'}
         <HarnessTaskCard attrs={block.attrs} content={block.content} />
+      {:else if block.name === 'long_work'}
+        {#if block.files?.length && block.blob}
+          <DownloadCard
+            title="LONG_WORK project"
+            description={`${block.files.length} files packaged`}
+            fileName={block.fileName}
+            blob={block.blob}
+            files={block.files}
+          />
+        {/if}
       {:else if block.name === 'auto:code_runner'}
         <AutoCodeRunnerCard language={block.attrs.language || block.attrs.lang} content={block.content} />
       {:else if block.name === 'auto_code_result'}
