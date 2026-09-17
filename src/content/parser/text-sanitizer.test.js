@@ -52,4 +52,59 @@ describe("sanitizeVisibleText", () => {
       "Hello <BDS:VISUALIZER still typing"
     );
   });
+
+  describe("fence repair (issue #120)", () => {
+    it("drops a fence left dangling when a removal took its partner", () => {
+      // The removal eats the opening fence because it sits inside the tag span;
+      // the closing fence is outside it and would otherwise render as a stray
+      // ``` at the end of the message.
+      const text = [
+        "Intro",
+        "",
+        '<BDS:create_file fileName="x">',
+        "```",
+        "</BDS:create_file>",
+        "",
+        "Prose.",
+        "```",
+      ].join("\n");
+
+      expect(sanitizeVisibleText(text)).toBe("Intro\n\nProse.");
+    });
+
+    it("leaves balanced fences alone", () => {
+      const text = ["Intro", "", "```", "code", "```", "", "Prose."].join("\n");
+
+      expect(sanitizeVisibleText(text)).toBe(text);
+    });
+
+    it("keeps a block's own fence lines while dropping the dangling one", () => {
+      // The inner ```bash belongs to the outer block; only the trailing,
+      // unpaired fence is an artifact.
+      const text = [
+        "Intro",
+        "",
+        "```",
+        "# T",
+        "",
+        "```bash",
+        "run",
+        "```",
+        "",
+        "```",
+        "",
+        "Prose.",
+      ].join("\n");
+
+      expect(sanitizeVisibleText(text)).toBe(
+        ["Intro", "", "```", "# T", "", "```bash", "run", "```", "", "Prose."].join("\n")
+      );
+    });
+
+    it("leaves text without fences untouched", () => {
+      const text = ["Intro", "", "plain", "Prose."].join("\n");
+
+      expect(sanitizeVisibleText(text)).toBe(text);
+    });
+  });
 });

@@ -95,6 +95,14 @@ describe("issue #120 — export tag stripping", () => {
     expect(md).toContain("calistirabilirsin");
   });
 
+  it("leaves no dangling fence when the tag removal cut one in half", () => {
+    const md = markdownFor(SWALLOWED_TAIL);
+
+    // Removing the tag span takes the opening fence with it and leaves the
+    // closing one behind. That stray ``` is what broke the export.
+    expect(md).not.toContain("```");
+  });
+
   it("keeps the prose that follows the tags", () => {
     const md = markdownFor(WELL_FORMED);
 
