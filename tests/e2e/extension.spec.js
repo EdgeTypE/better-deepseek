@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { test, expect } from "./helpers/extension.js";
 
 async function addAssistantMessage(page, text) {
@@ -823,4 +824,84 @@ test("host wrapper: create_file download card in block-level nonzero wrapper", a
   expect(hostContract.display).not.toBe("contents");
   expect(hostContract.w).toBeGreaterThan(0);
   expect(hostContract.h).toBeGreaterThan(0);
+});
+
+test("renders the LONG_WORK card between the paragraphs that surround the tag", async ({ page }) => {
+  await page.goto("https://chat.deepseek.com/chat/s/mock-chat-1");
+  await page.waitForSelector("#bds-toggle");
+
+  await addAssistantMessage(
+    page,
+    [
+      "Before.",
+      "<BDS:LONG_WORK>",
+      '<BDS:create_file fileName="a.txt">hi</BDS:create_file>',
+      "</BDS:LONG_WORK>",
+      "After.",
+    ].join("\n"),
+  );
+
+  await expect(page.locator(".bds-download-card")).toContainText("LONG_WORK project");
+
+  // long_work is a renderable block now, so interleave() drops the card where
+  // the tag sits. It used to be mounted into a host at the edge of the message,
+  // which put a mid-message LONG_WORK in the wrong place entirely.
+  const order = await page.evaluate(() => {
+    const overlay = document.querySelector(".bds-message-overlay");
+    return Array.from(overlay.children).map((el) =>
+      el.classList.contains("bds-download-card") ? "CARD" : el.textContent.trim(),
+    );
+  });
+
+  const cardIndex = order.indexOf("CARD");
+  expect(cardIndex).toBeGreaterThan(-1);
+  expect(order.slice(0, cardIndex).join(" ")).toContain("Before.");
+  expect(order.slice(cardIndex + 1).join(" ")).toContain("After.");
+});
+
+test("exports a LONG_WORK reply without a dangling fence or an orphaned close", async ({ page }) => {
+  await page.goto("https://chat.deepseek.com/chat/s/mock-chat-1");
+  await page.waitForSelector("#bds-toggle");
+
+  await addUserMessage(page, "Build me a project.");
+  await addAssistantMessage(
+    page,
+    [
+      "Starting long work.",
+      "<BDS:LONG_WORK>",
+      '<BDS:create_file fileName="a.txt">',
+      "```",
+      "</BDS:create_file>",
+      "</BDS:LONG_WORK>",
+      "",
+      "Done.",
+      "```",
+    ].join("\n"),
+  );
+
+  const chatItem = page.locator('.mock-chat-item:has(a[data-session-id="mock-chat-1"])');
+  await chatItem.hover();
+  await chatItem.locator("div._2090548").click({ force: true });
+  await page.waitForTimeout(500);
+
+  const exportOption = page.locator(".bds-export-option");
+  await expect(exportOption).toBeVisible({ timeout: 10000 });
+  await exportOption.click();
+
+  await expect(page.locator(".bds-selection-bar")).toBeVisible();
+  await page.waitForSelector(".bds-selection-checkbox", { timeout: 5000 });
+  await page.locator('button:has-text("Select All")').click();
+
+  const download = page.waitForEvent("download");
+  await page.locator('.bds-export-btn[title="Markdown (.md)"]').click();
+  const artifact = await download;
+
+  const markdown = fs.readFileSync(await artifact.path(), "utf8");
+
+  // The removal takes the opening fence because it sits inside the tag span; the
+  // closing one is left outside and used to reach the export as a bare ```.
+  expect(markdown).not.toContain("```");
+  expect(markdown).not.toContain("</BDS:");
+  expect(markdown).toContain("Starting long work.");
+  expect(markdown).toContain("Done.");
 });
