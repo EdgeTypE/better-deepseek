@@ -73,6 +73,13 @@ export async function createFirefoxFixture() {
     throw new Error(`Failed to create Firefox driver: ${e.message}`);
   }
 
+  // The mock reports its own deadline for the scale test (30s at 200 messages,
+  // 60s at 2000) and the default WebDriver script timeout is also 30s, so the
+  // driver always killed the script first: its ScriptTimeoutError replaced the
+  // mock's diagnostic, which is the one that says how many messages actually
+  // settled. Keep the driver out of the way and let the mock speak.
+  await driver.manage().setTimeouts({ script: 90000 });
+
   let bidi = null;
   let extensionId = null;
   let fixtureError = null;
