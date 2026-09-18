@@ -150,7 +150,7 @@ describe("memory, character, and skill components", () => {
       },
     ]);
     expect(state.ui.showToast).not.toHaveBeenCalledWith(
-      "Only .md files are supported for persona uploads.",
+      "Only .md and .json files are supported for personas.",
     );
     cleanup();
   });
@@ -169,7 +169,9 @@ describe("memory, character, and skill components", () => {
 
     await triggerFileInput(uploadInput, file);
 
-    expect(file.text).not.toHaveBeenCalled();
+    // The body is read first so the format can be sniffed from the content
+    // rather than trusted from the extension.
+    expect(file.text).toHaveBeenCalled();
     expect(state.characters).toEqual(initialCharacters);
     expect(state.ui.showToast).toHaveBeenCalledWith(
       "Only .md and .json files are supported for personas.",
@@ -266,7 +268,7 @@ describe("memory, character, and skill components", () => {
       },
     ]);
     expect(state.ui.showToast).not.toHaveBeenCalledWith(
-      "Only .md files are supported for skills.",
+      "Only .md and .json files are supported for skills.",
     );
     cleanup();
   });
@@ -285,7 +287,9 @@ describe("memory, character, and skill components", () => {
 
     await triggerFileInput(uploadInput, file);
 
-    expect(file.text).not.toHaveBeenCalled();
+    // The body is read first so the format can be sniffed from the content
+    // rather than trusted from the extension.
+    expect(file.text).toHaveBeenCalled();
     expect(state.skills).toEqual(initialSkills);
     expect(state.ui.showToast).toHaveBeenCalledWith(
       "Only .md and .json files are supported for skills.",

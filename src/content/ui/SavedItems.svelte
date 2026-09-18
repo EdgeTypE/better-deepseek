@@ -150,17 +150,19 @@
         const data = JSON.parse(text);
         if (Array.isArray(data)) {
           const merged = [...appState.savedItems];
+          const knownIds = new Set(merged.map((item) => item && item.id));
+          let added = 0;
           for (const item of data) {
-            if (item && item.id && item.content) {
-              if (!merged.some(m => m.id === item.id)) {
-                merged.push(item);
-              }
-            }
+            if (!item || !item.id || !item.content) continue;
+            if (knownIds.has(item.id)) continue;
+            knownIds.add(item.id);
+            merged.push(item);
+            added += 1;
           }
           appState.savedItems = merged;
           await chrome.storage.local.set({ [STORAGE_KEYS.savedItems]: appState.savedItems });
           items = [...appState.savedItems];
-          if (appState.ui) appState.ui.showToast(t('savedItems.importSuccess', { count: data.length }));
+          if (appState.ui) appState.ui.showToast(t('savedItems.importSuccess', { count: added }));
         }
       } catch (err) {
         if (appState.ui) appState.ui.showToast(t('savedItems.importFailed', { msg: err.message }));

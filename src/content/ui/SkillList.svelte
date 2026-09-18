@@ -4,6 +4,7 @@
   import { STORAGE_KEYS } from "../../lib/constants.js";
   import { makeId } from "../../lib/utils/helpers.js";
   import { openNativeFilePicker } from "../files/native-file-input.js";
+  import { IMPORT_FORMAT, detectImportFormat, parseJsonDocument } from "../files/import-format.js";
   import { t } from "../../lib/i18n.svelte.js";
 
   let skills = $state([...appState.skills]);
@@ -38,19 +39,26 @@
     const file = event.target.files && event.target.files[0];
     if (!file) return;
 
-    const isJson = file.name.toLowerCase().endsWith(".json");
-    const isMd = file.name.toLowerCase().endsWith(".md");
-    if (!isJson && !isMd) {
+    let raw;
+    try {
+      raw = await file.text();
+    } catch {
+      if (appState.ui) appState.ui.showToast(t('skillList.importFailed'));
+      event.target.value = "";
+      return;
+    }
+
+    const format = detectImportFormat(file.name, raw);
+
+    if (format === IMPORT_FORMAT.UNSUPPORTED) {
       if (appState.ui) appState.ui.showToast(t('skillList.onlyMdOrJson'));
       event.target.value = "";
       return;
     }
 
-    const raw = await file.text();
-
-    if (isJson) {
+    if (format === IMPORT_FORMAT.JSON) {
       try {
-        const parsed = JSON.parse(raw);
+        const parsed = parseJsonDocument(raw);
         if (!Array.isArray(parsed)) throw new Error("Not an array");
         let count = 0;
         for (const item of parsed) {
@@ -72,7 +80,7 @@
         if (appState.ui) appState.ui.showToast(t('skillList.importFailed'));
       }
     } else {
-      const name = file.name.replace(/\.md$/i, "") || `skill-${appState.skills.length + 1}`;
+      const name = file.name.replace(/\.(md|markdown)$/i, "") || `skill-${appState.skills.length + 1}`;
       appState.skills.push({ id: makeId(), name, usage: "", content: raw, active: true });
       await chrome.storage.local.set({ [STORAGE_KEYS.skills]: appState.skills });
       skills = [...appState.skills];

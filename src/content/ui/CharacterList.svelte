@@ -4,6 +4,7 @@
   import { STORAGE_KEYS } from "../../lib/constants.js";
   import { makeId } from "../../lib/utils/helpers.js";
   import { openNativeFilePicker } from "../files/native-file-input.js";
+  import { IMPORT_FORMAT, detectImportFormat, parseJsonDocument } from "../files/import-format.js";
   import { t } from "../../lib/i18n.svelte.js";
 
   let characters = $state([...appState.characters]);
@@ -38,19 +39,26 @@
     const file = event.target.files && event.target.files[0];
     if (!file) return;
 
-    const isJson = file.name.toLowerCase().endsWith(".json");
-    const isMd = file.name.toLowerCase().endsWith(".md");
-    if (!isJson && !isMd) {
+    let raw;
+    try {
+      raw = await file.text();
+    } catch {
+      if (appState.ui) appState.ui.showToast(t('characterList.importFailed'));
+      event.target.value = "";
+      return;
+    }
+
+    const format = detectImportFormat(file.name, raw);
+
+    if (format === IMPORT_FORMAT.UNSUPPORTED) {
       if (appState.ui) appState.ui.showToast(t('characterList.onlyMdOrJson'));
       event.target.value = "";
       return;
     }
 
-    const raw = await file.text();
-
-      if (isJson) {
+    if (format === IMPORT_FORMAT.JSON) {
       try {
-        const parsed = JSON.parse(raw);
+        const parsed = parseJsonDocument(raw);
         if (!Array.isArray(parsed)) throw new Error("Not an array");
         appState.characters.forEach(c => c.active = false);
         let count = 0;
@@ -73,7 +81,7 @@
         if (appState.ui) appState.ui.showToast(t('characterList.importFailed'));
       }
     } else {
-      const name = file.name.replace(/\.md$/i, "") || `char-${appState.characters.length + 1}`;
+      const name = file.name.replace(/\.(md|markdown)$/i, "") || `char-${appState.characters.length + 1}`;
       appState.characters.forEach(c => c.active = false);
       appState.characters.push({
         id: makeId(),

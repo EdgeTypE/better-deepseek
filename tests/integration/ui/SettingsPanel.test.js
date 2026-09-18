@@ -238,3 +238,95 @@ describe("SettingsPanel integration", () => {
     cleanup();
   });
 });
+
+describe("SettingsPanel import-all compatibility", () => {
+  const SKILLS_SECTION_EXPORT = [
+    { id: "s1", name: "Debugger", usage: "logs", content: "Inspect logs", active: true },
+  ];
+
+  const FULL_BACKUP = {
+    version: 1,
+    exportedAt: "2026-09-18T00:00:00.000Z",
+    settings: {},
+    cssSnippets: [],
+    customSystemPrompts: [],
+    skills: [
+      { id: "s9", name: "Restored", usage: "", content: "restored body", active: true },
+    ],
+    characters: [],
+    memories: { restored: { value: "yes", importance: "always" } },
+    mcpServers: [],
+    projects: [],
+    projectFiles: [],
+    chatTags: [],
+    savedItems: [],
+  };
+
+  async function importAll(target, payload) {
+    const input = target.querySelector('input[type="file"][accept=".json"]');
+    Object.defineProperty(input, "files", {
+      configurable: true,
+      value: [{ name: "payload.json", text: async () => JSON.stringify(payload) }],
+    });
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushUi();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const confirm = Array.from(document.querySelectorAll(".bds-modal-footer button")).find(
+      (button) => button.textContent.trim() === "Import",
+    );
+    expect(confirm).toBeTruthy();
+    bridgeMocks.pushConfigToPage.mockReset();
+    confirm.click();
+    await flushUi();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  }
+
+  function toasts() {
+    return state.ui.showToast.mock.calls.map((call) => call[0]);
+  }
+
+  beforeEach(() => {
+    resetAppState({
+      ui: { showToast: vi.fn(), showConfirm: vi.fn(() => Promise.resolve(true)) },
+    });
+    bridgeMocks.pushConfigToPage.mockReset();
+    projectManagerMocks.getActiveProject.mockReturnValue(null);
+    document.body.innerHTML = "";
+  });
+
+  it("applies a full backup and reports success", async () => {
+    state.skills = [];
+    state.memories = { old: { value: "old", importance: "called" } };
+
+    const { target, cleanup } = renderSvelte(SettingsPanel);
+    await flushUi();
+    await importAll(target, FULL_BACKUP);
+
+    expect(state.skills).toHaveLength(1);
+    expect(state.skills[0].name).toBe("Restored");
+    expect(state.memories).toEqual({ restored: { value: "yes", importance: "always" } });
+    expect(toasts()).toContain("Data imported successfully.");
+    expect(bridgeMocks.pushConfigToPage).toHaveBeenCalled();
+    cleanup();
+  });
+
+  it("reports nothing to import when a section export is dropped in", async () => {
+    state.skills = [
+      { id: "keep", name: "KeepMe", usage: "", content: "keep", active: true },
+    ];
+
+    const { target, cleanup } = renderSvelte(SettingsPanel);
+    await flushUi();
+    await importAll(target, SKILLS_SECTION_EXPORT);
+
+    expect(state.skills).toHaveLength(1);
+    expect(state.skills[0].name).toBe("KeepMe");
+    expect(toasts()).toContain(
+      "Nothing to import: this file does not contain any of the selected sections.",
+    );
+    expect(toasts()).not.toContain("Data imported successfully.");
+    expect(bridgeMocks.pushConfigToPage).not.toHaveBeenCalled();
+    cleanup();
+  });
+});

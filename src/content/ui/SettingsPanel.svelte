@@ -409,6 +409,13 @@
 
       const plain = (obj) => JSON.parse(JSON.stringify(obj ?? null));
 
+      // Sections this file can actually satisfy. A single-section export
+      // dropped into "Import All Data" matches none of them, and reporting
+      // success for a no-op is worse than reporting nothing happened.
+      const matchedSections = EXPORT_SECTIONS.filter(
+        (section) => selectedSections.has(section.key) && Boolean(d[section.key]),
+      );
+
       if (selectedSections.has("settings") && d.settings) {
         const oldToken = appState.settings.githubToken;
         // Preserve migration flags from the destination device so that
@@ -477,12 +484,17 @@
 
       // Explicitly refresh the settings form so local $state variables
       // reflect the newly imported values without requiring a page reload.
-      refresh();
+      if (matchedSections.length === 0) {
+        pendingToast = t('drawer.importNoSections');
+        pendingToastDuration = 6000;
+      } else {
+        refresh();
 
-      pushConfigToPage();
-      onimportdata?.();
+        pushConfigToPage();
+        onimportdata?.();
 
-      pendingToast = t('drawer.importDone');
+        pendingToast = t('drawer.importDone');
+      }
     } catch (e) {
       console.error("[BDS] doImportAll error:", e);
       if (isExtensionContextError(e)) {

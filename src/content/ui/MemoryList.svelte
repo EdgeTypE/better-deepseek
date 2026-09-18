@@ -50,12 +50,28 @@
     reader.onload = async (e) => {
       try {
         const raw = JSON.parse(e.target.result);
-        const normalized = normalizeMemories(raw);
+        const imported = normalizeMemories(raw);
 
-        // This will trigger the storage listener in storage.js, 
+        // A full backup, an encrypted backup, or any other JSON document
+        // normalises to nothing because its entries are not {value, importance}.
+        // Say so instead of reporting a successful import.
+        if (Object.keys(imported).length === 0) {
+          if (appState.ui) {
+            appState.ui.showToast(t('memoryList.importEmpty'));
+          }
+          event.target.value = "";
+          return;
+        }
+
+        // Merge instead of replace. A restore must not silently drop entries
+        // added after the backup was taken; on a key collision the imported
+        // value wins, which matches how skills and personas behave.
+        Object.assign(appState.memories, imported);
+
+        // This will trigger the storage listener in storage.js,
         // which updates appState.memories and refreshes the UI.
         await chrome.storage.local.set({
-          [STORAGE_KEYS.memories]: normalized,
+          [STORAGE_KEYS.memories]: { ...appState.memories },
         });
 
         if (appState.ui) {
