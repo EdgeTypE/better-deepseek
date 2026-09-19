@@ -1,0 +1,53 @@
+{
+  "name": "better-deepseek",
+  "version": "0.1.29",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check-locales": "node scripts/check-locales.js",
+    "dev": "node build.js --dev",
+    "build": "npm run build:chrome && npm run build:firefox",
+    "build:chrome": "node build.js --target=chrome",
+    "build:firefox": "node build.js --target=firefox",
+    "build:android": "node build.js --target=android && node scripts/copy-to-android-assets.js",
+    "build:source": "node build.js --source",
+    "sanitize": "node scripts/sanitize-dist.js",
+    "pretest": "npm run build",
+    "test": "npm run test:unit && npm run test:e2e && npm run test:e2e:firefox",
+    "test:unit": "vitest run --coverage",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:e2e": "playwright test",
+    "test:e2e:firefox": "vitest run --config=vitest.firefox.config.js",
+    "test:e2e:android": "playwright test --config=playwright.android.config.js",
+    "android:test": "node scripts/run-android-gradle.js test",
+    "android:assemble:debug": "node scripts/run-android-gradle.js assembleDebug",
+    "test:android": "npm run build:android && npm run test:e2e:android",
+    "test:ci:web": "npm run build && npm run test:unit && npm run test:e2e && npm run test:e2e:firefox",
+    "test:ci:android": "npm run build:android && npm run android:assemble:debug && npm run test:e2e:android && npm run android:test",
+    "test:ci": "npm run test:ci:web && npm run test:ci:android"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.0",
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/ui": "^3.2.4",
+    "jsdom": "^26.1.0",
+    "selenium-webdriver": "^4.46.0",
+    "svelte": "^5.28.2",
+    "vite": "^6.3.1",
+    "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "docx": "^9.6.1",
+    "fflate": "^0.8.2",
+    "html2canvas": "^1.4.1",
+    "ignore": "^7.0.5",
+    "marked": "^18.0.3",
+    "pptxgenjs": "^4.0.1",
+    "turndown": "^7.2.4",
+    "xlsx": "^0.18.5",
+    "youtube-transcript": "^1.3.0"
+  }
+}

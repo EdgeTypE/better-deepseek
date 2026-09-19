@@ -1,0 +1,1198 @@
+{
+  "updatedAt": "2026-07-27T00:00:00Z",
+  "messages": {
+    "common": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "delete": "Delete",
+      "edit": "Edit",
+      "close": "Close",
+      "back": "Back",
+      "export": "Export",
+      "import": "Import",
+      "refresh": "Refresh",
+      "download": "Download",
+      "name": "Name",
+      "content": "Content",
+      "description": "Description",
+      "none": "None",
+      "working": "Working..."
+    },
+    "drawer": {
+      "title": "Better DeepSeek",
+      "close": "Close",
+      "github": "GitHub",
+      "version": "v{{version}}",
+      "exportAll": "Export All Data",
+      "importAll": "Import All Data",
+      "exportEncrypt": "Protect with password (recommended)",
+      "enterPassword": "Enter password",
+      "confirmPassword": "Confirm password",
+      "passwordTooShort": "Password must be at least 4 characters.",
+      "passwordMismatch": "Passwords do not match.",
+      "passwordRequired": "Password is required.",
+      "passwordWrong": "Incorrect password.",
+      "exportDone": "Data exported successfully.",
+      "exportFailed": "Failed to export data.",
+      "exporting": "Exporting...",
+      "importing": "Importing...",
+      "download": "Download",
+      "decrypt": "Decrypt",
+      "selectSections": "Select sections to import:",
+      "importBtn": "Import",
+      "importParseError": "Invalid file format.",
+      "importDone": "Data imported successfully.",
+      "importFailed": "Failed to import data.",
+      "importContextError": "Extension was updated. Please reload the page and try again.",
+      "importPasswordPlaceholder": "Enter the export password",
+      "sectionSettings": "Settings",
+      "sectionPrompts": "Custom System Prompts",
+      "sectionSkills": "Skill Set",
+      "sectionCharacters": "RP Characters",
+      "sectionMemories": "Stored Memories",
+      "sectionProjects": "Projects",
+      "sectionProjectFiles": "Project Files",
+      "sectionChatTags": "Chat Tags",
+      "sectionSavedItems": "Saved Items",
+      "sectionCssSnippets": "CSS Snippets",
+      "sectionMcpServers": "MCP Servers"
+    },
+    "settings": {
+      "generalSettings": "General Settings",
+      "systemPrompts": "System Prompts",
+      "defaultPromptName": "Default (Hidden)",
+      "defaultPromptStatus": "Read-only core instructions",
+      "customPromptStatus": "Custom saved prompt",
+      "view": "View",
+      "edit": "Edit",
+      "delete": "Delete",
+      "addNewPrompt": "Add New System Prompt",
+      "addNewTitle": "Add New Prompt",
+      "viewTitle": "View Prompt",
+      "editTitle": "Edit Prompt",
+      "nameLabel": "Name",
+      "namePlaceholder": "e.g. My Custom Rules",
+      "contentLabel": "Content",
+      "contentPlaceholder": "System instructions here...",
+      "baseOnDefault": "Base on Default",
+      "cancel": "Cancel",
+      "savePrompt": "Save Prompt",
+      "nameRequired": "Name and content are required.",
+      "settingsSaved": "Settings saved.",
+      "advancedSettings": "Advanced Settings",
+      "subLanguage": "Language & Region",
+      "subChat": "Chat & Messages",
+      "subProjects": "Projects & Files",
+      "subInjection": "Prompt & Memory",
+      "subResearch": "Deep Research",
+      "subVoice": "Voice",
+      "subIntegrations": "Integrations",
+      "subUtilities": "Utilities",
+      "subCSS": "Custom CSS",
+      "projectAutoContext": "Project Auto-Context (Local RAG)",
+      "processGitignore": "Process .gitignore during upload",
+      "autoDownloadFiles": "Auto download create_file outputs",
+      "disableSystemPrompt": "Disable Hidden System Prompt",
+      "disableMemory": "Disable Stored Memory Injection",
+      "injectSystemDateTime": "Inject system date & time into messages",
+      "skipDeletionConfirmation": "Skip deletion confirmation",
+      "injectionFrequency": "System Prompt Injection Frequency",
+      "firstMessage": "Only on first message",
+      "everyMessage": "Always (every message)",
+      "everyNMessages": "Every N messages",
+      "injectionInterval": "Injection Interval (N)",
+      "injectEveryN": "Inject the prompt every {{n}} messages.",
+      "voiceMode": "Voice Mode (Auto-read responses)",
+      "autoSubmitVoice": "Auto-submit after speech",
+      "speechLanguage": "Speech Language",
+      "vadSilenceTimeout": "Silence timeout",
+      "autoDownloadZip": "Auto download LONG_WORK zip",
+      "preferredLang": "Preferred Response Language",
+      "preferredLangPlaceholder": "e.g. English, Turkish, Pirate",
+      "preferredLangHint": "Leave empty to let the model decide.",
+      "markdownMaxDepth": "Markdown Walker Max Depth",
+      "markdownMaxDepthHint": "Hard cap on DOM recursion depth when reconstructing markdown from a message. Lower = safer against stack overflow on deeply nested content; higher = preserves structure of pathologically nested messages. Default 200.",
+      "chatSessionCap": "Chat Session List Cap",
+      "chatSessionCapHint": "Maximum number of chat sessions kept in memory for the sidebar. Older sessions beyond this cap are evicted (FIFO). Lower values reduce memory usage on long-lived tabs. Default 500.",
+      "githubToken": "GitHub Personal Access Token",
+      "githubTokenPlaceholder": "ghp_...",
+      "githubTokenHelp": "Create a classic token with repo scope at GitHub Settings -> Tokens.",
+      "githubTokenShow": "Show",
+      "githubTokenHide": "Hide",
+      "githubTokenClear": "Clear",
+      "tokenPriceEstimation": "Token Price Estimation (Experimental)",
+      "tokenPriceHint": "Shows estimated DeepSeek API cost per message and session total. Input/output token prices are used for estimation. Pricing data is fetched dynamically with fallbacks.",
+      "deepResearchContextGuard": "Deep Research Context Guard",
+      "contextGuardEnabled": "Enable Context Guard",
+      "contextGuardEnabledHint": "Stops managed Deep Research before the chat context window is exhausted. Tracks hidden extension prompts, evidence digests, and server-reported usage.",
+      "contextGuardLimit": "Context Limit (tokens)",
+      "contextGuardLimitHint": "DeepSeek web-chat context window size. Default 128,000 tokens.",
+      "contextGuardStopPercent": "Stop Threshold (%)",
+      "contextGuardStopPercentHint": "Stop Deep Research when estimated context reaches {{threshold}} tokens. Clamped to 50-95%.",
+      "collapseLongUserMessages": "Collapse long user messages",
+      "collapseLongUserMessagesHint": "Automatically hide very long user messages behind a read-more toggle.",
+      "loadAllHistoryOnSession": "Load all history when opening a session",
+      "loadAllHistoryHint": "Scrolls to the top of the conversation to trigger DeepSeek's lazy-load, ensuring all messages are available for export and price calculation. May be slow for long conversations. Disabled by default.",
+      "showTimestamps": "Show message timestamps",
+      "showTimestampsHint": "Display the exact time each message was sent or received in the chat.",
+      "save": "Save Settings",
+      "ragChunks": "Max RAG Chunks to Inject",
+      "ragChunks3": "3 chunks (~600 words)",
+      "ragChunks5": "5 chunks (~1000 words)",
+      "ragChunks8": "8 chunks (~1600 words)",
+      "ragChunks10": "10 chunks (~2000 words)",
+      "ragHint": "Automatically retrieves relevant pieces from your project files.",
+      "projectInstructions": "Project Instructions",
+      "projectInstructionsPlaceholder": "Custom instructions appended to the global system prompt for this project…",
+      "autoSaved": "Auto-saved",
+      "languageSettings": "Language Settings",
+      "syncLocale": "Sync extension language with browser",
+      "selectLanguage": "Language",
+      "checkUpdates": "Check for Language Updates",
+      "resetFactory": "Reset to Factory Languages",
+      "lastChecked": "Last checked: {{date}}",
+      "updateAvailable": "Language update available!",
+      "updatedSuccess": "Language files updated successfully.",
+      "resetSuccess": "Language files reset to factory defaults.",
+      "updateFailed": "Failed to check for language updates.",
+      "unsavedTitle": "Unsaved Changes",
+      "unsavedMessage": "You have unsaved settings changes. Are you sure you want to discard them?",
+      "discard": "Discard",
+      "keepEditing": "Keep Editing",
+      "customCSS": "Custom CSS",
+      "customCSSPlaceholder": "/* Paste your CSS overrides here or pick a preset above */",
+      "multiPromptMode": "Multi-System Prompt Mode (Advanced)",
+      "scheduleType": "Injection Schedule",
+      "enabled": "Enabled",
+      "cssPresets": "Presets",
+      "presetNone": "None",
+      "presetReducePadding": "Reduce Chat Padding",
+      "presetWiderMessages": "Wider Messages",
+      "presetCompact": "Compact UI",
+      "presetBetterCodeFont": "Better Code Font",
+      "saveAsSnippet": "Save as Snippet",
+      "manageSnippets": "Manage CSS Snippets",
+      "restore": "Restore",
+      "delete": "Delete",
+      "enterSnippetName": "Enter snippet name:",
+      "snippetSaved": "Snippet saved!",
+      "snippetDeleted": "Snippet deleted",
+      "presetRestored": "Preset restored to default",
+      "duplicateNameError": "A snippet with this name already exists.",
+      "updateSnippet": "Update Snippet",
+      "snippetUpdated": "Snippet updated!",
+      "editingSnippet": "Editing snippet: {{name}}",
+      "exitEditMode": "Exit Edit Mode",
+      "noSnippets": "No CSS snippets yet.",
+      "advancedSearchPlaceholder": "Search settings...",
+      "advancedNoResults": "No matching settings found.",
+      "disableTipBox": "Disable Tip Box",
+      "disableTipBoxHint": "Shows a random tip each time you open the drawer."
+    },
+    "skillList": {
+      "title": "Skill Set",
+      "export": "Export",
+      "import": "Import",
+      "uploadLabel": "Upload Skill (.md)",
+      "empty": "No skills loaded.",
+      "namePlaceholder": "Skill Name",
+      "usagePlaceholder": "Usage (e.g. typescript, react)",
+      "contentPlaceholder": "Skill persona/instructions...",
+      "cancel": "Cancel",
+      "save": "Save",
+      "edit": "Edit",
+      "delete": "Delete",
+      "onlyMdOrJson": "Only .md and .json files are supported for skills.",
+      "onlyMd": "Only .md files are supported for skills.",
+      "loaded": "Skill loaded: {{name}}",
+      "removed": "Skill removed.",
+      "saved": "Skill saved.",
+      "importedCount": "{{count}} skill(s) imported.",
+      "importFailed": "Failed to import skills. Invalid file format."
+    },
+    "characterList": {
+      "title": "RP Characters",
+      "export": "Export",
+      "import": "Import",
+      "uploadLabel": "Upload Persona (.md)",
+      "defaultOption": "None (Assistant)",
+      "empty": "No personas saved.",
+      "namePlaceholder": "Character Name",
+      "usagePlaceholder": "Usage (e.g. fun, philosophy)",
+      "contentPlaceholder": "Character instructions/background...",
+      "cancel": "Cancel",
+      "save": "Save",
+      "edit": "Edit",
+      "delete": "Delete",
+      "onlyMdOrJson": "Only .md and .json files are supported for personas.",
+      "onlyMd": "Only .md files are supported for persona uploads.",
+      "loaded": "Character loaded: {{name}}",
+      "removed": "Character removed.",
+      "saved": "Character saved.",
+      "importedCount": "{{count}} persona(s) imported.",
+      "importFailed": "Failed to import personas. Invalid file format."
+    },
+    "memoryList": {
+      "title": "Stored Memory",
+      "export": "Export",
+      "import": "Import",
+      "empty": "No memory entries yet.",
+      "delete": "Delete",
+      "edit": "Edit",
+      "editTitle": "Edit Memory",
+      "saved": "Saved memory: {{key}}",
+      "importSuccess": "Memories imported successfully.",
+      "importFailed": "Import failed: JSON format error.",
+      "deleted": "Deleted memory: {{key}}",
+      "more": "+{{count}} more"
+    },
+    "memoryImport": {
+      "title": "Import Memory from Another AI",
+      "step1Title": "1. Copy prompt & paste into another AI",
+      "copyPrompt": "Copy",
+      "copied": "Copied!",
+      "step2Title": "2. Paste the AI response below",
+      "placeholder": "Paste the AI response here...",
+      "importButton": "Import & Start Expert Session",
+      "importError": "Please paste the AI response first."
+    },
+    "projectsManager": {
+      "noFilesPicked": "Nothing was attached - the selected file(s) are unsupported, too large (over 2 MB), or binary.",
+      "someFilesSkipped": "{{skipped}} of {{total}} selected file(s) could not be attached (unsupported, too large, or binary).",
+      "folderNoTextFiles": "No supported text files were found in the selected folder.",
+      "pickTimeout": "The file picker did not return a result. Please try again.",
+      "back": "Back",
+      "title": "Projects",
+      "manage": "Manage Projects",
+      "newProject": "+ New Project",
+      "nameRequired": "Project name (required)",
+      "descriptionOptional": "Description (optional)",
+      "cancel": "Cancel",
+      "create": "Create",
+      "empty": "No projects yet.",
+      "nameLabel": "Name",
+      "descriptionLabel": "Description",
+      "optional": "Optional",
+      "customInstructions": "Custom Instructions",
+      "instructionsPlaceholder": "Instructions appended to the global system prompt when this project is active...",
+      "autoSaved": "Auto-saved",
+      "files": "Files",
+      "exportAll": "Export All",
+      "noFiles": "No files added yet.",
+      "export": "Export",
+      "delete": "Delete",
+      "uploadFile": "+ Upload File",
+      "uploadFolder": "+ Upload Folder",
+      "fileHint": "Plain text files only. Max 500 KB per file.",
+      "localDirectory": "Local Directory",
+      "permissionLost": "(permission lost — re-link)",
+      "refresh": "Refresh",
+      "unlink": "Unlink",
+      "linkDirectory": "+ Link Local Directory",
+      "selectingDir": "Selecting directory...",
+      "dirHint": "Files are read live from your filesystem (not copied). Chromium-based browsers only.",
+      "deleteProject": "Delete Project",
+      "nameIsRequired": "Name is required.",
+      "filePickFailed": "File pick failed.",
+      "fileTooLarge": "\"{{name}}\" is too large ({{size}} KB)",
+      "fileUnreadable": "Could not read \"{{name}}\"",
+      "fileEmpty": "\"{{name}}\" is empty",
+      "storageError": "Storage error: {{msg}}",
+      "folderPickFailed": "Folder pick failed.",
+      "folderRequiresNewer": "Folder upload requires a newer version of the app.",
+      "folderUploadFailed": "Folder upload failed: {{msg}}",
+      "filesUploaded": "{{count}} file(s) uploaded, {{skipped}} skipped (too large, unreadable, or not text).",
+      "linkFailed": "Failed to link directory.",
+      "refreshFailed": "Failed to refresh directory.",
+      "downloadAll": "Download all files as a single concatenated text file",
+      "downloadFile": "Download {{name}}",
+      "removeFile": "Remove {{name}} from this project",
+      "deleteConfirm": "Delete \"{{name}}\"? This will also remove its {{count}} file(s).",
+      "filesUploadedShort": "{{count}} file(s) uploaded, {{skipped}} skipped (too large or empty)."
+    },
+    "projectsCard": {
+      "title": "Projects",
+      "manage": "Manage",
+      "description": "Project & file selection available below the chat input."
+    },
+    "selectionOverlay": {
+      "selected": "selected",
+      "deselectAll": "Deselect All",
+      "selectAll": "Select All",
+      "markdown": "Markdown (.md)",
+      "pdf": "PDF Document",
+      "html": "Interactive HTML",
+      "image": "Long Screenshot",
+      "cancel": "Cancel",
+      "exportHint": "Please select the messages you want to export first."
+    },
+    "questionPanel": {
+      "of": "{{current}} of {{total}}",
+      "dismiss": "Dismiss",
+      "somethingElse": "Something else...",
+      "typeAnswer": "Type your answer here...",
+      "keyboardNav": "↑↓ to navigate",
+      "keyboardSelect": "Enter to select",
+      "keyboardClose": "Esc to close",
+      "sendAnswers": "Send Answers",
+      "skip": "Skip",
+      "next": "Next",
+      "other": "Other",
+      "noOptionSkipped": "*(No option selected / Skipped)*",
+      "noAnswerSkipped": "*(No answer provided / Skipped)*",
+      "answersHeader": "Here are the answers to your clarifying questions:\n\n",
+      "noInputField": "Could not find DeepSeek input field."
+    },
+    "statusBanner": {
+      "title": "DeepSeek {{indicator}} issue detected | {{description}}",
+      "message": "The problem is not on your end, it's on DeepSeek's side. Servers may be experiencing issues due to high load or maintenance."
+    },
+    "announcementBanner": {
+      "dismiss": "Dismiss"
+    },
+    "attachMenu": {
+      "noFilesPicked": "Nothing was attached - the selected file(s) are unsupported, too large (over 2 MB), or binary.",
+      "someFilesSkipped": "{{skipped}} of {{total}} selected file(s) could not be attached (unsupported, too large, or binary).",
+      "folderNoTextFiles": "No supported text files were found in the selected folder.",
+      "pickTimeout": "The file picker did not return a result. Please try again.",
+      "imagesRequireVision": "Images can only be attached in Vision mode.",
+      "expertModeWarning": "Due to DeepSeek platform limitations, these tools may not work properly in Expert mode.",
+      "buttonTitle": "Advanced Upload",
+      "attachProject": "Attach Project",
+      "voicePrompt": "Voice Prompt",
+      "stopRecording": "Stop Recording",
+      "uploadFile": "Upload File",
+      "uploadFolder": "Upload Folder",
+      "githubRepo": "GitHub Repo",
+      "githubAuthLabel": "Authenticated GitHub access",
+      "fetchWebPage": "Fetch Web Page",
+      "githubImportTitle": "GitHub Repo Import",
+      "authenticated": "Authenticated",
+      "githubPlaceholder": "https://github.com/owner/repo or owner/repo",
+      "includeCommits": "Include commit history",
+      "commitsLabel": "Number of commits:",
+      "close": "Close",
+      "fetch": "Fetch",
+      "fetching": "Fetching...",
+      "projectLabel": "Project",
+      "noProject": "None",
+      "projectHint": "Instructions from selected project apply at first message only.",
+      "deselectAll": "Deselect all",
+      "selectAll": "Select all",
+      "file": "file",
+      "files": "files",
+      "attach": "Attach ({{count}})",
+      "noFiles": "No files — add via Manage Projects",
+      "noProjectSelected": "No project selected",
+      "webImportTitle": "Fetch Web Page",
+      "webPlaceholder": "https://example.com/article",
+      "close": "Close",
+      "fetch": "Fetch",
+      "fetching": "Fetching...",
+      "noSpeechRecognition": "Browser does not support Speech Recognition.",
+      "voiceError": "Voice Error: {{msg}}",
+      "noInputField": "Could not find input field.",
+      "filePickFailed": "File pick failed.",
+      "folderPickFailed": "Folder pick failed.",
+      "folderRequiresNewer": "Folder upload requires a newer version of the app.",
+      "folderUploadFailed": "Folder upload failed: {{msg}}",
+      "invalidGithubUrl": "Invalid URL. Use: https://github.com/owner/repo or owner/repo",
+      "commitsFailed": "Failed to fetch commit history: {{msg}}",
+      "repoFailed": "Failed to fetch repository: {{msg}}",
+      "invalidWebUrl": "Please enter a valid URL (including http/https).",
+      "webFetchFailed": "Could not fetch page content: {{msg}}"
+    },
+    "codeRunner": {
+      "pythonRunner": "Python Runner",
+      "tsRunner": "TypeScript Runner",
+      "jsRunner": "JavaScript Runner",
+      "luaRunner": "Lua Runner",
+      "rubyRunner": "Ruby Runner",
+      "download": "Download",
+      "placeholder": "Enter your code here...",
+      "running": "Running...",
+      "runPython": "▶ Run Python",
+      "runTs": "▶ Run TS",
+      "runJs": "▶ Run JS",
+      "runLua": "▶ Run Lua",
+      "runRuby": "▶ Run Ruby",
+      "consoleOutput": "Console Output",
+      "clear": "Clear",
+      "noOutput": "(Execution finished with no output)",
+      "loadingPyodide": "Loading Pyodide Runtime...",
+      "finished": "Finished.",
+      "executionError": "Execution Error.",
+      "pythonStatus": "Python 3.x (WASM)",
+      "tsStatus": "TypeScript (Babel)",
+      "jsStatus": "JavaScript (V8)",
+      "luaStatus": "Lua (Fengari)",
+      "rubyStatus": "Ruby (Opal)"
+    },
+    "autoCodeResult": {
+      "success": "Execution Successful",
+      "rejected": "Request Rejected",
+      "failed": "Execution Failed",
+      "completed": "{{lang}} code execution completed successfully",
+      "wasRejected": "{{lang}} code execution was rejected",
+      "execFailed": "{{lang}} code execution failed",
+      "hideOutput": "Hide Output ▴",
+      "showOutput": "Show Output ▾"
+    },
+    "searchResult": {
+      "searching": "Searching DuckDuckGo...",
+      "resultsFor": "Search Results: {{query}}",
+      "resultCount": "{{count}} results found"
+    },
+    "autoCodeRunner": {
+      "aiWantsToRun": "AI wants to run {{lang}} code",
+      "safeSandbox": "This will execute in a safe sandbox.",
+      "runCode": "▶ Run Code",
+      "reject": "✕ Reject",
+      "running": "Running...",
+      "finished": "Finished",
+      "runAgain": "Run Again",
+      "error": "Error",
+      "retry": "Retry",
+      "rejected": "Rejected",
+      "actuallyRun": "Actually, Run",
+      "hideCode": "Hide Code ▴",
+      "showCode": "Show Code ▾",
+      "consoleOutput": "Console Output"
+    },
+    "toolCard": {
+      "pythonRunner": "Python Runner"
+    },
+    "imageCard": {
+      "searching": "Searching...",
+      "close": "Close",
+      "notFound": "Image not found"
+    },
+    "todoCard": {
+      "title": "To-Do List",
+      "copy": "Copy Markdown",
+      "copied": "Copied!",
+      "download": "Download"
+    },
+    "downloadCard": {
+      "download": "Download"
+    },
+    "pptxCard": {
+      "title": "PowerPoint Presentation",
+      "download": "Download",
+      "working": "Working...",
+      "showScript": "Show generated script",
+      "hideScript": "Hide generated script",
+      "preparing": "Preparing sandbox...",
+      "downloading": "Downloading...",
+      "success": "Success!",
+      "error": "Error: {{msg}}",
+      "generating": "Generating PPTX...",
+      "bridgeError": "Bridge Error",
+      "browserUnsupported": "Your browser is not supported",
+      "browserUnsupportedDesc": "We are working on supporting your browser. If you'd like to help, check out our GitHub page."
+    },
+    "excelCard": {
+      "title": "Excel Spreadsheet",
+      "download": "Download",
+      "working": "Working...",
+      "showScript": "Show generated script",
+      "hideScript": "Hide generated script",
+      "preparing": "Preparing sandbox...",
+      "downloading": "Downloading...",
+      "success": "Success!",
+      "error": "Error: {{msg}}",
+      "generating": "Generating Excel...",
+      "bridgeError": "Bridge Error",
+      "browserUnsupported": "Your browser is not supported",
+      "browserUnsupportedDesc": "We are working on supporting your browser. If you'd like to help, check out our GitHub page."
+    },
+    "docxCard": {
+      "title": "Word Document",
+      "download": "Download",
+      "working": "Working...",
+      "showScript": "Show generated script",
+      "hideScript": "Hide generated script",
+      "preparing": "Preparing sandbox...",
+      "downloading": "Downloading...",
+      "success": "Success!",
+      "error": "Error: {{msg}}",
+      "generating": "Generating Word Doc...",
+      "bridgeError": "Bridge Error",
+      "browserUnsupported": "Your browser is not supported",
+      "browserUnsupportedDesc": "We are working on supporting your browser. If you'd like to help, check out our GitHub page."
+    },
+    "visualizerCard": {
+      "title": "Visualizer",
+      "subtitle": "Interactive Simulation",
+      "openInPanel": "Open in Panel",
+      "reportIssue": "Report Issue",
+      "runtimeError": "Runtime Error",
+      "reportErrorTooltip": "Runtime error detected. Click to send error to AI and regenerate.",
+      "reportWarningTooltip": "Report visualizer issue",
+      "runtimeErrorTitle": "Visualizer Runtime Error",
+      "feedbackTitle": "Visualizer Feedback",
+      "sentToAi": "Sent to AI for regeneration",
+      "optionBuggy": "Looks incorrect / Buggy behavior",
+      "optionBlank": "Nothing showing up / Blank",
+      "optionOther": "Other (Describe issue)",
+      "otherPlaceholder": "Explain what is missing or incorrect...",
+      "otherEmptyFallback": "Not specified",
+      "sendAndRegenerate": "Report & Regenerate",
+      "sendFailed": "Failed to send. Please try again.",
+      "cancel": "Cancel"
+    },
+    "previewPanel": {
+      "close": "Close",
+      "download": "Download .html"
+    },
+    "htmlPreview": {
+      "title": "HTML Preview",
+      "subtitle": "Interactive output",
+      "downloadHtml": "Download .html"
+    },
+    "pptxGenerator": {
+      "title": "PowerPoint Generator",
+      "subtitle": "PptxGenJS Engine",
+      "heading": "PowerPoint Presentation",
+      "download": "Download",
+      "showScript": "Show generated script",
+      "hideScript": "Hide script",
+      "processing": "Processing...",
+      "done": "Done!",
+      "error": "Error"
+    },
+    "loadingIndicator": {
+      "working": "Working..."
+    },
+    "ragPreview": {
+      "title": "RAG matched files",
+      "moreFiles": "+{{count}} more files",
+      "lines": "Lines {{start}}–{{end}}"
+    },
+    "mcp": {
+      "detailShow": "▸ Show Details",
+      "detailHide": "▾ Hide Details",
+      "inlineMaxChars": "Inline Content Max Chars",
+      "inlineMaxCharsHint": "Max characters for MCP tool list and tool results sent inline. If the tool list exceeds this, extra tools are omitted with a count warning. If a result is rejected, shorter fallbacks and pure text are tried.",
+      "transportNote": "Note: Only HTTP/Streamable HTTP transport is supported.",
+      "sectionTitle": "MCP Servers",
+      "description": "Add remote MCP (Model Context Protocol) servers. The AI can discover and invoke tools from these servers.",
+      "test": "Test",
+      "testLoading": "...",
+      "edit": "Edit",
+      "addServer": "Add MCP Server",
+      "addModalTitle": "Add MCP Server",
+      "editModalTitle": "Edit MCP Server",
+      "nameLabel": "Name",
+      "namePlaceholder": "My MCP Server",
+      "serverUrlLabel": "Server URL",
+      "serverUrlPlaceholder": "https://example.com/mcp",
+      "apiKeyLabel": "API Key (optional)",
+      "apiKeyPlaceholder": "sk-...",
+      "enabledLabel": "Enabled",
+      "cancel": "Cancel",
+      "save": "Save",
+      "deleteConfirm": "Delete MCP server \"{{name}}\"?",
+      "testFailed": "MCP test failed: {{message}}",
+      "toolsCount": "{{count}} tools",
+      "connected": "Connected: {{count}} tools found"
+    },
+    "expandToggle": {
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "expandTitle": "Expand Prompt Box",
+      "collapseTitle": "Collapse Prompt Box",
+      "showMore": "Show More",
+      "showLess": "Show Less"
+    },
+    "messageOverlay": {
+      "questionsAsked": "Clarifying questions asked.",
+      "questionsSubtitle": "Please provide your answers in the interaction panel below.",
+      "characterCreated": "Character/Persona created.",
+      "characterActive": "Active character: <strong>{{name}}</strong>",
+      "skillCreated": "Skill created.",
+      "skillActive": "Active skill: <strong>{{name}}</strong>",
+      "webFetchRequested": "Web page is being fetched",
+      "githubFetchRequested": "GitHub repository is being fetched",
+      "searchRequested": "Searching DuckDuckGo...",
+      "memoryStored": "Memory stored ({{count}}).",
+      "downloadMd": "Download as .md"
+    },
+    "sidebarMenu": {
+      "tags": "Tags (BDS)",
+      "exportChat": "Export Chat (BDS)",
+      "getBdsApp": "Get BDS App",
+      "whatsNew": "What's New?"
+    },
+    "savedItems": {
+      "title": "Saved Items",
+      "bookmarks": "Bookmarks",
+      "snippets": "Snippets",
+      "newSnippet": "New Snippet",
+      "editSnippet": "Edit Snippet",
+      "search": "Search saved items...",
+      "emptyBookmarks": "No bookmarks yet. Click the bookmark icon on any message to save it.",
+      "emptySnippets": "No snippets yet. Create one to reuse your favorite prompts.",
+      "delete": "Delete",
+      "edit": "Edit",
+      "send": "Send to chat",
+      "removeBookmark": "Remove bookmark",
+      "bookmarkThis": "Bookmark this message",
+      "bookmarked": "Message bookmarked",
+      "bookmarkRemoved": "Bookmark removed",
+      "deleted": "Deleted",
+      "snippetSent": "Snippet sent",
+      "importSuccess": "Imported {{count}} items",
+      "importFailed": "Import failed: {{msg}}",
+      "namePlaceholder": "Snippet name",
+      "contentPlaceholder": "Paste your prompt or message here...",
+      "contentRequired": "Content is required.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "titleRequired": "Title is required.",
+      "export": "Export",
+      "import": "Import",
+      "openConversation": "Open conversation",
+      "dateJustNow": "just now",
+      "dateMinAgo": "{{count}}m ago",
+      "dateHourAgo": "{{count}}h ago"
+    },
+    "commands": {
+      "title": "Commands",
+      "manage": "Manage",
+      "helpTitle": "Commands",
+      "search": "Search commands...",
+      "all": "All",
+      "noCommands": "No commands found",
+      "addCommand": "Add command",
+      "remove": "Remove",
+      "noCustomCommands": "No custom commands yet. Map a snippet above.",
+      "builtinCommands": "Built-in Commands",
+      "unknownCommand": "Unknown command: /{{cmd}}. Type /help for available commands.",
+      "cmdRequired": "Command is required",
+      "cmdInvalidChars": "Only lowercase letters, numbers, and underscores allowed",
+      "cmdConflictBuiltin": "Conflicts with a built-in command",
+      "cmdConflictSnippet": "Command already in use by another snippet",
+      "cmdPlaceholder": "command (optional)",
+      "cmdOk": "OK",
+      "selectSnippet": "Select snippet...",
+      "compress": "Summarize the conversation and start a new session with full context",
+      "summarize": "Generate a handoff summary of the conversation",
+      "done": "Done",
+      "commandShortcuts": "Command Shortcuts",
+      "cmdHint": "/mycommand (lowercase, no spaces)",
+      "add": "Add",
+      "categorySnippet": "snippet",
+      "autocompleteHint": "Tab \u21b9 complete \u00b7 \u21b5 execute",
+      "cmdSearchDesc": "Search the web and inject results into chat",
+      "cmdSearchUsage": "/search <query>",
+      "cmdNewDesc": "Start a new conversation",
+      "cmdNewUsage": "/new",
+      "cmdExportDesc": "Export the conversation (markdown, pdf, html, image)",
+      "cmdExportUsage": "/export <format>",
+      "cmdCompressDesc": "Summarize the conversation and start a new session with full context",
+      "cmdCompressUsage": "/compress",
+      "cmdSummarizeDesc": "Generate a handoff summary of the conversation in the current chat",
+      "cmdSummarizeUsage": "/summarize",
+      "cmdHelpDesc": "Show all available commands",
+      "cmdHelpUsage": "/help [command]",
+      "cattools": "tools",
+      "catnavigation": "navigation",
+      "catbuiltin": "builtin"
+    },
+    "sidebarSearch": {
+      "placeholder": "Search history... (#tag)"
+    },
+    "files": {
+      "standalone": {
+        "packageTitle": "Generated file package",
+        "folderPath": "{{path}} (folder path preserved)",
+        "singleTitle": "Generated file"
+      },
+      "longWork": {
+        "noFiles": "LONG_WORK finished. No files were produced.",
+        "complete": "LONG_WORK complete: {{count}} files zipped.",
+        "projectTitle": "LONG_WORK project",
+        "filesPackaged": "{{count}} files packaged"
+      },
+      "webReader": {
+        "fetching": "Fetching page content...",
+        "processing": "Processing content...",
+        "converting": "Converting to Markdown...",
+        "creating": "Creating file...",
+        "fetchFailed": "Failed to fetch page.",
+        "parseFailed": "Could not parse main content from this page.",
+        "unknown": "Unknown"
+      },
+      "githubReader": {
+        "downloading": "Downloading {{owner}}/{{repo}} ({{branch}})...",
+        "extracting": "Extracting ZIP...",
+        "processing": "Processing files...",
+        "creating": "Creating file...",
+        "invalidUrl": "Invalid GitHub URL. Use: https://github.com/owner/repo",
+        "tokenRejected": "GitHub rejected your token. Check that it has the repo scope and hasn't expired.",
+        "notFound": "Repository not found or you may need a GitHub token for private repos. Add one in Advanced Settings.",
+        "downloadFailed": "Could not download {{owner}}/{{repo}}/{{branch}}. Check the URL and make sure the repo is public.",
+        "extractFailed": "Failed to extract ZIP: {{msg}}",
+        "directoryTree": "Directory Tree:"
+      },
+      "youtubeReader": {
+        "invalidUrl": "Invalid YouTube URL.",
+        "fallbackTitle": "YouTube Video",
+        "noTranscript": "[Transcript is empty. This video might not have captions available.]",
+        "transcriptError": "[Error fetching transcript: {{msg}}]",
+        "bgScriptError": "[Could not retrieve transcript data from the background script.]"
+      },
+      "twitterReader": {
+        "fetchFailed": "Failed to fetch tweet info from Twitter OEmbed.",
+        "noExtract": "Could not extract tweet text."
+      }
+    },
+    "exporter": {
+      "branding": "Better DeepSeek",
+      "archiveReport": "Archive Report",
+      "userQuery": "User Query",
+      "aiResponse": "AI Response",
+      "pdfFooter": "Document generated via Better DeepSeek Browser Extension",
+      "imageHeader": "Long Capture",
+      "imageDate": "Captured on {{date}}",
+      "userLabel": "User",
+      "assistantLabel": "Assistant",
+      "imageFooter": "Generated via Better DeepSeek",
+      "htmlLogo": "Better DeepSeek Export",
+      "htmlToggleTheme": "Toggle Theme",
+      "htmlFooter": "Exported via Better DeepSeek Browser Extension",
+      "copy": "Copy",
+      "copied": "Copied!",
+      "powerpoint": "PowerPoint",
+      "presentation": "Presentation",
+      "bdsTool": "BDS Tool",
+      "imageTooLong": "Session is too long ({{height}}k px at {{scale}}x). Image may be clipped at {{limit}}k px. Use PDF or HTML instead.",
+      "imageFailed": "Image export has a browser canvas size limit. Try exporting fewer messages, or use PDF/HTML/MD."
+    },
+    "auto": {
+      "fetchFailed": "Failed to fetch {{url}}:\n\n{{msg}}",
+      "githubFailed": "Failed to fetch GitHub repo {{url}}:\n\n{{msg}}",
+      "tweetFailed": "Failed to fetch tweet {{url}}:\n\n{{msg}}",
+      "youtubeFailed": "Failed to fetch YouTube video {{url}}:\n\n{{msg}}",
+      "statusSuccess": "SUCCESS",
+      "statusError": "ERROR",
+      "statusRejected": "REJECTED",
+      "noOutput": "(No output)",
+      "generationError": "ERROR during {{toolName}} generation.",
+      "errorMessage": "Error Message: {{msg}}",
+      "correctionPrompt": "Please analyze the error above, study the Library API Reference, then fix the code and provide the corrected version within the appropriate <BDS:{{tagName}}> tag. Pay close attention to: correct API method names, proper arguments, and the required save/output call at the end."
+    },
+    "messageProcessor": {
+      "minCost": "<$0.0001",
+      "contextTemplate": "{{used}} / {{total}} ({{percent}}%)",
+      "contextTooltip": "Context: {{text}}",
+      "longWorkClosed": "LONG_WORK closed because API response ended.",
+      "userPrice": "API: ~{{price}}",
+      "tokenCount": "{{count}} tok"
+    },
+    "whatsnew": {
+      "title": "What's New",
+      "versionHistory": "Version History",
+      "dismiss": "Got it, thanks!",
+      "reportBug": "Report Bug",
+      "requestFeature": "Request Feature",
+      "brandingNote": "Better DeepSeek is an open-source community project.",
+      "seeAllChanges": "See all changes in v{{version}} on GitHub",
+      "seeDetailed": "See detailed release notes on GitHub",
+      "features": {
+        "v0_1_11": {
+          "title": "MCP Servers, Dynamic Tables & Stability",
+          "features": {
+            "feat_0": {
+              "title": "MCP Server Support",
+              "description": "Connect remote MCP servers to DeepSeek for external tool access. Configure servers in Settings → Advanced Settings → MCP Servers."
+            },
+            "feat_1": {
+              "title": "Dynamic Tables",
+              "description": "Sort data and reorder columns directly in tables generated by DeepSeek."
+            },
+            "feat_2": {
+              "title": "Stability & UX Improvements",
+              "description": "Dozens of bug fixes and UI/UX improvements across the extension."
+            }
+          }
+        },
+        "v0_1_10": {
+          "title": "Stability & Improvement",
+          "features": {
+            "feat_0": {
+              "title": "Image Support",
+              "description": "DeepSeek can now search and display images from Wikimedia Commons directly in the conversation with the new BDS:IMAGE tag."
+            },
+            "feat_1": {
+              "title": "Slash-Command System",
+              "description": "A full slash-command subsystem with autocomplete, context hand-off, built-in commands, and the ability to create custom commands from saved snippets."
+            },
+            "feat_2": {
+              "title": "Bug Fixes & UX Improvements",
+              "description": "Numerous bug fixes and UX refinements across the extension."
+            }
+          }
+        },
+        "v0_1_9": {
+          "title": "Multi-System Prompts, Visualizer Rework & Deep Research",
+          "features": {
+            "feat_0": {
+              "title": "Multi-System Prompt Mode & Advanced Scheduling",
+              "description": "Use multiple system prompt entries with per-entry scheduling options - first message, every N turns, or always."
+            },
+            "feat_1": {
+              "title": "Visualizer Rework",
+              "description": "Visualizer widgets can now be resized and downloaded. The entire UI has been reworked for a cleaner experience."
+            },
+            "feat_2": {
+              "title": "DeepResearch",
+              "description": "Tell DeepSeek a topic, review the generated plan, and upon approval it conducts deep multi-step research automatically."
+            },
+            "feat_3": {
+              "title": "Export/Import Overhaul",
+              "description": "All extension data (settings, skills, memories, characters, projects) can now be exported and imported with optional encryption support."
+            }
+          }
+        },
+        "v0_1_8": {
+          "title": "Memory Rework, Saved Items & API Playground",
+          "features": {
+            "feat_0": {
+              "title": "Memory Rework",
+              "description": "Called memory system has been reworked with a token overlap-based approach for better context matching."
+            },
+            "feat_1": {
+              "title": "Saved Items (Bookmarks & Snippets)",
+              "description": "Save messages for later access. Create snippets and send them with a single click."
+            },
+            "feat_2": {
+              "title": "Skill Creator Tool",
+              "description": "Ask AI to create a custom skill for you directly from the chat."
+            },
+            "feat_3": {
+              "title": "Import Memory from Another AI",
+              "description": "Import your memory from other AI platforms into DeepSeek."
+            },
+            "feat_4": {
+              "title": "API Playground",
+              "description": "A built-in playground to easily test the DeepSeek API."
+            },
+            "feat_5": {
+              "title": "Auto Search Tool",
+              "description": "Replaced the removed Expert mode link reading and search with our own integrated search tool."
+            },
+            "feat_6": {
+              "title": "Bug Fixes & UX Improvements",
+              "description": "Numerous bug fixes and UX refinements across the extension."
+            }
+          }
+        },
+        "v0_1_7": {
+          "title": "Localization, Custom Prompts & RAG",
+          "features": {
+            "feat_0": {
+              "title": "Localization System",
+              "description": "Better DeepSeek now supports multiple languages. Help us improve translations or add your language on <a href='https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md' target='_blank' style='color: #4d6bfe; text-decoration: underline;'>GitHub</a>."
+            },
+            "feat_1": {
+              "title": "Custom Prompts",
+              "description": "Create, save, and switch between multiple system prompts effortlessly."
+            },
+            "feat_2": {
+              "title": "Project RAG Search",
+              "description": "A primitive RAG system has been added. Connect a project or select a local folder for file search. We'll continue improving this in future releases."
+            },
+            "feat_3": {
+              "title": "UI Improvements",
+              "description": "Collapse/expand for long messages, extension icon opens DeepSeek website, server status and announcement banners and more..."
+            },
+            "feat_4": {
+              "title": "Bug Fixes & Performance",
+              "description": "BDS tool parser and Office tool improvements. Fixed font rendering issues. Various stability and performance optimizations and more..."
+            }
+          }
+        },
+        "v0_1_6": {
+          "title": "Android & Organization",
+          "features": {
+            "feat_0": {
+              "title": "Android Version",
+              "description": "Better DeepSeek is now available on <a href='https://github.com/EdgeTypE/better-deepseek/releases' target='_blank' style='color: #4d6bfe; text-decoration: underline;'>Android</a>."
+            },
+            "feat_1": {
+              "title": "Chat Filtering & Tags",
+              "description": "Organize your sessions by adding tags. Filter and group chats easily from the sidebar menu."
+            },
+            "feat_2": {
+              "title": "Export UI Rework",
+              "description": "Newly designed export interface for Markdown, PDF, HTML, and Images. Export full sessions or specific parts."
+            }
+          }
+        },
+        "v0_1_5": {
+          "title": "Refinement & Visibility",
+          "features": {
+            "feat_0": {
+              "title": "What's New Popup",
+              "description": "You're looking at it! We'll now keep you updated on the latest changes right here."
+            },
+            "feat_1": {
+              "title": "Advanced Injection Control",
+              "description": "Choose between 'Always', 'First Message', or 'Every X' messages with customizable intervals for system prompts."
+            },
+            "feat_2": {
+              "title": "Private Repo Support",
+              "description": "Import private repositories via GitHub Personal Access Tokens securely."
+            },
+            "feat_3": {
+              "title": "Token & Price Estimation",
+              "description": "Real-time token usage estimation and context window display for API-equivalent usage."
+            },
+            "feat_4": {
+              "title": "Disable Memory",
+              "description": "New toggle in Settings to prevent the extension from persisting conversation context."
+            },
+            "feat_5": {
+              "title": "Stability Improvements",
+              "description": "Resolved issues with message handling and refined the overall UI state."
+            }
+          }
+        },
+        "v0_1_4": {
+          "title": "Projects & Advanced Settings",
+          "features": {
+            "feat_0": {
+              "title": "Projects Menu",
+              "description": "Better organizational control for sessions and files."
+            },
+            "feat_1": {
+              "title": "History Search",
+              "description": "Added search functionality to the session history sidebar."
+            },
+            "feat_2": {
+              "title": "Advanced Settings",
+              "description": "Reworked settings menu with an accordion layout to save space and improve focus."
+            },
+            "feat_3": {
+              "title": "Disable System Prompt",
+              "description": "New option to disable the Hidden System Prompt entirely when not needed."
+            },
+            "feat_4": {
+              "title": "Force Language",
+              "description": "Ensure DeepSeek always responds in your preferred language, regardless of input."
+            }
+          }
+        },
+        "v0_1_3": {
+          "title": "Ask Questions & Exports",
+          "features": {
+            "feat_0": {
+              "title": "Ask Questions Tool",
+              "description": "DeepSeek can now ask for clarification when unsure about context or instructions."
+            },
+            "feat_1": {
+              "title": "Markdown & PDF Export",
+              "description": "Export your full chat sessions to Markdown and PDF files."
+            },
+            "feat_2": {
+              "title": "Prompt Reset",
+              "description": "Easily reset the system prompt to its default state."
+            },
+            "feat_3": {
+              "title": "Navigation Fixes",
+              "description": "Resolved full page reloading issues when clicking the logo or 'New Chat'."
+            }
+          }
+        },
+        "v0_1_2": {
+          "title": "Cross-Browser & Code Runners",
+          "features": {
+            "feat_0": {
+              "title": "Firefox Support",
+              "description": "Added experimental support for the Firefox browser."
+            },
+            "feat_1": {
+              "title": "Enhanced Code Runners",
+              "description": "Updated Python runner and added new JS and TS execution environments."
+            },
+            "feat_2": {
+              "title": "GitHub Auto-Fetch",
+              "description": "Inject GitHub repositories directly into the chat via the BDS:AUTO command."
+            }
+          }
+        },
+        "v0_1_1": {
+          "title": "Voice Support & Reliability",
+          "features": {
+            "feat_0": {
+              "title": "Full Voice Support",
+              "description": "Complete Speech-to-Text and Text-to-Speech integration."
+            },
+            "feat_1": {
+              "title": "Voice Configuration",
+              "description": "Configurable voice and recognition languages available in Settings."
+            },
+            "feat_2": {
+              "title": "Improved Navigation",
+              "description": "Logo and 'New Chat' are now real &lt;a&gt; tags, supporting 'Open in new tab'."
+            },
+            "feat_3": {
+              "title": "Streaming Reliability",
+              "description": "Better handling of stalled streams and automatic closing of tags."
+            }
+          }
+        }
+      }
+    },
+    "language": {
+      "en": "English",
+      "tr": "Türkçe",
+      "ru": "Russian",
+      "zh-cn": "简体中文"
+    },
+    "apiPlayground": {
+      "title": "API Playground",
+      "builder": "Builder",
+      "response": "Response",
+      "history": "History",
+      "presets": "Presets",
+      "endpoint": "Endpoint",
+      "model": "Model",
+      "messages": "Messages",
+      "stream": "Stream",
+      "temperature": "Temperature",
+      "maxTokens": "Max Tokens",
+      "topP": "Top P",
+      "frequencyPenalty": "Frequency Penalty",
+      "presencePenalty": "Presence Penalty",
+      "thinking": "Thinking",
+      "disabled": "Disabled",
+      "enabled": "Enabled",
+      "budgetToken": "Budget Token",
+      "reasoningEffort": "Reasoning Effort",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "responseFormat": "Response Format",
+      "text": "Text",
+      "jsonObject": "JSON Object",
+      "jsonSchema": "JSON Schema",
+      "schema": "Schema",
+      "tools": "Tools",
+      "toolChoice": "Tool Choice",
+      "auto": "Auto",
+      "required": "Required",
+      "none": "None",
+      "toolName": "Tool Name",
+      "addTool": "Add Tool",
+      "addMessage": "Add Message",
+      "role": "Role",
+      "content": "Content",
+      "name": "Name",
+      "prefix": "Prefix",
+      "toolCallId": "Tool Call ID",
+      "remove": "Remove",
+      "moveUp": "Move Up",
+      "moveDown": "Move Down",
+      "beta": "Beta",
+      "prefixCompletion": "Prefix Completion",
+      "store": "Store",
+      "reasoning": "Reasoning",
+      "metadata": "Metadata",
+      "userId": "User ID",
+      "labels": "Labels",
+      "logprobs": "Logprobs",
+      "topLogprobs": "Top Logprobs",
+      "copy": "Copy",
+      "noResponse": "Send a request to see the response.",
+      "noKey": "No key",
+      "messagePlaceholder": "Enter message content...",
+      "sending": "Sending...",
+      "send": "Send",
+      "reset": "Reset",
+      "saveRequest": "Save Request",
+      "saveName": "Save Name",
+      "manageKeys": "Manage API Keys",
+      "addKey": "Add Key",
+      "noKeysHint": "No API keys saved. Add one to start sending requests.",
+      "useActiveKey": "Using key: {{name}}",
+      "noActiveKey": "No active API key",
+      "searchHistory": "Search history...",
+      "allModels": "All Models",
+      "exportHistory": "Export",
+      "clearHistory": "Clear",
+      "noHistory": "No history entries yet.",
+      "delete": "Delete",
+      "historyLimit": "History limited to 500 entries. Export to save before clearing.",
+      "builtinPresets": "Built-in Presets",
+      "savedRequests": "Saved Requests",
+      "viewCurl": "View cURL",
+      "copyCode": "Copy Code",
+      "clear": "Clear",
+      "latency": "Latency",
+      "finishReason": "Finish Reason",
+      "tokens": "Tokens",
+      "input": "Input",
+      "output": "Output",
+      "cacheHit": "Cache Hit",
+      "cacheMiss": "Cache Miss",
+      "cacheSavings": "Cache Savings",
+      "cost": "Cost",
+      "estimatedCost": "Estimated Cost",
+      "responseTime": "Response Time",
+      "rawResponse": "Raw Response",
+      "streamChunks": "Stream Chunks",
+      "toolsCalled": "Tools Called",
+      "enterJsonSchema": "Enter JSON schema...",
+      "saveNamePlaceholder": "Name this request...",
+      "betaFeatureDescription": "Beta endpoint features (use with caution).",
+      "codeGen": "Code Gen",
+      "promptSuffix": "Prompt Suffix"
+    },
+    "queue": {
+      "title": "Queued Messages",
+      "waitingForAI": "Waiting for AI...",
+      "sendingNext": "Sending next...",
+      "clearAll": "Clear All",
+      "addToQueue": "Add to Queue",
+      "enterToQueueTip": "AI is generating. Press Enter to queue your prompt.",
+      "moveUp": "Move up",
+      "moveDown": "Move down"
+    },
+    "tableInjector": {
+      "columnOptions": "Column options",
+      "hideRow": "Hide row",
+      "manageColumnsRows": "Manage columns & rows",
+      "sortAsc": "\u25B2 Sort A \u2192 Z",
+      "sortDesc": "\u25BC Sort Z \u2192 A",
+      "hideColumn": "Hide column",
+      "showColumn": "Show column",
+      "columns": "Columns",
+      "hiddenRows": "Hidden rows ({{count}})",
+      "showAll": "Show all columns & rows",
+      "columnLabel": "Column {{n}}"
+    },
+    "shareModal": {
+      "searchEngineWarning": "Shared conversations may be discovered and indexed by search engines."
+    },
+    "tips": {
+      "title": "\uD83D\uDCA1 Tip",
+      "disableInSettings": "You can disable this from Settings.",
+      "0": "To export a chat, click the ... button next to the session in the chat history.",
+      "1": "You can disable this tip box from Settings.",
+      "2": "You can export your current settings and data. Just visit the Advanced Settings section.",
+      "3": "Save your frequently used prompts as snippets and easily send them again later. You can even assign snippets to a \"/\" command to speed things up. Visit the Snippets tab in the BDS drawer for details.",
+      "4": "Did you know you can activate Multi-System Prompt mode to use multiple system prompts at the same time, with various schedules and conditions to create your own custom workflow?",
+      "5": "You can import your memories from another AI into BDS. Click \"Import memory from Another AI\" at the bottom of the Memory section.",
+      "6": "Did you know Better DeepSeek also has an <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">Android app</a>?",
+      "7": "If you like the extension, share it with your friends! To request a feature, let us know on our <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub page</a>.",
+      "8": "Did you know you can connect MCP servers to Better DeepSeek? Check the Advanced Settings.",
+      "9": "You can customize the interface however you like with Custom CSS.",
+      "10": "We want to add more language support to Better DeepSeek. If you want to add your own language, check it out <a href=\"https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md\" target=\"_blank\" rel=\"noopener noreferrer\">here</a>. Also, if you notice any translation errors, you can fix them.",
+      "11": "You can assign tags to any chat session by clicking the ... button in the session history. Then use those tags to quickly search or filter your conversations.",
+      "12": "You can create new skills or characters just by asking DeepSeek. Simply tell it what you need."
+    }
+  }
+}
