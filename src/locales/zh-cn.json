@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-15T00:00:00Z",
+  "updatedAt": "2026-09-19T00:00:00Z",
   "messages": {
     "common": {
       "save": "保存",
@@ -956,6 +956,23 @@
       "seeAllChanges": "在 GitHub 上查看 v{{version}} 的全部变更",
       "seeDetailed": "在 GitHub 上查看详细发布说明",
       "features": {
+        "v0_1_14": {
+          "title": "高级图表、波斯语支持与多项改进",
+          "features": {
+            "feat_0": {
+              "title": "高级图表",
+              "description": "Better DeepSeek 现在可以为您生成更精美的图表。快让 DeepSeek 为您制作一张图表吧！（真的很酷！）"
+            },
+            "feat_1": {
+              "title": "新增语言支持",
+              "description": "现已支持波斯语（Farsi）。"
+            },
+            "feat_2": {
+              "title": "大量问题修复与体验优化",
+              "description": "修复了大量已知问题，并进行了多项稳定性与性能优化。"
+            }
+          }
+        },
         "v0_1_13": {
           "title": "紧急热修复 1",
           "features": {

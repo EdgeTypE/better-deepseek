@@ -360,6 +360,13 @@ Better DeepSeek does not collect, transmit, or sell any personal data. All setti
 
 ## Changelog
 
+### v0.1.14 (2026-09-19)
+- **Advanced Charts**: Comprehensive, interactive charts can now be generated using Vega-Lite (`<BDS:chart>`).
+- **New Language Support**: Added Persian (Farsi) language support.
+- **MCP Server Improvements**: Enhancements and stability fixes across the MCP server integration.
+- **BDS Parser Improvements**: The BDS tag parser has been improved; BDS tags are now detected and handled with significantly greater reliability.
+- **Status Monitor Update**: Migrated to DeepSeek's new status API schema. Please note that DeepSeek's new Status API is still unstable, so status tracking may not be as reliable as before.
+
 ### v0.1.13 (2026-08-26)
 - **Critical Hotfix**: Resolved an issue caused by a recent DeepSeek update that broke the extension. Core extension functionality has been restored. We are monitoring the situation closely and follow-up hotfixes will be issued for any minor remaining issues.
 - **New Feature**: Search Provider List. Users can now choose, reorder, and prioritize automatic search providers (Bing and DuckDuckGo) in settings.

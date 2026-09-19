@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-15T00:00:00Z",
+  "updatedAt": "2026-09-19T00:00:00Z",
   "messages": {
     "common": {
       "save": "Kaydet",
@@ -957,6 +957,23 @@
       "seeAllChanges": "v{{version}} sürümündeki tüm değişiklikleri GitHub'da gör",
       "seeDetailed": "Detaylı sürüm notlarını GitHub'da gör",
       "features": {
+        "v0_1_14": {
+          "title": "Gelişmiş Grafikler, Farsça Dil Desteği ve İyileştirmeler",
+          "features": {
+            "feat_0": {
+              "title": "Gelişmiş Grafikler",
+              "description": "Artık Better DeepSeek sizin için çok daha güzel grafikler hazırlayabilecek. DeepSeek'ten bir grafik yapmasını isteyin. (Çok havalı bence!)"
+            },
+            "feat_1": {
+              "title": "Yeni Dil Desteği",
+              "description": "Farsça dil desteği eklendi."
+            },
+            "feat_2": {
+              "title": "Bir Sürü Hata İyileştirmesi",
+              "description": "Pek çok hata düzeltildi, iyileştirmeler yapıldı."
+            }
+          }
+        },
         "v0_1_13": {
           "title": "Acil Hotfix 1",
           "features": {

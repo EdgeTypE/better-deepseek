@@ -1,5 +1,27 @@
 export const VERSION_HISTORY = [
   {
+    version: "0.1.14",
+    date: "2026-09-19",
+    title: "Advanced Charts, Persian Language & Improvements",
+    features: [
+      {
+        type: "feature",
+        title: "Advanced Charts",
+        description: "Better DeepSeek can now prepare much better charts for you. Just ask DeepSeek to create a chart. (Pretty cool if you ask me!)"
+      },
+      {
+        type: "feature",
+        title: "New Language Support",
+        description: "Persian (Farsi) language support has been added."
+      },
+      {
+        type: "bugfix",
+        title: "Bug Fixes & Improvements",
+        description: "Numerous bug fixes and performance improvements across the extension."
+      }
+    ]
+  },
+  {
     version: "0.1.13",
     date: "2026-08-26",
     title: "Emergency Hotfix 1",

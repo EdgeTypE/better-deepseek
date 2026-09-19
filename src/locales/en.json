@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-15T00:00:00Z",
+  "updatedAt": "2026-09-19T00:00:00Z",
   "messages": {
     "common": {
       "save": "Save",
@@ -960,6 +960,23 @@
       "seeAllChanges": "See all changes in v{{version}} on GitHub",
       "seeDetailed": "See detailed release notes on GitHub",
       "features": {
+        "v0_1_14": {
+          "title": "Advanced Charts, Persian Language & Improvements",
+          "features": {
+            "feat_0": {
+              "title": "Advanced Charts",
+              "description": "Better DeepSeek can now prepare much better charts for you. Just ask DeepSeek to create a chart. (Pretty cool if you ask me!)"
+            },
+            "feat_1": {
+              "title": "New Language Support",
+              "description": "Persian (Farsi) language support has been added."
+            },
+            "feat_2": {
+              "title": "Bug Fixes & Improvements",
+              "description": "Numerous bug fixes and performance improvements across the extension."
+            }
+          }
+        },
         "v0_1_13": {
           "title": "Emergency Hotfix 1",
           "features": {
