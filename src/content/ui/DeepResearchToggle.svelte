@@ -97,7 +97,7 @@
     display: block;
   }
 
-  /* The label is icon-only until hover/focus, floating above the chip instead of
-     widening it. Shared with DeepCode and defined in src/styles/content.css
-     (.bds-chip-label). */
+  /* The label span is kept because the native chip structure includes it, but it
+     is never rendered — see the .bds-chip-label rule in src/styles/content.css
+     for why a hover reveal cannot work inside this composer. */
 </style>

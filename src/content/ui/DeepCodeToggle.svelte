@@ -206,7 +206,6 @@
   class="bds-deep-code-toggle f79352dc ds-toggle-button ds-toggle-button--m"
   class:ds-toggle-button--selected={localEnabled}
   class:bds-deep-code-toggle--selected={localEnabled}
-  class:bds-chip-expanded={isOpen}
   style="transform: translateZ(0px);"
   onclick={handleButtonClick}
   onkeydown={(e) =>
@@ -671,22 +670,16 @@
     outline: none !important;
   }
 
-  /* No max-width here: the label is taken out of flow entirely by the shared
-     .bds-chip-label rule in src/styles/content.css, so it no longer sizes this
-     chip and cannot widen the toolbar. */
-  .bds-toggle-label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    display: inline-flex;
-    align-items: center;
-    line-height: inherit;
-    vertical-align: middle;
-  }
+  /* The label span is kept because the native chip structure includes it, but it
+     is never rendered. Do NOT reintroduce a `display` here: this scoped rule
+     (0,2,0) is injected after src/styles/content.css and would beat the shared
+     `.bds-chip-label { display: none }` rule (0,1,0) — that is exactly how the
+     earlier hover-reveal attempt broke. See content.css for why a reveal cannot
+     work inside this composer. */
 
-  /* Always visible: with the label out of flow the chevron is the only remaining
-     hint that this chip opens a panel, and a hover-only chevron would widen the
-     chip and reintroduce the toolbar reflow we just removed. */
+  /* Always visible: the chevron is the only remaining hint that this chip opens
+     a panel, and a hover-only chevron would widen the chip and reintroduce the
+     toolbar reflow we removed. */
   .bds-toggle-chevron {
     display: inline-flex;
     align-items: center;
@@ -1105,6 +1098,6 @@
     color: var(--bds-text-tertiary, #6b6b7b);
   }
 
-  /* The floating label is shared with DeepResearch and lives in
-     src/styles/content.css (.bds-chip-label, .bds-chip-expanded). */
+  /* The chip label is never rendered; the shared rule that hides it lives in
+     src/styles/content.css (.bds-chip-label). */
 </style>

@@ -569,46 +569,33 @@ textarea.bds-input,
 
 /* ── Composer toolbar chips ──
    DeepResearch / DeepCode sit in DeepSeek's native composer toolbar next to
-   DeepThink and Search. They stay icon-only so the toolbar reads quiet.
-   The label is taken out of flow and floats above the chip on hover, on focus,
-   or while the DeepCode panel is open. Because the chip's own box never changes
-   width, revealing the label reflows nothing: DeepThink and Search stay put and
-   the pointer target cannot run away mid-approach. */
-.bds-deep-research-toggle .bds-chip-label,
-.bds-deep-code-toggle .bds-chip-label {
+   DeepThink and Search. They are icon-only so the toolbar reads quiet; the
+   chevron on DeepCode is the only hint that it opens a panel.
+
+   The label span stays in the DOM — it is part of the native chip structure and
+   the tests pin it — but it is never rendered. An earlier attempt revealed it on
+   hover as a floating pill above the chip, and that cannot work here: a native
+   ancestor of the chip carries `overflow: hidden` and clips anything placed
+   outside the chip's own box, leaving a text-less sliver. `position: fixed` does
+   not escape it either, because the chip carries `transform: translateZ(0px)`,
+   which makes the chip the label's containing block, so the clipping ancestor
+   still clips it. Discoverability comes from the chevron plus each chip's own
+   `aria-label` (and `title` on DeepCode). */
+.bds-chip-label {
+  display: none;
+}
+
+/* The native chip is `display: inline-flex` with a `gap`, and it ships a
+   zero-width `.ds-focus-ring` overlay as its last child. That element still
+   participates in the flex flow, so it consumes a `gap` slot of its own and the
+   chip ends up with one extra gap of dead space on the right — measured on the
+   DeepCode chip as 13px of padding on the left against 19px on the right, which
+   is exactly what made the icon look off-centre. Taking the overlay out of flow
+   equalises the two paddings and reclaims 6px of width. */
+.bds-deep-research-toggle > .ds-focus-ring,
+.bds-deep-code-toggle > .ds-focus-ring {
   position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
-  z-index: 30;
-  max-width: 220px;
-  padding: 4px 10px;
-  border-radius: 8px;
-  border: 0.5px solid var(--bds-border, #3a3b3f);
-  background: var(--bds-bg-panel, #1e1f23);
-  color: var(--bds-text-primary, #ececec);
-  font-size: 12px;
-  line-height: 1.4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 0.16s ease;
-}
-
-.bds-deep-research-toggle:hover .bds-chip-label,
-.bds-deep-research-toggle:focus-visible .bds-chip-label,
-.bds-deep-code-toggle:hover .bds-chip-label,
-.bds-deep-code-toggle:focus-visible .bds-chip-label,
-.bds-deep-code-toggle.bds-chip-expanded .bds-chip-label {
-  opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bds-deep-research-toggle .bds-chip-label,
-  .bds-deep-code-toggle .bds-chip-label {
-    transition: none;
-  }
 }
 
 /* The toggle switch track */
