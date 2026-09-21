@@ -70,7 +70,7 @@
       </svg>
     </div>
   </div>
-  <span class="_6dbc175">DeepResearch</span>
+  <span class="_6dbc175 bds-chip-label">DeepResearch</span>
   <div class="ds-focus-ring" style="--dsl-focus-ring-offset: -1px;"></div>
 </div>
 
@@ -97,9 +97,7 @@
     display: block;
   }
 
-  @media (max-width: 560px) {
-    .bds-deep-research-toggle span._6dbc175 {
-      display: none !important;
-    }
-  }
+  /* The label is icon-only until hover/focus, floating above the chip instead of
+     widening it. Shared with DeepCode and defined in src/styles/content.css
+     (.bds-chip-label). */
 </style>

@@ -206,6 +206,7 @@
   class="bds-deep-code-toggle f79352dc ds-toggle-button ds-toggle-button--m"
   class:ds-toggle-button--selected={localEnabled}
   class:bds-deep-code-toggle--selected={localEnabled}
+  class:bds-chip-expanded={isOpen}
   style="transform: translateZ(0px);"
   onclick={handleButtonClick}
   onkeydown={(e) =>
@@ -235,7 +236,7 @@
       </svg>
     </div>
   </div>
-  <span class="_6dbc175 bds-toggle-label">{displayLabel}</span>
+  <span class="_6dbc175 bds-toggle-label bds-chip-label">{displayLabel}</span>
   <span class="bds-toggle-chevron" class:bds-toggle-chevron--open={isOpen}>
     <svg
       width="10"
@@ -670,8 +671,10 @@
     outline: none !important;
   }
 
+  /* No max-width here: the label is taken out of flow entirely by the shared
+     .bds-chip-label rule in src/styles/content.css, so it no longer sizes this
+     chip and cannot widen the toolbar. */
   .bds-toggle-label {
-    max-width: 140px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -681,6 +684,9 @@
     vertical-align: middle;
   }
 
+  /* Always visible: with the label out of flow the chevron is the only remaining
+     hint that this chip opens a panel, and a hover-only chevron would widen the
+     chip and reintroduce the toolbar reflow we just removed. */
   .bds-toggle-chevron {
     display: inline-flex;
     align-items: center;
@@ -1099,9 +1105,6 @@
     color: var(--bds-text-tertiary, #6b6b7b);
   }
 
-  @media (max-width: 560px) {
-    .bds-deep-code-toggle span._6dbc175 {
-      display: none !important;
-    }
-  }
+  /* The floating label is shared with DeepResearch and lives in
+     src/styles/content.css (.bds-chip-label, .bds-chip-expanded). */
 </style>
