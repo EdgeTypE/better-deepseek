@@ -152,6 +152,41 @@ describe("QuestionPanel integration", () => {
     cleanup();
   });
 
+  it("collapses from the footer and restores an unfinished answer", async () => {
+    const { cleanup } = renderSvelte(QuestionPanel);
+    await flushUi();
+
+    window.dispatchEvent(new CustomEvent("bds-ask-questions", {
+      detail: { questions: [{ id: "q1", question: "Explain", type: "input" }] },
+    }));
+    await flushUi();
+
+    const input = document.querySelector(".bds-text-input");
+    input.value = "A draft answer";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await flushUi();
+
+    const toggle = document.querySelector(".bds-collapse-btn");
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    toggle.click();
+    await flushUi();
+
+    expect(document.querySelector(".bds-question-panel--hidden")).toBeNull();
+    expect(document.querySelector(".bds-question-body")).toBeNull();
+    expect(document.querySelector(".bds-question-footer")).not.toBeNull();
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flushUi();
+    expect(document.querySelector('button[title="Send message"]').click).not.toHaveBeenCalled();
+
+    toggle.click();
+    await flushUi();
+    expect(document.querySelector(".bds-text-input").value).toBe("A draft answer");
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    cleanup();
+  });
+
   it("focuses free text input from wrapper clicks without leaking to composer", async () => {
     const { cleanup } = renderSvelte(QuestionPanel);
     await flushUi();

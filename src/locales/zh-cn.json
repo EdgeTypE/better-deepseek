@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-19T00:00:00Z",
+  "updatedAt": "2026-09-23T00:00:00Z",
   "messages": {
     "common": {
       "save": "保存",
@@ -337,6 +337,8 @@
     "questionPanel": {
       "of": "{{current}} / {{total}}",
       "dismiss": "关闭",
+      "collapse": "收起",
+      "expand": "展开",
       "somethingElse": "其他…",
       "typeAnswer": "在此输入你的回答…",
       "keyboardNav": "↑↓ 导航",

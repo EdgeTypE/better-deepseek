@@ -8,6 +8,7 @@
   let answers = $state({});
   let customAnswers = $state({});
   let visible = $state(false);
+  let collapsed = $state(false);
   let currentQuestionIndex = $state(0);
   let focusedOptionIndex = $state(0);
   let panelElement = $state(null);
@@ -19,6 +20,7 @@
       customAnswers = {};
       currentQuestionIndex = 0;
       focusedOptionIndex = 0;
+      collapsed = false;
 
       // Initialize answers state
       questions.forEach((q, index) => {
@@ -35,7 +37,7 @@
     };
 
     const handleKeyDown = (e) => {
-      if (!visible || questions.length === 0) return;
+      if (!visible || collapsed || questions.length === 0) return;
 
       if (isTypingTarget(document.activeElement)) {
         return;
@@ -365,6 +367,7 @@
     {#if questions.length > 0}
       {@const q = questions[currentQuestionIndex]}
       {@const key = q.id || `q_${currentQuestionIndex}`}
+    {#if !collapsed}
     <div class="bds-question-header">
       <h3>{q.question}</h3>
       <div class="bds-header-controls">
@@ -523,23 +526,37 @@
         </div>
       {/if}
     </div>
+    {/if}
 
-    <div class="bds-question-footer">
-      <div class="bds-keyboard-hints">
-        <span>{t('questionPanel.keyboardNav')}</span>
-        <span>{t('questionPanel.keyboardSelect')}</span>
-        <span>{t('questionPanel.keyboardClose')}</span>
-      </div>
+    <div class="bds-question-footer" class:bds-question-footer--collapsed={collapsed}>
+      {#if !collapsed}
+        <div class="bds-keyboard-hints">
+          <span>{t('questionPanel.keyboardNav')}</span>
+          <span>{t('questionPanel.keyboardSelect')}</span>
+          <span>{t('questionPanel.keyboardClose')}</span>
+        </div>
+      {/if}
       <div class="bds-footer-actions">
-        {#if currentQuestionIndex === questions.length - 1}
-          <button class="bds-action-btn bds-submit-btn" onclick={submitAnswers}>
-            {hasAnswer(q, key) ? t('questionPanel.sendAnswers') : t('questionPanel.skip')}
-          </button>
-        {:else}
-          <button class="bds-action-btn bds-next-btn" onclick={nextOrSubmit}>
-            {hasAnswer(q, key) ? t('questionPanel.next') : t('questionPanel.skip')}
-          </button>
+        {#if !collapsed}
+          {#if currentQuestionIndex === questions.length - 1}
+            <button class="bds-action-btn bds-submit-btn" onclick={submitAnswers}>
+              {hasAnswer(q, key) ? t('questionPanel.sendAnswers') : t('questionPanel.skip')}
+            </button>
+          {:else}
+            <button class="bds-action-btn bds-next-btn" onclick={nextOrSubmit}>
+              {hasAnswer(q, key) ? t('questionPanel.next') : t('questionPanel.skip')}
+            </button>
+          {/if}
         {/if}
+        <button
+          type="button"
+          class="bds-action-btn bds-collapse-btn"
+          onclick={() => collapsed = !collapsed}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? t('questionPanel.expand') : t('questionPanel.collapse')}
+        >
+          {collapsed ? t('questionPanel.expand') : t('questionPanel.collapse')}
+        </button>
       </div>
     </div>
     {/if}
@@ -795,6 +812,12 @@
     align-items: center;
     border-top: 1px solid var(--bds-border, #3a3b3f);
     padding-top: 12px;
+  }
+
+  .bds-question-footer--collapsed {
+    justify-content: flex-end;
+    border-top: none;
+    padding-top: 0;
   }
 
   .bds-keyboard-hints {

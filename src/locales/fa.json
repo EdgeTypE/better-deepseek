@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-19T00:00:00Z",
+  "updatedAt": "2026-09-23T00:00:00Z",
   "messages": {
     "common": {
       "save": "ذخیره",
@@ -337,6 +337,8 @@
     "questionPanel": {
       "of": "{{current}} از {{total}}",
       "dismiss": "ردکردن",
+      "collapse": "جمع کردن",
+      "expand": "باز کردن",
       "somethingElse": "چیز دیگر...",
       "typeAnswer": "پاسخ خود را اینجا بنویسید...",
       "keyboardNav": "↑↓ برای پیمایش",
