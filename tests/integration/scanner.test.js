@@ -596,6 +596,21 @@ describe("scanner scheduling", () => {
     expect(processMessageNodeMock).toHaveBeenCalledTimes(2);
   });
 
+  it("notifies the question panel before a queued scan when the URL has changed", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+    const { scheduleScan } = await import("../../src/content/scanner.js");
+    const listener = vi.fn();
+    window.addEventListener("bds:questionNavigationPending", listener);
+    try {
+      state.lastUrl = `${location.href}previous`;
+      scheduleScan();
+      expect(listener).toHaveBeenCalledOnce();
+      expect(processMessageNodeMock).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("bds:questionNavigationPending", listener);
+    }
+  });
+
   it("scheduleMessageScan processes bounded set not every message", async () => {
     const messages = [];
     for (let i = 0; i < 50; i++) {

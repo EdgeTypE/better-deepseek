@@ -970,8 +970,21 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
     }
 
     const isAbsLast = context ? context.absoluteLastNode === node : isAbsoluteLastMessage(node);
-    if (!state.activeQuestions && !isSystemGenerating() && parsed.askQuestions.length > 0 && isLatestAssistant && isAbsLast) {
+    // The previous conversation's panel stays in state until the URL watcher runs.
+    // Let destination questions replace it, but do not reopen the same old question.
+    const questionKey = JSON.stringify(parsed.askQuestions);
+    const activeQuestionsAreFromAnotherConversation =
+      state.activeQuestions && state.activeQuestionsUrl && state.activeQuestionsUrl !== location.href;
+    const questionBelongsToAnotherConversation =
+      stateData.questionOwnerUrl && stateData.questionOwnerUrl !== location.href &&
+      stateData.questionOwnerKey === questionKey;
+    if ((!state.activeQuestions || activeQuestionsAreFromAnotherConversation) &&
+        !questionBelongsToAnotherConversation && !isSystemGenerating() &&
+        parsed.askQuestions.length > 0 && isLatestAssistant && isAbsLast) {
+      stateData.questionOwnerUrl = location.href;
+      stateData.questionOwnerKey = questionKey;
       state.activeQuestions = parsed.askQuestions;
+      state.activeQuestionsUrl = location.href;
       window.dispatchEvent(new CustomEvent('bds-ask-questions', { 
         detail: { 
           questions: parsed.askQuestions,

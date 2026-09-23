@@ -36,6 +36,7 @@ export function resetAppState(overrides = {}) {
   state.chatSessions = [];
   state.savedItems = [];
   state.activeQuestions = null;
+  state.activeQuestionsUrl = null;
   state.deepResearch = {
     enabled: false,
     pendingRun: null,

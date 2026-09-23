@@ -615,6 +615,57 @@ describe("message processor integration", () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 
+  it("opens destination questions while previous conversation questions are active", () => {
+    const startingUrl = location.href;
+    const listener = vi.fn();
+    window.addEventListener("bds-ask-questions", listener);
+
+    try {
+      history.replaceState({}, "", "?conversation=first");
+      const first = createMessageNode(
+        '<BDS:ask_question>[{"id":"first","question":"First question","type":"input"}]</BDS:ask_question>',
+      );
+      processMessageNode(first);
+      vi.advanceTimersByTime(3000);
+      processMessageNode(first);
+      expect(listener).toHaveBeenCalledOnce();
+      expect(state.activeQuestionsUrl).toBe(location.href);
+
+      history.replaceState({}, "", "?conversation=second");
+      first.dataset.latest = "0";
+      first.dataset.absoluteLast = "0";
+      const second = createMessageNode(
+        '<BDS:ask_question>[{"id":"second","question":"Second question","type":"input"}]</BDS:ask_question>',
+      );
+      processMessageNode(second);
+      vi.advanceTimersByTime(3000);
+      processMessageNode(second);
+
+      expect(listener).toHaveBeenCalledTimes(2);
+      expect(state.activeQuestions[0].id).toBe("second");
+      expect(state.activeQuestionsUrl).toBe(location.href);
+
+      // The old source can still be connected while the destination loads.
+      state.activeQuestions = null;
+      state.activeQuestionsUrl = null;
+      first.dataset.latest = "1";
+      first.dataset.absoluteLast = "1";
+      first.dataset.rawText += " updated";
+      processMessageNode(first);
+      expect(listener).toHaveBeenCalledTimes(2);
+
+      // A reused DOM node can carry a different question in the new conversation.
+      first.dataset.rawText =
+        '<BDS:ask_question>[{"id":"replacement","question":"Replacement question","type":"input"}]</BDS:ask_question>';
+      processMessageNode(first);
+      expect(listener).toHaveBeenCalledTimes(3);
+      expect(state.activeQuestions[0].id).toBe("replacement");
+    } finally {
+      history.replaceState({}, "", startingUrl);
+      window.removeEventListener("bds-ask-questions", listener);
+    }
+  });
+
   it("does not reopen clarifying questions after a user reply", () => {
     const originalNode = createMessageNode(
       '<BDS:ask_question>[{"id":"q1","question":"Pick one","type":"test","options":["A"]}]</BDS:ask_question>',

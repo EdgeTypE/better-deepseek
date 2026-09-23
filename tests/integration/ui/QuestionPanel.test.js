@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import QuestionPanel from "../../../src/content/ui/QuestionPanel.svelte";
+import appState from "../../../src/content/state.js";
 import { resetAppState } from "../../helpers/app-state.js";
 import { renderSvelte, flushUi } from "../../helpers/svelte.js";
 
@@ -22,6 +23,73 @@ describe("QuestionPanel integration", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("closes the question panel when leaving its conversation", async () => {
+    const { cleanup } = renderSvelte(QuestionPanel);
+    await flushUi();
+    const originalLocation = Object.getOwnPropertyDescriptor(window, "location");
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { href: "https://chat.deepseek.com/chat/s/first" },
+    });
+    try {
+      const questions = [{ id: "q1", question: "Pick one", type: "input" }];
+      appState.activeQuestions = questions;
+      window.dispatchEvent(new CustomEvent("bds-ask-questions", { detail: { questions } }));
+      await flushUi();
+      expect(document.querySelector(".bds-question-panel--hidden")).toBeNull();
+
+      window.location.href = "https://chat.deepseek.com/chat/s/second";
+      window.dispatchEvent(new CustomEvent("bds:questionNavigationPending"));
+      await flushUi();
+      expect(document.querySelector(".bds-question-panel--hidden")).not.toBeNull();
+      expect(appState.activeQuestions).toBe(questions);
+
+      window.dispatchEvent(new CustomEvent("bds:urlChanged"));
+      await flushUi();
+      expect(document.querySelector(".bds-question-panel--hidden")).not.toBeNull();
+      expect(appState.activeQuestions).toBeNull();
+    } finally {
+      Object.defineProperty(window, "location", originalLocation);
+      cleanup();
+    }
+  });
+
+  it("keeps questions opened in the destination conversation before the URL watcher fires", async () => {
+    const { cleanup } = renderSvelte(QuestionPanel);
+    await flushUi();
+    const originalLocation = Object.getOwnPropertyDescriptor(window, "location");
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { href: "https://chat.deepseek.com/chat/s/first" },
+    });
+    try {
+      const firstQuestions = [{ id: "q1", question: "First conversation", type: "input" }];
+      appState.activeQuestions = firstQuestions;
+      window.dispatchEvent(new CustomEvent("bds-ask-questions", { detail: { questions: firstQuestions } }));
+      await flushUi();
+
+      const questions = [{ id: "q2", question: "Still unanswered", type: "input" }];
+      window.location.href = "https://chat.deepseek.com/chat/s/second";
+      appState.activeQuestions = questions;
+      window.dispatchEvent(new CustomEvent("bds-ask-questions", { detail: { questions } }));
+      await flushUi();
+      expect(document.querySelector(".bds-question-panel--hidden")).toBeNull();
+      expect(document.querySelector(".bds-question-panel").textContent).toContain("Still unanswered");
+
+      window.dispatchEvent(new CustomEvent("bds:questionNavigationPending"));
+      await flushUi();
+      expect(document.querySelector(".bds-question-panel--hidden")).toBeNull();
+
+      window.dispatchEvent(new CustomEvent("bds:urlChanged"));
+      await flushUi();
+      expect(document.querySelector(".bds-question-panel--hidden")).toBeNull();
+      expect(appState.activeQuestions).toBe(questions);
+    } finally {
+      Object.defineProperty(window, "location", originalLocation);
+      cleanup();
+    }
   });
 
   it("renders questions, supports keyboard selection, and submits answers", async () => {

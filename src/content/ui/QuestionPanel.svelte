@@ -11,9 +11,12 @@
   let currentQuestionIndex = $state(0);
   let focusedOptionIndex = $state(0);
   let panelElement = $state(null);
+  let questionsUrl = null;
 
   onMount(() => {
     const handleQuestions = (event) => {
+      questionsUrl = location.href;
+      appState.activeQuestionsUrl = questionsUrl;
       questions = event.detail.questions;
       answers = {};
       customAnswers = {};
@@ -32,6 +35,16 @@
       });
 
       visible = true;
+    };
+
+    const handleUrlChange = () => {
+      const shouldDismiss = questionsUrl !== null && questionsUrl !== location.href;
+      if (shouldDismiss) dismiss();
+    };
+
+    const handlePendingNavigation = () => {
+      if (!visible || questionsUrl === location.href) return;
+      visible = false;
     };
 
     const handleKeyDown = (e) => {
@@ -62,6 +75,8 @@
     };
 
     window.addEventListener("bds-ask-questions", handleQuestions);
+    window.addEventListener("bds:urlChanged", handleUrlChange);
+    window.addEventListener("bds:questionNavigationPending", handlePendingNavigation);
     window.addEventListener("keydown", handleKeyDown);
 
     // Keep checking if target changed or was replaced by framework
@@ -71,6 +86,8 @@
 
     return () => {
       window.removeEventListener("bds-ask-questions", handleQuestions);
+      window.removeEventListener("bds:urlChanged", handleUrlChange);
+      window.removeEventListener("bds:questionNavigationPending", handlePendingNavigation);
       window.removeEventListener("keydown", handleKeyDown);
       clearInterval(interval);
     };
@@ -342,7 +359,9 @@
 
     injectTextIntoDeepSeek(responseText.trim());
     appState.activeQuestions = null;
+    appState.activeQuestionsUrl = null;
     visible = false;
+    questionsUrl = null;
   }
 
   async function injectTextIntoDeepSeek(text) {
@@ -353,6 +372,8 @@
   function dismiss() {
     visible = false;
     appState.activeQuestions = null;
+    appState.activeQuestionsUrl = null;
+    questionsUrl = null;
   }
 </script>
 
