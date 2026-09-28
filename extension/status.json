@@ -31,13 +31,13 @@
   },
   {
     "id": "deepseek-update-breaks-bds-urgent-fix-v1",
-    "show": true,
+    "show": false,
     "message": "An update released today by DeepSeek has broken Better DeepSeek, whether intentionally or unintentionally. We have released an urgent fix. It may take up to 24 hours for the update to be reviewed and published by the extension stores. Thank you for your understanding. -BDS",
     "type": "warning"
   },
   {
     "id": "deepseek-contact-if-intentional-v1",
-    "show": true,
+    "show": false,
     "message": "If this update was intentionally released by the DeepSeek team to discontinue Better DeepSeek, please feel free to contact me via GitHub or a similar platform. I am open to discussion and will respectfully comply if removal is requested. -BDS",
     "type": "info"
   },
@@ -46,5 +46,11 @@
     "show": false,
     "message": "Due to a recent update to the DeepSeek interface, some extension features may currently not be working properly. We are aware of the issue and actively working on a fix. For more details or if you would like to help resolve it, please check our GitHub repository. -BDS",
     "type": "warning"
+  },
+    {
+    "id": "bds-512-star",
+    "show": true,
+    "message": "Better DeepSeek just passed 512 stars on GitHub and unlocked the Silver Starstruck achievement. Back when it hit 128 stars, I thought 512 was impossible. Genuinely didn't think we'd get here. Thank you to everyone who starred, tested, reported, and contributed.",
+    "type": "info"
   }
 ]
