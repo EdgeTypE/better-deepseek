@@ -26,6 +26,8 @@ const state = {
   scanTimer: 0,
   urlWatchTimer: 0,
   lastUrl: location.href,
+  activeQuestions: null,
+  activeQuestionsUrl: null,
   processedStandaloneFiles: new Set(),
   network: {
     activeCompletionRequests: 0,

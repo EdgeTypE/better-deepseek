@@ -125,6 +125,9 @@ const MAX_SCAN_WAIT_MS = 100;
 
 // ── Internal: arm the shared debounce timer ──
 function armScanTimer() {
+  if (location.href !== state.lastUrl) {
+    window.dispatchEvent(new CustomEvent("bds:questionNavigationPending"));
+  }
   const now = Date.now();
   if (state.scanTimer) {
     // If a timer is already pending within the max wait window, let it run
