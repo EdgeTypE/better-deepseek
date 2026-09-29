@@ -78,7 +78,6 @@
   :global(.bds-deep-research-mount) {
     display: contents !important;
   }
-
   .bds-deep-research-toggle {
     position: relative;
     display: inline-flex;
@@ -97,7 +96,9 @@
     display: block;
   }
 
-  /* The label span is kept because the native chip structure includes it, but it
-     is never rendered — see the .bds-chip-label rule in src/styles/content.css
-     for why a hover reveal cannot work inside this composer. */
+  /* The label span is part of the native chip structure (and the tests pin its
+     text), but it stays collapsed until the chip is hovered or selected. The
+     reveal itself lives in the shared .bds-chip-label rules in
+     src/styles/content.css — a scoped `display`/`max-width` here would win on
+     specificity and kill the reveal. */
 </style>

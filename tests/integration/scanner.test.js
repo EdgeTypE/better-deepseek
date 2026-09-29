@@ -105,6 +105,28 @@ describe("scanner input controls", () => {
     expect(mountMock.mock.calls[0][1].target).toBe(deepResearchMount);
   });
 
+  it("mounts the composer chips through a layout-transparent wrapper", async () => {
+    document.body.innerHTML = `
+      <div id="composer">
+        <div id="actions">
+          <button type="button" aria-label="DeepThink"></button>
+          <button type="button" aria-label="Search"></button>
+        </div>
+        <input type="file" multiple />
+      </div>
+    `;
+    const { scanInputArea } = await import("../../src/content/scanner.js");
+
+    scanInputArea();
+
+    // The chip must stay a flex item of the native row so it can widen on hover
+    // and push its neighbours along. A block-level wrapper would pin its width.
+    const wrapper = document.querySelector(".bds-deep-research-mount");
+    expect(wrapper).toBeTruthy();
+    expect(wrapper.style.display).toBe("contents");
+    expect(wrapper.parentElement).toBe(document.querySelector("#actions"));
+  });
+
   it("does not mount Deep Code when target is Android", async () => {
     process.env.BDS_TARGET = "android";
     document.body.innerHTML = `

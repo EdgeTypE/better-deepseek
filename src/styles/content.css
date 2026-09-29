@@ -569,20 +569,53 @@ textarea.bds-input,
 
 /* ── Composer toolbar chips ──
    DeepResearch / DeepCode sit in DeepSeek's native composer toolbar next to
-   DeepThink and Search. They are icon-only so the toolbar reads quiet; the
-   chevron on DeepCode is the only hint that it opens a panel.
+   DeepThink and Search. At rest they are icon-only so the toolbar reads quiet;
+   on hover — and whenever the chip is selected — it widens in place and reveals
+   its name, the same way the native DeepThink / Search chips behave.
 
-   The label span stays in the DOM — it is part of the native chip structure and
-   the tests pin it — but it is never rendered. An earlier attempt revealed it on
-   hover as a floating pill above the chip, and that cannot work here: a native
-   ancestor of the chip carries `overflow: hidden` and clips anything placed
-   outside the chip's own box, leaving a text-less sliver. `position: fixed` does
-   not escape it either, because the chip carries `transform: translateZ(0px)`,
-   which makes the chip the label's containing block, so the clipping ancestor
-   still clips it. Discoverability comes from the chevron plus each chip's own
-   `aria-label` (and `title` on DeepCode). */
+   The reveal has to grow the chip's own inline size, and the toolbar must be
+   allowed to reflow when it does. Anything drawn outside the chip's box cannot
+   work here: a native ancestor of the chip carries `overflow: hidden`, and even
+   `position: fixed` does not escape it, because the chip's own
+   `transform: translateZ(0px)` makes the chip the containing block.
+
+   `max-width` is the collapse mechanism because it is the one size property
+   that still applies to a flex item. The span's own `flex-basis: auto` keeps
+   resolving to max-content, so the chip's max-content width — and therefore its
+   `flex: 0 0 auto` basis — stays constant while the chip is collapsed; the gap
+   below is simply never reused, so its neighbours sit still at rest.
+
+   A collapsed label still owns its `gap` slots, and the chip's `gap` is paid on
+   *both* sides of it. DeepResearch has no trailing sibling to absorb the second
+   slot, so the icon ends up 6px closer to the left edge than to the right — the
+   chip reads visibly off-centre. `margin-left: -0.428em` cancels exactly one
+   `gap` (0.428 x 14px font = 6px); once the label is revealed the negative
+   margin returns to 0 and the normal spacing applies. The value must not exceed
+   the gap, or it starts eating into the icon's own space. DeepCode happens to
+   look centred because its chevron occupies the trailing slot, but the same
+   correction keeps its revealed spacing even. */
 .bds-chip-label {
-  display: none;
+  display: block;
+  box-sizing: content-box;
+  max-width: 0;
+  margin-left: -0.428em;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  transition:
+    max-width 0.18s ease,
+    opacity 0.18s ease,
+    margin-left 0.18s ease;
+}
+
+/* Hover reveals the label; so does selection, because `--selected` is set
+   whenever the feature is on rather than while the chip is being hovered. */
+.bds-deep-research-toggle:hover .bds-chip-label,
+.bds-deep-code-toggle:hover .bds-chip-label,
+.ds-toggle-button--selected .bds-chip-label {
+  max-width: 40ch;
+  margin-left: 6px;
+  opacity: 1;
 }
 
 /* The native chip is `display: inline-flex` with a `gap`, and it ships a

@@ -670,12 +670,13 @@
     outline: none !important;
   }
 
-  /* The label span is kept because the native chip structure includes it, but it
-     is never rendered. Do NOT reintroduce a `display` here: this scoped rule
-     (0,2,0) is injected after src/styles/content.css and would beat the shared
-     `.bds-chip-label { display: none }` rule (0,1,0) — that is exactly how the
-     earlier hover-reveal attempt broke. See content.css for why a reveal cannot
-     work inside this composer. */
+  /* The label span is part of the native chip structure, but it stays collapsed
+     until the chip is hovered or selected. Do NOT introduce a `display`,
+     `max-width` or `opacity` here: this scoped rule (0,2,0) is injected after
+     src/styles/content.css and beats the shared `.bds-chip-label` rules
+     (0,1,0) that drive the reveal. A `max-width` in particular — even a `ch`
+     value meant as a ceiling — overrides the shared `max-width: 0` collapse and
+     leaves the chip at full label width at rest. */
 
   /* Always visible: the chevron is the only remaining hint that this chip opens
      a panel, and a hover-only chevron would widen the chip and reintroduce the
@@ -1098,6 +1099,6 @@
     color: var(--bds-text-tertiary, #6b6b7b);
   }
 
-  /* The chip label is never rendered; the shared rule that hides it lives in
+  /* The chip label collapses and reveals via the shared rules in
      src/styles/content.css (.bds-chip-label). */
 </style>

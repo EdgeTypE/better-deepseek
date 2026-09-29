@@ -948,7 +948,12 @@ function ensureComposerMount(wrapper, className, descendantSelector, beforeNode)
   }
 
   if (!mountPoint) {
+    // The chip itself is the mount point. `display: contents` keeps it
+    // layout-transparent, so the chip joins the native toolbar flex row as a
+    // direct flex item and can widen in place — a wrapper element would become
+    // the flex item instead and pin the chip's width.
     mountPoint = document.createElement("div");
+    mountPoint.style.display = "contents";
   }
 
   mountPoint.classList.add(className);
