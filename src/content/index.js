@@ -26,6 +26,7 @@ import { observeChatDom, scheduleScan, startUrlWatcher } from "./scanner.js";
 import { initSidebarMenuInjector } from "./ui/SidebarMenuInjector.js";
 import { initSidebarSearch } from "./ui/SidebarSearch.js";
 import { checkPendingExport } from "./tools/pending-export.js";
+import { checkPendingContextPrompt } from "./tools/pending-context-prompt.js";
 import { initPricing } from "../lib/pricing.js";
 import { startStatusMonitor } from "./status-monitor.js";
 import { startThemeWatcher } from "./theme.js";
@@ -79,6 +80,7 @@ async function init() {
   scheduleScan();
   checkPendingExport();
   checkPendingMemoryImport();
+  checkPendingContextPrompt();
   pushConfigToPage();
   import("./bridge.js").then(async (m) => {
     await m.discoverMcpToolSchemas();

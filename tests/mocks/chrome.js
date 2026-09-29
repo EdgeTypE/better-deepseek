@@ -161,6 +161,26 @@ export const chromeMock = {
       removeListener: vi.fn(),
       hasListener: vi.fn(() => false),
     },
+    onStartup: {
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      hasListener: vi.fn(() => false),
+    },
+  },
+  contextMenus: {
+    create: vi.fn((opts, cb) => cb && cb()),
+    removeAll: vi.fn((cb) => cb && cb()),
+    onClicked: {
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      hasListener: vi.fn(() => false),
+    },
+  },
+  tabs: {
+    create: vi.fn(async (opts) => ({ id: 12345, url: opts?.url })),
+  },
+  i18n: {
+    getUILanguage: vi.fn(() => "en"),
   },
 };
 
@@ -223,6 +243,12 @@ export function resetChromeMock() {
   chromeMock.runtime.onInstalled.addListener.mockClear();
   chromeMock.runtime.onInstalled.removeListener.mockClear();
   chromeMock.runtime.onInstalled.hasListener.mockClear();
+  chromeMock.runtime.onStartup?.addListener.mockClear();
+  chromeMock.contextMenus.create.mockClear();
+  chromeMock.contextMenus.removeAll.mockClear();
+  chromeMock.contextMenus.onClicked.addListener.mockClear();
+  chromeMock.tabs.create.mockClear();
+  chromeMock.i18n?.getUILanguage.mockClear();
   listeners.clear();
 }
 

@@ -8,6 +8,8 @@ import {
 import { devLog } from "../lib/dev-log.js";
 import { getExtensionVersion } from "../lib/extension-version.js";
 
+import { setupContextMenus } from "./context-menu.js";
+
 export {
   DEFAULT_GITHUB_COMMIT_COUNT,
   GITHUB_COMMITS_PAGE_SIZE,
@@ -25,7 +27,14 @@ export {
   MCP_REQUEST_TIMEOUT_MS,
 };
 
+setupContextMenus();
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "bds-get-my-tab-id") {
+    sendResponse({ tabId: sender.tab?.id || null });
+    return true;
+  }
+
   if (message.type === "PING_HARNESS") {
     const baseUrl = message.baseUrl || "http://127.0.0.1:3080";
     // Check if dedicated Cordis bridge plugin is active (Mode B)
