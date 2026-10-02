@@ -1358,7 +1358,7 @@ function syncVisibilityState(node, isLatestAssistant, stateData, isSettled) {
   }
 
   // --- VOICE OUTPUT (TTS) ---
-  if (isLatestAssistant && isSettled && state.settings.voiceMode) {
+  if (isLatestAssistant && isSettled && state.settings.voiceMode && !state.liveMode?.active) {
     if (!readMessages.has(node)) {
       readMessages.add(node);
       playVoiceResponse(stateData.lastRawText);

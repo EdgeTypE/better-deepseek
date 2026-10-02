@@ -7,6 +7,7 @@
 
 import { buildOfficeSkillsBlock } from "../lib/office-skills/index.js";
 import { searchActiveProjectRAG, formatRagInjections } from "../lib/rag-engine.js";
+import { LIVE_MODE_SYSTEM_PROMPT } from "../lib/constants.js";
 
 /**
  * @param {object} payload - The parsed JSON request body
@@ -127,6 +128,22 @@ export function mutatePayload(payload, state) {
       changed = true;
     } else if (cleanText !== payload.prompt) {
       payload.prompt = cleanText;
+      changed = true;
+    }
+  }
+
+  // ── Live Voice Mode (disable thinking for ultra-low latency response) ──
+  if (state.config?.isLiveMode) {
+    if (payload.thinking_enabled !== false) {
+      payload.thinking_enabled = false;
+      changed = true;
+    }
+    if (payload.chat_session && typeof payload.chat_session === "object" && payload.chat_session.thinking_enabled !== false) {
+      payload.chat_session.thinking_enabled = false;
+      changed = true;
+    }
+    if (payload.model_pref && typeof payload.model_pref === "object" && payload.model_pref.thinking_enabled !== false) {
+      payload.model_pref.thinking_enabled = false;
       changed = true;
     }
   }
@@ -319,6 +336,10 @@ export function buildHiddenPrefix(
   excludeTarget = null
 ) {
   const blocks = [];
+
+  if (state.config?.isLiveMode) {
+    blocks.push(`<BetterDeepSeek>\n${LIVE_MODE_SYSTEM_PROMPT}\n</BetterDeepSeek>`);
+  }
 
   const deepResearchBlock = buildDeepResearchPlanningBlock(
     userPrompt,

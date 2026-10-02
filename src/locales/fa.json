@@ -408,7 +408,21 @@
       "commitsFailed": "دریافت تاریخچه commit ناموفق بود: {{msg}}",
       "repoFailed": "دریافت مخزن ناموفق بود: {{msg}}",
       "invalidWebUrl": "لطفاً یک نشانی معتبر وارد کنید (شامل http/https).",
-      "webFetchFailed": "دریافت محتوای صفحه ممکن نشد: {{msg}}"
+      "webFetchFailed": "دریافت محتوای صفحه ممکن نشد: {{msg}}",
+      "liveMode": "حالت صوتی زنده"
+    },
+    "liveMode": {
+      "title": "Better DeepSeek Live",
+      "listening": "در حال گوش دادن...",
+      "thinking": "در حال فکر کردن...",
+      "speaking": "در حال صحبت...",
+      "ready": "آماده گفتگو",
+      "muted": "میکروفون بی‌صدا است",
+      "unmute": "وصل کردن صدا",
+      "mute": "بی‌صدا کردن",
+      "stop": "توقف",
+      "exit": "پایان حالت زنده",
+      "notSupported": "مرورگر از تشخیص گفتار پشتیبانی نمی‌کند."
     },
     "codeRunner": {
       "pythonRunner": "اجراگر پایتون",

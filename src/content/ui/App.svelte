@@ -12,11 +12,13 @@
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import DeepCodeModal from "./DeepCodeModal.svelte";
   import ApiPlayground from "../api-playground/ApiPlayground.svelte";
+  import LiveModeOverlay from "./LiveModeOverlay.svelte";
   import appState from "../state.js";
 
   let drawerOpen = $state(false);
   let apiPlaygroundOpen = $state(false);
   let deepCodeModalOpen = $state(false);
+  let liveModeOpen = $state(false);
   let whatsNewPending = $state(appState.whatsNewPending);
 
   let previewVisible = $state(false);
@@ -127,6 +129,14 @@
     apiPlaygroundOpen = false;
   }
 
+  export function openLiveMode() {
+    liveModeOpen = true;
+  }
+
+  export function closeLiveMode() {
+    liveModeOpen = false;
+  }
+
   // Handle external selection mode toggle
   window.addEventListener("bds:toggleSelectionMode", () => {
     appState.selectionMode = true;
@@ -135,6 +145,10 @@
 
   window.addEventListener("bds:open-deep-code-modal", () => {
     deepCodeModalOpen = true;
+  });
+
+  window.addEventListener("bds:open-live-mode", () => {
+    liveModeOpen = true;
   });
 </script>
 
@@ -147,6 +161,10 @@
 
 {#if apiPlaygroundOpen}
   <ApiPlayground onclose={closeApiPlayground} />
+{/if}
+
+{#if liveModeOpen}
+  <LiveModeOverlay onclose={closeLiveMode} />
 {/if}
 
 <DeepCodeModal

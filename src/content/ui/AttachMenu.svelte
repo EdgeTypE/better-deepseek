@@ -360,6 +360,10 @@
     }
   }
 
+  function startLiveMode() {
+    window.dispatchEvent(new CustomEvent("bds:open-live-mode"));
+  }
+
   function injectTextIntoDeepSeek(text, isFinal) {
     // DeepSeek uses a <textarea> or a contenteditable div.
     // Usually it's #chat-input in modern DeepSeek.
@@ -964,6 +968,32 @@
 
   {#if shouldShowVoice && supportsVoiceInput}
     <button
+      class="bds-live-mode-btn"
+      onclick={startLiveMode}
+      title={t('attachMenu.liveMode') || 'Live Voice Mode'}
+      aria-label={t('attachMenu.liveMode') || 'Live Voice Mode'}
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M2 12h2"></path>
+        <path d="M6 8v8"></path>
+        <path d="M10 4v16"></path>
+        <path d="M14 7v10"></path>
+        <path d="M18 9v6"></path>
+        <path d="M22 12h-2"></path>
+      </svg>
+    </button>
+
+    <button
       class="bds-mic-btn {isRecording ? 'bds-recording' : ''}"
       onclick={toggleSpeechRecognition}
       title={isRecording ? t('attachMenu.stopRecording') : t('attachMenu.voicePrompt')}
@@ -1480,6 +1510,27 @@
 
   .bds-plus-btn:active {
     transform: scale(0.95);
+  }
+
+  .bds-live-mode-btn {
+    position: relative;
+    background: transparent;
+    border: none;
+    color: var(--bds-accent);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--bds-transition, 0.18s ease);
+    margin-right: 2px;
+  }
+
+  .bds-live-mode-btn:hover {
+    background-color: var(--bds-accent-glow);
+    transform: scale(1.08);
   }
 
   .bds-mic-btn {

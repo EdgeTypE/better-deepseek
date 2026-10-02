@@ -409,7 +409,21 @@
       "commitsFailed": "Не удалось получить историю коммитов: {{msg}}",
       "repoFailed": "Не удалось получить репозиторий: {{msg}}",
       "invalidWebUrl": "Пожалуйста, введите корректный URL (с http/https).",
-      "webFetchFailed": "Не удалось загрузить содержимое страницы: {{msg}}"
+      "webFetchFailed": "Не удалось загрузить содержимое страницы: {{msg}}",
+      "liveMode": "Голосовой Live-режим"
+    },
+    "liveMode": {
+      "title": "Better DeepSeek Live",
+      "listening": "Слушаю...",
+      "thinking": "Думаю...",
+      "speaking": "Говорю...",
+      "ready": "Готов к общению",
+      "muted": "Микрофон выключен",
+      "unmute": "Включить микрофон",
+      "mute": "Выключить микрофон",
+      "stop": "Прервать",
+      "exit": "Завершить сеанс",
+      "notSupported": "Распознавание речи не поддерживается в этом браузере."
     },
     "codeRunner": {
       "pythonRunner": "Запуск Python",

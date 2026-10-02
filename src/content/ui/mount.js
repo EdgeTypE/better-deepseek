@@ -56,6 +56,8 @@ export function mountUi() {
     showPreviewPanel: (title, content) => app.showPreviewPanel(title, content),
     hidePreviewPanel: () => app.hidePreviewPanel(),
     showLongWorkOverlay: (visible) => app.showLongWorkOverlay(visible),
+    openLiveMode: () => app.openLiveMode(),
+    closeLiveMode: () => app.closeLiveMode(),
   };
 
   state.ui = api;

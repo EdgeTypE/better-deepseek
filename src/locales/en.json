@@ -412,7 +412,21 @@
       "commitsFailed": "Failed to fetch commit history: {{msg}}",
       "repoFailed": "Failed to fetch repository: {{msg}}",
       "invalidWebUrl": "Please enter a valid URL (including http/https).",
-      "webFetchFailed": "Could not fetch page content: {{msg}}"
+      "webFetchFailed": "Could not fetch page content: {{msg}}",
+      "liveMode": "Live Voice Mode"
+    },
+    "liveMode": {
+      "title": "Better DeepSeek Live",
+      "listening": "Listening...",
+      "thinking": "Thinking...",
+      "speaking": "Speaking...",
+      "ready": "Ready to chat",
+      "muted": "Microphone Muted",
+      "unmute": "Unmute Microphone",
+      "mute": "Mute Microphone",
+      "stop": "Interrupt",
+      "exit": "End Live Session",
+      "notSupported": "Speech recognition is not supported in this browser."
     },
     "codeRunner": {
       "pythonRunner": "Python Runner",

@@ -344,6 +344,7 @@ export async function pushConfigToPage() {
       projectRagEnabled,
       projectRagLimit: Number(state.settings.projectRagLimit || 5),
       injectSystemDateTime: Boolean(state.settings.injectSystemDateTime),
+      isLiveMode: Boolean(state.liveMode?.active),
       deepResearch: {
         enabled: Boolean(state.deepResearch.enabled && state.deepResearch.pendingRun),
         runId: state.deepResearch.pendingRun?.id || "",

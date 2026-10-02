@@ -126,6 +126,12 @@ const state = {
   mcpServers: [],
   /** @type {Array<{serverName:string,toolName:string,description:string,inputSchema:object}>} cached merged tool schemas */
   mcpToolSchemas: [],
+  /** Live Voice Mode (Gemini Live-style realtime voice session) */
+  liveMode: {
+    active: false,
+    status: 'idle',
+    isMuted: false,
+  },
   /** Remote config object (deep-merged with built-in defaults). Populated by RemoteConfigManager. */
   remoteConfig: DEFAULT_REMOTE_CONFIG,
 };

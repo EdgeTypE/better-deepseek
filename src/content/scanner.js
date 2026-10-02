@@ -188,25 +188,30 @@ export function findLatestAssistantMessageNode(nodes) {
  * Detect the role of a message DOM node.
  */
 export function detectMessageRole(node) {
-  if (node.classList && node.classList.contains("d29f3d7d")) {
+  if (!node) return "unknown";
+
+  const roleAttr = node.getAttribute?.("data-message-author-role");
+  if (roleAttr) {
+    return String(roleAttr).toLowerCase();
+  }
+
+  if (
+    (node.classList && (node.classList.contains("d29f3d7d") || node.classList.contains("fbb737a4"))) ||
+    node.closest("div._9663006") ||
+    node.querySelector?.("div._9663006, .d29f3d7d, .fbb737a4")
+  ) {
     return "user";
   }
 
-  if (node.closest("div._4f9bf79._43c05b5")) {
+  if (
+    node.closest("div._4f9bf79._43c05b5") ||
+    node.querySelector?.("div._4f9bf79, .ds-markdown, [class*='ds-markdown']")
+  ) {
     return "assistant";
-  }
-
-  if (node.closest("div._9663006")) {
-    return "user";
   }
 
   if (node.classList && node.classList.contains("ds-message")) {
     return "assistant";
-  }
-
-  const roleAttr = node.getAttribute("data-message-author-role");
-  if (roleAttr) {
-    return String(roleAttr).toLowerCase();
   }
 
   return "unknown";
@@ -874,7 +879,28 @@ function findDeepSeekSendButton() {
   }) || null;
 }
 
-function findDeepSeekStopButton() {
+/**
+ * Checks if DeepThink toggle button is currently active/selected in the DOM,
+ * and if so, clicks it to toggle thinking off.
+ * @returns {boolean} true if thinking was active and clicked off
+ */
+export function disableDeepThinkIfActive() {
+  const controls = Array.from(document.querySelectorAll('.ds-toggle-button, div[role="button"], button'));
+  for (const control of controls) {
+    if (isDeepThinkControl(control)) {
+      const isSelected = control.classList?.contains("ds-toggle-button--selected") ||
+                         control.getAttribute("aria-checked") === "true" ||
+                         control.getAttribute("aria-pressed") === "true";
+      if (isSelected) {
+        control.click();
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+export function findDeepSeekStopButton() {
   const buttons = Array.from(document.querySelectorAll('div[role="button"], button'));
   return buttons.find((button) => {
     if (button.closest("#bds-root")) {

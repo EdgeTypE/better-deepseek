@@ -104,6 +104,15 @@ if (!globalThis.SpeechSynthesisUtterance) {
   };
 }
 
+if (typeof window !== "undefined" && !window.speechSynthesis) {
+  window.speechSynthesis = {
+    speaking: false,
+    speak: vi.fn(),
+    cancel: vi.fn(),
+    getVoices: vi.fn(() => []),
+  };
+}
+
 beforeEach(() => {
   resetChromeMock();
   vi.useRealTimers();

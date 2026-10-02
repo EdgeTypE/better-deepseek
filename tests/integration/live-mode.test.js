@@ -1,0 +1,268 @@
+// @vitest-environment jsdom
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import state from "../../src/content/state.js";
+import { resetAppState } from "../helpers/app-state.js";
+import { LIVE_MODE_SYSTEM_PROMPT } from "../../src/lib/constants.js";
+import { cleanTextForSpeech, LiveEngine } from "../../src/content/live/live-engine.js";
+import { buildHiddenPrefix, mutatePayload } from "../../src/injected/payload-mutator.js";
+import { disableDeepThinkIfActive, findDeepSeekStopButton } from "../../src/content/scanner.js";
+
+describe("Live Mode - cleanTextForSpeech", () => {
+  it("strips think blocks", () => {
+    const input = "<think>Let me ponder this deeply...</think>Hello, how can I help you today?";
+    expect(cleanTextForSpeech(input)).toBe("Hello, how can I help you today?");
+  });
+
+  it("strips BDS tags and brackets", () => {
+    const input = "<BDS:create_file fileName=\"test.txt\">hello</BDS:create_file>Sure, here is your file. [BDS:AUTO_FILE_READ_RESULT] data [/BDS:AUTO_FILE_READ_RESULT]";
+    expect(cleanTextForSpeech(input)).toBe("Sure, here is your file. data");
+  });
+
+  it("strips markdown formatting, code fences, headers and URLs", () => {
+    const input = "### Title\nHere is **bold** and `code`.\n```js\nconsole.log(1);\n```\nVisit https://example.com for more.";
+    expect(cleanTextForSpeech(input)).toBe("Title Here is bold and code. Visit for more.");
+  });
+
+  it("handles null and empty input gracefully", () => {
+    expect(cleanTextForSpeech("")).toBe("");
+    expect(cleanTextForSpeech(null)).toBe("");
+  });
+});
+
+function makeMockInjectedState(configOverrides = {}) {
+  return {
+    config: {
+      isLiveMode: false,
+      systemPrompt: "",
+      systemPromptEntries: [],
+      skills: [],
+      memories: [],
+      activeCharacter: null,
+      activeProject: null,
+      projectRagEnabled: false,
+      deepResearch: { enabled: false },
+      ...configOverrides,
+    },
+    sessionUserMsgCounts: {},
+  };
+}
+
+describe("Live Mode - System Prompt & Payload Mutation", () => {
+  beforeEach(() => {
+    resetAppState();
+  });
+
+  it("injects LIVE_MODE_SYSTEM_PROMPT into hidden prefix when isLiveMode is true", () => {
+    const mockState = makeMockInjectedState({
+      isLiveMode: true,
+      systemPrompt: "Default prompt",
+    });
+
+    const prefix = buildHiddenPrefix("hello", "conv-1", mockState, true, [], null);
+    expect(prefix).toContain(LIVE_MODE_SYSTEM_PROMPT);
+  });
+
+  it("does not inject LIVE_MODE_SYSTEM_PROMPT when isLiveMode is false", () => {
+    const mockState = makeMockInjectedState({
+      isLiveMode: false,
+      systemPrompt: "Default prompt",
+    });
+
+    const prefix = buildHiddenPrefix("hello", "conv-1", mockState, true, [], null);
+    expect(prefix).not.toContain("LIVE VOICE MODE");
+  });
+
+  it("forces thinking_enabled = false in payload when isLiveMode is true", () => {
+    const payload = {
+      model: "deepseek-chat",
+      messages: [{ role: "user", content: "hello" }],
+      thinking_enabled: true,
+      chat_session: { thinking_enabled: true },
+      model_pref: { thinking_enabled: true },
+    };
+
+    const mockState = makeMockInjectedState({
+      isLiveMode: true,
+    });
+
+    const { changed, payload: modified } = mutatePayload(payload, mockState);
+    expect(changed).toBe(true);
+    expect(modified.thinking_enabled).toBe(false);
+    expect(modified.chat_session.thinking_enabled).toBe(false);
+    expect(modified.model_pref.thinking_enabled).toBe(false);
+  });
+
+  it("leaves thinking_enabled unchanged when isLiveMode is false", () => {
+    const payload = {
+      model: "deepseek-chat",
+      messages: [{ role: "user", content: "hello" }],
+      thinking_enabled: true,
+    };
+
+    const mockState = makeMockInjectedState({
+      isLiveMode: false,
+    });
+
+    mutatePayload(payload, mockState);
+    expect(payload.thinking_enabled).toBe(true);
+  });
+});
+
+describe("Live Mode - disableDeepThinkIfActive & findDeepSeekStopButton", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("clicks active DeepThink toggle button and returns true", () => {
+    const btn = document.createElement("div");
+    btn.className = "ds-toggle-button ds-toggle-button--selected";
+    btn.innerHTML = `<svg><path d="M7.0643 test"></path></svg><span>DeepThink</span>`;
+    let clicked = false;
+    btn.addEventListener("click", () => { clicked = true; });
+    document.body.appendChild(btn);
+
+    const result = disableDeepThinkIfActive();
+    expect(result).toBe(true);
+    expect(clicked).toBe(true);
+  });
+
+  it("returns false if DeepThink toggle is not active", () => {
+    const btn = document.createElement("div");
+    btn.className = "ds-toggle-button";
+    btn.innerHTML = `<svg><path d="M7.0643 test"></path></svg><span>DeepThink</span>`;
+    document.body.appendChild(btn);
+
+    const result = disableDeepThinkIfActive();
+    expect(result).toBe(false);
+  });
+
+  it("finds stop button correctly", () => {
+    const stopBtn = document.createElement("button");
+    stopBtn.setAttribute("aria-label", "Stop generating");
+    document.body.appendChild(stopBtn);
+
+    const found = findDeepSeekStopButton();
+    expect(found).toBe(stopBtn);
+  });
+});
+
+describe("Live Mode - LiveEngine Lifecycle & State", () => {
+  let engine;
+
+  beforeEach(() => {
+    resetAppState();
+    document.body.innerHTML = "";
+    engine = new LiveEngine();
+  });
+
+  it("initializes with idle status", () => {
+    expect(engine.status).toBe("idle");
+    expect(engine.isMuted).toBe(false);
+  });
+
+  it("toggles mute correctly and reflects in state", () => {
+    const muted1 = engine.toggleMute();
+    expect(muted1).toBe(true);
+    expect(engine.isMuted).toBe(true);
+    expect(engine.status).toBe("muted");
+    expect(state.liveMode.isMuted).toBe(true);
+
+    const muted2 = engine.toggleMute();
+    expect(muted2).toBe(false);
+    expect(engine.isMuted).toBe(false);
+    expect(engine.status).toBe("listening");
+    expect(state.liveMode.isMuted).toBe(false);
+  });
+
+  it("interrupts speaking state, cancels TTS and returns to listening", () => {
+    engine.status = "speaking";
+    engine.interrupt();
+    expect(engine.status).toBe("listening");
+    expect(window.speechSynthesis.cancel).toHaveBeenCalled();
+  });
+
+  it("handles barge-in speech start while thinking by interrupting generation", () => {
+    engine.status = "thinking";
+    const stopBtn = document.createElement("button");
+    stopBtn.setAttribute("aria-label", "Stop generating");
+    let stopClicked = false;
+    stopBtn.addEventListener("click", () => { stopClicked = true; });
+    document.body.appendChild(stopBtn);
+
+    engine.handleUserSpeechStart();
+
+    expect(window.speechSynthesis.cancel).toHaveBeenCalled();
+    expect(stopClicked).toBe(true);
+    expect(engine.status).toBe("listening");
+  });
+
+  it("does not interrupt speaking state purely on VAD energy (prevents speaker feedback)", () => {
+    engine.status = "speaking";
+    engine.handleUserSpeechStart();
+    expect(engine.status).toBe("speaking");
+  });
+
+  it("filters out TTS echo and recognizes genuine voice barge-in", () => {
+    engine.lastChunkStartTime = Date.now() - 1000;
+    engine.recentSpokenChunks = [
+      { text: "merhaba bugün hava çok güzel", timestamp: Date.now() - 500 },
+    ];
+
+    // Substring of recent AI speech is rejected as echo
+    expect(engine.isGenuineBargeIn("hava çok güzel")).toBe(false);
+
+    // New/different words from user are accepted as genuine barge-in
+    expect(engine.isGenuineBargeIn("dur bekle bir şey diyeceğim")).toBe(true);
+    expect(engine.isGenuineBargeIn("stop")).toBe(true);
+  });
+
+  it("stops and cleans up active session", () => {
+    state.liveMode.active = true;
+    engine.status = "speaking";
+    engine.stop();
+
+    expect(state.liveMode.active).toBe(false);
+    expect(engine.status).toBe("idle");
+    expect(window.speechSynthesis.cancel).toHaveBeenCalled();
+  });
+
+  it("findLatestAssistantNode ignores user messages even without 'user' class and matches genuine assistant markdown", () => {
+    const userMsg = document.createElement("div");
+    userMsg.className = "ds-message _63c77b1";
+    userMsg.innerHTML = '<div class="_9663006"><div class="d29f3d7d">hi deep sea can you hear me now</div></div>';
+    document.body.appendChild(userMsg);
+
+    // Only user message exists: should return null
+    expect(engine.findLatestAssistantNode()).toBe(null);
+
+    // Add assistant message
+    const assistantMsg = document.createElement("div");
+    assistantMsg.className = "ds-message _63c77b1";
+    assistantMsg.innerHTML = '<div class="_4f9bf79 _43c05b5"><div class="ds-markdown"><p>Hello! Yes I hear you.</p></div></div>';
+    document.body.appendChild(assistantMsg);
+
+    expect(engine.findLatestAssistantNode()).toBe(assistantMsg);
+  });
+
+  it("findLatestAssistantNode rejects candidate if its text equals lastSubmittedPrompt", () => {
+    engine.lastSubmittedPrompt = "hi deep sea can you hear me now";
+
+    const echoMsg = document.createElement("div");
+    echoMsg.className = "ds-message";
+    echoMsg.innerHTML = '<div class="ds-markdown">hi deep sea can you hear me now</div>';
+    document.body.appendChild(echoMsg);
+
+    // Text identical to user prompt should be rejected
+    expect(engine.findLatestAssistantNode()).toBe(null);
+
+    // When new text arrives, it is accepted
+    const genuineMsg = document.createElement("div");
+    genuineMsg.className = "ds-message";
+    genuineMsg.innerHTML = '<div class="ds-markdown">Hello! How can I help you?</div>';
+    document.body.appendChild(genuineMsg);
+
+    expect(engine.findLatestAssistantNode()).toBe(genuineMsg);
+  });
+});
+

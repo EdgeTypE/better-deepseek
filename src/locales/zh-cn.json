@@ -408,7 +408,21 @@
       "commitsFailed": "获取提交历史失败：{{msg}}",
       "repoFailed": "获取仓库失败：{{msg}}",
       "invalidWebUrl": "请输入有效的 URL（需包含 http/https）。",
-      "webFetchFailed": "抓取页面内容失败：{{msg}}"
+      "webFetchFailed": "抓取页面内容失败：{{msg}}",
+      "liveMode": "实时语音模式"
+    },
+    "liveMode": {
+      "title": "Better DeepSeek 实时语音",
+      "listening": "正在倾听...",
+      "thinking": "思考中...",
+      "speaking": "正在说话...",
+      "ready": "准备就绪",
+      "muted": "已静音",
+      "unmute": "解除静音",
+      "mute": "静音",
+      "stop": "打断",
+      "exit": "结束实时对话",
+      "notSupported": "当前浏览器不支持语音识别。"
     },
     "codeRunner": {
       "pythonRunner": "Python 运行器",

@@ -409,7 +409,21 @@
       "commitsFailed": "Commit geçmişi getirilemedi: {{msg}}",
       "repoFailed": "Repo getirilemedi: {{msg}}",
       "invalidWebUrl": "Lütfen geçerli bir URL girin (http/https dahil).",
-      "webFetchFailed": "Sayfa içeriği getirilemedi: {{msg}}"
+      "webFetchFailed": "Sayfa içeriği getirilemedi: {{msg}}",
+      "liveMode": "Canlı Ses Modu"
+    },
+    "liveMode": {
+      "title": "Better DeepSeek Live",
+      "listening": "Dinleniyor...",
+      "thinking": "Düşünülüyor...",
+      "speaking": "Konuşuyor...",
+      "ready": "Sohbete hazır",
+      "muted": "Mikrofon Sessizde",
+      "unmute": "Sesi Aç",
+      "mute": "Sessize Al",
+      "stop": "Durdur",
+      "exit": "Canlı Modu Kapat",
+      "notSupported": "Tarayıcı ses tanıma özelliğini desteklemiyor."
     },
     "codeRunner": {
       "pythonRunner": "Python Çalıştırıcı",
