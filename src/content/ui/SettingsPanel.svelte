@@ -41,6 +41,7 @@
   );
   let autoSubmitVoice = $state(Boolean(appState.settings.autoSubmitVoice));
   let vadSilenceTimeout = $state(Number(appState.settings.vadSilenceTimeout) || 1100);
+  let liveModeShowText = $state(Boolean(appState.settings.liveModeShowText));
   let preferredLang = $state(appState.settings.preferredLang || "");
   let githubToken = $state(appState.settings.githubToken || "");
   let showGithubToken = $state(shouldShowGithubTokenByDefault(appState.settings.githubToken));
@@ -210,7 +211,7 @@
   function captureFormSnapshot() {
     return JSON.stringify({
       autoFiles, autoZip, voiceMode, voiceLanguage, autoSubmitVoice,
-      vadSilenceTimeout,
+      vadSilenceTimeout, liveModeShowText,
       preferredLang, githubToken, disableSystemPrompt,
       systemPromptMultiMode, systemPromptEntries,
       systemPromptInjectionFrequency, systemPromptInjectionInterval,
@@ -589,6 +590,7 @@
     { key: 'subVoice', labelKey: 'settings.subVoice', settingKeys: [
       'settings.voiceMode', 'settings.autoSubmitVoice',
       'settings.speechLanguage', 'settings.vadSilenceTimeout',
+      'settings.liveModeShowText',
     ]},
     { key: 'subIntegrations', labelKey: 'settings.subIntegrations', settingKeys: [
       'settings.markdownMaxDepth', 'settings.githubToken',
@@ -737,6 +739,7 @@
       (typeof navigator !== "undefined" ? navigator.language : "en-US");
     autoSubmitVoice = Boolean(appState.settings.autoSubmitVoice);
     vadSilenceTimeout = Number(appState.settings.vadSilenceTimeout) || 1100;
+    liveModeShowText = Boolean(appState.settings.liveModeShowText);
     preferredLang = appState.settings.preferredLang || "";
     githubToken = appState.settings.githubToken || "";
     showGithubToken = shouldShowGithubTokenByDefault(githubToken);
@@ -966,6 +969,7 @@
     appState.settings.voiceLanguage = voiceLanguage;
     appState.settings.autoSubmitVoice = autoSubmitVoice;
     appState.settings.vadSilenceTimeout = Math.max(500, Math.min(3000, Math.round(vadSilenceTimeout)));
+    appState.settings.liveModeShowText = liveModeShowText;
     appState.settings.preferredLang = preferredLang.trim();
     appState.settings.githubToken = githubToken.trim();
     appState.settings.disableSystemPrompt = disableSystemPrompt;
@@ -1966,6 +1970,17 @@
             <span class="bds-slider-value">{(vadSilenceTimeout / 1000).toFixed(1)}s</span>
           </div>
         </div>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.liveModeShowText')}</span>
+          <label class="bds-switch">
+            <input id="bds-live-mode-show-text" type="checkbox" bind:checked={liveModeShowText} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+        <p style="font-size: 10px; opacity: 0.5; margin: -4px 0 8px; padding-left: 0;">
+          {t('settings.liveModeShowTextHint')}
+        </p>
       </div>
     </div>
     {/if}

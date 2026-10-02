@@ -887,6 +887,9 @@ export const DEFAULT_SETTINGS = {
   voiceLanguage: (typeof navigator !== 'undefined' ? navigator.language : 'en-US'),
   autoSubmitVoice: true,
   vadSilenceTimeout: 1100,
+  // Live Voice Mode: overlay shows the assistant's reply as text. Off by default —
+  // voice-only. The user's own speech is never rendered, either way.
+  liveModeShowText: false,
   preferredLang: "",
   disableSystemPrompt: false,
   disableMemory: false,

@@ -4,20 +4,28 @@
    *
    * Visual model:
    *   · an aurora "orb" that breathes with the real microphone energy (canvas)
-   *   · a live caption rail that shows what the user said and what the AI is saying
+   *   · an optional transcript rail showing the assistant's reply (see `showText`)
    *   · a glass control dock (mute / end / interrupt) anchored at the bottom
    *
    * Everything is driven off the public surface of `liveEngine`:
-   *   status · isMuted · analyser · currentTranscript · activeAssistantNode
+   *   status · isMuted · analyser · activeAssistantNode
    * No engine behaviour is modified here — this component is presentation only.
    */
   import { onMount, onDestroy } from "svelte";
+  import appState from "../state.js";
   import { liveEngine } from "../live/live-engine.js";
   import { extractMessageRawText } from "../dom/message-text.js";
   import { t } from "../../lib/i18n.svelte.js";
 
   /** @type {{ onclose: () => void }} */
   let { onclose } = $props();
+
+  /**
+   * Whether the assistant's reply is rendered as text beside the orb.
+   * Read once at mount: Live Mode is a full-screen surface, so the settings
+   * panel cannot be opened (and the flag changed) while it is up.
+   */
+  const showText = Boolean(appState?.settings?.liveModeShowText);
 
   const PHASE_LABELS = {
     listening: "liveMode.listening",
@@ -31,7 +39,6 @@
   let isMuted = $state(false);
   let supported = $state(true);
   let starting = $state(true);
-  let userText = $state(""); // live interim transcription
   let aiText = $state(""); // live assistant transcript
 
   let canvasRef = $state(null);
@@ -64,7 +71,6 @@
     return { a: "#5b7bff", b: "#22d3ee", rgb: [91, 123, 255] };
   });
 
-  const visibleUserText = $derived(userText.trim());
   const visibleAiText = $derived(aiText.trim());
 
   /** Wrapping the orb in a hover-safe flex row keeps the palette in one place. */
@@ -113,17 +119,14 @@
   });
 
   /**
-   * Poll the engine's live fields. The engine mutates `currentTranscript` and
-   * streams straight from the DOM node, so there is no event to subscribe to;
-   * a 120 ms read is cheap and keeps the captions in sync without touching
-   * engine internals.
+   * Poll the assistant's streamed reply. The engine streams straight from the
+   * DOM node and emits no event, so a 120 ms read is cheap and keeps the
+   * transcript in sync without touching engine internals. The user's own
+   * interim STT text is deliberately never rendered.
    */
   function startTextPoller() {
     const tick = () => {
       if (!supported) return;
-      const nextUser = (liveEngine.currentTranscript || "").trim();
-      if (nextUser !== userText) userText = nextUser;
-
       const node = liveEngine.activeAssistantNode;
       if (node && node.isConnected) {
         const raw = extractMessageRawText(node) || "";
@@ -510,27 +513,22 @@
         {/each}
       </div>
 
-      <div class="bds-live__captions" class:bds-live__captions--muted={isMuted}>
-        {#if isMuted}
-          <p class="bds-live__caption bds-live__caption--idle">{t("liveMode.muted")}</p>
-        {:else if visibleUserText}
-          <div class="bds-live__bubble bds-live__bubble--user">
-            <span class="bds-live__bubble-tag">{t("liveMode.you")}</span>
-            <p>{shorten(visibleUserText, 320)}</p>
-          </div>
-        {/if}
-
-        {#if showCaps && visibleAiText}
-          <div class="bds-live__bubble bds-live__bubble--ai">
-            <span class="bds-live__bubble-tag">{t("liveMode.assistant")}</span>
-            <p>{shorten(visibleAiText, 460)}</p>
-          </div>
-        {:else if !isMuted && !visibleUserText}
-          <p class="bds-live__caption bds-live__caption--idle">
-            {starting ? t("liveMode.connecting") : t("liveMode.tagline")}
-          </p>
-        {/if}
-      </div>
+      {#if showText}
+        <div class="bds-live__captions" class:bds-live__captions--muted={isMuted}>
+          {#if isMuted}
+            <p class="bds-live__caption bds-live__caption--idle">{t("liveMode.muted")}</p>
+          {:else if showCaps && visibleAiText}
+            <div class="bds-live__bubble bds-live__bubble--ai">
+              <span class="bds-live__bubble-tag">{t("liveMode.assistant")}</span>
+              <p>{shorten(visibleAiText, 460)}</p>
+            </div>
+          {:else}
+            <p class="bds-live__caption bds-live__caption--idle">
+              {starting ? t("liveMode.connecting") : t("liveMode.tagline")}
+            </p>
+          {/if}
+        </div>
+      {/if}
     {/if}
   </main>
 
@@ -855,10 +853,6 @@
   @keyframes bds-live-rise {
     from { opacity: 0; transform: translateY(7px); }
     to { opacity: 1; transform: translateY(0); }
-  }
-
-  .bds-live__bubble--user {
-    border-left: 2px solid var(--bds-accent);
   }
 
   .bds-live__bubble--ai {
