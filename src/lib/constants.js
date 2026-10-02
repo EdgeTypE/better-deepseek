@@ -885,6 +885,7 @@ export const DEFAULT_SETTINGS = {
   githubToken: "",
   voiceMode: false,
   voiceLanguage: (typeof navigator !== 'undefined' ? navigator.language : 'en-US'),
+  voiceURI: "",
   autoSubmitVoice: true,
   vadSilenceTimeout: 1100,
   // Live Voice Mode: overlay shows the assistant's reply as text. Off by default —

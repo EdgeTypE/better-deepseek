@@ -437,6 +437,132 @@ textarea.bds-input,
   border-bottom: none;
 }
 
+/* ── Voice picker (table-like list) ── */
+.bds-voice-current {
+  font-size: 12px;
+  color: var(--bds-text-secondary);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 55%;
+}
+
+.bds-voice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 12px;
+}
+
+.bds-voice-row {
+  display: grid;
+  grid-template-columns: 16px 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--bds-border);
+  border-radius: 8px;
+  background: var(--bds-bg-input);
+  color: var(--bds-text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: border-color var(--bds-transition), background var(--bds-transition);
+}
+
+.bds-voice-row:hover {
+  border-color: var(--bds-border-hover);
+}
+
+.bds-voice-row.selected {
+  border-color: var(--bds-accent);
+  background: var(--bds-accent-glow);
+}
+
+.bds-voice-row--auto {
+  font-weight: 600;
+}
+
+.bds-voice-radio {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--bds-border-hover);
+  box-sizing: border-box;
+  position: relative;
+}
+
+.bds-voice-row.selected .bds-voice-radio {
+  border-color: var(--bds-accent);
+}
+
+.bds-voice-row.selected .bds-voice-radio::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: var(--bds-accent);
+}
+
+.bds-voice-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bds-voice-lang {
+  color: var(--bds-text-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.bds-voice-play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--bds-border);
+  background: var(--bds-bg-panel);
+  color: var(--bds-text-primary);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  flex: 0 0 auto;
+  transition: border-color var(--bds-transition), background var(--bds-transition), color var(--bds-transition);
+}
+
+.bds-voice-play:hover {
+  border-color: var(--bds-accent);
+  color: var(--bds-accent);
+}
+
+.bds-voice-play.playing {
+  border-color: var(--bds-accent);
+  background: var(--bds-accent);
+  color: #fff;
+}
+
+.bds-voice-scroll {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 2px;
+}
+
+.bds-voice-note {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--bds-text-tertiary);
+}
+
 /* ── Advanced Settings Accordion ── */
 .bds-advanced-toggle {
   display: flex;

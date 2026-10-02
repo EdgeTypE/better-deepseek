@@ -40,6 +40,129 @@
       (typeof navigator !== "undefined" ? navigator.language : "en-US"),
   );
   let autoSubmitVoice = $state(Boolean(appState.settings.autoSubmitVoice));
+  let voiceURI = $state(appState.settings.voiceURI || "");
+  /** Installed speech-synthesis voices. Populated async — see loadVoices(). */
+  let availableVoices = $state([]);
+
+  /**
+   * `getVoices()` is commonly empty on the first call and only fills in after the
+   * browser fires `voiceschanged`, so read it now and re-read on that event.
+   */
+  function loadVoices() {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    let list = [];
+    try {
+      list = window.speechSynthesis.getVoices() || [];
+    } catch {
+      list = [];
+    }
+    availableVoices = list;
+  }
+
+  $effect(() => {
+    loadVoices();
+    const synth = typeof window !== "undefined" ? window.speechSynthesis : null;
+    if (!synth?.addEventListener) return;
+    synth.addEventListener("voiceschanged", loadVoices);
+    return () => synth.removeEventListener("voiceschanged", loadVoices);
+  });
+
+  /** When the speech language changes, drop any specific voice pick — the saved
+   *  voice was for the previous language and would otherwise linger at the top
+   *  of the list. Skips the initial mount so a saved voice survives reload. */
+  let lastVoiceLang = voiceLanguage;
+  $effect(() => {
+    if (voiceLanguage !== lastVoiceLang) {
+      lastVoiceLang = voiceLanguage;
+      if (playingURI) {
+        if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
+        playingURI = "";
+      }
+      voiceURI = "";
+    }
+  });
+
+  /** Voices for the chosen speech language, sorted by language then name. */
+  const voiceList = $derived.by(() => {
+    const all = availableVoices;
+    const prefix = (voiceLanguage || "").split("-")[0].toLowerCase();
+    const matches = all.filter(
+      (v) => (v.lang || "").toLowerCase().replace("_", "-").split("-")[0] === prefix,
+    );
+    // No voice matches the language? Fall back to the full list so the user still sees options.
+    const base = matches.length > 0 ? matches : all;
+    // Keep an already-saved voice listed even after the language changed, so the
+    // picker never silently drops the current pick.
+    if (voiceURI && !base.some((v) => v.voiceURI === voiceURI)) {
+      const saved = all.find((v) => v.voiceURI === voiceURI);
+      if (saved) return [saved, ...base];
+    }
+    return [...base].sort(
+      (a, b) =>
+        (a.lang || "").localeCompare(b.lang || "") ||
+        (a.name || "").localeCompare(b.name || ""),
+    );
+  });
+
+  /** Label of the currently selected voice (Auto when none is picked). */
+  const currentVoiceLabel = $derived.by(() => {
+    if (!voiceURI) return t("settings.voiceAuto");
+    const cur = availableVoices.find((v) => v.voiceURI === voiceURI);
+    return cur ? cur.name : t("settings.voiceAuto");
+  });
+
+  /** voiceURI currently previewing, so the UI can show a stop state. */
+  let playingURI = $state("");
+
+  /** Pick a voice ("" = Auto / best available for the language). */
+  function selectVoice(uri) {
+    if (playingURI) {
+      if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
+      playingURI = "";
+    }
+    voiceURI = uri || "";
+  }
+
+  /** Short, language-appropriate sample so previews sound natural. */
+  const VOICE_SAMPLES = {
+    en: "Hello, this is a sample of this voice.",
+    tr: "Merhaba, bu sesin bir örneğidir.",
+    de: "Hallo, das ist ein Beispiel dieser Stimme.",
+    fr: "Bonjour, voici un exemple de cette voix.",
+    es: "Hola, este es un ejemplo de esta voz.",
+    it: "Ciao, questo è un esempio di questa voce.",
+    ru: "Здравствуйте, это пример этого голоса.",
+    zh: "你好，这是这个声音的一个示例。",
+    ja: "こんにちは、これはこの音声のサンプルです。",
+    pt: "Olá, este é um exemplo desta voz.",
+    ar: "مرحبًا، هذا مثال على هذا الصوت.",
+    fa: "سلام، این یک نمونه از این صدا است.",
+    nl: "Hallo, dit is een voorbeeld van deze stem.",
+    pl: "Cześć, to przykład tego głosu.",
+    ko: "안녕하세요, 이것은 이 목소리의 샘플입니다.",
+  };
+
+  /** Speak a short sample of `v`; click the same voice's button again to stop. */
+  function playExample(v) {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const synth = window.speechSynthesis;
+    if (playingURI === v.voiceURI) {
+      synth.cancel();
+      playingURI = "";
+      return;
+    }
+    synth.cancel();
+    const prefix = (v.lang || "en").toLowerCase().split("-")[0];
+    const text = VOICE_SAMPLES[prefix] || VOICE_SAMPLES.en;
+    const u = new SpeechSynthesisUtterance(text);
+    u.voice = v;
+    if (v.lang) u.lang = v.lang;
+    u.onend = u.onerror = () => {
+      if (playingURI === v.voiceURI) playingURI = "";
+    };
+    synth.speak(u);
+    playingURI = v.voiceURI;
+  }
   let vadSilenceTimeout = $state(Number(appState.settings.vadSilenceTimeout) || 1100);
   let liveModeShowText = $state(Boolean(appState.settings.liveModeShowText));
   let preferredLang = $state(appState.settings.preferredLang || "");
@@ -211,7 +334,7 @@
   function captureFormSnapshot() {
     return JSON.stringify({
       autoFiles, autoZip, voiceMode, voiceLanguage, autoSubmitVoice,
-      vadSilenceTimeout, liveModeShowText,
+      vadSilenceTimeout, liveModeShowText, voiceURI,
       preferredLang, githubToken, disableSystemPrompt,
       systemPromptMultiMode, systemPromptEntries,
       systemPromptInjectionFrequency, systemPromptInjectionInterval,
@@ -589,8 +712,8 @@
     ]},
     { key: 'subVoice', labelKey: 'settings.subVoice', settingKeys: [
       'settings.voiceMode', 'settings.autoSubmitVoice',
-      'settings.speechLanguage', 'settings.vadSilenceTimeout',
-      'settings.liveModeShowText',
+      'settings.speechLanguage', 'settings.voiceURI',
+      'settings.vadSilenceTimeout', 'settings.liveModeShowText',
     ]},
     { key: 'subIntegrations', labelKey: 'settings.subIntegrations', settingKeys: [
       'settings.markdownMaxDepth', 'settings.githubToken',
@@ -740,6 +863,7 @@
     autoSubmitVoice = Boolean(appState.settings.autoSubmitVoice);
     vadSilenceTimeout = Number(appState.settings.vadSilenceTimeout) || 1100;
     liveModeShowText = Boolean(appState.settings.liveModeShowText);
+    voiceURI = appState.settings.voiceURI || "";
     preferredLang = appState.settings.preferredLang || "";
     githubToken = appState.settings.githubToken || "";
     showGithubToken = shouldShowGithubTokenByDefault(githubToken);
@@ -970,6 +1094,7 @@
     appState.settings.autoSubmitVoice = autoSubmitVoice;
     appState.settings.vadSilenceTimeout = Math.max(500, Math.min(3000, Math.round(vadSilenceTimeout)));
     appState.settings.liveModeShowText = liveModeShowText;
+    appState.settings.voiceURI = voiceURI || "";
     appState.settings.preferredLang = preferredLang.trim();
     appState.settings.githubToken = githubToken.trim();
     appState.settings.disableSystemPrompt = disableSystemPrompt;
@@ -1962,6 +2087,58 @@
             <option value="ja-JP">日本語 (JP)</option>
           </select>
         </div>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.voiceURI')}</span>
+          <span class="bds-voice-current">{currentVoiceLabel}</span>
+        </div>
+
+        <div class="bds-voice-list">
+          <button
+            type="button"
+            class="bds-voice-row bds-voice-row--auto"
+            class:selected={voiceURI === ""}
+            onclick={() => selectVoice("")}
+          >
+            <span class="bds-voice-radio" aria-hidden="true"></span>
+            <span class="bds-voice-name">{t('settings.voiceAuto')}</span>
+            <span class="bds-voice-lang"></span>
+          </button>
+
+          {#if voiceList.length > 0}
+            <div class="bds-voice-scroll">
+              {#each voiceList as v (v.voiceURI)}
+                <div
+                  class="bds-voice-row"
+                  class:selected={voiceURI === v.voiceURI}
+                  role="button"
+                  tabindex="0"
+                  onclick={() => selectVoice(v.voiceURI)}
+                  onkeydown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectVoice(v.voiceURI); }
+                  }}
+                >
+                  <span class="bds-voice-radio" aria-hidden="true"></span>
+                  <span class="bds-voice-name">{v.name}</span>
+                  <span class="bds-voice-lang">{v.lang || ""}</span>
+                  <button
+                    type="button"
+                    class="bds-voice-play"
+                    class:playing={playingURI === v.voiceURI}
+                    title={playingURI === v.voiceURI ? t('settings.voiceStop') : t('settings.voicePlay')}
+                    aria-label={playingURI === v.voiceURI ? t('settings.voiceStop') : t('settings.voicePlay')}
+                    onclick={(e) => { e.stopPropagation(); playExample(v); }}
+                  >
+                    {#if playingURI === v.voiceURI}■{:else}▶{/if}
+                  </button>
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <p class="bds-voice-note">{t('settings.voiceListEmpty')}</p>
+          {/if}
+        </div>
+        <p class="bds-voice-note">{t('settings.voiceListHint')}</p>
 
         <div class="bds-toggle-row">
           <span class="bds-toggle-label">{t('settings.vadSilenceTimeout')}</span>

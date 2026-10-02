@@ -1416,7 +1416,7 @@ function playVoiceResponse(text) {
   utterance.pitch = 1.0;
   
   // Find best high-quality voice for the language
-  const voice = getBestVoice(utterance.lang);
+  const voice = getBestVoice(utterance.lang, state.settings.voiceURI || "");
   if (voice) utterance.voice = voice;
 
   window.speechSynthesis.speak(utterance);

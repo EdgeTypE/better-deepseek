@@ -56,6 +56,42 @@ describe("Live Mode - getBestVoice", () => {
     const voiceEdge = getBestVoice("tr-TR");
     expect(voiceEdge).toBe(mockEdgeVoices[1]); // Natural voice wins
   });
+
+  it("honours an explicit voiceURI pick over a higher-scoring voice", () => {
+    const mockVoices = [
+      { name: "Microsoft Tolga Desktop - Turkish", lang: "tr-TR", localService: true, voiceURI: "urn:tolga" },
+      { name: "Microsoft Ahmet Online (Natural) - Turkish (Turkey)", lang: "tr-TR", localService: false, voiceURI: "urn:ahmet" },
+      { name: "Microsoft Emel Online (Natural) - Turkish (Turkey)", lang: "tr-TR", localService: false, voiceURI: "urn:emel" },
+    ];
+    window.speechSynthesis.getVoices = vi.fn(() => mockVoices);
+
+    // Auto would land on Ahmet (first of the equally-scored Natural voices), so
+    // both picks below prove the override beats the score, not just ties with it.
+    expect(getBestVoice("tr-TR", "urn:emel")).toBe(mockVoices[2]);
+    expect(getBestVoice("tr-TR", "urn:tolga")).toBe(mockVoices[0]);
+  });
+
+  it("falls back to the heuristic when the saved voiceURI is gone", () => {
+    const mockVoices = [
+      { name: "Microsoft Tolga Desktop - Turkish", lang: "tr-TR", localService: true, voiceURI: "urn:tolga" },
+      { name: "Google Türkçe", lang: "tr-TR", localService: false, voiceURI: "urn:google" },
+    ];
+    window.speechSynthesis.getVoices = vi.fn(() => mockVoices);
+
+    // Voice removed by an OS/browser update — must not leave TTS silent.
+    expect(getBestVoice("tr-TR", "urn:removed")).toBe(mockVoices[1]);
+  });
+
+  it("treats an empty or omitted preference as Auto", () => {
+    const mockVoices = [
+      { name: "Microsoft Tolga Desktop - Turkish", lang: "tr-TR", localService: true, voiceURI: "urn:tolga" },
+      { name: "Google Türkçe", lang: "tr-TR", localService: false, voiceURI: "urn:google" },
+    ];
+    window.speechSynthesis.getVoices = vi.fn(() => mockVoices);
+
+    expect(getBestVoice("tr-TR")).toBe(mockVoices[1]);
+    expect(getBestVoice("tr-TR", "")).toBe(mockVoices[1]);
+  });
 });
 
 function makeMockInjectedState(configOverrides = {}) {

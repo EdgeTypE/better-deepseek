@@ -39,8 +39,13 @@ export function cleanTextForSpeech(text) {
  * Intelligently select the highest quality natural/neural voice available in the browser.
  * Prioritizes Microsoft Natural / Azure Neural, Google Neural, Apple Premium/Enhanced voices,
  * and heavily penalizes legacy robotic desktop/SAPI voices (e.g. "Microsoft Tolga Desktop").
+ *
+ *
+ * @param {string} targetLang BCP-47 tag, e.g. "tr-TR"
+ * @param {string} [preferredURI] voiceURI chosen in settings; "" means Auto
+ * @returns {SpeechSynthesisVoice | null}
  */
-export function getBestVoice(targetLang = "tr-TR") {
+export function getBestVoice(targetLang = "tr-TR", preferredURI = "") {
   if (typeof window === "undefined" || !window.speechSynthesis) return null;
   let voices = [];
   try {
@@ -49,6 +54,13 @@ export function getBestVoice(targetLang = "tr-TR") {
     return null;
   }
   if (!voices || voices.length === 0) return null;
+
+  // An explicit pick short-circuits the scoring — the user chose that voice.
+  if (preferredURI) {
+    const explicit = voices.find((v) => v.voiceURI === preferredURI);
+    if (explicit) return explicit;
+    // Falls through when the voice is gone (browser updated, OS voice removed).
+  }
 
   const targetPrefix = targetLang.split("-")[0].toLowerCase();
   const targetFull = targetLang.toLowerCase().replace("_", "-");

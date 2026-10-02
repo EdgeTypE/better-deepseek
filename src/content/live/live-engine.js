@@ -66,6 +66,7 @@ export class LiveEngine {
     this.ttsKeepAliveTimer = null;
     this.cachedBestVoice = null;
     this.cachedVoiceLang = null;
+    this.cachedVoiceURI = null;
   }
 
   get analyser() {
@@ -723,9 +724,15 @@ export class LiveEngine {
   }
 
   getVoice() {
-    if (!this.cachedBestVoice || this.cachedVoiceLang !== this.speechLang) {
-      this.cachedBestVoice = getBestVoice(this.speechLang);
+    const preferredURI = state.settings.voiceURI || "";
+    if (
+      !this.cachedBestVoice ||
+      this.cachedVoiceLang !== this.speechLang ||
+      this.cachedVoiceURI !== preferredURI
+    ) {
+      this.cachedBestVoice = getBestVoice(this.speechLang, preferredURI);
       this.cachedVoiceLang = this.speechLang;
+      this.cachedVoiceURI = preferredURI;
       if (this.cachedBestVoice) {
         devLog("Live", `Selected high-quality TTS voice: "${this.cachedBestVoice.name}" (${this.cachedBestVoice.lang})`);
       }
