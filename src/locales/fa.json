@@ -413,6 +413,7 @@
     },
     "liveMode": {
       "title": "Better DeepSeek Live",
+      "tagline": "طبیعی صحبت کنید — برای ارسال مکث کنید، برای قطع دوباره حرف بزنید.",
       "listening": "در حال گوش دادن...",
       "thinking": "در حال فکر کردن...",
       "speaking": "در حال صحبت...",
@@ -422,7 +423,14 @@
       "mute": "بی‌صدا کردن",
       "stop": "توقف",
       "exit": "پایان حالت زنده",
-      "notSupported": "مرورگر از تشخیص گفتار پشتیبانی نمی‌کند."
+      "hint": "برای پایان Esc · برای بی‌صدا کردن یا قطع Space",
+      "you": "شما",
+      "assistant": "دستیار",
+      "starting": "در حال راه‌اندازی میکروفون...",
+      "connecting": "در حال راه‌اندازی میکروفون...",
+      "notSupported": "مرورگر از تشخیص گفتار پشتیبانی نمی‌کند.",
+      "notSupportedDetail": "حالت صوتی زنده به Web Speech API نیاز دارد. Chrome یا Edge را امتحان کنید یا Better DeepSeek را در اپ اندروید باز کنید.",
+      "unsupportedBrowser": "مرورگر پشتیبانی نمی‌شود"
     },
     "codeRunner": {
       "pythonRunner": "اجراگر پایتون",

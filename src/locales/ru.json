@@ -414,6 +414,7 @@
     },
     "liveMode": {
       "title": "Better DeepSeek Live",
+      "tagline": "Говорите естественно — пауза для отправки, снова говорите для прерывания.",
       "listening": "Слушаю...",
       "thinking": "Думаю...",
       "speaking": "Говорю...",
@@ -423,7 +424,14 @@
       "mute": "Выключить микрофон",
       "stop": "Прервать",
       "exit": "Завершить сеанс",
-      "notSupported": "Распознавание речи не поддерживается в этом браузере."
+      "hint": "Esc — завершить · Space — микрофон или прерывание",
+      "you": "Вы",
+      "assistant": "Ассистент",
+      "starting": "Запуск микрофона...",
+      "connecting": "Запуск микрофона...",
+      "notSupported": "Распознавание речи не поддерживается в этом браузере.",
+      "notSupportedDetail": "Голосовому Live-режиму нужен Web Speech API. Попробуйте Chrome или Edge либо откройте Better DeepSeek в приложении для Android.",
+      "unsupportedBrowser": "Браузер не поддерживается"
     },
     "codeRunner": {
       "pythonRunner": "Запуск Python",

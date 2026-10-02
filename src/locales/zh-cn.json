@@ -413,6 +413,7 @@
     },
     "liveMode": {
       "title": "Better DeepSeek 实时语音",
+      "tagline": "自然地说话 —— 停顿即发送，再次开口即打断。",
       "listening": "正在倾听...",
       "thinking": "思考中...",
       "speaking": "正在说话...",
@@ -422,7 +423,14 @@
       "mute": "静音",
       "stop": "打断",
       "exit": "结束实时对话",
-      "notSupported": "当前浏览器不支持语音识别。"
+      "hint": "按 Esc 结束 · 按空格静音或打断",
+      "you": "你",
+      "assistant": "助手",
+      "starting": "正在启动麦克风...",
+      "connecting": "正在启动麦克风...",
+      "notSupported": "当前浏览器不支持语音识别。",
+      "notSupportedDetail": "实时语音模式需要 Web Speech API。请使用 Chrome 或 Edge，或在 Android 应用中打开 Better DeepSeek。",
+      "unsupportedBrowser": "不支持的浏览器"
     },
     "codeRunner": {
       "pythonRunner": "Python 运行器",

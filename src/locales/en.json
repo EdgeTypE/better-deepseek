@@ -417,6 +417,7 @@
     },
     "liveMode": {
       "title": "Better DeepSeek Live",
+      "tagline": "Talk naturally — pause to send, speak again to interrupt.",
       "listening": "Listening...",
       "thinking": "Thinking...",
       "speaking": "Speaking...",
@@ -426,7 +427,14 @@
       "mute": "Mute Microphone",
       "stop": "Interrupt",
       "exit": "End Live Session",
-      "notSupported": "Speech recognition is not supported in this browser."
+      "hint": "Esc to end · Space to mute or interrupt",
+      "you": "You",
+      "assistant": "Assistant",
+      "starting": "Starting microphone...",
+      "connecting": "Starting microphone...",
+      "notSupported": "Speech recognition is not supported in this browser.",
+      "notSupportedDetail": "Live Voice Mode needs the Web Speech API. Try Chrome or Edge, or open Better DeepSeek in the Android app.",
+      "unsupportedBrowser": "Unsupported browser"
     },
     "codeRunner": {
       "pythonRunner": "Python Runner",

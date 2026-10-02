@@ -414,6 +414,7 @@
     },
     "liveMode": {
       "title": "Better DeepSeek Live",
+      "tagline": "Doğal konuşun — göndermek için duraklayın, kesmek için tekrar konuşun.",
       "listening": "Dinleniyor...",
       "thinking": "Düşünülüyor...",
       "speaking": "Konuşuyor...",
@@ -423,7 +424,14 @@
       "mute": "Sessize Al",
       "stop": "Durdur",
       "exit": "Canlı Modu Kapat",
-      "notSupported": "Tarayıcı ses tanıma özelliğini desteklemiyor."
+      "hint": "Kapatmak için Esc · Sessize almak ya da kesmek için Space",
+      "you": "Siz",
+      "assistant": "Asistan",
+      "starting": "Mikrofon başlatılıyor...",
+      "connecting": "Mikrofon başlatılıyor...",
+      "notSupported": "Tarayıcı ses tanıma özelliğini desteklemiyor.",
+      "notSupportedDetail": "Canlı Ses Modu Web Speech API gerektirir. Chrome veya Edge deneyin ya da Android uygulamasında açın.",
+      "unsupportedBrowser": "Desteklenmeyen tarayıcı"
     },
     "codeRunner": {
       "pythonRunner": "Python Çalıştırıcı",
