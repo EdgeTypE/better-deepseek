@@ -22,9 +22,9 @@ android {
         applicationId = "com.betterdeepseek.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 10
+        versionCode = 11
         // Keep in sync with package.json "version" and static/manifest.json "version".
-        versionName = "0.1.14"
+        versionName = "0.1.15"
         buildConfigField("long", "BUILD_ID", "${bdsBuildId}L")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
