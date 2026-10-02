@@ -35,6 +35,7 @@ import {
 } from "./dom/host.js";
 import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun, handleAutoMcpCall, handleAutoFileRead, handleAutoSearchInDirectory, handleAutoListDir, findChatEditor } from "./auto.js";
 import { handleManagedAutoContinuation, isManagedRunActive, trySynthesizeReport } from "./deep-research.js";
+import { cleanTextForSpeech, getBestVoice } from "./live/tts-utils.js";
 
 import {
   safeAppendChild,
@@ -1406,20 +1407,17 @@ function applyRtlToNative(node, isRtl) {
 function playVoiceResponse(text) {
   if (typeof window === 'undefined' || !window.speechSynthesis) return;
 
-  // Clean the text: remove BDS tags
-  const cleanText = text.replace(/<(BDS|BetterDeepSeek):[\s\S]*?<\/(BDS|BetterDeepSeek):[\s\S]*?>/gi, '')
-                        .replace(/<[^>]*>?/gm, '') // Remove any other HTML-like tags
-                        .trim();
-
+  const cleanText = cleanTextForSpeech(text);
   if (!cleanText) return;
 
   const utterance = new SpeechSynthesisUtterance(cleanText);
   utterance.lang = state.settings.voiceLanguage || navigator.language || 'en-US';
+  utterance.rate = 1.05;
+  utterance.pitch = 1.0;
   
-  // Try to find a good voice for the language
-  const voices = window.speechSynthesis.getVoices();
-  const langMatch = voices.find(v => v.lang.startsWith(utterance.lang.split('-')[0]));
-  if (langMatch) utterance.voice = langMatch;
+  // Find best high-quality voice for the language
+  const voice = getBestVoice(utterance.lang);
+  if (voice) utterance.voice = voice;
 
   window.speechSynthesis.speak(utterance);
 }

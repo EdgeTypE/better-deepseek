@@ -40,7 +40,7 @@
       (typeof navigator !== "undefined" ? navigator.language : "en-US"),
   );
   let autoSubmitVoice = $state(Boolean(appState.settings.autoSubmitVoice));
-  let vadSilenceTimeout = $state(Number(appState.settings.vadSilenceTimeout) || 1500);
+  let vadSilenceTimeout = $state(Number(appState.settings.vadSilenceTimeout) || 1100);
   let preferredLang = $state(appState.settings.preferredLang || "");
   let githubToken = $state(appState.settings.githubToken || "");
   let showGithubToken = $state(shouldShowGithubTokenByDefault(appState.settings.githubToken));
@@ -736,7 +736,7 @@
       appState.settings.voiceLanguage ||
       (typeof navigator !== "undefined" ? navigator.language : "en-US");
     autoSubmitVoice = Boolean(appState.settings.autoSubmitVoice);
-    vadSilenceTimeout = Number(appState.settings.vadSilenceTimeout) || 1500;
+    vadSilenceTimeout = Number(appState.settings.vadSilenceTimeout) || 1100;
     preferredLang = appState.settings.preferredLang || "";
     githubToken = appState.settings.githubToken || "";
     showGithubToken = shouldShowGithubTokenByDefault(githubToken);

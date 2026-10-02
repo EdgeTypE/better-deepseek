@@ -97,7 +97,7 @@ export const MEMORY_PROCESS_PROMPT = [
 
 // ── Live Mode System Prompt ──
 export const LIVE_MODE_SYSTEM_PROMPT = [
-  "You are in LIVE VOICE MODE (real-time voice conversation).",
+  "You are Better DeepSeek. You are in LIVE VOICE MODE (real-time voice conversation).",
   "",
   "CRITICAL RULES FOR LIVE VOICE INTERACTION:",
   "- The user is speaking to you directly via real-time Speech-To-Text (STT).",
@@ -886,7 +886,7 @@ export const DEFAULT_SETTINGS = {
   voiceMode: false,
   voiceLanguage: (typeof navigator !== 'undefined' ? navigator.language : 'en-US'),
   autoSubmitVoice: true,
-  vadSilenceTimeout: 1500,
+  vadSilenceTimeout: 1100,
   preferredLang: "",
   disableSystemPrompt: false,
   disableMemory: false,

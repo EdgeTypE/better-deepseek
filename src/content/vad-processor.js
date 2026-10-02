@@ -1,7 +1,7 @@
 export class VADProcessor {
   constructor(options = {}) {
-    this.silenceTimeout = options.silenceTimeout || 1500;
-    this.hangoverFrames = options.hangoverFrames || 25; // ~400ms at 60fps – tolerates natural speech pauses
+    this.silenceTimeout = options.silenceTimeout || 1100;
+    this.hangoverFrames = options.hangoverFrames || 14; // ~233ms at 60fps – bridges intra-sentence words without sluggishness
     this.minSpeechFrames = options.minSpeechFrames || 3;
     this.thresholdMultiplier = options.thresholdMultiplier || 1.5;
     this.minThreshold = options.minThreshold || 0.015;

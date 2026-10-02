@@ -24,28 +24,9 @@ import { injectPureTextAndSend } from "../auto.js";
 import { extractMessageRawText } from "../dom/message-text.js";
 import { isSystemGenerating } from "../message-processor.svelte.js";
 import { devLog } from "../../lib/dev-log.js";
+import { cleanTextForSpeech, getBestVoice } from "./tts-utils.js";
 
-/**
- * Clean text for smooth, natural Text-to-Speech playback.
- * Strips code fences, markdown symbols, BDS tags, URLs, and HTML.
- */
-export function cleanTextForSpeech(text) {
-  if (!text) return "";
-  return text
-    .replace(/<think>[\s\S]*?<\/think>/gi, "")
-    .replace(/<think>[\s\S]*$/gi, "") // strip unclosed thinking block during generation
-    .replace(/<(BDS|BetterDeepSeek):[^>]*>[\s\S]*?<\/(BDS|BetterDeepSeek):[^>]*>/gi, "")
-    .replace(/\[\/?(BDS|BetterDeepSeek):[^\]]*\]/gi, "")
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/^#+\s+/gm, "")
-    .replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, "$1")
-    .replace(/<[^>]+>/g, "")
-    .replace(/https?:\/\/\S+/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+export { cleanTextForSpeech, getBestVoice };
 
 export class LiveEngine {
   constructor() {
@@ -77,6 +58,14 @@ export class LiveEngine {
     // Echo cancellation & barge-in tracking
     this.recentSpokenChunks = [];
     this.lastChunkStartTime = 0;
+
+    // Fluent TTS Pipeline & State
+    this.ttsQueue = [];
+    this.isSpeakingUtterance = false;
+    this.activeUtteranceSet = new Set();
+    this.ttsKeepAliveTimer = null;
+    this.cachedBestVoice = null;
+    this.cachedVoiceLang = null;
   }
 
   get analyser() {
@@ -122,6 +111,7 @@ export class LiveEngine {
           window.speechSynthesis.resume();
         }
         window.speechSynthesis.onvoiceschanged = () => {
+          this.cachedBestVoice = null;
           try { window.speechSynthesis.getVoices(); } catch {}
         };
       } catch {}
@@ -154,13 +144,16 @@ export class LiveEngine {
     }
 
     // 4. Initialize VAD with continuous mode enabled so mic never dies between turns
+    const silenceTimeout = Math.max(600, Math.min(2500, Number(state.settings?.vadSilenceTimeout) || 1100));
+    this.silenceTimeout = silenceTimeout;
+
     try {
       this.vadProcessor = new VADProcessor({
         continuous: true,
-        silenceTimeout: 1800,   // 1.8s of absolute silence before VAD fires
-        hangoverFrames: 20,     // ~333ms at 60fps — generous hangover for natural pauses
+        silenceTimeout: silenceTimeout,
+        hangoverFrames: 14,      // ~233ms at 60fps — keeps natural pauses connected without sluggishness
         minSpeechFrames: 3,
-        minSpeechDurationMs: 400, // speech burst must last at least 400ms to count
+        minSpeechDurationMs: 300, // 300ms minimum speech burst to avoid click/thump triggers
       });
 
       this.vadProcessor.onSpeechStart = () => this.handleUserSpeechStart();
@@ -200,20 +193,18 @@ export class LiveEngine {
         if (this.status === "listening" && this.currentTranscript.trim()) {
           clearTimeout(this.speechSilenceTimer);
           this.speechSilenceTimer = setTimeout(() => {
-            // Double-check: if transcript has been updated recently, the user
-            // may still be speaking and STT is just catching up.
+            // Double-check: if transcript has been updated recently, STT is just catching up.
             const sinceLast = Date.now() - this.lastTranscriptUpdateTime;
-            if (sinceLast < 1200) {
+            if (sinceLast < 600) {
               devLog("Live", "Silence trigger deferred: transcript still updating recently");
-              // Re-arm a shorter timer to check again
               this.speechSilenceTimer = setTimeout(() => {
                 this.handleUserSilenceStop("speechend-timer-retry");
-              }, 1000);
+              }, 400);
               return;
             }
             devLog("Live", "Silence trigger: speechend timer expired");
             this.handleUserSilenceStop("speechend-timer");
-          }, 1500); // 1.5s after speechend — much more forgiving
+          }, 800); // 800ms after browser's native speechend
         }
       };
 
@@ -247,17 +238,16 @@ export class LiveEngine {
           this.speechSilenceTimer = setTimeout(() => {
             // Before firing, check one more time if transcript grew since this timer started.
             const sinceLast = Date.now() - this.lastTranscriptUpdateTime;
-            if (sinceLast < 1500) {
+            if (sinceLast < 800) {
               devLog("Live", "Silence trigger deferred: transcript still growing");
-              // Re-arm to check again
               this.speechSilenceTimer = setTimeout(() => {
                 this.handleUserSilenceStop("result-timer-retry");
-              }, 1200);
+              }, 400);
               return;
             }
             devLog("Live", "Silence trigger: speech result timer expired");
             this.handleUserSilenceStop("result-timer");
-          }, 1800); // 1.8s of silence after last transcript change
+          }, this.silenceTimeout || 1100);
         }
       };
 
@@ -411,13 +401,13 @@ export class LiveEngine {
     }
 
     // If the transcript was updated very recently, the user may still be
-    // in mid-sentence.  Defer unless enough silence has truly elapsed.
+    // in mid-sentence. Defer unless enough silence has truly elapsed.
     const sinceLast = Date.now() - this.lastTranscriptUpdateTime;
-    if (sinceLast < 1200 && source !== "result-timer-retry" && source !== "speechend-timer-retry") {
+    if (sinceLast < 700 && source !== "result-timer-retry" && source !== "speechend-timer-retry") {
       devLog("Live", `Silence stop from '${source}' deferred: transcript updated ${sinceLast}ms ago`);
       this.speechSilenceTimer = setTimeout(() => {
         this.handleUserSilenceStop(source + "-deferred");
-      }, 1200);
+      }, 500);
       return;
     }
 
@@ -634,22 +624,24 @@ export class LiveEngine {
           return;
         }
 
-        // ── STREAMING TTS: 3-5 tokens (~15 chars) trigger ──
+        // ── STREAMING TTS: Natural sentence chunking ──
         if (this.spokenOffset === 0) {
-          const hasPunctuation = /[.!?,;:\n]/.test(unread);
-          if (unread.length >= 15 || hasPunctuation) {
+          // First chunk: start as soon as first full sentence arrives (or at least 45 chars for long opening clauses)
+          const sentenceEndMatch = unread.match(/^([\s\S]*?[.!?\n]+)(?:\s+|$)/);
+          if (sentenceEndMatch && sentenceEndMatch[1].trim().length >= 8) {
+            const chunk = sentenceEndMatch[1].trim();
+            this.spokenOffset += sentenceEndMatch[0].length;
+            this.speakChunk(chunk);
+          } else if (unread.length >= 45) {
+            // Introductory clause fallback: split at comma or space (min 25 chars)
             let splitIdx = -1;
-            const puncMatch = unread.search(/[.!?,;:\n]/);
-            if (puncMatch !== -1 && puncMatch <= 35) {
-              splitIdx = puncMatch + 1;
+            const commaIdx = unread.indexOf(",", 25);
+            if (commaIdx !== -1 && commaIdx <= 60) {
+              splitIdx = commaIdx + 1;
             } else {
-              // Find first space after at least 12 characters
-              const spaceIdx = unread.indexOf(" ", 12);
-              if (spaceIdx !== -1) {
+              const spaceIdx = unread.lastIndexOf(" ", 55);
+              if (spaceIdx > 25) {
                 splitIdx = spaceIdx;
-              } else if (unread.length >= 25) {
-                splitIdx = unread.lastIndexOf(" ");
-                if (splitIdx <= 0) splitIdx = unread.length;
               }
             }
 
@@ -662,18 +654,19 @@ export class LiveEngine {
             }
           }
         } else {
-          // Subsequent chunks: split on sentence/clause boundaries
-          const clauseMatch = unread.match(/^([\s\S]*?[.!?,;:\n]+)\s+/);
-          if (clauseMatch) {
-            const chunk = clauseMatch[1].trim();
-            this.spokenOffset += clauseMatch[0].length;
-            if (chunk) this.speakChunk(chunk);
-          } else if (unread.length >= 80) {
-            const spaceIdx = unread.lastIndexOf(" ", 80);
-            const splitIdx = spaceIdx > 20 ? spaceIdx : 80;
+          // Subsequent chunks: ONLY split on full sentence boundaries [.!?\n]+ (never on commas or colons)
+          const sentenceMatch = unread.match(/^([\s\S]*?[.!?\n]+)(?:\s+|$)/);
+          if (sentenceMatch) {
+            const chunk = sentenceMatch[1].trim();
+            this.spokenOffset += sentenceMatch[0].length;
+            this.speakChunk(chunk);
+          } else if (unread.length >= 140) {
+            // Long sentence fallback: only if a sentence exceeds 140 characters without ending punctuation
+            const spaceIdx = unread.lastIndexOf(" ", 140);
+            const splitIdx = spaceIdx > 40 ? spaceIdx : 140;
             const chunk = unread.slice(0, splitIdx).trim();
             this.spokenOffset += splitIdx;
-            if (chunk) this.speakChunk(chunk);
+            this.speakChunk(chunk);
           }
         }
 
@@ -714,7 +707,7 @@ export class LiveEngine {
           this.activeAssistantNode = null;
 
           // If nothing was queued to speak, resume listening
-          if (this.activeUtterances === 0) {
+          if (!this.isSpeakingUtterance && this.ttsQueue.length === 0 && this.activeUtterances === 0) {
             this.setStatus("listening");
           }
         }
@@ -729,11 +722,55 @@ export class LiveEngine {
     }
   }
 
+  getVoice() {
+    if (!this.cachedBestVoice || this.cachedVoiceLang !== this.speechLang) {
+      this.cachedBestVoice = getBestVoice(this.speechLang);
+      this.cachedVoiceLang = this.speechLang;
+      if (this.cachedBestVoice) {
+        devLog("Live", `Selected high-quality TTS voice: "${this.cachedBestVoice.name}" (${this.cachedBestVoice.lang})`);
+      }
+    }
+    return this.cachedBestVoice;
+  }
+
   speakChunk(text, isFinal = false) {
+    if (!text || !text.trim() || typeof window === "undefined" || !window.speechSynthesis) return;
+    this.queueTTS(text);
+  }
+
+  queueTTS(text) {
+    if (!text || !text.trim()) return;
+    this.ttsQueue.push(text.trim());
+    this.processTTSQueue();
+  }
+
+  processTTSQueue() {
+    if (this.destroyed || this.isMuted) return;
+    if (this.isSpeakingUtterance) return;
+    if (this.ttsQueue.length === 0) return;
+
+    // Merge pending sentences from queue into a fluid paragraph (up to 260 chars)
+    // to avoid inter-chunk gaps and robotic pauses
+    let combinedText = this.ttsQueue.shift();
+    while (this.ttsQueue.length > 0) {
+      const next = this.ttsQueue[0];
+      if (combinedText.length + next.length + 1 <= 260) {
+        combinedText += " " + this.ttsQueue.shift();
+      } else {
+        break;
+      }
+    }
+
+    this.speakUtterance(combinedText);
+  }
+
+  speakUtterance(text) {
     if (!text || !text.trim() || typeof window === "undefined" || !window.speechSynthesis) return;
 
     this.setStatus("speaking");
     this.lastChunkStartTime = Date.now();
+    this.isSpeakingUtterance = true;
+
     const cleanSpoken = text.toLowerCase().replace(/[.,!?;:"]/g, "").trim();
     this.recentSpokenChunks.push({ text: cleanSpoken, timestamp: Date.now() });
     if (this.recentSpokenChunks.length > 12) {
@@ -742,30 +779,29 @@ export class LiveEngine {
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = this.speechLang;
+    utterance.rate = 1.05;
+    utterance.pitch = 1.0;
 
-    // Find best voice match
-    const voices = window.speechSynthesis.getVoices();
-    const langPrefix = this.speechLang.split("-")[0];
-    const match = voices.find((v) => v.lang.startsWith(langPrefix));
-    if (match) utterance.voice = match;
+    const voice = this.getVoice();
+    if (voice) {
+      utterance.voice = voice;
+    }
 
+    // Retain in Set to prevent V8 Garbage Collector from killing active playback
+    this.activeUtteranceSet.add(utterance);
     this.activeUtterances++;
 
+    this.ensureTtsKeepAlive();
+
     utterance.onend = () => {
+      this.activeUtteranceSet.delete(utterance);
       this.activeUtterances = Math.max(0, this.activeUtterances - 1);
-      if (this.activeUtterances === 0 && (isFinal || !this.isWaitingForResponse)) {
-        if (this.status === "speaking") {
-          // Flush any echo transcript picked up during TTS playback
-          this.accumulatedTranscript = "";
-          this.currentTranscript = "";
-          this.setStatus("listening");
-        }
-      }
-    };
+      this.isSpeakingUtterance = false;
 
-    utterance.onerror = () => {
-      this.activeUtterances = Math.max(0, this.activeUtterances - 1);
-      if (this.activeUtterances === 0) {
+      if (this.ttsQueue.length > 0) {
+        this.processTTSQueue();
+      } else if (!this.isWaitingForResponse && this.activeUtterances === 0) {
+        this.stopTtsKeepAlive();
         if (this.status === "speaking") {
           this.accumulatedTranscript = "";
           this.currentTranscript = "";
@@ -774,22 +810,69 @@ export class LiveEngine {
       }
     };
 
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      try {
-        if (window.speechSynthesis.paused) {
-          window.speechSynthesis.resume();
+    utterance.onerror = (err) => {
+      devLog("Live", "TTS utterance error:", err);
+      this.activeUtteranceSet.delete(utterance);
+      this.activeUtterances = Math.max(0, this.activeUtterances - 1);
+      this.isSpeakingUtterance = false;
+
+      if (this.ttsQueue.length > 0) {
+        this.processTTSQueue();
+      } else if (!this.isWaitingForResponse && this.activeUtterances === 0) {
+        this.stopTtsKeepAlive();
+        if (this.status === "speaking") {
+          this.accumulatedTranscript = "";
+          this.currentTranscript = "";
+          this.setStatus("listening");
         }
-      } catch {}
-    }
+      }
+    };
+
+    try {
+      if (typeof window.speechSynthesis.resume === "function" && window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+    } catch {}
 
     window.speechSynthesis.speak(utterance);
   }
 
-  cancelTTS() {
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
+  ensureTtsKeepAlive() {
+    if (this.ttsKeepAliveTimer) return;
+    this.ttsKeepAliveTimer = setInterval(() => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        if (window.speechSynthesis.speaking) {
+          try {
+            if (typeof window.speechSynthesis.pause === "function") {
+              window.speechSynthesis.pause();
+            }
+            if (typeof window.speechSynthesis.resume === "function") {
+              window.speechSynthesis.resume();
+            }
+          } catch {}
+        }
+      }
+    }, 10000);
+  }
+
+  stopTtsKeepAlive() {
+    if (this.ttsKeepAliveTimer) {
+      clearInterval(this.ttsKeepAliveTimer);
+      this.ttsKeepAliveTimer = null;
     }
+  }
+
+  cancelTTS() {
+    this.stopTtsKeepAlive();
+    this.ttsQueue = [];
+    this.isSpeakingUtterance = false;
     this.activeUtterances = 0;
+    this.activeUtteranceSet.clear();
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
+    }
   }
 
   stopAIGeneration() {

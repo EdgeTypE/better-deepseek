@@ -313,7 +313,7 @@ export async function pushConfigToPage() {
 
     const allFiles = [...activeProjectFiles, ...localDirFiles];
 
-    const mcpSchemas = await discoverMcpToolSchemas();
+    const mcpSchemas = state.liveMode?.active ? [] : await discoverMcpToolSchemas();
 
     const detail = {
       mcpToolSchemas: mcpSchemas,

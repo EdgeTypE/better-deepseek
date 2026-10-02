@@ -367,30 +367,33 @@ export function buildHiddenPrefix(
     }
   }
 
-  const entries = state.config.systemPromptEntries || [];
-  if (entries.length > 0) {
-    const userMsgCount = state.sessionUserMsgCounts[conversationId] || 1;
-    for (const entry of entries) {
-      if (!entry.content.trim()) continue;
-      if (evaluateEntrySchedule(entry, userMsgCount, conversationId, state)) {
-        blocks.push(`<BetterDeepSeek>\n${entry.content.trim()}\n</BetterDeepSeek>`);
-        if (state.markEntryInjected) {
-          state.markEntryInjected(conversationId, entry.id);
+  // In Live mode, only LIVE_MODE_SYSTEM_PROMPT is injected — the main system prompt (DEFAULT_SYSTEM_PROMPT) is suppressed
+  if (!state.config?.isLiveMode) {
+    const entries = state.config.systemPromptEntries || [];
+    if (entries.length > 0) {
+      const userMsgCount = state.sessionUserMsgCounts[conversationId] || 1;
+      for (const entry of entries) {
+        if (!entry.content.trim()) continue;
+        if (evaluateEntrySchedule(entry, userMsgCount, conversationId, state)) {
+          blocks.push(`<BetterDeepSeek>\n${entry.content.trim()}\n</BetterDeepSeek>`);
+          if (state.markEntryInjected) {
+            state.markEntryInjected(conversationId, entry.id);
+          }
         }
       }
-    }
-  } else {
-    const shouldInjectSystemPrompt =
-      forceSystemPrompt &&
-      state.config.systemPrompt.trim() &&
-      !state.config.disableSystemPrompt;
+    } else {
+      const shouldInjectSystemPrompt =
+        forceSystemPrompt &&
+        state.config.systemPrompt?.trim() &&
+        !state.config.disableSystemPrompt;
 
-    if (shouldInjectSystemPrompt) {
-      blocks.push(
-        `<BetterDeepSeek>\n${state.config.systemPrompt.trim()}\n</BetterDeepSeek>`
-      );
-      if (state.markInjected) {
-        state.markInjected(conversationId);
+      if (shouldInjectSystemPrompt) {
+        blocks.push(
+          `<BetterDeepSeek>\n${state.config.systemPrompt.trim()}\n</BetterDeepSeek>`
+        );
+        if (state.markInjected) {
+          state.markInjected(conversationId);
+        }
       }
     }
   }
@@ -486,16 +489,18 @@ export function buildHiddenPrefix(
     }
   }
 
-  const currentMcpFingerprint = getMcpFingerprint(state.config?.mcpToolSchemas);
-  let lastMcpFingerprint = null;
-  if (!forceSystemPrompt && messages) {
-    lastMcpFingerprint = getLastMcpFingerprintInHistory(messages, excludeTarget);
-  }
+  if (!state.config?.isLiveMode) {
+    const currentMcpFingerprint = getMcpFingerprint(state.config?.mcpToolSchemas);
+    let lastMcpFingerprint = null;
+    if (!forceSystemPrompt && messages) {
+      lastMcpFingerprint = getLastMcpFingerprintInHistory(messages, excludeTarget);
+    }
 
-  if (forceSystemPrompt || (currentMcpFingerprint && currentMcpFingerprint !== lastMcpFingerprint)) {
-    const mcpBlock = buildMcpBlock(state, currentMcpFingerprint);
-    if (mcpBlock) {
-      blocks.push(mcpBlock);
+    if (forceSystemPrompt || (currentMcpFingerprint && currentMcpFingerprint !== lastMcpFingerprint)) {
+      const mcpBlock = buildMcpBlock(state, currentMcpFingerprint);
+      if (mcpBlock) {
+        blocks.push(mcpBlock);
+      }
     }
   }
 
@@ -742,6 +747,7 @@ export function buildUserDataBlock(state) {
  * appending a count of omitted tools when the budget is exceeded.
  */
 export function buildMcpBlock(state, fingerprint) {
+  if (state.config?.isLiveMode) return "";
   const schemas = state.config?.mcpToolSchemas;
   if (!Array.isArray(schemas) || !schemas.length) return "";
 

@@ -3,8 +3,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import state from "../../src/content/state.js";
 import { resetAppState } from "../helpers/app-state.js";
-import { LIVE_MODE_SYSTEM_PROMPT } from "../../src/lib/constants.js";
-import { cleanTextForSpeech, LiveEngine } from "../../src/content/live/live-engine.js";
+import { DEFAULT_SYSTEM_PROMPT, LIVE_MODE_SYSTEM_PROMPT } from "../../src/lib/constants.js";
+import { cleanTextForSpeech, getBestVoice, LiveEngine } from "../../src/content/live/live-engine.js";
 import { buildHiddenPrefix, mutatePayload } from "../../src/injected/payload-mutator.js";
 import { disableDeepThinkIfActive, findDeepSeekStopButton } from "../../src/content/scanner.js";
 
@@ -24,9 +24,37 @@ describe("Live Mode - cleanTextForSpeech", () => {
     expect(cleanTextForSpeech(input)).toBe("Title Here is bold and code. Visit for more.");
   });
 
+  it("strips bullet points, numbered lists and emojis for natural speech", () => {
+    const input = "Harika haber! 😊\n- Birinci adım\n2. İkinci adım\n• Üçüncü adım 👍";
+    expect(cleanTextForSpeech(input)).toBe("Harika haber! Birinci adım İkinci adım Üçüncü adım");
+  });
+
   it("handles null and empty input gracefully", () => {
     expect(cleanTextForSpeech("")).toBe("");
     expect(cleanTextForSpeech(null)).toBe("");
+  });
+});
+
+describe("Live Mode - getBestVoice", () => {
+  it("selects natural / neural cloud voice over legacy desktop voice", () => {
+    const mockVoices = [
+      { name: "Microsoft Tolga Desktop - Turkish", lang: "tr-TR", localService: true },
+      { name: "Google Türkçe", lang: "tr-TR", localService: false },
+      { name: "Microsoft David Desktop - English (United States)", lang: "en-US", localService: true },
+    ];
+    window.speechSynthesis.getVoices = vi.fn(() => mockVoices);
+
+    const voiceTr = getBestVoice("tr-TR");
+    expect(voiceTr).toBe(mockVoices[1]); // Google Türkçe wins
+
+    const mockEdgeVoices = [
+      { name: "Microsoft Tolga Desktop - Turkish", lang: "tr-TR", localService: true },
+      { name: "Microsoft Ahmet Online (Natural) - Turkish (Turkey)", lang: "tr-TR", localService: false },
+    ];
+    window.speechSynthesis.getVoices = vi.fn(() => mockEdgeVoices);
+
+    const voiceEdge = getBestVoice("tr-TR");
+    expect(voiceEdge).toBe(mockEdgeVoices[1]); // Natural voice wins
   });
 });
 
@@ -53,7 +81,7 @@ describe("Live Mode - System Prompt & Payload Mutation", () => {
     resetAppState();
   });
 
-  it("injects LIVE_MODE_SYSTEM_PROMPT into hidden prefix when isLiveMode is true", () => {
+  it("injects LIVE_MODE_SYSTEM_PROMPT into hidden prefix when isLiveMode is true, suppressing main systemPrompt", () => {
     const mockState = makeMockInjectedState({
       isLiveMode: true,
       systemPrompt: "Default prompt",
@@ -61,9 +89,21 @@ describe("Live Mode - System Prompt & Payload Mutation", () => {
 
     const prefix = buildHiddenPrefix("hello", "conv-1", mockState, true, [], null);
     expect(prefix).toContain(LIVE_MODE_SYSTEM_PROMPT);
+    expect(prefix).not.toContain("Default prompt");
   });
 
-  it("does not inject LIVE_MODE_SYSTEM_PROMPT when isLiveMode is false", () => {
+  it("suppresses DEFAULT_SYSTEM_PROMPT in live mode even when forceSystemPrompt is true", () => {
+    const mockState = makeMockInjectedState({
+      isLiveMode: true,
+      systemPrompt: DEFAULT_SYSTEM_PROMPT,
+    });
+
+    const prefix = buildHiddenPrefix("hello", "conv-1", mockState, true, [], null);
+    expect(prefix).toContain(LIVE_MODE_SYSTEM_PROMPT);
+    expect(prefix).not.toContain(DEFAULT_SYSTEM_PROMPT);
+  });
+
+  it("does not inject LIVE_MODE_SYSTEM_PROMPT when isLiveMode is false, and injects main systemPrompt", () => {
     const mockState = makeMockInjectedState({
       isLiveMode: false,
       systemPrompt: "Default prompt",
@@ -71,6 +111,44 @@ describe("Live Mode - System Prompt & Payload Mutation", () => {
 
     const prefix = buildHiddenPrefix("hello", "conv-1", mockState, true, [], null);
     expect(prefix).not.toContain("LIVE VOICE MODE");
+    expect(prefix).toContain("Default prompt");
+  });
+
+  it("does not inject MCP server tools/block when isLiveMode is true", () => {
+    const mockState = makeMockInjectedState({
+      isLiveMode: true,
+      mcpToolSchemas: [
+        {
+          serverName: "test-server",
+          serverUrl: "http://localhost:3000",
+          toolName: "fetch_data",
+          description: "Fetch mock data",
+        },
+      ],
+    });
+
+    const prefix = buildHiddenPrefix("hello", "conv-1", mockState, true, [], null);
+    expect(prefix).toContain(LIVE_MODE_SYSTEM_PROMPT);
+    expect(prefix).not.toContain("BDS:MCP");
+    expect(prefix).not.toContain("test-server");
+  });
+
+  it("injects MCP server tools/block when isLiveMode is false", () => {
+    const mockState = makeMockInjectedState({
+      isLiveMode: false,
+      mcpToolSchemas: [
+        {
+          serverName: "test-server",
+          serverUrl: "http://localhost:3000",
+          toolName: "fetch_data",
+          description: "Fetch mock data",
+        },
+      ],
+    });
+
+    const prefix = buildHiddenPrefix("hello", "conv-1", mockState, true, [], null);
+    expect(prefix).toContain("BDS:MCP");
+    expect(prefix).toContain("test-server");
   });
 
   it("forces thinking_enabled = false in payload when isLiveMode is true", () => {
@@ -263,6 +341,43 @@ describe("Live Mode - LiveEngine Lifecycle & State", () => {
     document.body.appendChild(genuineMsg);
 
     expect(engine.findLatestAssistantNode()).toBe(genuineMsg);
+  });
+});
+
+describe("Live Mode - TTS Queue & Merging", () => {
+  let engine;
+  beforeEach(() => {
+    resetAppState();
+    document.body.innerHTML = "";
+    engine = new LiveEngine();
+  });
+
+  it("buffers incoming chunks in ttsQueue and merges subsequent sentences when previous is speaking", () => {
+    engine.isSpeakingUtterance = true; // simulate speech in progress
+    engine.queueTTS("İlk cümle tamamlandı.");
+    engine.queueTTS("İkinci cümle de eklendi.");
+
+    expect(engine.ttsQueue.length).toBe(2);
+
+    engine.isSpeakingUtterance = false;
+    engine.processTTSQueue();
+
+    // The two sentences should be merged into one single utterance to prevent inter-utterance pause
+    expect(engine.ttsQueue.length).toBe(0);
+    expect(engine.isSpeakingUtterance).toBe(true);
+    expect(window.speechSynthesis.speak).toHaveBeenCalled();
+  });
+
+  it("cancelTTS clears active queue and cancels window.speechSynthesis", () => {
+    engine.queueTTS("Bekleyen mesaj 1");
+    engine.queueTTS("Bekleyen mesaj 2");
+    expect(engine.ttsQueue.length).toBeGreaterThan(0);
+
+    engine.cancelTTS();
+    expect(engine.ttsQueue.length).toBe(0);
+    expect(engine.isSpeakingUtterance).toBe(false);
+    expect(engine.activeUtterances).toBe(0);
+    expect(window.speechSynthesis.cancel).toHaveBeenCalled();
   });
 });
 
