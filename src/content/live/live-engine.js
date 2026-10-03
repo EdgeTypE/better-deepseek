@@ -24,9 +24,13 @@ import { injectPureTextAndSend } from "../auto.js";
 import { extractMessageRawText } from "../dom/message-text.js";
 import { isSystemGenerating } from "../message-processor.svelte.js";
 import { devLog } from "../../lib/dev-log.js";
-import { cleanTextForSpeech, getBestVoice } from "./tts-utils.js";
+import { cleanTextForSpeech, getBestVoice, softenPunctuationForSpeech } from "./tts-utils.js";
 
-export { cleanTextForSpeech, getBestVoice };
+export { cleanTextForSpeech, getBestVoice, softenPunctuationForSpeech };
+
+/** Upper bound for merging queued sentences into one utterance. Bigger = fewer
+ *  hand-offs to the synthesizer = fewer inter-utterance gaps. */
+const TTS_MERGE_LIMIT = 400;
 
 export class LiveEngine {
   constructor() {
@@ -756,12 +760,12 @@ export class LiveEngine {
     if (this.isSpeakingUtterance) return;
     if (this.ttsQueue.length === 0) return;
 
-    // Merge pending sentences from queue into a fluid paragraph (up to 260 chars)
-    // to avoid inter-chunk gaps and robotic pauses
+    // Merge pending sentences from queue into a fluid paragraph (up to TTS_MERGE_LIMIT
+    // chars) to avoid inter-chunk gaps and robotic pauses
     let combinedText = this.ttsQueue.shift();
     while (this.ttsQueue.length > 0) {
       const next = this.ttsQueue[0];
-      if (combinedText.length + next.length + 1 <= 260) {
+      if (combinedText.length + next.length + 1 <= TTS_MERGE_LIMIT) {
         combinedText += " " + this.ttsQueue.shift();
       } else {
         break;
@@ -784,7 +788,12 @@ export class LiveEngine {
       this.recentSpokenChunks.shift();
     }
 
-    const utterance = new SpeechSynthesisUtterance(text);
+    // Drop comma/semicolon/colon/bracket pauses — the synthesizer waits at each one,
+    // which is what makes long replies feel stalled. Sentence ends stay for prosody.
+    const spokenText = softenPunctuationForSpeech(text);
+    if (!spokenText) return;
+
+    const utterance = new SpeechSynthesisUtterance(spokenText);
     utterance.lang = this.speechLang;
     utterance.rate = 1.05;
     utterance.pitch = 1.0;

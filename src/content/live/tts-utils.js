@@ -36,6 +36,39 @@ export function cleanTextForSpeech(text) {
 }
 
 /**
+ * Trim pause-inducing punctuation right before handing text to the synthesizer.
+ *
+ * Every comma, semicolon, colon, bracket and spaced dash makes the engine insert a
+ * silence, and those add up to a stuttery, over-paused delivery on long replies.
+ * They are replaced by a plain space. Sentence-final marks (. ! ?) are downgraded
+ * to a comma rather than removed: that keeps an audible boundary between sentences
+ * (speech would otherwise be one run-on) while cutting most of the silence a full
+ * stop costs. See the inline note below — pause duration itself is not controllable.
+ *
+ * Kept separate from `cleanTextForSpeech` (which only sanitizes markup) so the
+ * readable text shown to the user is unaffected.
+ *
+ * @param {string} text Already cleaned text
+ * @returns {string} Same words, fewer pauses
+ */
+export function softenPunctuationForSpeech(text) {
+  if (!text) return "";
+  return text
+    .replace(/[,;:]/g, " ")
+    .replace(/[()\[\]{}]/g, " ")
+    .replace(/\s+[–—]\s+/g, " ") // spaced dash only — keeps hyphenated words ("e-mail") intact
+    .replace(/\s+/g, " ")
+    .trim()
+    // Shorten the sentence pause. Web Speech exposes no control over pause length,
+    // so the only lever is the mark itself: a full stop makes the engine idle far
+    // longer than a comma. Downgrading sentence ends to a comma keeps a boundary
+    // while cutting most of the silence. Decimals ("3.14") survive because the mark
+    // must be followed by whitespace or end-of-string.
+    .replace(/[.!?]+(?=\s|$)/g, ",")
+    .replace(/[,\s]+$/, ""); // a trailing comma would add a pause at the very end
+}
+
+/**
  * Intelligently select the highest quality natural/neural voice available in the browser.
  * Prioritizes Microsoft Natural / Azure Neural, Google Neural, Apple Premium/Enhanced voices,
  * and heavily penalizes legacy robotic desktop/SAPI voices (e.g. "Microsoft Tolga Desktop").

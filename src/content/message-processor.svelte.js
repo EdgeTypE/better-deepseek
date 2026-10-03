@@ -35,7 +35,7 @@ import {
 } from "./dom/host.js";
 import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun, handleAutoMcpCall, handleAutoFileRead, handleAutoSearchInDirectory, handleAutoListDir, findChatEditor } from "./auto.js";
 import { handleManagedAutoContinuation, isManagedRunActive, trySynthesizeReport } from "./deep-research.js";
-import { cleanTextForSpeech, getBestVoice } from "./live/tts-utils.js";
+import { cleanTextForSpeech, getBestVoice, softenPunctuationForSpeech } from "./live/tts-utils.js";
 
 import {
   safeAppendChild,
@@ -1410,7 +1410,7 @@ function playVoiceResponse(text) {
   const cleanText = cleanTextForSpeech(text);
   if (!cleanText) return;
 
-  const utterance = new SpeechSynthesisUtterance(cleanText);
+  const utterance = new SpeechSynthesisUtterance(softenPunctuationForSpeech(cleanText));
   utterance.lang = state.settings.voiceLanguage || navigator.language || 'en-US';
   utterance.rate = 1.05;
   utterance.pitch = 1.0;

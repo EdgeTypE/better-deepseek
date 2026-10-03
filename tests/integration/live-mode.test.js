@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import state from "../../src/content/state.js";
 import { resetAppState } from "../helpers/app-state.js";
 import { DEFAULT_SYSTEM_PROMPT, LIVE_MODE_SYSTEM_PROMPT } from "../../src/lib/constants.js";
-import { cleanTextForSpeech, getBestVoice, LiveEngine } from "../../src/content/live/live-engine.js";
+import { cleanTextForSpeech, getBestVoice, softenPunctuationForSpeech, LiveEngine } from "../../src/content/live/live-engine.js";
 import { buildHiddenPrefix, mutatePayload } from "../../src/injected/payload-mutator.js";
 import { disableDeepThinkIfActive, findDeepSeekStopButton } from "../../src/content/scanner.js";
 
@@ -32,6 +32,41 @@ describe("Live Mode - cleanTextForSpeech", () => {
   it("handles null and empty input gracefully", () => {
     expect(cleanTextForSpeech("")).toBe("");
     expect(cleanTextForSpeech(null)).toBe("");
+  });
+});
+
+describe("Live Mode - softenPunctuationForSpeech", () => {
+  it("drops comma, semicolon and colon pauses", () => {
+    expect(softenPunctuationForSpeech("Merhaba, nasılsın? İyiyim; teşekkürler: evet."))
+      .toBe("Merhaba nasılsın, İyiyim teşekkürler evet");
+  });
+
+  it("downgrades sentence ends to a comma so the pause is shorter, not gone", () => {
+    expect(softenPunctuationForSpeech("Birinci cümle. İkinci cümle! Üçüncü mü?"))
+      .toBe("Birinci cümle, İkinci cümle, Üçüncü mü");
+  });
+
+  it("leaves decimals alone when shortening sentence pauses", () => {
+    expect(softenPunctuationForSpeech("Fiyat 3.14 TL, değil mi?"))
+      .toBe("Fiyat 3.14 TL değil mi");
+  });
+
+  it("removes brackets and spaced dashes but keeps hyphenated words", () => {
+    expect(softenPunctuationForSpeech("e-mail adresi (burada) — ve devamı"))
+      .toBe("e-mail adresi burada ve devamı");
+  });
+
+  it("collapses the extra whitespace it creates", () => {
+    expect(softenPunctuationForSpeech("A, B;  C")).toBe("A B C");
+  });
+
+  it("leaves already plain text untouched", () => {
+    expect(softenPunctuationForSpeech("Düz metin burada")).toBe("Düz metin burada");
+  });
+
+  it("handles null and empty input gracefully", () => {
+    expect(softenPunctuationForSpeech("")).toBe("");
+    expect(softenPunctuationForSpeech(null)).toBe("");
   });
 });
 
