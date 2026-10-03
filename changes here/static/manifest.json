@@ -1,0 +1,72 @@
+{
+  "manifest_version": 3,
+  "name": "betterdeepnote",
+  "version": "0.1.29",
+  "description": "Enhanced UX layer for DeepSeek with hidden prompts, tools, memory, document generation, and long-work packaging.",
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "downloads"
+  ],
+  "host_permissions": [
+    "https://*.deepseek.com/*",
+    "https://codeload.github.com/*",
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.deepseek.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "injected.js",
+        "sandbox.html",
+        "sandbox.js",
+        "static/loading/*.svg",
+        "static/vendor/babel.min.js",
+        "static/vendor/fengari-web.js",
+        "static/vendor/opal.min.js",
+        "static/vendor/opal-parser.min.js",
+        "static/vendor/pyodide/pyodide.js",
+        "static/vendor/pyodide/pyodide.asm.js",
+        "static/vendor/pyodide/pyodide.asm.wasm",
+        "static/vendor/pyodide/python_stdlib.zip",
+        "static/vendor/pyodide/pyodide-lock.json"
+      ],
+      "matches": [
+        "https://*.deepseek.com/*"
+      ]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "sandbox": {
+    "pages": [
+      "sandbox.html"
+    ]
+  },
+  "action": {
+    "default_title": "betterdeepnote"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'",
+    "sandbox": "sandbox allow-scripts allow-forms allow-popups; script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:; object-src 'self'"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "576de2b3-ccd4-498d-8e17-fd591a294cee"
+    }
+  }
+}
