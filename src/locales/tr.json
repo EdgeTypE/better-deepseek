@@ -150,6 +150,8 @@
       "tokenPriceHint": "Mesaj başına tahmini DeepSeek API maliyetini ve toplam oturum maliyetini gösterir. Girdi/çıktı token fiyatları kullanılır. Fiyat verileri dinamik olarak çekilir.",
       "collapseLongUserMessages": "Uzun kullanıcı mesajlarını daralt",
       "collapseLongUserMessagesHint": "Çok uzun kullanıcı mesajlarını otomatik olarak daraltarak bir buton aracılığıyla tamamının açılmasını sağlar.",
+      "keepReasoningBlocksOpen": "Düşünce bloklarını açık bırak",
+      "keepReasoningBlocksOpenHint": "Düşünce bloklarının varsayılan olarak açık kalmasını sağlar. Kapatıldığında, uzun düşünme çıktılarında arayüz donmalarını önlemek için bloklar otomatik olarak daraltılır.",
       "loadAllHistoryOnSession": "Oturum açılırken tüm geçmişi yükle",
       "loadAllHistoryHint": "DeepSeek'in tembel yüklemesini tetiklemek için konuşmanın en üstüne kaydırır, böylece tüm mesajlar dışa aktarma ve fiyat hesaplaması için kullanılabilir olur. Uzun konuşmalarda yavaş olabilir. Varsayılan olarak kapalıdır.",
       "showTimestamps": "Mesaj zaman damgalarını göster",
@@ -422,7 +424,7 @@
     },
     "liveMode": {
       "title": "Better DeepSeek Live",
-      "tagline": "Doğal konuşun — göndermek için duraklayın, kesmek için tekrar konuşun.",
+      "tagline": "Konuşun, göndermek için susun, kesmek için tekrar konuşabilirsiniz.",
       "listening": "Dinleniyor...",
       "thinking": "Düşünülüyor...",
       "speaking": "Konuşuyor...",

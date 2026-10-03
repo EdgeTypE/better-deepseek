@@ -788,8 +788,8 @@ export class LiveEngine {
       this.recentSpokenChunks.shift();
     }
 
-    // Drop comma/semicolon/colon/bracket pauses — the synthesizer waits at each one,
-    // which is what makes long replies feel stalled. Sentence ends stay for prosody.
+    // Shorten punctuation pauses: sentence/clause marks become commas (the engine's
+    // shortest pause) instead of long full-stop silences, so clauses still breathe.
     const spokenText = softenPunctuationForSpeech(text);
     if (!spokenText) return;
 

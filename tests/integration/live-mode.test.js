@@ -36,9 +36,9 @@ describe("Live Mode - cleanTextForSpeech", () => {
 });
 
 describe("Live Mode - softenPunctuationForSpeech", () => {
-  it("drops comma, semicolon and colon pauses", () => {
+  it("keeps commas and downgrades every clause mark to a comma", () => {
     expect(softenPunctuationForSpeech("Merhaba, nasılsın? İyiyim; teşekkürler: evet."))
-      .toBe("Merhaba nasılsın, İyiyim teşekkürler evet");
+      .toBe("Merhaba, nasılsın, İyiyim, teşekkürler, evet");
   });
 
   it("downgrades sentence ends to a comma so the pause is shorter, not gone", () => {
@@ -48,20 +48,25 @@ describe("Live Mode - softenPunctuationForSpeech", () => {
 
   it("leaves decimals alone when shortening sentence pauses", () => {
     expect(softenPunctuationForSpeech("Fiyat 3.14 TL, değil mi?"))
-      .toBe("Fiyat 3.14 TL değil mi");
+      .toBe("Fiyat 3.14 TL, değil mi");
   });
 
-  it("removes brackets and spaced dashes but keeps hyphenated words", () => {
+  it("turns a spaced dash into a comma but keeps hyphenated words", () => {
     expect(softenPunctuationForSpeech("e-mail adresi (burada) — ve devamı"))
-      .toBe("e-mail adresi burada ve devamı");
+      .toBe("e-mail adresi burada, ve devamı");
   });
 
   it("collapses the extra whitespace it creates", () => {
-    expect(softenPunctuationForSpeech("A, B;  C")).toBe("A B C");
+    expect(softenPunctuationForSpeech("A, B;  C")).toBe("A, B, C");
   });
 
   it("leaves already plain text untouched", () => {
     expect(softenPunctuationForSpeech("Düz metin burada")).toBe("Düz metin burada");
+  });
+
+  it("softens Arabic and Persian punctuation to the Arabic comma", () => {
+    expect(softenPunctuationForSpeech("سلام، چطوری؟ خوبم؛ ممنون."))
+      .toBe("سلام، چطوری، خوبم، ممنون");
   });
 
   it("handles null and empty input gracefully", () => {

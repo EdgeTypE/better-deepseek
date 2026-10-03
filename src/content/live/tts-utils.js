@@ -36,36 +36,35 @@ export function cleanTextForSpeech(text) {
 }
 
 /**
- * Trim pause-inducing punctuation right before handing text to the synthesizer.
+ * Soften punctuation right before handing text to the synthesizer: keep the
+ * clause/sentence boundaries audible, but make each pause short.
  *
- * Every comma, semicolon, colon, bracket and spaced dash makes the engine insert a
- * silence, and those add up to a stuttery, over-paused delivery on long replies.
- * They are replaced by a plain space. Sentence-final marks (. ! ?) are downgraded
- * to a comma rather than removed: that keeps an audible boundary between sentences
- * (speech would otherwise be one run-on) while cutting most of the silence a full
- * stop costs. See the inline note below — pause duration itself is not controllable.
+ * Web Speech API exposes no control over pause length (no SSML), so the mark itself
+ * is the only lever — a full stop (and a semicolon or colon) makes the engine idle
+ * far longer than a comma. So every sentence/clause mark is DOWNGRADED to a comma,
+ * while existing commas are left in place. A spaced dash counts as a clause break too,
+ * so it becomes a comma rather than vanishing. Clauses still breathe (speech never runs
+ * together) but nothing stalls. Only brackets are dropped outright — the engine reads
+ * them awkwardly and their pause adds nothing.
  *
  * Kept separate from `cleanTextForSpeech` (which only sanitizes markup) so the
  * readable text shown to the user is unaffected.
  *
  * @param {string} text Already cleaned text
- * @returns {string} Same words, fewer pauses
+ * @returns {string} Same words, short pauses
  */
 export function softenPunctuationForSpeech(text) {
   if (!text) return "";
   return text
-    .replace(/[,;:]/g, " ")
     .replace(/[()\[\]{}]/g, " ")
-    .replace(/\s+[–—]\s+/g, " ") // spaced dash only — keeps hyphenated words ("e-mail") intact
+    .replace(/\s+[-–—]\s+/g, ", ") // spaced dash → comma; hyphenated words ("e-mail") have no spaces, so survive
     .replace(/\s+/g, " ")
     .trim()
-    // Shorten the sentence pause. Web Speech exposes no control over pause length,
-    // so the only lever is the mark itself: a full stop makes the engine idle far
-    // longer than a comma. Downgrading sentence ends to a comma keeps a boundary
-    // while cutting most of the silence. Decimals ("3.14") survive because the mark
-    // must be followed by whitespace or end-of-string.
-    .replace(/[.!?]+(?=\s|$)/g, ",")
-    .replace(/[,\s]+$/, ""); // a trailing comma would add a pause at the very end
+    // Full stops, exclamation/question marks, semicolons and colons all become commas.
+    // The lookahead keeps decimals ("3.14") intact — the mark must end a word/token.
+    .replace(/[.!?;:]+(?=\s|$)/g, ",")
+    .replace(/[\u061F\u06D4\u061B]+(?=\s|$)/g, "\u060C") // Arabic ? ۔ ؛ → Arabic comma
+    .replace(/[,\u060C\s]+$/, ""); // a trailing comma would add a pause at the very end
 }
 
 /**

@@ -149,6 +149,8 @@
       },
       "collapseLongUserMessages": "Collapse long user messages",
       "collapseLongUserMessagesHint": "Automatically hide very long user messages behind a read-more toggle.",
+      "keepReasoningBlocksOpen": "Keep reasoning blocks open",
+      "keepReasoningBlocksOpenHint": "Keeps reasoning blocks expanded by default. When turned off, blocks automatically collapse to prevent UI lag during long thinking output.",
       "loadAllHistoryOnSession": "Load all history when opening a session",
       "loadAllHistoryHint": "Scrolls to the top of the conversation to trigger DeepSeek's lazy-load, ensuring all messages are available for export and price calculation. May be slow for long conversations. Disabled by default.",
       "showTimestamps": "Show message timestamps",
@@ -425,7 +427,7 @@
     },
     "liveMode": {
       "title": "Better DeepSeek Live",
-      "tagline": "Talk naturally — pause to send, speak again to interrupt.",
+      "tagline": "Talk naturally, pause to send, speak again to interrupt.",
       "listening": "Listening...",
       "thinking": "Thinking...",
       "speaking": "Speaking...",

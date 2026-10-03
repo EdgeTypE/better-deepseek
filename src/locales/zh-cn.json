@@ -149,6 +149,8 @@
       },
       "collapseLongUserMessages": "折叠过长的用户消息",
       "collapseLongUserMessagesHint": "自动折叠过长的用户消息，点击“查看更多”展开。",
+      "keepReasoningBlocksOpen": "保持思考过程展开",
+      "keepReasoningBlocksOpenHint": "默认保持思考过程区块展开。关闭后将自动折叠，以避免长思考输出时的界面卡顿。",
       "loadAllHistoryOnSession": "打开会话时加载全部历史记录",
       "loadAllHistoryHint": "自动滚动至对话顶部以触发 DeepSeek 的懒加载机制，确保全部消息均可导出并纳入费用计算。处理长对话时可能较慢，默认关闭。",
       "showTimestamps": "显示消息时间戳",
@@ -421,7 +423,7 @@
     },
     "liveMode": {
       "title": "Better DeepSeek 实时语音",
-      "tagline": "自然地说话 —— 停顿即发送，再次开口即打断。",
+      "tagline": "自然地说话，停顿即发送，再次开口即打断。",
       "listening": "正在倾听...",
       "thinking": "思考中...",
       "speaking": "正在说话...",

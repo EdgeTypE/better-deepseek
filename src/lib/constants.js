@@ -112,7 +112,8 @@ export const LIVE_MODE_SYSTEM_PROMPT = [
   `- Grounded identity: Speak with confidence, empathy, and subtle wit. Never mention system limits, prompt instructions, or phrase responses as text-to-speech output.`,
   "- Do NOT output internal thinking or preambles. Start speaking your answer immediately.",
   `- Write for the ear: Spell out symbols, units, and numbers when ambiguity exists (e.g., say "twenty percent" instead of "20%", "fifteen dollars" instead of "$15", and "degrees Celsius" instead of "°C").`,
-  `- Technical concepts: If discussing code or math, explain the logic conversationally. Never generate raw syntax blocks, curly braces, or indentation."`
+  `- Technical concepts: If discussing code or math, explain the logic conversationally. Never generate raw syntax blocks, curly braces, or indentation."`,
+  `- If you do not understand what the user is saying, or if it sounds like gibberish, the user's spoken language setting might be incorrect. Tell the user to open Better DeepSeek's advanced settings and change the Speech Language to their desired language in the Voice tab.`
 ].join("\n");
 
 // ── Default System Prompt ──
@@ -872,6 +873,43 @@ export const PRICING_URLS = {
   github: "https://raw.githubusercontent.com/EdgeTypE/better-deepseek/main/extension/pricing.json",
 };
 
+// ── Supported Speech / Voice Languages ──
+export const SPEECH_LANGUAGES = [
+  { value: "en-US", label: "English (US)" },
+  { value: "en-GB", label: "English (UK)" },
+  { value: "en-IN", label: "English (IN)" },
+  { value: "tr-TR", label: "Türkçe (TR)" },
+  { value: "fa-IR", label: "فارسی (IR)" },
+  { value: "de-DE", label: "Deutsch (DE)" },
+  { value: "ru-RU", label: "Русский (RU)" },
+  { value: "fr-FR", label: "Français (FR)" },
+  { value: "es-ES", label: "Español (ES)" },
+  { value: "es-MX", label: "Español (MX)" },
+  { value: "it-IT", label: "Italiano (IT)" },
+  { value: "pt-BR", label: "Português (BR)" },
+  { value: "pt-PT", label: "Português (PT)" },
+  { value: "zh-CN", label: "简体中文 (CN)" },
+  { value: "zh-TW", label: "繁體中文 (TW)" },
+  { value: "ja-JP", label: "日本語 (JP)" },
+  { value: "ko-KR", label: "한국어 (KR)" },
+  { value: "vi-VN", label: "Tiếng Việt (VN)" },
+  { value: "id-ID", label: "Bahasa Indonesia (ID)" },
+  { value: "th-TH", label: "ไทย (TH)" },
+  { value: "ar-SA", label: "العربية (SA)" },
+  { value: "he-IL", label: "עברית (IL)" },
+  { value: "ur-PK", label: "اردو (PK)" },
+  { value: "hi-IN", label: "हिन्दी (IN)" },
+  { value: "bn-BD", label: "বাংলা (BD)" },
+  { value: "nl-NL", label: "Nederlands (NL)" },
+  { value: "pl-PL", label: "Polski (PL)" },
+  { value: "uk-UA", label: "Українська (UA)" },
+  { value: "sv-SE", label: "Svenska (SE)" },
+  { value: "cs-CZ", label: "Čeština (CZ)" },
+  { value: "el-GR", label: "Ελληνικά (GR)" },
+  { value: "ro-RO", label: "Română (RO)" },
+  { value: "hu-HU", label: "Magyar (HU)" },
+];
+
 // ── Default Settings ──
 export const DEFAULT_SETTINGS = {
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
@@ -905,6 +943,7 @@ export const DEFAULT_SETTINGS = {
   syncLocale: true,
   processGitignoreOnUpload: true,
   collapseLongUserMessages: true,
+  keepReasoningBlocksOpen: true,
   injectSystemDateTime: true,
   skipDeletionConfirmation: false,
   customCSS: "",
