@@ -1116,6 +1116,8 @@
     appState.settings.autoDownloadLongWorkZip = autoZip;
     appState.settings.voiceMode = voiceMode;
     appState.settings.voiceLanguage = voiceLanguage;
+    // Saving from Settings counts as having chosen a language — no first-run prompt.
+    appState.settings.voiceLanguageChosen = true;
     appState.settings.autoSubmitVoice = autoSubmitVoice;
     appState.settings.vadSilenceTimeout = Math.max(500, Math.min(3000, Math.round(vadSilenceTimeout)));
     appState.settings.liveModeShowText = liveModeShowText;

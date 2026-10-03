@@ -197,13 +197,20 @@
   let destroyed = false;
   const MAX_RESTART_ATTEMPTS = 5;
 
-  function toggleSpeechRecognition() {
+  async function toggleSpeechRecognition() {
     if (isRecording) {
       shouldStop = true;
       stopVAD();
       if (recognition) recognition.stop();
       isRecording = false;
       return;
+    }
+
+    // First voice-input use asks for a speech language before recording starts.
+    // promptVoiceLanguage() resolves immediately once the user has chosen.
+    if (appState.ui?.promptVoiceLanguage) {
+      const lang = await appState.ui.promptVoiceLanguage();
+      if (!lang) return;
     }
 
     const SpeechRecognition =

@@ -18,6 +18,11 @@
       "none": "无",
       "working": "处理中…"
     },
+    "voiceLangPrompt": {
+      "title": "选择你的语音语言",
+      "hint": "实时模式和语音输入将使用此语言进行语音识别和语音回复。你可以在稍后的设置中更改。",
+      "confirm": "继续"
+    },
     "drawer": {
       "title": "Better DeepSeek",
       "close": "关闭",

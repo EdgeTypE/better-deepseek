@@ -13,7 +13,9 @@
   import DeepCodeModal from "./DeepCodeModal.svelte";
   import ApiPlayground from "../api-playground/ApiPlayground.svelte";
   import LiveModeOverlay from "./LiveModeOverlay.svelte";
+  import VoiceLanguagePrompt from "./VoiceLanguagePrompt.svelte";
   import appState from "../state.js";
+  import { STORAGE_KEYS } from "../../lib/constants.js";
 
   let drawerOpen = $state(false);
   let apiPlaygroundOpen = $state(false);
@@ -48,6 +50,65 @@
       confirmResolve(result);
       confirmResolve = null;
     }
+  }
+
+  // ── First-run speech language prompt ──
+  let voiceLangPromptVisible = $state(false);
+  let voiceLangPromptCurrent = $state("");
+  let voiceLangPromptResolve = null;
+
+  /** Persist the whole settings object, matching SettingsPanel's save path. */
+  function persistSettings() {
+    if (typeof chrome === "undefined" || !chrome.storage?.local) return;
+    try {
+      chrome.storage.local.set({
+        [STORAGE_KEYS.settings]: JSON.parse(JSON.stringify(appState.settings)),
+      });
+    } catch (_) {
+      // Storage unavailable in some embedded contexts; the in-memory choice still applies.
+    }
+  }
+
+  /**
+   * Ask the user to pick a speech language, once. Resolves with the chosen code, or
+   * null when dismissed. Resolves immediately (no prompt) once the user has chosen.
+   * @returns {Promise<string|null>}
+   */
+  export function promptVoiceLanguage() {
+    if (appState.settings.voiceLanguageChosen) {
+      return Promise.resolve(appState.settings.voiceLanguage || "");
+    }
+    return new Promise((resolve) => {
+      voiceLangPromptResolve = resolve;
+      voiceLangPromptCurrent = appState.settings.voiceLanguage || "";
+      voiceLangPromptVisible = true;
+    });
+  }
+
+  function handleVoiceLangConfirm(lang) {
+    voiceLangPromptVisible = false;
+    appState.settings.voiceLanguage = lang || "";
+    appState.settings.voiceLanguageChosen = true;
+    persistSettings();
+    if (voiceLangPromptResolve) {
+      voiceLangPromptResolve(lang || "");
+      voiceLangPromptResolve = null;
+    }
+  }
+
+  function handleVoiceLangCancel() {
+    voiceLangPromptVisible = false;
+    if (voiceLangPromptResolve) {
+      voiceLangPromptResolve(null);
+      voiceLangPromptResolve = null;
+    }
+  }
+
+  /** True once a language is set; blocks Live Mode / voice input until then. */
+  async function ensureVoiceLanguage() {
+    if (appState.settings.voiceLanguageChosen) return true;
+    const lang = await promptVoiceLanguage();
+    return Boolean(lang);
   }
 
   // ── Public API (called from non-Svelte code via mount.js) ──
@@ -129,7 +190,9 @@
     apiPlaygroundOpen = false;
   }
 
-  export function openLiveMode() {
+  export async function openLiveMode() {
+    // First Live Mode use asks for a speech language before anything starts.
+    if (!(await ensureVoiceLanguage())) return;
     liveModeOpen = true;
   }
 
@@ -148,7 +211,7 @@
   });
 
   window.addEventListener("bds:open-live-mode", () => {
-    liveModeOpen = true;
+    openLiveMode();
   });
 </script>
 
@@ -198,4 +261,11 @@
   message={confirmMessage}
   onconfirm={() => handleConfirm(true)}
   oncancel={() => handleConfirm(false)}
+/>
+
+<VoiceLanguagePrompt
+  show={voiceLangPromptVisible}
+  current={voiceLangPromptCurrent}
+  onconfirm={handleVoiceLangConfirm}
+  oncancel={handleVoiceLangCancel}
 />

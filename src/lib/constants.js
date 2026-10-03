@@ -923,6 +923,9 @@ export const DEFAULT_SETTINGS = {
   githubToken: "",
   voiceMode: false,
   voiceLanguage: (typeof navigator !== 'undefined' ? navigator.language : 'en-US'),
+  // False until the user is asked to pick a speech language on first Live Mode /
+  // voice-input use. The one-off prompt flips this so it never nags again.
+  voiceLanguageChosen: false,
   voiceURI: "",
   autoSubmitVoice: true,
   vadSilenceTimeout: 1100,

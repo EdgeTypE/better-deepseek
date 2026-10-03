@@ -18,6 +18,11 @@
       "none": "None",
       "working": "Working..."
     },
+    "voiceLangPrompt": {
+      "title": "Choose your speech language",
+      "hint": "Live Mode and voice input use this language for speech recognition and voice replies. You can change it later in Settings.",
+      "confirm": "Continue"
+    },
     "drawer": {
       "title": "Better DeepSeek",
       "close": "Close",

@@ -18,6 +18,11 @@
       "none": "Hiçbiri",
       "working": "Çalışıyor..."
     },
+    "voiceLangPrompt": {
+      "title": "Konuşma dilinizi seçin",
+      "hint": "Canlı Mod ve sesli giriş, konuşma tanıma ve sesli yanıtlar için bu dili kullanır. Daha sonra Ayarlar'dan değiştirebilirsiniz.",
+      "confirm": "Devam"
+    },
     "drawer": {
       "title": "Better DeepSeek",
       "close": "Kapat",
