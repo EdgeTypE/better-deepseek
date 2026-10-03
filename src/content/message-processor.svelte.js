@@ -215,6 +215,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
   injectDynamicTableFeatures(node);
   injectSelectionCheckbox(node);
   injectBookmarkButton(node);
+  handleReasoningBlockCollapse(node);
 
   // `plain` drives everything that measures or speaks the text (change hash, RTL
   // detection, token/price accounting, read-aloud). `rich` keeps already-rendered
@@ -2064,5 +2065,75 @@ function cleanupUserMessageCollapse(node, stateData, textContainer) {
     stateData.collapseInitialized = false;
     stateData.isCollapsed = false;
     stateData.expandBtn = null;
+  }
+}
+
+/**
+ * Auto-collapse reasoning / thinking block for a message node if keepReasoningBlocksOpen is disabled.
+ * Once collapsed, stateData.reasoningCollapsed prevents re-collapsing so user manual expansion is honored.
+ */
+export function handleReasoningBlockCollapse(node) {
+  if (state.settings.keepReasoningBlocksOpen) {
+    return;
+  }
+
+  const thinkContent = node.querySelector('.ds-think-content, [class*="think-content"]');
+  if (!thinkContent) return;
+
+  const stateData = getNodeState(node);
+  if (stateData.reasoningCollapsed) return;
+
+  const container = thinkContent.closest('div[style*="--collapsible-area-title-height"]') ||
+                    thinkContent.closest('._74c0879') ||
+                    thinkContent.parentElement;
+  if (!container) return;
+
+  const header = container.querySelector('._245c867, ._5ab5d64') || container.firstElementChild;
+  if (!header || typeof header.click !== 'function') return;
+
+  stateData.reasoningCollapsed = true;
+  header.click();
+}
+
+/**
+ * Collapses all currently open reasoning blocks on the page.
+ */
+export function collapseAllOpenReasoningBlocks() {
+  const thinkBlocks = document.querySelectorAll('.ds-think-content, [class*="think-content"]');
+  for (const think of thinkBlocks) {
+    const container = think.closest('div[style*="--collapsible-area-title-height"]') ||
+                      think.closest('._74c0879') ||
+                      think.parentElement;
+    const header = container?.querySelector('._245c867, ._5ab5d64') || container?.firstElementChild;
+    const messageNode = think.closest('.ds-message') || think.closest('[data-bds-msg-id]') || think.closest('div[class*="message"]');
+    if (messageNode) {
+      const stateData = getNodeState(messageNode);
+      stateData.reasoningCollapsed = true;
+    }
+    if (header && typeof header.click === 'function') {
+      header.click();
+    }
+  }
+}
+
+/**
+ * Expands all currently collapsed reasoning blocks on the page.
+ */
+export function expandAllCollapsedReasoningBlocks() {
+  const containers = document.querySelectorAll('div[style*="--collapsible-area-title-height"], ._74c0879');
+  for (const container of containers) {
+    const isReasoning = container.querySelector('._5255ff8, ._970ac5e') || container.querySelector('svg path[d*="M8.00192"]');
+    const hasThink = Boolean(container.querySelector('.ds-think-content, [class*="think-content"]'));
+    if (isReasoning && !hasThink) {
+      const header = container.querySelector('._245c867, ._5ab5d64') || container.firstElementChild;
+      const messageNode = container.closest('.ds-message') || container.closest('[data-bds-msg-id]') || container.closest('div[class*="message"]');
+      if (messageNode) {
+        const stateData = getNodeState(messageNode);
+        stateData.reasoningCollapsed = false;
+      }
+      if (header && typeof header.click === 'function') {
+        header.click();
+      }
+    }
   }
 }

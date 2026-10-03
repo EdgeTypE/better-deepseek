@@ -7,6 +7,7 @@
     SYSTEM_PROMPT_TEMPLATE_VERSION,
     DOWNLOAD_BEHAVIOR_VERSION,
     DEFAULT_SYSTEM_PROMPT,
+    SPEECH_LANGUAGES,
   } from "../../lib/constants.js";
   import { getActiveProject, updateProject } from "../project-manager.js";
   import { t, i18n, availableLocaleCodes } from "../../lib/i18n.svelte.js";
@@ -16,6 +17,7 @@
   import { encryptData, decryptData } from "../../lib/utils/crypto.js";
   import { makeId } from "../../lib/utils/helpers.js";
   import SnippetList from "./SnippetList.svelte";
+  import { collapseAllOpenReasoningBlocks, expandAllCollapsedReasoningBlocks } from "../message-processor.svelte.js";
 
   let { onapiplayground, onimportdata, onsave } = $props();
 
@@ -104,6 +106,14 @@
     );
   });
 
+  /** Supported speech languages, dynamically prepending current pick if custom/unlisted. */
+  const speechLanguages = $derived.by(() => {
+    if (voiceLanguage && !SPEECH_LANGUAGES.some((l) => l.value === voiceLanguage)) {
+      return [{ value: voiceLanguage, label: voiceLanguage }, ...SPEECH_LANGUAGES];
+    }
+    return SPEECH_LANGUAGES;
+  });
+
   /** Label of the currently selected voice (Auto when none is picked). */
   const currentVoiceLabel = $derived.by(() => {
     if (!voiceURI) return t("settings.voiceAuto");
@@ -140,6 +150,19 @@
     nl: "Hallo, dit is een voorbeeld van deze stem.",
     pl: "Cześć, to przykład tego głosu.",
     ko: "안녕하세요, 이것은 이 목소리의 샘플입니다.",
+    uk: "Привіт, це приклад цього голосу.",
+    hi: "नमस्ते, यह इस आवाज़ का एक नमूना है।",
+    vi: "Xin chào, đây là bản mẫu của giọng nói này.",
+    id: "Halo, ini adalah contoh suara ini.",
+    th: "สวัสดี นี่คือตัวอย่างของเสียงนี้",
+    he: "שלום, זו דוגמה לקול הזה.",
+    ur: "ہیلو، یہ اس آواز کا ایک نمونہ ہے۔",
+    bn: "হ্যালো, এটি এই কণ্ঠের একটি নমুনা।",
+    sv: "Hej, det här är ett exempel på denna röst.",
+    cs: "Dobrý den, toto je ukázka tohoto hlasu.",
+    el: "Γεια σας, αυτό είναι ένα δείγμα αυτής της φωνής.",
+    ro: "Bună, acesta este un exemplu pentru această voce.",
+    hu: "Helló, ez egy minta ebből a hangból.",
   };
 
   /** Speak a short sample of `v`; click the same voice's button again to stop. */
@@ -190,6 +213,7 @@
   let tokenPriceDisplay = $state(Boolean(appState.settings.tokenPriceDisplay));
   let showTimestamps = $state(Boolean(appState.settings.showTimestamps));
   let collapseLongUserMessages = $state(Boolean(appState.settings.collapseLongUserMessages));
+  let keepReasoningBlocksOpen = $state(appState.settings.keepReasoningBlocksOpen ?? true);
   let loadAllHistoryOnSession = $state(Boolean(appState.settings.loadAllHistoryOnSession));
   let projectRagEnabled = $state(Boolean(appState.settings.projectRagEnabled));
   let projectRagLimit = $state(Number(appState.settings.projectRagLimit) || 5);
@@ -344,7 +368,7 @@
       deepResearchDeepFetch,
       searchProviders: enabledSearchProviderIds(),
       mcpInlineMaxChars,
-      locale, syncLocale, collapseLongUserMessages,
+      locale, syncLocale, collapseLongUserMessages, keepReasoningBlocksOpen,
       loadAllHistoryOnSession, customCSS, disableTipBox
     });
   }
@@ -692,7 +716,7 @@
       'settings.resetFactory', 'settings.preferredLang',
     ]},
     { key: 'subChat', labelKey: 'settings.subChat', settingKeys: [
-      'settings.collapseLongUserMessages', 'settings.loadAllHistoryOnSession', 'settings.chatSessionCap',
+      'settings.collapseLongUserMessages', 'settings.keepReasoningBlocksOpen', 'settings.loadAllHistoryOnSession', 'settings.chatSessionCap',
     ]},
     { key: 'subProjects', labelKey: 'settings.subProjects', settingKeys: [
       'settings.projectAutoContext', 'settings.processGitignore',
@@ -879,6 +903,7 @@
     tokenPriceDisplay = Boolean(appState.settings.tokenPriceDisplay);
     showTimestamps = Boolean(appState.settings.showTimestamps);
     collapseLongUserMessages = Boolean(appState.settings.collapseLongUserMessages);
+    keepReasoningBlocksOpen = appState.settings.keepReasoningBlocksOpen ?? true;
     loadAllHistoryOnSession = Boolean(appState.settings.loadAllHistoryOnSession);
     projectRagEnabled = Boolean(appState.settings.projectRagEnabled);
     projectRagLimit = Number(appState.settings.projectRagLimit) || 5;
@@ -1111,9 +1136,11 @@
       10,
       Math.floor(Number(maxChatSessions) || 500),
     );
+    const previousKeepReasoningBlocksOpen = appState.settings.keepReasoningBlocksOpen ?? true;
     appState.settings.tokenPriceDisplay = tokenPriceDisplay;
     appState.settings.showTimestamps = showTimestamps;
     appState.settings.collapseLongUserMessages = collapseLongUserMessages;
+    appState.settings.keepReasoningBlocksOpen = keepReasoningBlocksOpen;
     appState.settings.loadAllHistoryOnSession = loadAllHistoryOnSession;
     appState.settings.projectRagEnabled = projectRagEnabled;
     appState.settings.projectRagLimit = Number(projectRagLimit) || 5;
@@ -1142,6 +1169,14 @@
       i18n.setLocale(locale);
     }
     pushConfigToPage();
+
+    if (previousKeepReasoningBlocksOpen !== keepReasoningBlocksOpen) {
+      if (!keepReasoningBlocksOpen) {
+        collapseAllOpenReasoningBlocks();
+      } else {
+        expandAllCollapsedReasoningBlocks();
+      }
+    }
 
     formSnapshot = captureFormSnapshot();
 
@@ -1801,6 +1836,14 @@
           </label>
         </div>
 
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.keepReasoningBlocksOpen')}</span>
+          <label class="bds-switch">
+            <input id="bds-keep-reasoning-blocks-open" type="checkbox" bind:checked={keepReasoningBlocksOpen} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+
         <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
           <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 12px;">
             <span class="bds-toggle-label">{t('settings.loadAllHistoryOnSession')}</span>
@@ -2075,16 +2118,9 @@
         <div class="bds-toggle-row">
           <span class="bds-toggle-label">{t('settings.speechLanguage')}</span>
           <select class="bds-select" bind:value={voiceLanguage}>
-            <option value="en-US">English (US)</option>
-            <option value="en-GB">English (UK)</option>
-            <option value="tr-TR">Türkçe (TR)</option>
-            <option value="de-DE">Deutsch (DE)</option>
-            <option value="ru-RU">Русский (RU)</option>
-            <option value="fr-FR">Français (FR)</option>
-            <option value="es-ES">Español (ES)</option>
-            <option value="it-IT">Italiano (IT)</option>
-            <option value="zh-CN">简体中文 (CN)</option>
-            <option value="ja-JP">日本語 (JP)</option>
+            {#each speechLanguages as lang (lang.value)}
+              <option value={lang.value}>{lang.label}</option>
+            {/each}
           </select>
         </div>
 

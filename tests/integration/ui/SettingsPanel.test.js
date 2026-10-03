@@ -329,4 +329,84 @@ describe("SettingsPanel import-all compatibility", () => {
     expect(bridgeMocks.pushConfigToPage).not.toHaveBeenCalled();
     cleanup();
   });
+
+  it("renders speech language options including fa-IR and saves selection", async () => {
+    const { target, cleanup } = renderSvelte(SettingsPanel);
+    await flushUi();
+
+    // Expand voice settings accordion if needed or find the select directly
+    const voiceSelect = Array.from(target.querySelectorAll("select.bds-select")).find(
+      (sel) => Array.from(sel.options).some((opt) => opt.value === "fa-IR"),
+    );
+
+    expect(voiceSelect).toBeDefined();
+    const optionValues = Array.from(voiceSelect.options).map((opt) => opt.value);
+    expect(optionValues).toContain("en-US");
+    expect(optionValues).toContain("tr-TR");
+    expect(optionValues).toContain("fa-IR");
+    expect(optionValues).toContain("ru-RU");
+    expect(optionValues).toContain("zh-CN");
+    expect(optionValues).toContain("ko-KR");
+    expect(optionValues).toContain("ar-SA");
+    expect(optionValues).toContain("vi-VN");
+    expect(optionValues).toContain("id-ID");
+    expect(optionValues).toContain("es-MX");
+    expect(optionValues).toContain("sv-SE");
+    expect(optionValues).toContain("he-IL");
+
+    // Change to fa-IR and save
+    voiceSelect.value = "fa-IR";
+    voiceSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushUi();
+
+    target.querySelector("#bds-save-settings").click();
+    await flushUi();
+
+    expect(chrome.storage.local.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bds_settings: expect.objectContaining({
+          voiceLanguage: "fa-IR",
+        }),
+      }),
+    );
+    cleanup();
+  });
+
+  it("toggles keepReasoningBlocksOpen setting and saves to chrome storage", async () => {
+    state.settings.keepReasoningBlocksOpen = true;
+    const { target, cleanup } = renderSvelte(SettingsPanel);
+
+    target.querySelector(".bds-advanced-toggle").click();
+    await flushUi();
+
+    const subChatToggle = Array.from(target.querySelectorAll(".bds-sub-toggle")).find(
+      (btn) => btn.textContent.includes("Chat") || btn.textContent.includes("Sohbet") || btn.textContent.includes("聊天")
+    );
+    if (subChatToggle) {
+      subChatToggle.click();
+      await flushUi();
+    }
+
+    const toggle = target.querySelector("#bds-keep-reasoning-blocks-open");
+    expect(toggle).not.toBeNull();
+    expect(toggle.checked).toBe(true);
+
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushUi();
+
+    target.querySelector("#bds-save-settings").click();
+    await flushUi();
+
+    expect(chrome.storage.local.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bds_settings: expect.objectContaining({
+          keepReasoningBlocksOpen: false,
+        }),
+      }),
+    );
+    cleanup();
+  });
 });
+
+

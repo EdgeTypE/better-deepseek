@@ -108,6 +108,9 @@ import {
   resetMessagePricing,
   resetGeneratingTracker,
   isSystemGenerating,
+  handleReasoningBlockCollapse,
+  collapseAllOpenReasoningBlocks,
+  expandAllCollapsedReasoningBlocks,
 } from "../../src/content/message-processor.svelte.js";
 
 function createMessageNode(rawText, role = "assistant") {
@@ -1044,5 +1047,117 @@ describe("bookmark button injection", () => {
 
     expect(mocks.mount).toHaveBeenCalledOnce();
     expect(document.querySelectorAll(".mock-overlay")).toHaveLength(1);
+  });
+
+  describe("reasoning block collapse (Issue #180)", () => {
+    function createMessageWithReasoning(isCollapsed = false) {
+      const node = document.createElement("div");
+      node.className = "ds-message";
+      node.dataset.role = "assistant";
+      node.dataset.latest = "1";
+      node.dataset.absoluteLast = "1";
+      node.dataset.rawText = "Hello from assistant";
+
+      const container = document.createElement("div");
+      container.className = "_74c0879";
+      container.setAttribute("style", "--collapsible-area-title-height: 34px;");
+
+      const headerRow = document.createElement("div");
+      headerRow.className = "_245c867 _34a54ec";
+
+      const headerInner = document.createElement("div");
+      headerInner.className = "_5ab5d64";
+
+      const icon = document.createElement("div");
+      icon.className = "ds-icon _970ac5e";
+      icon.innerHTML = '<svg width="16" height="16"><path d="M8.00192 6.64454C8.75026"></path></svg>';
+
+      const title = document.createElement("span");
+      title.className = "_5255ff8";
+      title.textContent = "Thought for 5 seconds";
+
+      headerInner.appendChild(icon);
+      headerInner.appendChild(title);
+      headerRow.appendChild(headerInner);
+      container.appendChild(headerRow);
+
+      if (!isCollapsed) {
+        const thinkContent = document.createElement("div");
+        thinkContent.className = "ds-think-content _767406f";
+        thinkContent.textContent = "Analyzing user query...";
+        container.appendChild(thinkContent);
+      }
+
+      node.appendChild(container);
+
+      const markdown = document.createElement("div");
+      markdown.className = "ds-markdown";
+      markdown.textContent = "Hello from assistant";
+      node.appendChild(markdown);
+
+      document.body.appendChild(node);
+      return { node, container, headerRow };
+    }
+
+    it("does not collapse reasoning blocks when keepReasoningBlocksOpen is true (default)", () => {
+      state.settings.keepReasoningBlocksOpen = true;
+      const { node, headerRow } = createMessageWithReasoning(false);
+      const clickSpy = vi.fn();
+      headerRow.addEventListener("click", clickSpy);
+
+      processMessageNode(node);
+
+      expect(clickSpy).not.toHaveBeenCalled();
+    });
+
+    it("automatically collapses open reasoning block when keepReasoningBlocksOpen is false", () => {
+      state.settings.keepReasoningBlocksOpen = false;
+      const { node, headerRow } = createMessageWithReasoning(false);
+      const clickSpy = vi.fn();
+      headerRow.addEventListener("click", clickSpy);
+
+      processMessageNode(node);
+
+      expect(clickSpy).toHaveBeenCalledOnce();
+    });
+
+    it("does not re-collapse if user manually expanded it afterwards", () => {
+      state.settings.keepReasoningBlocksOpen = false;
+      const { node, headerRow } = createMessageWithReasoning(false);
+      const clickSpy = vi.fn();
+      headerRow.addEventListener("click", clickSpy);
+
+      // First run: auto-collapse triggered
+      processMessageNode(node);
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+
+      // Subsequent scan / mutation: reasoningCollapsed is true, so no re-collapse
+      processMessageNode(node);
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("collapseAllOpenReasoningBlocks clicks all open thinking block headers", () => {
+      const msg1 = createMessageWithReasoning(false);
+      const msg2 = createMessageWithReasoning(false);
+      const clickSpy1 = vi.fn();
+      const clickSpy2 = vi.fn();
+      msg1.headerRow.addEventListener("click", clickSpy1);
+      msg2.headerRow.addEventListener("click", clickSpy2);
+
+      collapseAllOpenReasoningBlocks();
+
+      expect(clickSpy1).toHaveBeenCalledOnce();
+      expect(clickSpy2).toHaveBeenCalledOnce();
+    });
+
+    it("expandAllCollapsedReasoningBlocks clicks headers of collapsed thinking blocks", () => {
+      const msg = createMessageWithReasoning(true); // isCollapsed = true
+      const clickSpy = vi.fn();
+      msg.headerRow.addEventListener("click", clickSpy);
+
+      expandAllCollapsedReasoningBlocks();
+
+      expect(clickSpy).toHaveBeenCalledOnce();
+    });
   });
 });
