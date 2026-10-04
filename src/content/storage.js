@@ -378,6 +378,22 @@ export function normalizeCommandMappings(raw) {
   return result
 }
 
+/**
+ * Normalize the optional "use this server as a web search provider" config.
+ * Returns null when the server is not a search provider, which is the default
+ * for every server that predates the feature.
+ */
+export function normalizeMcpSearchTool(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const toolName = String(raw.toolName || "").trim();
+  if (!toolName) return null;
+  return {
+    toolName,
+    queryArg: String(raw.queryArg || "").trim(),
+    countArg: String(raw.countArg || "").trim(),
+  };
+}
+
 export function normalizeMcpServers(raw) {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -392,6 +408,7 @@ export function normalizeMcpServers(raw) {
         description: String(t.description || ""),
         inputSchema: t.inputSchema || {},
       })).filter(t => t.name) : [],
+      searchTool: normalizeMcpSearchTool(s.searchTool),
       enabled: s.enabled !== false,
       createdAt: Number(s.createdAt) || Date.now(),
     }));

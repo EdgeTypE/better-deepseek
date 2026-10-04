@@ -17,6 +17,8 @@ import {
   bindStorageChangeListener,
   loadStateFromStorage,
   normalizeCharacters,
+  normalizeMcpSearchTool,
+  normalizeMcpServers,
   normalizeMemories,
   normalizeProjectFiles,
   normalizeProjects,
@@ -783,5 +785,43 @@ describe("config-removal integration", () => {
     const setCalls = chrome.storage.local.set.mock.calls;
     const configWrites = setCalls.filter((c) => c[0] && "bds_remote_config" in c[0]);
     expect(configWrites).toHaveLength(0);
+  });
+});
+
+describe("normalizeMcpServers searchTool", () => {
+  const baseServer = {
+    id: "srv1",
+    name: "Exa",
+    serverUrl: "https://mcp.exa.ai/mcp",
+    apiKey: "sk-1",
+    enabled: true,
+  };
+
+  it("keeps a valid search tool config and trims its strings", () => {
+    const [server] = normalizeMcpServers([
+      { ...baseServer, searchTool: { toolName: "  web_search_exa ", queryArg: " query ", countArg: " numResults " } },
+    ]);
+    expect(server.searchTool).toEqual({
+      toolName: "web_search_exa",
+      queryArg: "query",
+      countArg: "numResults",
+    });
+  });
+
+  it("defaults to null when no search tool is configured", () => {
+    expect(normalizeMcpServers([baseServer])[0].searchTool).toBeNull();
+    expect(normalizeMcpServers([{ ...baseServer, searchTool: {} }])[0].searchTool).toBeNull();
+    expect(normalizeMcpServers([{ ...baseServer, searchTool: "nope" }])[0].searchTool).toBeNull();
+    expect(normalizeMcpServers([{ ...baseServer, searchTool: { toolName: "   " } }])[0].searchTool).toBeNull();
+  });
+
+  it("normalizeMcpSearchTool rejects non-objects", () => {
+    expect(normalizeMcpSearchTool(null)).toBeNull();
+    expect(normalizeMcpSearchTool([])).toBeNull();
+    expect(normalizeMcpSearchTool({ toolName: "search" })).toEqual({
+      toolName: "search",
+      queryArg: "",
+      countArg: "",
+    });
   });
 });

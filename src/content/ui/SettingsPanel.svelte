@@ -11,7 +11,7 @@
   } from "../../lib/constants.js";
   import { getActiveProject, updateProject } from "../project-manager.js";
   import { t, i18n, availableLocaleCodes } from "../../lib/i18n.svelte.js";
-  import { SEARCH_PROVIDER_CATALOG } from "../files/search-reader.js";
+  import { SEARCH_PROVIDER_CATALOG, buildSearchProviderCatalog } from "../files/search-reader.js";
   import { CSS_PRESETS } from "../../lib/constants.js";
   import { openNativeFilePicker } from "../files/native-file-input.js";
   import { encryptData, decryptData } from "../../lib/utils/crypto.js";
@@ -224,6 +224,9 @@
   let deepResearchContextGuardEnabled = $state(Boolean(appState.settings.deepResearchContextGuardEnabled));
   let deepResearchContextLimitTokens = $state(Number(appState.settings.deepResearchContextLimitTokens) || 128000);
   let deepResearchContextStopPercent = $state(Number(appState.settings.deepResearchContextStopPercent) || 70);
+  // Declared before searchProviderRows: the row builder reads the MCP servers
+  // to include MCP-backed search providers.
+  let mcpServers = $state([...appState.mcpServers]);
   let searchProviderRows = $state(buildSearchProviderRows(appState.settings.searchProviders));
   let activeSearchProviderCount = $derived(searchProviderRows.filter((row) => row.enabled).length);
   let locale = $state(appState.settings.locale || availableLocaleCodes[0] || "en");
@@ -255,8 +258,12 @@
   let mcpEditorApiKey = $state("");
   let mcpEditorEnabled = $state(true);
   let mcpEditorIsNew = $state(false);
+  let mcpEditorTools = $state([]);
+  let mcpEditorSearchTool = $state("");
+  let mcpEditorQueryArg = $state("");
+  let mcpEditorCountArg = $state("");
+  let mcpEditorFetching = $state(false);
   let mcpTestingIndex = $state(-1);
-  let mcpServers = $state([...appState.mcpServers]);
   let mcpInlineMaxChars = $state(Number(appState.settings.mcpInlineMaxChars) || 8000);
   let disableTipBox = $state(Boolean(appState.settings.disableTipBox));
   let advancedSearchQuery = $state("");
@@ -300,8 +307,8 @@
   ];
   let selectedSections = $state(new Set(EXPORT_SECTIONS.map(s => s.key)));
 
-  function normalizeSearchProvidersSetting(raw) {
-    const known = new Set(SEARCH_PROVIDER_CATALOG.map((provider) => provider.id));
+  function normalizeSearchProvidersSetting(raw, catalog) {
+    const known = new Set(catalog.map((provider) => provider.id));
     const seen = new Set();
     const enabled = [];
     if (Array.isArray(raw)) {
@@ -319,11 +326,15 @@
   function buildSearchProviderRows(raw) {
     // Enabled providers keep their configured order; disabled ones follow in
     // canonical catalog order so every provider stays visible and toggleable.
-    const enabled = normalizeSearchProvidersSetting(raw);
-    return SEARCH_PROVIDER_CATALOG.map((provider) => ({
+    // The catalog is rebuilt from the current MCP servers, so a server that is
+    // (or stops being) a search provider gains/loses its row automatically.
+    const catalog = buildSearchProviderCatalog(mcpServers);
+    const enabled = normalizeSearchProvidersSetting(raw, catalog);
+    return catalog.map((provider) => ({
       id: provider.id,
       labelKey: provider.labelKey,
       name: provider.name,
+      kind: provider.kind,
       enabled: enabled.includes(provider.id),
     })).sort((a, b) => {
       const ai = enabled.indexOf(a.id);
@@ -333,6 +344,14 @@
       if (bi !== -1) return 1;
       return 0;
     });
+  }
+
+  /**
+   * Rebuild the provider rows from the ids currently enabled in the form, so
+   * pending toggles survive an MCP server being added or removed.
+   */
+  function refreshSearchProviderRows() {
+    searchProviderRows = buildSearchProviderRows(enabledSearchProviderIds());
   }
 
   function enabledSearchProviderIds() {
@@ -908,6 +927,9 @@
     projectRagEnabled = Boolean(appState.settings.projectRagEnabled);
     projectRagLimit = Number(appState.settings.projectRagLimit) || 5;
     deepResearchDeepFetch = Number(appState.settings.deepResearchDeepFetch) ?? 1;
+    // Assigned before the rows are rebuilt: the builder reads mcpServers to
+    // include MCP-backed search providers.
+    mcpServers = [...appState.mcpServers];
     searchProviderRows = buildSearchProviderRows(appState.settings.searchProviders);
     processGitignoreOnUpload = Boolean(appState.settings.processGitignoreOnUpload);
     injectSystemDateTime = Boolean(appState.settings.injectSystemDateTime);
@@ -918,7 +940,6 @@
     disableTipBox = Boolean(appState.settings.disableTipBox);
     mcpInlineMaxChars = Number(appState.settings.mcpInlineMaxChars) || 8000;
     cssSnippets = [...appState.cssSnippets];
-    mcpServers = [...appState.mcpServers];
     if (snippetListRef) snippetListRef.refresh();
     chrome.storage.local.get("bds_locale_update_last_checked", (data) => {
       lastCheckedDate = data.bds_locale_update_last_checked || "";
@@ -1267,7 +1288,80 @@
       mcpEditorEnabled = true;
       mcpEditorIsNew = true;
     }
+    mcpEditorTools = Array.isArray(server?.tools) ? [...server.tools] : [];
+    mcpEditorSearchTool = server?.searchTool?.toolName || "";
+    mcpEditorQueryArg = server?.searchTool?.queryArg || "";
+    mcpEditorCountArg = server?.searchTool?.countArg || "";
+    mcpEditorFetching = false;
     showMcpEditor = true;
+  }
+
+  // Best-effort inference of the search tool's argument names from its JSON
+  // schema: the first required (or first) string property carries the query,
+  // and a numeric property whose name starts with num/count/limit/max carries
+  // the result count.
+  function inferMcpSearchArgs(tool) {
+    const props = tool?.inputSchema?.properties;
+    if (!props || typeof props !== "object") return { queryArg: "", countArg: "" };
+
+    const names = Object.keys(props);
+    const stringProps = names.filter((name) => {
+      const type = props[name]?.type;
+      return type === "string" || (Array.isArray(type) && type.includes("string"));
+    });
+    const required = Array.isArray(tool?.inputSchema?.required) ? tool.inputSchema.required : [];
+
+    const queryArg = required.find((name) => stringProps.includes(name)) || stringProps[0] || "";
+    const countArg = names.find((name) => {
+      const type = props[name]?.type;
+      return /^(num|count|limit|max)/i.test(name) && (type === "number" || type === "integer");
+    }) || "";
+
+    return { queryArg, countArg };
+  }
+
+  function onMcpSearchToolChange(value) {
+    mcpEditorSearchTool = value;
+    if (!value) {
+      mcpEditorQueryArg = "";
+      mcpEditorCountArg = "";
+      return;
+    }
+    const tool = mcpEditorTools.find((candidate) => candidate.name === value);
+    const inferred = inferMcpSearchArgs(tool);
+    mcpEditorQueryArg = inferred.queryArg;
+    mcpEditorCountArg = inferred.countArg;
+  }
+
+  async function fetchMcpEditorTools() {
+    const serverUrl = mcpEditorUrl.trim();
+    if (!serverUrl) return;
+
+    mcpEditorFetching = true;
+    try {
+      const response = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage(
+          { type: "bds-mcp-list-tools", serverUrl, apiKey: mcpEditorApiKey.trim() },
+          (resp) => {
+            if (resp?.ok) resolve(resp);
+            else reject(new Error(resp?.error || "Connection failed"));
+          }
+        );
+      });
+      mcpEditorTools = (Array.isArray(response.tools) ? response.tools : (response.tools?.tools || [])).map(t => ({
+        name: t.name,
+        description: t.description || "",
+        inputSchema: t.inputSchema || {},
+      }));
+      if (mcpEditorSearchTool && !mcpEditorTools.some(t => t.name === mcpEditorSearchTool)) {
+        mcpEditorSearchTool = "";
+        mcpEditorQueryArg = "";
+        mcpEditorCountArg = "";
+      }
+    } catch (err) {
+      if (appState.ui) appState.ui.showToast(t('mcp.fetchToolsFailed', { message: err.message }));
+    }
+    mcpEditorFetching = false;
   }
 
   function closeMcpEditor() {
@@ -1277,13 +1371,26 @@
 
   async function saveMcpServer() {
     if (!mcpEditorName.trim() || !mcpEditorUrl.trim()) return;
+    // Drop a selected tool that the current tool list no longer contains — e.g.
+    // after the server URL was changed, or after a re-fetch returned a
+    // different tool set. Keeping it would leave a search provider pointing at
+    // a tool that does not exist.
+    const searchToolValid = mcpEditorSearchTool
+      && (mcpEditorTools.length === 0 || mcpEditorTools.some((tool) => tool.name === mcpEditorSearchTool));
     const entry = {
       id: editingMcp ? editingMcp.id : "mcp_" + Math.random().toString(36).substring(2, 9),
       name: mcpEditorName.trim(),
       serverUrl: mcpEditorUrl.trim(),
       apiKey: mcpEditorApiKey.trim(),
       enabled: mcpEditorEnabled,
-      tools: editingMcp ? editingMcp.tools : [],
+      tools: mcpEditorTools,
+      searchTool: searchToolValid
+        ? {
+            toolName: mcpEditorSearchTool,
+            queryArg: mcpEditorQueryArg.trim(),
+            countArg: mcpEditorCountArg.trim(),
+          }
+        : null,
       createdAt: editingMcp ? editingMcp.createdAt : Date.now(),
     };
     if (mcpEditorIsNew) {
@@ -1294,6 +1401,7 @@
     const plain = JSON.parse(JSON.stringify(mcpServers));
     appState.mcpServers = plain;
     await chrome.storage.local.set({ [STORAGE_KEYS.mcpServers]: plain });
+    refreshSearchProviderRows();
     await discoverMcpToolSchemas();
     pushConfigToPage();
     closeMcpEditor();
@@ -1307,6 +1415,7 @@
     const plainDelete = JSON.parse(JSON.stringify(mcpServers));
     appState.mcpServers = plainDelete;
     await chrome.storage.local.set({ [STORAGE_KEYS.mcpServers]: plainDelete });
+    refreshSearchProviderRows();
     await discoverMcpToolSchemas();
     pushConfigToPage();
   }
@@ -2027,7 +2136,10 @@
                     disabled={row.enabled && activeSearchProviderCount <= 1}
                     onchange={() => toggleSearchProvider(row)}
                   />
-                  <span>{t(row.labelKey)}</span>
+                  <span>{row.labelKey ? t(row.labelKey) : row.name}</span>
+                  {#if row.kind === "mcp"}
+                    <span class="bds-search-provider-badge">{t('settings.searchProviderMcpBadge')}</span>
+                  {/if}
                 </label>
                 <span class="bds-search-provider-controls">
                   <button
@@ -2567,6 +2679,48 @@
             <span class="bds-switch-track"></span>
           </label>
         </div>
+
+        <div class="bds-field" style="border-top: 1px solid rgba(128, 128, 128, 0.2); padding-top: 10px; margin-top: 4px;">
+          <label class="bds-label">{t('mcp.searchToolLabel')}</label>
+          <p style="font-size: 10px; opacity: 0.5; margin: 0 0 6px;">{t('mcp.searchToolHint')}</p>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <select
+              class="bds-input"
+              style="flex: 1; min-width: 0;"
+              value={mcpEditorSearchTool}
+              disabled={mcpEditorTools.length === 0}
+              onchange={(e) => onMcpSearchToolChange(e.currentTarget.value)}
+            >
+              <option value="">{t('mcp.searchToolNone')}</option>
+              {#each mcpEditorTools as tool (tool.name)}
+                <option value={tool.name}>{tool.name}</option>
+              {/each}
+            </select>
+            <button
+              type="button"
+              class="bds-btn-outlined"
+              style="font-size: 11px; padding: 4px 8px; white-space: nowrap;"
+              onclick={fetchMcpEditorTools}
+              disabled={mcpEditorFetching || !mcpEditorUrl.trim()}
+            >
+              {mcpEditorFetching ? t('mcp.testLoading') : t('mcp.fetchTools')}
+            </button>
+          </div>
+          {#if mcpEditorTools.length === 0}
+            <p style="font-size: 10px; opacity: 0.5; margin: 6px 0 0;">{t('mcp.searchToolNoTools')}</p>
+          {/if}
+        </div>
+
+        {#if mcpEditorSearchTool}
+          <div class="bds-field">
+            <label class="bds-label">{t('mcp.queryArgLabel')}</label>
+            <input type="text" class="bds-input" bind:value={mcpEditorQueryArg} placeholder="query" />
+          </div>
+          <div class="bds-field">
+            <label class="bds-label">{t('mcp.countArgLabel')}</label>
+            <input type="text" class="bds-input" bind:value={mcpEditorCountArg} placeholder="numResults" />
+          </div>
+        {/if}
       </div>
       <div class="bds-modal-footer">
         <button class="bds-btn-outlined" onclick={closeMcpEditor}>{t('mcp.cancel')}</button>
@@ -3043,6 +3197,18 @@
   .bds-search-provider-label input {
     margin: 0;
     accent-color: var(--bds-accent);
+  }
+
+  .bds-search-provider-badge {
+    flex-shrink: 0;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--bds-accent, #4d6bfe);
+    color: #fff;
+    opacity: 0.85;
   }
 
   .bds-search-provider-controls {

@@ -18,6 +18,11 @@ import {
   extractUrlFromBingLink,
   resolveSearchProviders,
   SEARCH_PROVIDER_CATALOG,
+  buildSearchProviderCatalog,
+  buildMcpSearchProvider,
+  mcpSearchProviderId,
+  parseMcpSearchResults,
+  MCP_SEARCH_RESULT_COUNT,
 } from "./search-reader.js";
 import enMessages from "../../../src/locales/en.json";
 
@@ -865,6 +870,303 @@ describe("searchWeb", () => {
     const result = await searchWeb("general query without site constraint", 0, ON_STATUS);
 
     expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("lite.duckduckgo.com");
+    expect(result.provider).toBe("DuckDuckGo Lite");
+  });
+});
+
+describe("MCP search providers", () => {
+  const ON_STATUS = vi.fn();
+  const EXA_SERVER = {
+    id: "srv1",
+    name: "Exa",
+    serverUrl: "https://mcp.exa.ai/mcp",
+    apiKey: "sk-test",
+    enabled: true,
+    searchTool: { toolName: "web_search_exa", queryArg: "query", countArg: "numResults" },
+  };
+
+  const mcpText = (results) => ({
+    ok: true,
+    result: { content: [{ type: "text", text: JSON.stringify(results) }] },
+  });
+
+  beforeEach(() => {
+    chromeSendMessageMock.mockReset();
+    ON_STATUS.mockReset();
+  });
+
+  it("builds a provider descriptor from a server with a searchTool", () => {
+    expect(buildMcpSearchProvider(EXA_SERVER)).toEqual({
+      id: "mcp:srv1",
+      kind: "mcp",
+      name: "Exa",
+      serverId: "srv1",
+      serverUrl: "https://mcp.exa.ai/mcp",
+      apiKey: "sk-test",
+      toolName: "web_search_exa",
+      queryArg: "query",
+      countArg: "numResults",
+    });
+  });
+
+  it("returns null for a server without a usable searchTool", () => {
+    expect(buildMcpSearchProvider({ id: "s", name: "n", serverUrl: "https://x/mcp" })).toBeNull();
+    expect(buildMcpSearchProvider({ id: "s", serverUrl: "https://x/mcp", searchTool: { toolName: "" } })).toBeNull();
+    expect(buildMcpSearchProvider({ id: "s", searchTool: { toolName: "search" } })).toBeNull();
+    expect(buildMcpSearchProvider(null)).toBeNull();
+  });
+
+  it("defaults the query argument and leaves the count argument empty", () => {
+    const provider = buildMcpSearchProvider({ ...EXA_SERVER, searchTool: { toolName: "search" } });
+    expect(provider.queryArg).toBe("query");
+    expect(provider.countArg).toBe("");
+  });
+
+  it("exposes a stable provider id helper", () => {
+    expect(mcpSearchProviderId("abc")).toBe("mcp:abc");
+  });
+
+  it("appends MCP servers to the settings catalog", () => {
+    const catalog = buildSearchProviderCatalog([EXA_SERVER]);
+    expect(catalog.map((p) => p.id)).toEqual(["ddg-lite", "ddg-html", "bing", "mcp:srv1"]);
+    expect(catalog[0].kind).toBe("http");
+    expect(catalog.at(-1)).toEqual({
+      id: "mcp:srv1",
+      name: "Exa",
+      labelKey: null,
+      kind: "mcp",
+      serverId: "srv1",
+    });
+  });
+
+  it("resolves an MCP provider id from the configured order", () => {
+    const resolved = resolveSearchProviders(["mcp:srv1", "bing"], [EXA_SERVER]);
+    expect(resolved.map((p) => p.id)).toEqual(["mcp:srv1", "bing"]);
+    expect(resolved[0].kind).toBe("mcp");
+  });
+
+  it("drops an MCP id once its server stops being a search provider", () => {
+    const resolved = resolveSearchProviders(["mcp:srv1", "bing"], [{ ...EXA_SERVER, searchTool: null }]);
+    expect(resolved.map((p) => p.id)).toEqual(["bing"]);
+  });
+
+  it("passes already-resolved descriptors through instead of re-resolving them", () => {
+    // auto.js / deep-research.js resolve the order first (so they can attach
+    // MCP servers) and hand the descriptors to searchWeb. Re-resolving them by
+    // stringifying the objects used to drop the entire configured order.
+    const resolvedInCaller = resolveSearchProviders(["mcp:srv1", "bing"], [EXA_SERVER]);
+    expect(resolveSearchProviders(resolvedInCaller).map((p) => p.id)).toEqual(["mcp:srv1", "bing"]);
+  });
+
+  it("parses a JSON result array", () => {
+    const text = JSON.stringify([
+      { title: "A", url: "https://a.com", text: "about a" },
+      { title: "B", url: "https://b.com", summary: "about b" },
+    ]);
+    expect(parseMcpSearchResults(text)).toEqual([
+      { title: "A", url: "https://a.com", snippet: "about a" },
+      { title: "B", url: "https://b.com", snippet: "about b" },
+    ]);
+  });
+
+  it("parses a JSON object wrapping a results array", () => {
+    const text = JSON.stringify({ results: [{ title: "A", url: "https://a.com", snippet: "s" }] });
+    expect(parseMcpSearchResults(text)).toEqual([
+      { title: "A", url: "https://a.com", snippet: "s" },
+    ]);
+  });
+
+  it("parses fenced JSON embedded in prose", () => {
+    const text = 'Here you go:\n```json\n{"results":[{"title":"A","url":"https://a.com"}]}\n```';
+    expect(parseMcpSearchResults(text)).toEqual([
+      { title: "A", url: "https://a.com", snippet: "" },
+    ]);
+  });
+
+  it("parses markdown link lists", () => {
+    const text = "1. [Alpha](https://alpha.com) — first\n2. [Beta](https://beta.com)";
+    expect(parseMcpSearchResults(text).map((r) => r.url)).toEqual([
+      "https://alpha.com",
+      "https://beta.com",
+    ]);
+  });
+
+  it("parses Title:/URL: text blocks", () => {
+    const text = "Title: Alpha\nURL: https://alpha.com\nSome snippet here.\n\nTitle: Beta\nURL: https://beta.com";
+    expect(parseMcpSearchResults(text)).toEqual([
+      { title: "Alpha", url: "https://alpha.com", snippet: "Some snippet here." },
+      { title: "Beta", url: "https://beta.com", snippet: "" },
+    ]);
+  });
+
+  it("parses numbered lists whose URLs sit on their own line", () => {
+    const text = [
+      '8 results for "vector databases" (est. 1,234 total)',
+      "",
+      "Answer: A vector database stores embeddings.",
+      "",
+      "1. Best Vector Databases 2026",
+      "   https://example.com/best",
+      "   A roundup of the leading options.",
+      "",
+      "2. Pinecone Review",
+      "   https://example.com/pinecone",
+      "   Hands-on review.",
+    ].join("\n");
+    expect(parseMcpSearchResults(text)).toEqual([
+      {
+        title: "Best Vector Databases 2026",
+        url: "https://example.com/best",
+        snippet: "A roundup of the leading options.",
+      },
+      { title: "Pinecone Review", url: "https://example.com/pinecone", snippet: "Hands-on review." },
+    ]);
+  });
+
+  it("parses numbered lists with the URL inline in the heading", () => {
+    const text = "1. Alpha — https://alpha.com\n2. Beta (https://beta.com)";
+    expect(parseMcpSearchResults(text)).toEqual([
+      { title: "Alpha", url: "https://alpha.com", snippet: "" },
+      { title: "Beta", url: "https://beta.com", snippet: "" },
+    ]);
+  });
+
+  it("keeps heading brackets that are not URL wrappers", () => {
+    const text = "1. Python (programming language) https://python.org";
+    expect(parseMcpSearchResults(text)).toEqual([
+      { title: "Python (programming language)", url: "https://python.org", snippet: "" },
+    ]);
+  });
+
+  it("keeps text that precedes the URL inside a numbered item", () => {
+    const text = "1. Alpha\n   A short description.\n   https://alpha.com";
+    expect(parseMcpSearchResults(text)).toEqual([
+      { title: "Alpha", url: "https://alpha.com", snippet: "A short description." },
+    ]);
+  });
+
+  it("strips trailing sentence punctuation from a bare URL line", () => {
+    const text = "1. Alpha\n   See https://alpha.com.";
+    expect(parseMcpSearchResults(text)).toEqual([
+      { title: "Alpha", url: "https://alpha.com", snippet: "" },
+    ]);
+  });
+
+  it("dedupes repeated URLs across numbered items", () => {
+    const text = "1. Alpha\n   https://alpha.com\n2. Alpha again\n   https://alpha.com";
+    expect(parseMcpSearchResults(text)).toEqual([
+      { title: "Alpha", url: "https://alpha.com", snippet: "" },
+    ]);
+  });
+
+  it("ignores numbered lists that never yield a URL", () => {
+    expect(parseMcpSearchResults("1. Alpha\n2. Beta\n3. Gamma")).toEqual([]);
+  });
+
+  it("dedupes URLs and ignores non-http entries", () => {
+    const text = JSON.stringify([
+      { title: "A", url: "https://a.com" },
+      { title: "A again", url: "https://a.com" },
+      { title: "Bad", url: "not-a-url" },
+    ]);
+    expect(parseMcpSearchResults(text)).toEqual([{ title: "A", url: "https://a.com", snippet: "" }]);
+  });
+
+  it("returns no results for unreadable text", () => {
+    expect(parseMcpSearchResults("no links or json here")).toEqual([]);
+    expect(parseMcpSearchResults("")).toEqual([]);
+    expect(parseMcpSearchResults(undefined)).toEqual([]);
+  });
+
+  it("searches through an MCP provider and normalizes the tool result", async () => {
+    chromeSendMessageMock.mockResolvedValue(
+      mcpText([{ title: "MCP search test result", url: "https://mcp-search-test.com/a", text: "mcp search test content" }])
+    );
+
+    const result = await searchWeb("mcp search test", 0, ON_STATUS, {
+      providers: ["mcp:srv1"],
+      mcpServers: [EXA_SERVER],
+    });
+
+    expect(chromeSendMessageMock).toHaveBeenCalledWith({
+      type: "bds-mcp-call",
+      serverUrl: "https://mcp.exa.ai/mcp",
+      apiKey: "sk-test",
+      toolName: "web_search_exa",
+      args: { query: "mcp search test", numResults: MCP_SEARCH_RESULT_COUNT },
+    });
+    expect(result.provider).toBe("Exa");
+    expect(result.lowConfidence).toBe(false);
+    expect(result.results[0]).toEqual({
+      title: "MCP search test result",
+      url: "https://mcp-search-test.com/a",
+      snippet: "mcp search test content",
+    });
+  });
+
+  it("runs an MCP provider handed over as an already-resolved descriptor", async () => {
+    chromeSendMessageMock.mockResolvedValue(
+      mcpText([{ title: "MCP search test result", url: "https://mcp-search-test.com/a", text: "mcp search test content" }])
+    );
+
+    // Mirrors what auto.js passes: a resolved list, not raw ids.
+    const providers = resolveSearchProviders(["mcp:srv1"], [EXA_SERVER]);
+    const result = await searchWeb("mcp search test", 0, ON_STATUS, { providers });
+
+    expect(result.provider).toBe("Exa");
+    expect(chromeSendMessageMock.mock.calls[0][0].type).toBe("bds-mcp-call");
+  });
+
+  it("omits the count argument when the server configures none", async () => {
+    chromeSendMessageMock.mockResolvedValue(
+      mcpText([{ title: "MCP search test result", url: "https://mcp-search-test.com/a", text: "mcp search test content" }])
+    );
+
+    await searchWeb("mcp search test", 0, ON_STATUS, {
+      providers: ["mcp:srv1"],
+      mcpServers: [{ ...EXA_SERVER, searchTool: { toolName: "web_search_exa", queryArg: "q" } }],
+    });
+
+    expect(chromeSendMessageMock.mock.calls[0][0].args).toEqual({ q: "mcp search test" });
+  });
+
+  it("falls through to the next provider when the MCP call fails", async () => {
+    chromeSendMessageMock
+      .mockResolvedValueOnce({ ok: false, error: "server down" })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        html: makeResultHtml([
+          { title: "duckduckgo test result", url: "https://ddg-result.com", snippet: "duckduckgo test content" },
+        ]),
+      });
+
+    const result = await searchWeb("duckduckgo test", 0, ON_STATUS, {
+      providers: ["mcp:srv1", "ddg-lite"],
+      mcpServers: [EXA_SERVER],
+    });
+
+    expect(chromeSendMessageMock.mock.calls[0][0].type).toBe("bds-mcp-call");
+    expect(chromeSendMessageMock.mock.calls[1][0].type).toBe("bds-fetch-url");
+    expect(result.provider).toBe("DuckDuckGo Lite");
+  });
+
+  it("reports an unreadable MCP result as a provider error and moves on", async () => {
+    chromeSendMessageMock
+      .mockResolvedValueOnce({ ok: true, result: { content: [{ type: "text", text: "nothing parseable" }] } })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        html: makeResultHtml([
+          { title: "duckduckgo test result", url: "https://ddg-result.com", snippet: "duckduckgo test content" },
+        ]),
+      });
+
+    const result = await searchWeb("duckduckgo test", 0, ON_STATUS, {
+      providers: ["mcp:srv1", "ddg-lite"],
+      mcpServers: [EXA_SERVER],
+    });
+
     expect(result.provider).toBe("DuckDuckGo Lite");
   });
 });

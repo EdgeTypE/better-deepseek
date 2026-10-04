@@ -653,7 +653,7 @@ async function runCurrentStep(run) {
       }, {
         purpose: step.purpose,
         sourceType: step.sourceType,
-        providers: resolveSearchProviders(state.settings?.searchProviders),
+        providers: resolveSearchProviders(state.settings?.searchProviders, state.mcpServers),
       });
       if (result && result.file && result.results) {
         const text = await readFileText(result.file);

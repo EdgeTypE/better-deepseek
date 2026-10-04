@@ -145,6 +145,7 @@
       "contextGuardStopPercentHint": "Stop Deep Research when estimated context reaches {{threshold}} tokens. Clamped to 50-95%.",
       "searchProviders": "Search Providers",
       "searchProvidersHint": "Choose and order the engines used by automatic web search. The first engine that returns strong results wins.",
+      "searchProviderMcpBadge": "MCP",
       "providerMoveUp": "Move provider up",
       "providerMoveDown": "Move provider down",
       "searchProvider": {
@@ -789,7 +790,15 @@
       "deleteConfirm": "Delete MCP server \"{{name}}\"?",
       "testFailed": "MCP test failed: {{message}}",
       "toolsCount": "{{count}} tools",
-      "connected": "Connected: {{count}} tools found"
+      "connected": "Connected: {{count}} tools found",
+      "searchToolLabel": "Use as Search Provider",
+      "searchToolHint": "Pick a tool on this server to use as a web search engine. Once selected, enable it in Deep Research → Search Providers and order it like any other engine.",
+      "searchToolNone": "Not a search provider",
+      "searchToolNoTools": "Fetch the tool list first to choose a search tool.",
+      "fetchTools": "Fetch tools",
+      "fetchToolsFailed": "Failed to fetch tools: {{message}}",
+      "queryArgLabel": "Query argument name",
+      "countArgLabel": "Result-count argument (optional)"
     },
     "expandToggle": {
       "expand": "Expand",

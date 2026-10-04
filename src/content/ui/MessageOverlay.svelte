@@ -83,7 +83,7 @@
 
   function primarySearchProviderName() {
     try {
-      return resolveSearchProviders(appState.settings?.searchProviders)[0]?.name || "";
+      return resolveSearchProviders(appState.settings?.searchProviders, appState.mcpServers)[0]?.name || "";
     } catch {
       return "";
     }

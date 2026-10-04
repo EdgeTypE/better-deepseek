@@ -457,7 +457,7 @@ export async function handleAutoSearch(query, deepFetch = 0, options = {}) {
       emitSearchStatus(q, info?.provider || "", info?.phase || "", status);
     }, {
       ...options,
-      providers: resolveSearchProviders(appState.settings?.searchProviders),
+      providers: resolveSearchProviders(appState.settings?.searchProviders, appState.mcpServers),
     });
 
     if (!result?.file) {
@@ -529,7 +529,7 @@ export async function handleAutoSearchForRun(query, deepFetch = 0, runId = "", o
       emitSearchStatus(q, info?.provider || "", info?.phase || "", status);
     }, {
       ...options,
-      providers: resolveSearchProviders(appState.settings?.searchProviders),
+      providers: resolveSearchProviders(appState.settings?.searchProviders, appState.mcpServers),
     });
 
     if (!result?.file) {

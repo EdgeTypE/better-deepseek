@@ -145,6 +145,7 @@
       "contextGuardStopPercentHint": "تحقیق عمیق وقتی زمینه تخمینی به {{threshold}} توکن برسد متوقف می‌شود. محدود به ۵۰ تا ۹۵٪.",
       "searchProviders": "ارائه‌دهندگان جستجو",
       "searchProvidersHint": "موتورهای استفاده‌شده برای جستجوی خودکار وب را انتخاب و مرتب کنید. اولین موتوری که نتایج قوی برگرداند برنده است.",
+      "searchProviderMcpBadge": "MCP",
       "providerMoveUp": "انتقال ارائه‌دهنده به بالا",
       "providerMoveDown": "انتقال ارائه‌دهنده به پایین",
       "searchProvider": {
@@ -785,7 +786,15 @@
       "deleteConfirm": "حذف سرور MCP «{{name}}»؟",
       "testFailed": "آزمایش MCP ناموفق بود: {{message}}",
       "toolsCount": "{{count}} ابزار",
-      "connected": "متصل: {{count}} ابزار یافت شد"
+      "connected": "متصل: {{count}} ابزار یافت شد",
+      "searchToolLabel": "استفاده به عنوان ارائه‌دهنده جستجو",
+      "searchToolHint": "یک ابزار در این سرور را برای استفاده به‌عنوان موتور جستجوی وب انتخاب کنید. پس از انتخاب، آن را در Deep Research → ارائه‌دهندگان جستجو فعال و مانند سایر موتورها مرتب کنید.",
+      "searchToolNone": "ارائه‌دهنده جستجو نیست",
+      "searchToolNoTools": "برای انتخاب ابزار جستجو، ابتدا فهرست ابزارها را دریافت کنید.",
+      "fetchTools": "دریافت ابزارها",
+      "fetchToolsFailed": "دریافت ابزارها ناموفق بود: {{message}}",
+      "queryArgLabel": "نام آرگومان پرس‌وجو",
+      "countArgLabel": "آرگومان تعداد نتایج (اختیاری)"
     },
     "expandToggle": {
       "expand": "بازکردن",

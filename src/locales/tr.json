@@ -139,6 +139,7 @@
       "contextGuardStopPercentHint": "Tahmini bağlam {{threshold}} tokene ulaştığında Deep Research'ü durdurur. 50-95% aralığıyla sınırlandırılır.",
       "searchProviders": "Arama Sağlayıcıları",
       "searchProvidersHint": "Otomatik web aramasında kullanılacak motorları seçin ve sıralayın. Güçlü sonuç döndüren ilk motor kullanılır.",
+      "searchProviderMcpBadge": "MCP",
       "providerMoveUp": "Sağlayıcıyı yukarı taşı",
       "providerMoveDown": "Sağlayıcıyı aşağı taşı",
       "searchProvider": {
@@ -786,7 +787,15 @@
       "deleteConfirm": "\"{{name}}\" MCP sunucusu silinsin mi?",
       "testFailed": "MCP testi başarısız: {{message}}",
       "toolsCount": "{{count}} araç",
-      "connected": "Bağlandı: {{count}} araç bulundu"
+      "connected": "Bağlandı: {{count}} araç bulundu",
+      "searchToolLabel": "Arama Sağlayıcı Olarak Kullan",
+      "searchToolHint": "Bu sunucudan web arama motoru olarak kullanılacak bir araç seçin. Seçtikten sonra Deep Research → Arama Sağlayıcıları bölümünde etkinleştirip diğer motorlar gibi sıralayın.",
+      "searchToolNone": "Arama sağlayıcı değil",
+      "searchToolNoTools": "Arama aracını seçmek için önce araç listesini çekin.",
+      "fetchTools": "Araçları çek",
+      "fetchToolsFailed": "Araçlar alınamadı: {{message}}",
+      "queryArgLabel": "Sorgu argümanı adı",
+      "countArgLabel": "Sonuç sayısı argümanı (isteğe bağlı)"
     },
     "expandToggle": {
       "expand": "Genişlet",
