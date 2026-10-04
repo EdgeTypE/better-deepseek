@@ -918,3 +918,98 @@ describe("scanner scheduling", () => {
     expect(processMessageNodeMock).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("scanner logo / new-chat link overlays (#184)", () => {
+  beforeEach(async () => {
+    resetAppState();
+    vi.useFakeTimers();
+    mountMock.mockClear();
+    document.body.innerHTML = "";
+    const { resetIncrementalState } = await import("../../src/content/scanner.js");
+    resetIncrementalState();
+  });
+
+  afterEach(async () => {
+    const state = (await import("../../src/content/state.js")).default;
+    if (state.observer) {
+      state.observer.disconnect();
+      state.observer = null;
+    }
+    if (state.scanTimer) {
+      clearTimeout(state.scanTimer);
+      state.scanTimer = 0;
+    }
+    const { resetIncrementalState } = await import("../../src/content/scanner.js");
+    resetIncrementalState();
+    vi.useRealTimers();
+  });
+
+  // The native header card holds the logo AND the search / sidebar buttons.
+  // A card-sized overlay used to swallow clicks on those buttons (#184).
+  const HEADER_WITH_BUTTONS = `
+    <div class="_262baab" style="position: relative">
+      <div class="logo-wrap">
+        <svg width="143" height="23" viewBox="0 0 143 23"></svg>
+      </div>
+      <div class="header-buttons">
+        <div role="button" id="native-search" tabindex="0">Search</div>
+        <div role="button" id="native-sidebar" tabindex="0">Sidebar</div>
+      </div>
+    </div>
+  `;
+
+  const NEW_CHAT_BUTTON = `
+    <div tabindex="0" id="new-chat">
+      <svg width="16" height="16" viewBox="0 0 16 16">
+        <path d="M8 0.599609L8 15.4" stroke="currentColor"></path>
+      </svg>
+      <span>New Chat</span>
+    </div>
+  `;
+
+  it("scopes the logo overlay to the logo box, not the header card", async () => {
+    document.body.innerHTML = `<header>${HEADER_WITH_BUTTONS}</header>${NEW_CHAT_BUTTON}`;
+    const { scheduleScan } = await import("../../src/content/scanner.js");
+    scheduleScan();
+    vi.advanceTimersByTime(200);
+
+    const logoWrap = document.querySelector(".logo-wrap");
+    const card = document.querySelector("._262baab");
+
+    expect(logoWrap.querySelector(":scope > .bds-logo-link")).toBeTruthy();
+    // The overlay must NOT live on the card, or it covers the header buttons.
+    expect(card.querySelector(":scope > .bds-logo-link")).toBeNull();
+  });
+
+  it("never places an overlay over the native search / sidebar buttons", async () => {
+    document.body.innerHTML = `<header>${HEADER_WITH_BUTTONS}</header>${NEW_CHAT_BUTTON}`;
+    const { scheduleScan } = await import("../../src/content/scanner.js");
+    scheduleScan();
+    vi.advanceTimersByTime(200);
+
+    expect(document.querySelector("#native-search").closest(".bds-logo-link")).toBeNull();
+    expect(document.querySelector("#native-sidebar").closest(".bds-logo-link")).toBeNull();
+  });
+
+  it("still linkifies the New Chat button", async () => {
+    document.body.innerHTML = `<header>${HEADER_WITH_BUTTONS}</header>${NEW_CHAT_BUTTON}`;
+    const { scheduleScan } = await import("../../src/content/scanner.js");
+    scheduleScan();
+    vi.advanceTimersByTime(200);
+
+    const newChat = document.querySelector("#new-chat");
+    expect(newChat.querySelector(":scope > .bds-logo-link")).toBeTruthy();
+    expect(newChat.style.position).toBe("relative");
+  });
+
+  it("does not re-inject an overlay on repeated scans", async () => {
+    document.body.innerHTML = `<header>${HEADER_WITH_BUTTONS}</header>${NEW_CHAT_BUTTON}`;
+    const { scheduleScan } = await import("../../src/content/scanner.js");
+    scheduleScan();
+    vi.advanceTimersByTime(200);
+    scheduleScan();
+    vi.advanceTimersByTime(200);
+
+    expect(document.querySelectorAll(".bds-logo-link")).toHaveLength(2);
+  });
+});

@@ -996,26 +996,32 @@ function ensureComposerMount(wrapper, className, descendantSelector, beforeNode)
 }
 
 /**
- * Overlays an <a> tag over the logo div to support "Open in new tab" without reparenting.
+ * Overlays an <a> tag over a small native control (logo, icon button) so
+ * "Open in new tab" works without reparenting it.
+ *
+ * ⚠️ The overlay is `position:absolute; inset:0`, so the anchor element MUST be
+ * the tight box around the control itself. Anchoring it to a wrapping card
+ * makes the overlay stretch over every sibling in that card and swallow their
+ * clicks — the header card also holds the native search / sidebar buttons, so
+ * a card-sized overlay left the reported "search button is not clickable"
+ * (#184). Anchoring to the control's own element keeps the hit area to the
+ * control.
+ *
+ * @param {Element | null} anchor element that should become clickable
+ * @returns {HTMLAnchorElement | null} the injected overlay, or null if skipped
  */
-function linkifyLogo() {
-  // Look for the DeepSeek logo SVG
-  const logoSvg = document.querySelector('svg[viewBox="0 0 143 23"]');
-  if (!logoSvg) return;
-
-  const container = logoSvg.closest('div');
-  if (!container || container.tagName === 'A' || container.closest('a')) {
-    return;
+function overlayLogoLink(anchor) {
+  if (!anchor || anchor.tagName === 'A' || anchor.closest('a')) return null;
+  if (anchor.querySelector(':scope > .bds-logo-link') || anchor.hasAttribute('data-bds-linkified')) {
+    return null;
   }
 
-  let target = container;
-  if (target.parentElement && target.parentElement.classList.contains('_262baab')) {
-    target = target.parentElement;
+  // Set inline only when the anchor defines no position of its own. Inline styles
+  // are written here rather than read back from getComputedStyle(), because the
+  // computed value is not reliably populated outside a real layout engine.
+  if (!anchor.style.position) {
+    anchor.style.position = 'relative';
   }
-
-  if (target.tagName === 'A' || target.querySelector(':scope > .bds-logo-link')) return;
-
-  target.style.position = target.style.position || 'relative';
 
   const link = document.createElement('a');
   link.href = '/';
@@ -1023,12 +1029,30 @@ function linkifyLogo() {
   link.setAttribute('data-bds-linkified', 'true');
 
   link.addEventListener('click', (e) => {
+    // Let modified clicks (new tab / window) reach the browser untouched.
     if (e.button === 0 && !e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
       e.preventDefault();
     }
   });
 
-  target.appendChild(link);
+  anchor.appendChild(link);
+  return link;
+}
+
+/**
+ * Overlays an <a> tag over the DeepSeek logo so it opens "/" like a link.
+ */
+function linkifyLogo() {
+  // Look for the DeepSeek logo SVG
+  const logoSvg = document.querySelector('svg[viewBox="0 0 143 23"]');
+  if (!logoSvg) return;
+
+  // Anchor to the logo's own wrapper (the <div> around the SVG). Never walk up
+  // to the header card — see overlayLogoLink().
+  const container = logoSvg.closest('div');
+  if (!container) return;
+
+  overlayLogoLink(container);
 }
 
 /**
@@ -1047,26 +1071,9 @@ function linkifyNewChatButton() {
   if (!newChatSvg) return;
 
   const container = newChatSvg.closest('div[tabindex="0"]');
-  if (!container || container.tagName === 'A' || container.closest('a')) {
-    return;
-  }
+  if (!container) return;
 
-  if (container.querySelector(':scope > .bds-logo-link') || container.hasAttribute('data-bds-linkified')) return;
-
-  container.style.position = container.style.position || 'relative';
-
-  const link = document.createElement('a');
-  link.href = '/';
-  link.className = 'bds-logo-link';
-  link.setAttribute('data-bds-linkified', 'true');
-
-  link.addEventListener('click', (e) => {
-    if (e.button === 0 && !e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
-      e.preventDefault();
-    }
-  });
-
-  container.appendChild(link);
+  overlayLogoLink(container);
 }
 
 /**

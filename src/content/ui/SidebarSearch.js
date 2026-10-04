@@ -36,7 +36,10 @@ export function injectSearchInput() {
 
   if (!newChatSvg) return;
 
-  const newChatLink = newChatSvg.closest('a.bds-logo-link') || newChatSvg.closest('div[tabindex="0"]');
+  // Anchor to the native "New Chat" control. The `.bds-logo-link` overlay is
+  // deliberately NOT used as an anchor: it is scoped to the logo box (#184),
+  // so resolving it here would insert the search box next to the logo.
+  const newChatLink = newChatSvg.closest('div[tabindex="0"]') || newChatSvg.closest('a');
   if (!newChatLink) return;
 
   const container = document.createElement('div');
