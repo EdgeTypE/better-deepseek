@@ -54,7 +54,7 @@ import { remoteConfig } from "../lib/remote-config.svelte.js";
 import { makeId, buildTimestamp } from "../lib/utils/helpers.js";
 import { buildZip } from "../lib/zip.js";
 import { STORAGE_KEYS } from "../lib/constants.js";
-import { isPredominantlyRtl } from '../lib/utils/rtl-detector.js';
+import { applyAutoDirection } from '../lib/utils/bidi-direction.js';
 
 const messageOverlays = new Map();
 const nodeStates = new WeakMap();
@@ -675,10 +675,9 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
   const parsed = parseBdsMessage(richText, shouldForceCloseTags);
   const preGateBlocks = parsed.renderableBlocks;
 
-  // --- RTL DETECTION ---
-  const isRtl = isPredominantlyRtl(rawText);
-  stateData.isRtl = isRtl;
-  applyRtlToNative(node, isRtl);
+  // --- BIDI DIRECTION (issue #181) ---
+  // Each block resolves its own direction; nothing is forced on the container.
+  applyAutoDirectionToMessage(node);
   // --- AUTO INTERFACES (instant trigger on completion) ---
   // Triggers immediately when the global stop button disappears,
   // which signals that DeepSeek's SSE stream has fired "event: close".
@@ -1016,7 +1015,6 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
         existing.props.blocks = newBlocks;
         existing.props.loading = isLoading;
         existing.props.loadingIndex = loadingIndex;
-        existing.props.isRtl = stateData.isRtl || false; 
       } else {
         const host = getOrCreateHost(node, "bds-overlay-host");
         removeStaleMessageOverlays(host);
@@ -1030,7 +1028,6 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
           blocks: newBlocks,
           loading: isLoading,
           loadingIndex: loadingIndex,
-          isRtl: stateData.isRtl || false 
         });
 
         const component = mount(MessageOverlay, {
@@ -1383,23 +1380,21 @@ function syncVisibilityState(node, isLatestAssistant, stateData, isSettled) {
 }
 
 /**
- * Apply RTL styling directly to the native message's markdown container
- * for messages that don't trigger an overlay.
+ * Give every block of a native message its own direction (issue #181).
+ *
+ * Covers the markdown container of the message itself and of its thinking
+ * block, so a Persian reply is right-aligned even when no overlay is mounted.
+ * Containers rendered by the extension are skipped — the overlay applies the
+ * same pass to its own markdown.
  */
-function applyRtlToNative(node, isRtl) {
-  if (!isRtl) return;
+function applyAutoDirectionToMessage(node) {
+  const containers = node.querySelectorAll('.ds-markdown, [class*="markdown"]');
 
-  // Find ALL markdown containers (including thinking blocks)
-  const allMarkdown = node.querySelectorAll('.ds-markdown, [class*="markdown"]');
-  
-  for (const target of allMarkdown) {
-    // Skip cursor elements and BDS containers
-    if (target.closest('.ds-cursor') || target.closest('.bds-host-wrapper') || target.closest('#bds-root')) continue;
-    
-    target.setAttribute('dir', 'rtl');
-    target.style.direction = 'rtl';
-    target.style.textAlign = 'right';
-    target.classList.add('bds-rtl-native');
+  for (const container of containers) {
+    if (container.closest('.ds-cursor')) continue;
+    if (container.closest('.bds-host-wrapper') || container.closest('#bds-root')) continue;
+
+    applyAutoDirection(container);
   }
 }
 /**

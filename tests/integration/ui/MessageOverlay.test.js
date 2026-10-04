@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import MessageOverlay from "../../../src/content/ui/MessageOverlay.svelte";
 import appState from "../../../src/content/state.js";
 import { renderSvelte, flushUi } from "../../helpers/svelte.js";
+import { reactiveProps } from "../../helpers/reactive.svelte.js";
 
 describe("MessageOverlay integration", () => {
   beforeEach(() => {
@@ -209,6 +210,66 @@ describe("MessageOverlay integration", () => {
     expect(target.textContent).toContain("Rooting Tecno POVA Pro 5G");
     expect(target.textContent).toContain("Tecno POVA Pro 5G");
     expect(target.textContent).not.toContain("Failed to parse");
+    cleanup();
+  });
+});
+
+describe("MessageOverlay per-block direction (issue #181)", () => {
+  const FA = "این یک متن فارسی است که توضیح می‌دهد چه اتفاقی افتاده است";
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("keeps an English line LTR inside a Persian reply", async () => {
+    const { target, cleanup } = renderSvelte(MessageOverlay, {
+      text: `${FA}\n\nHere is the summary of the configuration.`,
+    });
+    await flushUi();
+
+    const [persian, english] = target.querySelectorAll(".bds-sanitized-text p");
+    expect(persian.getAttribute("dir")).toBe("rtl");
+    expect(english.getAttribute("dir")).toBe("ltr");
+    cleanup();
+  });
+
+  it("keeps a Persian line RTL inside an English reply", async () => {
+    const { target, cleanup } = renderSvelte(MessageOverlay, {
+      text: `Here is the summary.\n\n${FA}`,
+    });
+    await flushUi();
+
+    const [english, persian] = target.querySelectorAll(".bds-sanitized-text p");
+    expect(english.getAttribute("dir")).toBe("ltr");
+    expect(persian.getAttribute("dir")).toBe("rtl");
+    cleanup();
+  });
+
+  it("never forces a direction on the overlay container", async () => {
+    const { target, cleanup } = renderSvelte(MessageOverlay, { text: FA });
+    await flushUi();
+
+    // The old message-level `dir="rtl"` on the container is what flipped lines.
+    const overlay = target.querySelector(".bds-message-overlay");
+    expect(overlay.hasAttribute("dir")).toBe(false);
+    expect(overlay.classList.contains("rtl")).toBe(false);
+    cleanup();
+  });
+
+  it("re-applies direction after the markdown is re-rendered", async () => {
+    const props = reactiveProps({ text: "Here is the summary." });
+    const { target, cleanup } = renderSvelte(MessageOverlay, props);
+    await flushUi();
+    expect(target.querySelector(".bds-sanitized-text p").getAttribute("dir")).toBe("ltr");
+
+    // Streaming replaces the `{@html}` content wholesale, dropping the
+    // attributes stamped by the previous pass.
+    props.text = `Here is the summary.\n\n${FA}`;
+    await flushUi();
+
+    const paragraphs = target.querySelectorAll(".bds-sanitized-text p");
+    expect(paragraphs[0].getAttribute("dir")).toBe("ltr");
+    expect(paragraphs[1].getAttribute("dir")).toBe("rtl");
     cleanup();
   });
 });

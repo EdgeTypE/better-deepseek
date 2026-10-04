@@ -4948,66 +4948,41 @@ textarea.bds-input,
   justify-content: center;
   backdrop-filter: blur(2px);
 }
-/* RTL message support */
-.bds-message-rtl {
-  direction: rtl;
-  text-align: right;
-  unicode-bidi: isolate;
-}
+/* ── Per-block bidi direction (issue #181) ──
+   Every block carries its own `dir`, resolved from its first strong character
+   by bidi-direction.js. Nothing is forced on the container, so an English
+   paragraph inside a Persian reply stays LTR and vice versa. */
 
-.bds-message-rtl code,
-.bds-message-rtl pre {
+/* Code, formulas and diagrams are never reordered — a Persian comment inside a
+   fenced block must not drag the block into RTL. Only needed under an RTL
+   block; elsewhere the code already inherits LTR. */
+.bds-dir-rtl pre,
+.bds-dir-rtl code,
+.bds-dir-rtl .md-code-block {
   direction: ltr;
   text-align: left;
-  unicode-bidi: embed;
-}
-
-.bds-message-rtl ul,
-.bds-message-rtl ol {
-  padding-right: 1.5em;
-  padding-left: 0;
-}
-
-.bds-message-rtl blockquote {
-  border-right: 3px solid var(--bds-accent);
-  border-left: none;
-  padding-right: 1em;
-  padding-left: 0;
-}
-/* RTL styling for native DeepSeek messages (no overlay) */
-.bds-rtl-native {
-  direction: rtl;
-  text-align: right;
   unicode-bidi: isolate;
 }
 
-/* Keep code blocks LTR even in RTL mode */
-.bds-rtl-native pre,
-.bds-rtl-native code,
-.bds-rtl-native .md-code-block {
-  direction: ltr !important;
-  text-align: left !important;
-  unicode-bidi: embed;
+/* `.bds-dir-rtl` marks the blocks resolved to RTL. For the mirroring rules the
+   class sits on the block itself, so those selectors are element-scoped; only
+   RTL blocks are touched and LTR messages keep DeepSeek's own spacing. */
+ul.bds-dir-rtl,
+ol.bds-dir-rtl {
+  padding-inline-start: 1.5em;
+  padding-inline-end: 0;
 }
 
-/* Adjust lists, blockquotes, etc. */
-.bds-rtl-native ul,
-.bds-rtl-native ol {
-  padding-right: 1.5em;
-  padding-left: 0;
+blockquote.bds-dir-rtl {
+  border-inline-start: 2px solid var(--dsw-alias-label-caption, var(--bds-text-tertiary, #6b6b7b));
+  border-inline-end: none;
+  padding-inline-start: 14px;
+  padding-inline-end: 0;
 }
 
-.bds-rtl-native blockquote {
-  border-right: 2px solid var(--dsw-alias-label-caption, var(--bds-text-tertiary, #6b6b7b));
-  border-left: none;
-  padding-right: 14px;
-  padding-left: 0;
-}
-
-/* Override table alignment for RTL */
-.bds-rtl-native th,
-.bds-rtl-native td {
-  text-align: right;
+th.bds-dir-rtl,
+td.bds-dir-rtl {
+  text-align: start;
 }
 
 /* ── Dynamic Table Enhancements ── */
