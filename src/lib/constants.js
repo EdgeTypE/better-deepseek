@@ -922,6 +922,10 @@ export const DEFAULT_SETTINGS = {
   autoDownloadLongWorkZip: false,
   githubToken: "",
   voiceMode: false,
+  // Prefer DeepSeek's own neural voices (server-side TTS) for auto-read. Falls
+  // back to the Web Speech API whenever the native path is unavailable — no
+  // AudioDecoder (Firefox), no ticket, unsupported language, or a stream error.
+  nativeVoice: true,
   voiceLanguage: (typeof navigator !== 'undefined' ? navigator.language : 'en-US'),
   // False until the user is asked to pick a speech language on first Live Mode /
   // voice-input use. The one-off prompt flips this so it never nags again.

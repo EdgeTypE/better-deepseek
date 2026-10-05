@@ -24,6 +24,7 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
 
   const SESSION_FETCH_URL = "/api/v0/chat_session/fetch_page";
   const HISTORY_MSGS_URL = "/api/v0/chat/history_messages";
+  const TTS_TICKET_URL = "/api/v0/auth/ticket";
 
   const CHAT_COMPLETION_PATH = "/api/v0/chat/completion";
 
@@ -228,6 +229,9 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
       const response = await _originalFetch(url, { method: "GET", headers, credentials: "include" });
       if (!response.ok) {
         console.warn("[BDS] history_mgs fetch failed:", response.status);
+        window.dispatchEvent(new CustomEvent("bds:history-msgs-error", {
+          detail: JSON.stringify({ sessionId, error: `http ${response.status}` }),
+        }));
         return;
       }
       const data = await response.json();
@@ -235,7 +239,54 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
       window.dispatchEvent(new CustomEvent("bds:history-msgs", { detail: JSON.stringify(data) }));
     } catch (e) {
       console.warn("[BDS] history_msgs fetch error:", e);
+      window.dispatchEvent(new CustomEvent("bds:history-msgs-error", {
+        detail: JSON.stringify({ sessionId, error: String((e && e.message) || e) }),
+      }));
     }
+  });
+
+  // ── Listen for on-demand TTS ticket requests ──
+  // DeepSeek's native voice stream is authorized by a short-lived ticket
+  // (`POST /api/v0/auth/ticket {scope:"tts"}`). The request carries the same
+  // Bearer token the app itself sends, and that token only exists in the MAIN
+  // world — so the fetch happens here and the ticket is handed back as an event.
+  window.addEventListener("bds:request-tts-ticket", async (event) => {
+    let detail = event && event.detail ? event.detail : {};
+    if (typeof detail === "string") {
+      try { detail = JSON.parse(detail); } catch { return; }
+    }
+    const id = detail?.id;
+    if (!id) return;
+
+    const headers = { "Content-Type": "application/json" };
+    if (state.authToken) {
+      headers["Authorization"] = `Bearer ${state.authToken}`;
+    }
+
+    let result = { ok: false, error: "request failed" };
+    try {
+      const response = await _originalFetch(TTS_TICKET_URL, {
+        method: "POST",
+        headers,
+        credentials: "include",
+        body: JSON.stringify({ scope: "tts" }),
+      });
+      if (!response.ok) {
+        result = { ok: false, error: `http ${response.status}` };
+      } else {
+        const data = await response.json();
+        const ticket = data?.data?.biz_data?.ticket;
+        result = ticket
+          ? { ok: true, ticket }
+          : { ok: false, error: "no ticket in response" };
+      }
+    } catch (e) {
+      result = { ok: false, error: String((e && e.message) || e) };
+    }
+
+    window.dispatchEvent(new CustomEvent("bds:tts-ticket", {
+      detail: JSON.stringify({ id, ...result }),
+    }));
   });
 
   // ── Request initial config ──

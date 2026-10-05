@@ -1,4 +1,9 @@
 import { mutatePayload } from "./payload-mutator.js";
+import {
+  emitAssistantMessageId,
+  findMessageIdInSse,
+  isReplyStreamUrl,
+} from "./message-id.js";
 
 /**
  * Patch XMLHttpRequest to intercept chat completion requests.
@@ -105,7 +110,7 @@ export function patchXmlHttpRequest(
         try {
           const responseText = xhrRef.responseText;
           if (responseText) {
-            extractXhrUsageContent(responseText, xhrRef, requestModelName);
+            extractXhrUsageContent(responseText, xhrRef, requestModelName, meta.url);
           }
         } catch (e) {}
       }, { once: true });
@@ -141,7 +146,7 @@ function getXhrBodyText(body) {
   return "";
 }
 
-function extractXhrUsageContent(responseText, xhr, modelName) {
+function extractXhrUsageContent(responseText, xhr, modelName, url) {
   try {
     const contentType = xhr.getResponseHeader?.("content-type") || "";
     if (contentType.includes("text/event-stream") || responseText.startsWith("data: ")) {
@@ -166,6 +171,13 @@ function extractXhrUsageContent(responseText, xhr, modelName) {
             break;
           }
         } catch (e) {}
+      }
+
+      // The same stream carries the id of the reply being generated — the id
+      // DeepSeek's own read-aloud button addresses it by.
+      if (isReplyStreamUrl(url)) {
+        const messageId = findMessageIdInSse(responseText);
+        if (messageId) emitAssistantMessageId(messageId);
       }
     }
   } catch (e) {}

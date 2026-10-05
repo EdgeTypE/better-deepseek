@@ -9,6 +9,7 @@
  */
 
 import state from "./state.js";
+import { devLog } from "../lib/dev-log.js";
 
 const HISTORY_MSGS_TIMEOUT = 10000;
 
@@ -123,12 +124,14 @@ function waitForHistoryData(sessionId) {
 export async function loadAllHistory() {
   const sessionId = getSessionId();
   if (!sessionId) {
+    devLog("Voice", "history: no session id in the URL — nothing requested");
     return null;
   }
 
   // Check per-session pending — never block on a different session's load
   const existing = pendingBySession.get(sessionId);
   if (existing) {
+    devLog("Voice", "history: request already in flight");
     return existing.promise;
   }
 
@@ -157,7 +160,10 @@ export async function loadAllHistory() {
     if (loaded && state.chatMessagesBySession.has(sessionId)) {
       const messages = state.chatMessagesBySession.get(sessionId);
       _fullHistoryLoaded.add(sessionId);
-      if (messages.length > 0) return messages;
+      if (messages.length > 0) {
+        devLog("Voice", `history: ready with ${messages.length} messages`);
+        return messages;
+      }
     }
 
     // loaded but no messages cached (e.g. empty explicit response)
@@ -166,6 +172,9 @@ export async function loadAllHistory() {
       _fullHistoryLoaded.add(sessionId);
     }
 
+    devLog("Voice", loaded
+      ? "history: request answered but no usable messages"
+      : "history: timed out waiting for the request");
     return null;
   })();
 

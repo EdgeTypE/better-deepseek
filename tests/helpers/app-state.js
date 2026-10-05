@@ -53,6 +53,8 @@ export function resetAppState(overrides = {}) {
   };
   state.mcpServers = [];
   state.mcpToolSchemas = [];
+  state.chatMessagesBySession.clear();
+  state.assistantMessageIds = new Map();
 
   Object.assign(state, overrides);
   return state;

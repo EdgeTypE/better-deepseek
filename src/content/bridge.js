@@ -12,6 +12,7 @@ import { getDeepCodeFiles, buildDeepCodeFileTree } from "./deep-code.js";
 import { discoverTags } from "./tags/tag-manager.js";
 import { recordOutgoingContext, recordServerUsage } from "./context-budget.js";
 import { retainOnlyHistorySession } from "./load-all-history.js";
+import { devLog } from "../lib/dev-log.js";
 import {
   coalesceMcpDiscovery,
   evictMcpDiscovery,
@@ -92,6 +93,39 @@ export function setupBridgeEvents() {
     handleHistoryMessages(data);
   };
   window.addEventListener("bds:history-msgs", handlers["bds:history-msgs"]);
+
+  // The completion stream reported which message the reply it just generated
+  // became. Native synthesis addresses messages by exactly that id, so keep the
+  // freshest one per session.
+  handlers["bds:assistant-message-id"] = (event) => {
+    let detail = event.detail;
+    if (typeof detail === "string") {
+      try { detail = JSON.parse(detail); } catch (e) { return; }
+    }
+    const messageId = detail?.messageId;
+    const sessionId = detail?.sessionId;
+    if (!messageId || !sessionId) return;
+
+    state.assistantMessageIds.set(sessionId, String(messageId));
+    // Only the current session is ever consulted; keep the map from growing.
+    while (state.assistantMessageIds.size > 5) {
+      const oldest = state.assistantMessageIds.keys().next().value;
+      state.assistantMessageIds.delete(oldest);
+    }
+    devLog("Voice", `stream reported assistant message id ${messageId} for ${sessionId}`);
+  };
+  window.addEventListener("bds:assistant-message-id", handlers["bds:assistant-message-id"]);
+
+  // The MAIN world could not fetch the history at all (no token, http error,
+  // network failure). Surface it where the voice diagnostics can see it.
+  handlers["bds:history-msgs-error"] = (event) => {
+    let detail = event.detail;
+    if (typeof detail === "string") {
+      try { detail = JSON.parse(detail); } catch (e) { return; }
+    }
+    devLog("Voice", `history: request failed (${detail?.error || "unknown"})`);
+  };
+  window.addEventListener("bds:history-msgs-error", handlers["bds:history-msgs-error"]);
 
   handlers["bds:token-usage"] = (event) => {
     let data = event.detail;
@@ -211,34 +245,41 @@ function handleSessionData(data) {
  */
 function handleHistoryMessages(data) {
   const bizData = data?.data?.biz_data;
-  if (!bizData) return;
+  if (!bizData) {
+    devLog("Voice", "history: payload has no biz_data");
+    return;
+  }
 
   const sessionId = bizData.chat_session?.id;
-  if (!sessionId) return;
+  if (!sessionId) {
+    devLog("Voice", "history: payload has no chat_session.id");
+    return;
+  }
 
   // Require exact match with current URL session — ignore stale responses
   const match = String(location.href || "").match(/\/chat\/s\/([^/?#]+)/);
   const currentSessionId = match ? match[1] : null;
-  if (!currentSessionId || sessionId !== currentSessionId) return;
+  if (!currentSessionId || sessionId !== currentSessionId) {
+    devLog("Voice", `history: session mismatch (payload ${sessionId} vs url ${currentSessionId})`);
+    return;
+  }
 
   // Reject malformed payloads — only arrays (including empty) are valid.
   // Non-array chat_messages cannot complete a request; a later valid
   // response must still be accepted.
   const incomingMessages = bizData.chat_messages;
-  if (!Array.isArray(incomingMessages)) return;
+  if (!Array.isArray(incomingMessages)) {
+    devLog("Voice", "history: chat_messages is not an array");
+    return;
+  }
 
   // Validate every entry before mutating cache state.
-  // Reject the entire payload if any entry is not a non-null object with
-  // a non-empty message_id. A later valid response remains accepted.
+  // Reject the entire payload if any entry is not a non-null object with a
+  // usable message_id. A later valid response remains accepted.
   for (const msg of incomingMessages) {
-    if (
-      !msg ||
-      typeof msg !== "object" ||
-      Array.isArray(msg) ||
-      Object.getPrototypeOf(msg) !== Object.prototype ||
-      typeof msg.message_id !== "string" ||
-      !msg.message_id.trim()
-    ) {
+    const reason = describeInvalidMessage(msg);
+    if (reason) {
+      devLog("Voice", `history: rejected payload (${reason})`);
       return;
     }
   }
@@ -256,9 +297,13 @@ function handleHistoryMessages(data) {
   const existingIds = new Set(existing.map(m => m.message_id));
 
   for (const msg of incomingMessages) {
-    if (!existingIds.has(msg.message_id)) {
+    // The live API sends `message_id` as a number. Normalise on the way in so
+    // dedupe and every downstream consumer see one type.
+    const id = String(msg.message_id);
+    if (!existingIds.has(id)) {
+      msg.message_id = id;
       existing.push(msg);
-      existingIds.add(msg.message_id);
+      existingIds.add(id);
     }
   }
 
@@ -276,6 +321,34 @@ function handleHistoryMessages(data) {
   if (state.settings.showTimestamps) {
     scheduleScan();
   }
+
+  devLog("Voice", `history: stored ${existing.length} messages for ${sessionId}`);
+}
+
+/**
+ * Why an API message entry is unusable, or `null` when it is fine.
+ *
+ * The same checks as before, but naming the failure — this validation rejects
+ * the *whole* payload, so a silent `return` used to leave callers with no idea
+ * why the history never arrived.
+ *
+ * `message_id` is accepted as a string **or** a number: the live API sends
+ * numbers, and demanding a string rejected every real payload.
+ */
+function describeInvalidMessage(msg) {
+  if (!msg) return "entry is null";
+  if (typeof msg !== "object") return `entry is ${typeof msg}`;
+  if (Array.isArray(msg)) return "entry is an array";
+  if (Object.getPrototypeOf(msg) !== Object.prototype) return "entry has a custom prototype";
+
+  const id = msg.message_id;
+  if (typeof id === "number") {
+    if (!Number.isFinite(id)) return "message_id is not a finite number";
+  } else if (typeof id !== "string") {
+    return `message_id is ${id === null ? "null" : typeof id}`;
+  }
+  if (!String(id).trim()) return "message_id is blank";
+  return null;
 }
 
 /**

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const scannerMocks = vi.hoisted(() => ({
   findLatestAssistantMessageNode: vi.fn(),
@@ -257,14 +257,72 @@ describe("handleHistoryMessages validation", () => {
     expect(state.chatMessagesBySession.has("test-session-1")).toBe(false);
   });
 
-  it("rejects an entry with non-string message_id", async () => {
+  it("accepts a numeric message_id and normalises it to a string", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+
+    // The live API sends numbers. Demanding a string here rejected every real
+    // history payload, which silently disabled precise timestamps, export
+    // message pairing and native voice.
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [{ message_id: 12345, role: "user" }],
+        },
+      },
+    });
+
+    const stored = state.chatMessagesBySession.get("test-session-1");
+    expect(stored).toHaveLength(1);
+    expect(stored[0].message_id).toBe("12345");
+  });
+
+  it("deduplicates a numeric id against an already-stored string id", async () => {
     const state = (await import("../../src/content/state.js")).default;
 
     dispatchHistory({
       data: {
         biz_data: {
           chat_session: { id: "test-session-1" },
-          chat_messages: [{ message_id: 12345, role: "user" }],
+          chat_messages: [{ message_id: "7", role: "user" }],
+        },
+      },
+    });
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [{ message_id: 7, role: "user" }],
+        },
+      },
+    });
+
+    expect(state.chatMessagesBySession.get("test-session-1")).toHaveLength(1);
+  });
+
+  it("rejects an entry with a boolean message_id", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [{ message_id: true, role: "user" }],
+        },
+      },
+    });
+
+    expect(state.chatMessagesBySession.has("test-session-1")).toBe(false);
+  });
+
+  it("rejects an entry with a non-finite numeric message_id", async () => {
+    const state = (await import("../../src/content/state.js")).default;
+
+    dispatchHistory({
+      data: {
+        biz_data: {
+          chat_session: { id: "test-session-1" },
+          chat_messages: [{ message_id: Number.NaN, role: "user" }],
         },
       },
     });
@@ -493,5 +551,49 @@ describe("setupBridgeEvents lifecycle", () => {
     c();
     c();
     c();
+  });
+});
+
+describe("bds:assistant-message-id", () => {
+  beforeAll(() => {
+    setupBridgeEvents();
+  });
+
+  beforeEach(() => {
+    resetAppState();
+  });
+
+  function dispatchMessageId(detail) {
+    window.dispatchEvent(new CustomEvent("bds:assistant-message-id", {
+      detail: typeof detail === "string" ? detail : JSON.stringify(detail),
+    }));
+  }
+
+  it("stores the id the completion stream reported for a session", () => {
+    dispatchMessageId({ messageId: "42", sessionId: "s1" });
+
+    expect(state.assistantMessageIds.get("s1")).toBe("42");
+  });
+
+  it("accepts a pre-stringified detail", () => {
+    dispatchMessageId('{"messageId":"9","sessionId":"s2"}');
+
+    expect(state.assistantMessageIds.get("s2")).toBe("9");
+  });
+
+  it("ignores events that are missing either id", () => {
+    dispatchMessageId({ messageId: "42" });
+    dispatchMessageId({ sessionId: "s1" });
+
+    expect(state.assistantMessageIds.size).toBe(0);
+  });
+
+  it("stays bounded and keeps the newest session", () => {
+    for (let i = 0; i < 12; i++) {
+      dispatchMessageId({ messageId: `m${i}`, sessionId: `s${i}` });
+    }
+
+    expect(state.assistantMessageIds.size).toBeLessThanOrEqual(5);
+    expect(state.assistantMessageIds.get("s11")).toBe("m11");
   });
 });

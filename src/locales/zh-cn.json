@@ -109,6 +109,8 @@
       "injectionInterval": "注入间隔（N）",
       "injectEveryN": "每 {{n}} 条消息注入一次提示词。",
       "voiceMode": "语音模式（自动朗读回复）",
+      "nativeVoice": "使用 DeepSeek 原生语音",
+      "nativeVoiceHint": "使用 DeepSeek 自有的神经网络语音朗读回复，而不是浏览器的语音合成。当原生语音不可用时（不支持的语言、Firefox 或音频流失败）会自动回退到浏览器语音。",
       "autoSubmitVoice": "语音输入后自动发送",
       "speechLanguage": "语音语言",
       "voiceURI": "音色",

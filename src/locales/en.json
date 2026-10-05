@@ -109,6 +109,8 @@
       "injectionInterval": "Injection Interval (N)",
       "injectEveryN": "Inject the prompt every {{n}} messages.",
       "voiceMode": "Voice Mode (Auto-read responses)",
+      "nativeVoice": "Use DeepSeek's native voice",
+      "nativeVoiceHint": "Reads replies with DeepSeek's own neural voices instead of the browser's speech synthesis. Falls back to the browser voice automatically when the native voice is unavailable (unsupported language, Firefox, or a failed stream).",
       "autoSubmitVoice": "Auto-submit after speech",
       "speechLanguage": "Speech Language",
       "voiceURI": "Voice",

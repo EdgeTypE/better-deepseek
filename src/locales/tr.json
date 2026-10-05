@@ -109,6 +109,8 @@
       "injectionInterval": "Enjeksiyon Aralığı (N)",
       "injectEveryN": "Yönergeyi her {{n}} mesajda bir enjekte et.",
       "voiceMode": "Ses Modu (Yanıtları otomatik oku)",
+      "nativeVoice": "DeepSeek'in kendi sesini kullan",
+      "nativeVoiceHint": "Yanıtları tarayıcının konuşma sentezleyicisi yerine DeepSeek'in kendi nöral sesleriyle okur. Native ses kullanılamadığında (desteklenmeyen dil, Firefox veya akış hatası) kendiliğinden tarayıcı sesine düşer.",
       "autoSubmitVoice": "Konuşma bitince otomatik gönder",
       "speechLanguage": "Konuşma Dili",
       "voiceURI": "Ses",

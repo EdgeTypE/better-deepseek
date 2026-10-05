@@ -36,6 +36,13 @@ import {
 import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun, handleAutoMcpCall, handleAutoFileRead, handleAutoSearchInDirectory, handleAutoListDir, findChatEditor } from "./auto.js";
 import { handleManagedAutoContinuation, isManagedRunActive, trySynthesizeReport } from "./deep-research.js";
 import { cleanTextForSpeech, getBestVoice, softenPunctuationForSpeech } from "./live/tts-utils.js";
+import {
+  isNativeVoiceSupported,
+  speakNativeResponse,
+  stopNativeSpeech,
+} from "./live/native-tts.js";
+import { loadAllHistory } from "./load-all-history.js";
+import { devLog } from "../lib/dev-log.js";
 
 import {
   safeAppendChild,
@@ -65,6 +72,29 @@ const processedFileReadResultCards = new WeakSet();
 const processedDirSearchResultCards = new WeakSet();
 const processedDirListResultCards = new WeakSet();
 const pricingContributions = new Map();
+
+/**
+ * How long a message's text has to stay unchanged before it counts as settled.
+ *
+ * `isSettled` gates the final re-parse (tag force-closing) and voice mode's
+ * auto-read, so this is a behavioural threshold rather than a tuning knob.
+ */
+const SETTLE_STALL_MS = 2500;
+
+/**
+ * Extra margin on top of SETTLE_STALL_MS before the self-armed settle re-check
+ * fires, so the re-check always lands strictly past the threshold.
+ */
+const SETTLE_RECHECK_MARGIN_MS = 120;
+
+/**
+ * How long auto-read waits for the API message ids before settling for Web
+ * Speech. Only reached when the pre-warm has not already filled the cache, so
+ * it is a safety net for a slow round-trip rather than the normal path — and it
+ * only applies where native synthesis is actually possible (a browser without
+ * WebCodecs is filtered out earlier and never waits).
+ */
+const NATIVE_TARGET_GRACE_MS = 2500;
 
 function removePricingContribution(node) {
   const previous = pricingContributions.get(node);
@@ -124,6 +154,7 @@ export function disposeMessageNode(node) {
   if (stateData) {
     if (stateData.autoTimer) { clearTimeout(stateData.autoTimer); stateData.autoTimer = null; }
     if (stateData.stallTimer) { clearTimeout(stateData.stallTimer); stateData.stallTimer = null; }
+    if (stateData.voiceTimer) { clearTimeout(stateData.voiceTimer); stateData.voiceTimer = null; }
     if (stateData.deepResearchTimer) { clearTimeout(stateData.deepResearchTimer); stateData.deepResearchTimer = null; }
   }
 
@@ -650,12 +681,42 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
   }
 
   const timeSinceUpdate = now - (stateData.lastUpdateAt || now);
-  const isStalled = timeSinceUpdate > 2500;
+  const isStalled = timeSinceUpdate > SETTLE_STALL_MS;
 
   // Fix false positives: a message cannot be completely settled if it's currently mutating
   let isSettled = isMessageFinished(node, cachedIsLatestAssistant, cachedSystemGenerating);
   if (!isStalled) {
     isSettled = false;
+  }
+
+  // --- VOICE MODE (AUTO-READ): SELF-ARMED SETTLE RE-CHECK ---
+  // `isSettled` is time-based: it can only become true once the text has been
+  // quiet for SETTLE_STALL_MS. Scans, however, are mutation-driven, and by
+  // definition no mutation arrives once the stream stops — so the scan that
+  // would observe the stall never runs, and the response is only read aloud
+  // when some unrelated scan (window focus, tab visibility, a settings change)
+  // happens to fire. That is why auto-read looks broken until you alt+tab.
+  // Arm the re-check here instead of waiting for that accident.
+  if (
+    !isStalled &&
+    role === "assistant" &&
+    isLatestAssistant &&
+    state.settings.voiceMode &&
+    !state.liveMode?.active &&
+    !readMessages.has(node)
+  ) {
+    if (stateData.voiceTimer) clearTimeout(stateData.voiceTimer);
+    stateData.voiceTimer = setTimeout(() => {
+      stateData.voiceTimer = null;
+      // Warm the API message list *after* the stream has stopped. Asking any
+      // earlier can snapshot a session that does not contain this reply yet,
+      // and `loadAllHistory` caches that snapshot as complete — which would
+      // leave auto-read with no id (or the wrong one) for the rest of the
+      // session. The re-check below runs right after, so the request still
+      // overlaps with it.
+      prewarmNativeVoiceTarget(stateData);
+      scheduleMessageScan(node);
+    }, Math.max(0, SETTLE_STALL_MS - timeSinceUpdate) + SETTLE_RECHECK_MARGIN_MS);
   }
 
   // Include settlement state in hash so transition to 'finished' triggers a final re-parse
@@ -1360,6 +1421,13 @@ function syncVisibilityState(node, isLatestAssistant, stateData, isSettled) {
   if (isLatestAssistant && isSettled && state.settings.voiceMode && !state.liveMode?.active) {
     if (!readMessages.has(node)) {
       readMessages.add(node);
+      devLog("Voice", "auto-read fired", {
+        chars: (stateData.lastRawText || "").length,
+        nativeVoice: state.settings.nativeVoice,
+        support: describeNativeVoiceSupport(),
+        sessionId: getCurrentConversationIdInline(),
+        href: location.href,
+      });
       playVoiceResponse(stateData.lastRawText);
     }
   }
@@ -1398,13 +1466,199 @@ function applyAutoDirectionToMessage(node) {
   }
 }
 /**
- * Play voice response using Web Speech Synthesis.
+ * Read a reply aloud, preferring DeepSeek's own voice.
+ *
+ * The native path is tried first when enabled and supported, and any failure
+ * (no ticket, unsupported language, stream error, no WebCodecs) falls back to
+ * the Web Speech API — so auto-read always speaks, just with a worse voice.
  */
 function playVoiceResponse(text) {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return;
+  stopNativeSpeech();
+
+  const blocked = nativeVoiceBlockReason(text);
+  if (blocked) {
+    devLog("Voice", `auto-read: Web Speech — native unavailable (${blocked})`);
+    playVoiceResponseWithWebSpeech(text);
+    return;
+  }
+
+  const target = resolveNativeVoiceTarget();
+  if (target) {
+    devLog("Voice", "auto-read: native", target);
+    speakNativeWithFallback(target, text);
+    return;
+  }
+
+  // No API message id (yet). The pre-warm normally beat us here; give a slow
+  // round-trip a short grace, then settle for Web Speech rather than staying
+  // silent any longer.
+  devLog("Voice", `auto-read: no message id yet (${describeCachedMessages()}), waiting ${NATIVE_TARGET_GRACE_MS}ms`);
+  withGrace(loadAllHistory(), NATIVE_TARGET_GRACE_MS)
+    .then(() => {
+      const late = resolveNativeVoiceTarget();
+      if (late) {
+        devLog("Voice", "auto-read: native (id arrived late)", late);
+        speakNativeWithFallback(late, text);
+      } else {
+        devLog("Voice", "auto-read: Web Speech — no message id arrived");
+        playVoiceResponseWithWebSpeech(text);
+      }
+    })
+    .catch((error) => {
+      devLog("Voice", "auto-read: Web Speech — id lookup failed:", error);
+      playVoiceResponseWithWebSpeech(text);
+    });
+}
+
+/**
+ * Why native synthesis is not an option for this reply, or `null` when it is.
+ * One function so the reason can be logged verbatim instead of guessed at.
+ */
+function nativeVoiceBlockReason(text) {
+  if (state.settings.nativeVoice === false) return "setting turned off";
+  if (hasBdsTags(text)) return "reply contains BDS tags";
+  if (!isNativeVoiceSupported()) {
+    return `browser cannot decode opus (${describeNativeVoiceSupport()})`;
+  }
+  return null;
+}
+
+/** Name the WebCodecs pieces this browser is missing, for the log. */
+function describeNativeVoiceSupport() {
+  const missing = [];
+  if (typeof window.AudioDecoder !== "function") missing.push("AudioDecoder");
+  if (typeof window.AudioContext !== "function") missing.push("AudioContext");
+  if (typeof window.WebSocket !== "function") missing.push("WebSocket");
+  return missing.length ? `missing ${missing.join(", ")}` : "all present";
+}
+
+/** Summarise what the API message cache holds for the current session. */
+function describeCachedMessages() {
+  const sessionId = getCurrentConversationIdInline();
+  const fromStream = state.assistantMessageIds?.get(sessionId);
+  if (fromStream) return `stream id: ${fromStream}`;
+  const cached = state.chatMessagesBySession?.get(sessionId);
+  if (!Array.isArray(cached)) return `cache: none for ${sessionId}`;
+  const assistants = cached.filter(
+    (message) => String(message?.role || "").toUpperCase() === "ASSISTANT",
+  ).length;
+  return `cache: ${cached.length} messages, ${assistants} assistant`;
+}
+
+/**
+ * Try DeepSeek's own voice, and hand the reply to Web Speech if it does not
+ * actually produce audio.
+ */
+function speakNativeWithFallback(target, text) {
+  speakNativeResponse(target)
+    .then((result) => {
+      if (result.ok) return;
+      devLog("Voice", "falling back to Web Speech:", result.reason);
+      playVoiceResponseWithWebSpeech(text);
+    })
+    .catch((error) => {
+      devLog("Voice", "unexpected failure:", error);
+      playVoiceResponseWithWebSpeech(text);
+    });
+}
+
+/** Resolve once `promise` settles or `ms` elapses, whichever comes first. */
+function withGrace(promise, ms) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    const done = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    promise.then(done, done);
+  });
+}
+
+/**
+ * Warm the API message list ahead of the read, once per message node.
+ *
+ * Without this the native path never fires on a fresh session: nothing else in
+ * the default configuration asks DeepSeek for the session's messages, so
+ * `chatMessagesBySession` stays empty and there is no `message_id` to
+ * synthesize. `loadAllHistory` caches its result per session.
+ */
+function prewarmNativeVoiceTarget(stateData) {
+  if (stateData.nativePrewarmed) return;
+  if (!shouldPrepareNativeVoice()) return;
+  if (resolveNativeVoiceTarget()) return;
+
+  stateData.nativePrewarmed = true;
+  devLog("Voice", "prewarming API message ids");
+  loadAllHistory().catch((error) => {
+    devLog("Voice", "history prewarm failed:", error);
+  });
+}
+
+function shouldPrepareNativeVoice() {
+  return state.settings.nativeVoice !== false && isNativeVoiceSupported();
+}
+
+/**
+ * Native TTS speaks the message DeepSeek has stored, so a reply carrying BDS
+ * tags would have the tags read out verbatim. Those replies stay on Web Speech,
+ * which speaks the cleaned visible text instead.
+ */
+function hasBdsTags(text) {
+  return /(?:<|\[)\/?(?:BDS|BetterDeepSeek):/i.test(String(text || ""));
+}
+
+/**
+ * Resolve the DeepSeek message id to synthesize.
+ *
+ * Two sources, freshest first:
+ *
+ *   1. `state.assistantMessageIds` — the id the completion stream reported for
+ *      the reply it just generated. Costs nothing and cannot be stale, so it is
+ *      the normal path.
+ *   2. `state.chatMessagesBySession` — the session's API message list, last
+ *      assistant entry. Only populated by export / select-all / the voice
+ *      pre-warm, so it is the fallback for a stream that yielded no id.
+ *
+ * With neither, the caller falls back to Web Speech.
+ */
+function resolveNativeVoiceTarget() {
+  const sessionId = getCurrentConversationIdInline();
+  if (!sessionId) return null;
+
+  // Freshest source first: the completion stream reported the id of the reply it
+  // just generated. No request, and it cannot be a stale snapshot.
+  const fromStream = state.assistantMessageIds?.get(sessionId);
+  if (fromStream) return { sessionId, messageId: String(fromStream) };
+
+  const messages = state.chatMessagesBySession?.get(sessionId);
+  if (!Array.isArray(messages)) return null;
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (
+      String(message?.role || "").toUpperCase() === "ASSISTANT" &&
+      message.message_id
+    ) {
+      return { sessionId, messageId: String(message.message_id) };
+    }
+  }
+  return null;
+}
+
+/**
+ * Play voice response using Web Speech Synthesis.
+ */
+function playVoiceResponseWithWebSpeech(text) {
+  if (typeof window === 'undefined' || !window.speechSynthesis) {
+    devLog("Voice", "Web Speech unavailable: no speechSynthesis");
+    return;
+  }
 
   const cleanText = cleanTextForSpeech(text);
-  if (!cleanText) return;
+  if (!cleanText) {
+    devLog("Voice", "Web Speech skipped: nothing left to say");
+    return;
+  }
 
   const utterance = new SpeechSynthesisUtterance(softenPunctuationForSpeech(cleanText));
   utterance.lang = state.settings.voiceLanguage || navigator.language || 'en-US';
@@ -1415,6 +1669,7 @@ function playVoiceResponse(text) {
   const voice = getBestVoice(utterance.lang, state.settings.voiceURI || "");
   if (voice) utterance.voice = voice;
 
+  devLog("Voice", "Web Speech speaking", { lang: utterance.lang, chars: cleanText.length });
   window.speechSynthesis.speak(utterance);
 }
 
@@ -1581,7 +1836,10 @@ function extractThinkingTextInline(node) {
 }
 
 function getCurrentConversationIdInline() {
-  const match = location.href.match(/\/chat\/s\/([^\/]+)/);
+  // Must stop at `?`/`#` exactly like bridge.js does, otherwise a session URL
+  // carrying a query or hash yields an id that never matches the keys in
+  // `chatMessagesBySession`.
+  const match = location.href.match(/\/chat\/s\/([^/?#]+)/);
   return match ? match[1] : "default";
 }
 const nodeTimeMap = new WeakMap();

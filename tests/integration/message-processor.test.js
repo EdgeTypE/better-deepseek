@@ -45,6 +45,13 @@ const mocks = vi.hoisted(() => ({
     return { component, props, target };
   }),
   unmount: vi.fn(),
+  // Native voice is opt-in per test: the default keeps every other test on the
+  // Web Speech path it was written against.
+  isNativeVoiceSupported: vi.fn(() => false),
+  speakNativeResponse: vi.fn(() => Promise.resolve({ ok: false, reason: "not stubbed" })),
+  stopNativeSpeech: vi.fn(),
+  loadAllHistory: vi.fn(() => Promise.resolve(null)),
+  devLog: vi.fn(),
 }));
 
 vi.mock("../../src/content/scanner.js", () => ({
@@ -101,6 +108,19 @@ vi.mock("svelte", async () => {
   const actual = await vi.importActual("svelte");
   return { ...actual, mount: mocks.mount, unmount: mocks.unmount };
 });
+vi.mock("../../src/content/live/native-tts.js", () => ({
+  isNativeVoiceSupported: mocks.isNativeVoiceSupported,
+  speakNativeResponse: mocks.speakNativeResponse,
+  stopNativeSpeech: mocks.stopNativeSpeech,
+}));
+vi.mock("../../src/content/load-all-history.js", async () => {
+  const actual = await vi.importActual("../../src/content/load-all-history.js");
+  return { ...actual, loadAllHistory: mocks.loadAllHistory };
+});
+vi.mock("../../src/lib/dev-log.js", async () => {
+  const actual = await vi.importActual("../../src/lib/dev-log.js");
+  return { ...actual, devLog: mocks.devLog };
+});
 
 import {
   disposeMessageNode,
@@ -154,6 +174,12 @@ describe("message processor integration", () => {
       target.appendChild(marker);
       return { component, props, target };
     });
+    mocks.isNativeVoiceSupported.mockImplementation(() => false);
+    mocks.speakNativeResponse.mockImplementation(() =>
+      Promise.resolve({ ok: false, reason: "not stubbed" }),
+    );
+    mocks.stopNativeSpeech.mockImplementation(() => {});
+    mocks.loadAllHistory.mockImplementation(() => Promise.resolve(null));
     document.body.innerHTML = "";
     vi.useFakeTimers();
   });
@@ -802,6 +828,411 @@ describe("message processor integration", () => {
     expect(spoken).toContain("Formula $a^2 + b^2$ here");
   });
 
+  it("re-checks the settle window on its own so auto-read fires without an external scan", () => {
+    const speak = vi.fn();
+    window.speechSynthesis = {
+      cancel: vi.fn(),
+      getVoices: () => [{ lang: "en-US" }],
+      speak,
+    };
+    state.settings.voiceMode = true;
+    // The scanner re-enters the processor when a queued scan fires.
+    mocks.scheduleMessageScan.mockImplementation((n) => processMessageNode(n));
+
+    const node = createMessageNode("Hello there");
+
+    // First scan lands while the text is still fresh, so `isSettled` is false.
+    processMessageNode(node);
+    expect(speak).not.toHaveBeenCalled();
+
+    // After this point nothing touches the DOM. In the real app the stream has
+    // stopped mutating, so no scan is queued by the MutationObserver — the only
+    // way the message can ever be read is a re-check the processor arms itself.
+    vi.advanceTimersByTime(3000);
+
+    expect(speak).toHaveBeenCalledOnce();
+    expect(speak.mock.calls[0][0].text).toBe("Hello there");
+  });
+
+  it("does not arm settle re-checks while voice mode is off", () => {
+    state.settings.voiceMode = false;
+    const node = createMessageNode("Hello there");
+
+    processMessageNode(node);
+    vi.advanceTimersByTime(3000);
+
+    expect(mocks.scheduleMessageScan).not.toHaveBeenCalled();
+  });
+
+  describe("native voice", () => {
+    /** Speak the node once and let the native promise chain settle. */
+    async function speakOnce(node) {
+      processMessageNode(node);
+      vi.advanceTimersByTime(3000);
+      processMessageNode(node);
+      for (let i = 0; i < 6; i++) await Promise.resolve();
+    }
+
+    function stubSpeech() {
+      const speak = vi.fn();
+      window.speechSynthesis = {
+        cancel: vi.fn(),
+        getVoices: () => [{ lang: "en-US" }],
+        speak,
+      };
+      state.settings.voiceMode = true;
+      state.settings.nativeVoice = true;
+      return speak;
+    }
+
+    afterEach(() => {
+      if (location.pathname !== "/") window.history.pushState({}, "", "/");
+    });
+
+    /** API messages for the "default" conversation the test URL resolves to. */
+    function stubApiMessages(messages) {
+      state.chatMessagesBySession.clear();
+      if (messages) state.chatMessagesBySession.set("default", messages);
+    }
+
+    it("prefers DeepSeek's own voice and never reaches Web Speech", async () => {
+      const speak = stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      mocks.speakNativeResponse.mockResolvedValue({ ok: true });
+      stubApiMessages([
+        { message_id: "m1", role: "USER" },
+        { message_id: "m2", role: "ASSISTANT" },
+      ]);
+
+      await speakOnce(createMessageNode("Hello there"));
+
+      expect(mocks.speakNativeResponse).toHaveBeenCalledWith({
+        sessionId: "default",
+        messageId: "m2",
+      });
+      expect(speak).not.toHaveBeenCalled();
+    });
+
+    it("takes the newest assistant id, not the newest entry", async () => {
+      stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      mocks.speakNativeResponse.mockResolvedValue({ ok: true });
+      stubApiMessages([
+        { message_id: "m1", role: "ASSISTANT" },
+        { message_id: "m2", role: "USER" },
+      ]);
+
+      await speakOnce(createMessageNode("Hello there"));
+
+      expect(mocks.speakNativeResponse).toHaveBeenCalledWith({
+        sessionId: "default",
+        messageId: "m1",
+      });
+    });
+
+    it("falls back to Web Speech when the native stream fails", async () => {
+      const speak = stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      mocks.speakNativeResponse.mockResolvedValue({ ok: false, reason: "ticket: http 401" });
+      stubApiMessages([{ message_id: "m2", role: "ASSISTANT" }]);
+
+      await speakOnce(createMessageNode("Hello there"));
+
+      expect(mocks.speakNativeResponse).toHaveBeenCalledOnce();
+      expect(speak).toHaveBeenCalledOnce();
+      expect(speak.mock.calls[0][0].text).toBe("Hello there");
+    });
+
+    it("falls back to Web Speech when native rejects", async () => {
+      const speak = stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      mocks.speakNativeResponse.mockRejectedValue(new Error("boom"));
+      stubApiMessages([{ message_id: "m2", role: "ASSISTANT" }]);
+
+      await speakOnce(createMessageNode("Hello there"));
+
+      expect(speak).toHaveBeenCalledOnce();
+    });
+
+    it("skips the native attempt when the browser cannot decode opus", async () => {
+      const speak = stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(false);
+      stubApiMessages([{ message_id: "m2", role: "ASSISTANT" }]);
+
+      await speakOnce(createMessageNode("Hello there"));
+
+      expect(mocks.speakNativeResponse).not.toHaveBeenCalled();
+      expect(speak).toHaveBeenCalledOnce();
+    });
+
+    it("skips the native attempt when the session has no API message id", async () => {
+      const speak = stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      stubApiMessages(null);
+
+      await speakOnce(createMessageNode("Hello there"));
+
+      expect(mocks.speakNativeResponse).not.toHaveBeenCalled();
+      expect(speak).toHaveBeenCalledOnce();
+    });
+
+    it("skips the native attempt when the user turned the setting off", async () => {
+      const speak = stubSpeech();
+      state.settings.nativeVoice = false;
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      stubApiMessages([{ message_id: "m2", role: "ASSISTANT" }]);
+
+      await speakOnce(createMessageNode("Hello there"));
+
+      expect(mocks.speakNativeResponse).not.toHaveBeenCalled();
+      expect(speak).toHaveBeenCalledOnce();
+    });
+
+    it("keeps replies carrying BDS tags on Web Speech", async () => {
+      const speak = stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      stubApiMessages([{ message_id: "m2", role: "ASSISTANT" }]);
+
+      // DeepSeek synthesizes the *stored* text, so tags would be read verbatim.
+      await speakOnce(
+        createMessageNode("Intro\n<BDS:VISUALIZER><div>viz</div></BDS:VISUALIZER>"),
+      );
+
+      expect(mocks.speakNativeResponse).not.toHaveBeenCalled();
+      expect(speak).toHaveBeenCalledOnce();
+      expect(speak.mock.calls[0][0].text).not.toContain("BDS:VISUALIZER");
+    });
+
+    it("stops any previous native playback before starting a new one", async () => {
+      stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      mocks.speakNativeResponse.mockResolvedValue({ ok: true });
+      stubApiMessages([{ message_id: "m2", role: "ASSISTANT" }]);
+
+      await speakOnce(createMessageNode("Hello there"));
+
+      expect(mocks.stopNativeSpeech).toHaveBeenCalled();
+    });
+
+    it("asks for the API message ids in the background once the stream settles", () => {
+      stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      stubApiMessages(null);
+
+      const node = createMessageNode("Hello there");
+      processMessageNode(node);
+
+      // Not while the text is still fresh: the reply may not be persisted yet,
+      // and `loadAllHistory` would cache that incomplete snapshot as final.
+      expect(mocks.loadAllHistory).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(3000);
+
+      // Without this the native path can never fire on a fresh session: nothing
+      // else in the default configuration populates `chatMessagesBySession`.
+      expect(mocks.loadAllHistory).toHaveBeenCalledOnce();
+    });
+
+    it("does not warm the API ids when the user turned the setting off", () => {
+      stubSpeech();
+      state.settings.nativeVoice = false;
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      stubApiMessages(null);
+
+      processMessageNode(createMessageNode("Hello there"));
+      vi.advanceTimersByTime(3000);
+
+      expect(mocks.loadAllHistory).not.toHaveBeenCalled();
+    });
+
+    it("does not warm the API ids when the browser cannot decode opus", () => {
+      stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(false);
+      stubApiMessages(null);
+
+      processMessageNode(createMessageNode("Hello there"));
+      vi.advanceTimersByTime(3000);
+
+      expect(mocks.loadAllHistory).not.toHaveBeenCalled();
+    });
+
+    it("uses native voice once the warmed ids land", async () => {
+      const speak = stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      mocks.speakNativeResponse.mockResolvedValue({ ok: true });
+      stubApiMessages(null);
+      mocks.loadAllHistory.mockImplementation(() => {
+        state.chatMessagesBySession.set("default", [
+          { message_id: "m9", role: "ASSISTANT" },
+        ]);
+        return Promise.resolve([]);
+      });
+
+      await speakOnce(createMessageNode("Hello there"));
+
+      expect(mocks.speakNativeResponse).toHaveBeenCalledWith({
+        sessionId: "default",
+        messageId: "m9",
+      });
+      expect(speak).not.toHaveBeenCalled();
+    });
+
+    it("waits a short grace for the ids before settling for Web Speech", async () => {
+      const speak = stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      mocks.speakNativeResponse.mockResolvedValue({ ok: true });
+      stubApiMessages(null);
+      mocks.loadAllHistory.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => {
+              state.chatMessagesBySession.set("default", [
+                { message_id: "m7", role: "ASSISTANT" },
+              ]);
+              resolve([]);
+            }, 500);
+          }),
+      );
+
+      const node = createMessageNode("Hello there");
+      processMessageNode(node);
+      vi.advanceTimersByTime(3000);
+      processMessageNode(node);
+
+      // The read is held only for NATIVE_TARGET_GRACE_MS, not the 10s timeout
+      // `loadAllHistory` carries internally.
+      await vi.advanceTimersByTimeAsync(500);
+      for (let i = 0; i < 6; i++) await Promise.resolve();
+
+      expect(mocks.speakNativeResponse).toHaveBeenCalledWith({
+        sessionId: "default",
+        messageId: "m7",
+      });
+      expect(speak).not.toHaveBeenCalled();
+    });
+
+    it("falls back to Web Speech when the ids never arrive", async () => {
+      const speak = stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      stubApiMessages(null);
+      mocks.loadAllHistory.mockImplementation(() => new Promise(() => {}));
+
+      const node = createMessageNode("Hello there");
+      processMessageNode(node);
+      vi.advanceTimersByTime(3000);
+      processMessageNode(node);
+
+      // Bounded by the grace, so a hanging request cannot leave the reply mute.
+      await vi.advanceTimersByTimeAsync(2500);
+      for (let i = 0; i < 6; i++) await Promise.resolve();
+
+      expect(mocks.speakNativeResponse).not.toHaveBeenCalled();
+      expect(speak).toHaveBeenCalledOnce();
+    });
+
+    it("logs which gate kept the reply on Web Speech", async () => {
+      const cases = [
+        {
+          name: "setting turned off",
+          arm: () => { state.settings.nativeVoice = false; },
+          expected: "setting turned off",
+        },
+        {
+          name: "browser cannot decode opus",
+          arm: () => { mocks.isNativeVoiceSupported.mockReturnValue(false); },
+          expected: "cannot decode opus",
+        },
+        {
+          name: "reply carries BDS tags",
+          arm: () => {},
+          text: "Intro\n<BDS:VISUALIZER><div>viz</div></BDS:VISUALIZER>",
+          expected: "BDS tags",
+        },
+      ];
+
+      for (const testCase of cases) {
+        stubSpeech();
+        mocks.isNativeVoiceSupported.mockReturnValue(true);
+        stubApiMessages([{ message_id: "m2", role: "ASSISTANT" }]);
+        mocks.devLog.mockClear();
+        testCase.arm();
+
+        await speakOnce(createMessageNode(testCase.text || "Hello there"));
+
+        const lines = mocks.devLog.mock.calls.map((call) => String(call[1]));
+        expect(
+          lines.some((line) => line.includes(testCase.expected)),
+          `expected a log mentioning "${testCase.expected}", got: ${lines.join(" | ")}`,
+        ).toBe(true);
+      }
+    });
+
+    it("logs when Web Speech actually speaks", async () => {
+      stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(false);
+      stubApiMessages(null);
+
+      await speakOnce(createMessageNode("Hello there"));
+
+      const lines = mocks.devLog.mock.calls.map((call) => String(call[1]));
+      expect(lines.some((line) => line.includes("Web Speech speaking"))).toBe(true);
+    });
+
+    it("uses the id the completion stream reported, without fetching history", async () => {
+      const speak = stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      mocks.speakNativeResponse.mockResolvedValue({ ok: true });
+      stubApiMessages(null);
+      state.assistantMessageIds.set("default", "m11");
+
+      await speakOnce(createMessageNode("Hello there"));
+
+      expect(mocks.speakNativeResponse).toHaveBeenCalledWith({
+        sessionId: "default",
+        messageId: "m11",
+      });
+      expect(speak).not.toHaveBeenCalled();
+      // The stream id is enough on its own, so nothing needs to be requested.
+      expect(mocks.loadAllHistory).not.toHaveBeenCalled();
+    });
+
+    it("prefers the stream id over a possibly stale API cache", async () => {
+      stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      mocks.speakNativeResponse.mockResolvedValue({ ok: true });
+      stubApiMessages([{ message_id: "stale-1", role: "ASSISTANT" }]);
+      state.assistantMessageIds.set("default", "fresh-2");
+
+      await speakOnce(createMessageNode("Hello there"));
+
+      expect(mocks.speakNativeResponse).toHaveBeenCalledWith({
+        sessionId: "default",
+        messageId: "fresh-2",
+      });
+    });
+
+    it("resolves the session id without swallowing a query string", async () => {
+      const speak = stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      mocks.speakNativeResponse.mockResolvedValue({ ok: true });
+      // `handleHistoryMessages` keys the cache by the id up to `?`/`#`; the
+      // lookup here must use the same boundary or it never finds anything.
+      state.chatMessagesBySession.clear();
+      state.chatMessagesBySession.set("sess-1", [
+        { message_id: "m5", role: "ASSISTANT" },
+      ]);
+      window.history.pushState({}, "", "/a/chat/s/sess-1?from=sidebar");
+
+      await speakOnce(createMessageNode("Hello there"));
+
+      expect(mocks.speakNativeResponse).toHaveBeenCalledWith({
+        sessionId: "sess-1",
+        messageId: "m5",
+      });
+      expect(speak).not.toHaveBeenCalled();
+    });
+  });
+
   it("does not re-parse when only the rich markup changes", () => {
     const node = createMessageNode(
       "Intro\n<BDS:VISUALIZER><div>viz</div></BDS:VISUALIZER>",
@@ -845,6 +1276,12 @@ describe("bookmark button injection", () => {
       target.appendChild(marker);
       return { component, props, target };
     });
+    mocks.isNativeVoiceSupported.mockImplementation(() => false);
+    mocks.speakNativeResponse.mockImplementation(() =>
+      Promise.resolve({ ok: false, reason: "not stubbed" }),
+    );
+    mocks.stopNativeSpeech.mockImplementation(() => {});
+    mocks.loadAllHistory.mockImplementation(() => Promise.resolve(null));
     document.body.innerHTML = "";
     vi.useFakeTimers();
     state.ui = { showToast: vi.fn(), showConfirm: vi.fn(() => Promise.resolve(true)) };

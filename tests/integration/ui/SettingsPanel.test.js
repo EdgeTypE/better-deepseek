@@ -237,6 +237,29 @@ describe("SettingsPanel integration", () => {
 
     cleanup();
   });
+
+  it("defaults the native voice toggle on and persists turning it off", async () => {
+    const { target, cleanup } = renderSvelte(SettingsPanel);
+    await flushUi();
+
+    const toggle = target.querySelector("#bds-native-voice");
+    expect(toggle).not.toBeNull();
+    expect(toggle.checked).toBe(true);
+
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushUi();
+
+    target.querySelector("#bds-save-settings").click();
+    await flushUi();
+
+    expect(chrome.storage.local.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bds_settings: expect.objectContaining({ nativeVoice: false }),
+      }),
+    );
+    cleanup();
+  });
 });
 
 describe("SettingsPanel import-all compatibility", () => {

@@ -37,6 +37,7 @@
   let autoFiles = $state(Boolean(appState.settings.autoDownloadFiles));
   let autoZip = $state(Boolean(appState.settings.autoDownloadLongWorkZip));
   let voiceMode = $state(Boolean(appState.settings.voiceMode));
+  let nativeVoice = $state(appState.settings.nativeVoice !== false);
   let voiceLanguage = $state(
     appState.settings.voiceLanguage ||
       (typeof navigator !== "undefined" ? navigator.language : "en-US"),
@@ -376,7 +377,7 @@
 
   function captureFormSnapshot() {
     return JSON.stringify({
-      autoFiles, autoZip, voiceMode, voiceLanguage, autoSubmitVoice,
+      autoFiles, autoZip, voiceMode, nativeVoice, voiceLanguage, autoSubmitVoice,
       vadSilenceTimeout, liveModeShowText, voiceURI,
       preferredLang, githubToken, disableSystemPrompt,
       systemPromptMultiMode, systemPromptEntries,
@@ -754,7 +755,7 @@
       'settings.contextGuardStopPercent',
     ]},
     { key: 'subVoice', labelKey: 'settings.subVoice', settingKeys: [
-      'settings.voiceMode', 'settings.autoSubmitVoice',
+      'settings.voiceMode', 'settings.nativeVoice', 'settings.autoSubmitVoice',
       'settings.speechLanguage', 'settings.voiceURI',
       'settings.vadSilenceTimeout', 'settings.liveModeShowText',
     ]},
@@ -900,6 +901,7 @@
     autoFiles = Boolean(appState.settings.autoDownloadFiles);
     autoZip = Boolean(appState.settings.autoDownloadLongWorkZip);
     voiceMode = Boolean(appState.settings.voiceMode);
+    nativeVoice = appState.settings.nativeVoice !== false;
     voiceLanguage =
       appState.settings.voiceLanguage ||
       (typeof navigator !== "undefined" ? navigator.language : "en-US");
@@ -1136,6 +1138,7 @@
     appState.settings.autoDownloadFiles = autoFiles;
     appState.settings.autoDownloadLongWorkZip = autoZip;
     appState.settings.voiceMode = voiceMode;
+    appState.settings.nativeVoice = nativeVoice;
     appState.settings.voiceLanguage = voiceLanguage;
     // Saving from Settings counts as having chosen a language — no first-run prompt.
     appState.settings.voiceLanguageChosen = true;
@@ -2220,6 +2223,17 @@
             <span class="bds-switch-track"></span>
           </label>
         </div>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.nativeVoice')}</span>
+          <label class="bds-switch">
+            <input id="bds-native-voice" type="checkbox" bind:checked={nativeVoice} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+        <p style="font-size: 10px; opacity: 0.5; margin: -4px 0 8px; padding-left: 0;">
+          {t('settings.nativeVoiceHint')}
+        </p>
 
         <div class="bds-toggle-row">
           <span class="bds-toggle-label">{t('settings.autoSubmitVoice')}</span>

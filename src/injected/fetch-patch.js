@@ -1,4 +1,10 @@
 import { mutatePayload } from "./payload-mutator.js";
+import {
+  emitAssistantMessageId,
+  findMessageId,
+  findMessageIdInSse,
+  isReplyStreamUrl,
+} from "./message-id.js";
 
 /**
  * Patch window.fetch to intercept chat completion requests.
@@ -103,7 +109,7 @@ function tryCaptureTokenUsage(response, url, modelName) {
   if (!response || !response.clone) return;
   try {
     const cloned = response.clone();
-    readResponseForUsage(cloned, modelName).catch(() => {});
+    readResponseForUsage(cloned, modelName, isReplyStreamUrl(url)).catch(() => {});
   } catch (e) {
     // clone might fail if body already consumed; ignore
   }
@@ -200,23 +206,41 @@ async function buildMutatedFetchRequest(input, init, state) {
 
 /**
  * Read the response body (handles both streaming SSE and JSON) to extract token usage info.
+ *
+ * @param {boolean} captureMessageId - only true for completion streams; other
+ *   endpoints also carry `message_id` fields and must not be mistaken for the
+ *   reply that was just generated.
  */
-async function readResponseForUsage(response, modelName) {
+async function readResponseForUsage(response, modelName, captureMessageId) {
   try {
     const contentType = response.headers.get("content-type") || "";
     if (contentType.includes("text/event-stream") || contentType.includes("stream")) {
-      await parseSSEUsage(response, modelName);
+      await parseSSEUsage(response, modelName, captureMessageId);
     } else {
       const text = await response.text();
+      let data = null;
       try {
-        const data = JSON.parse(text);
+        data = JSON.parse(text);
+      } catch (e) {
+        // Not JSON — some deployments stream SSE without advertising it in the
+        // content type, so fall through to the SSE reader below.
+      }
+
+      if (data) {
         const usage = data?.usage || data?.token_usage;
         if (usage) {
           emitTokenUsage(usage.prompt_tokens || usage.input_tokens || 0,
             usage.completion_tokens || usage.output_tokens || 0,
             modelName);
         }
-      } catch (e) { /* ignore parse errors */ }
+        if (captureMessageId) {
+          const messageId = findMessageId(data);
+          if (messageId) emitAssistantMessageId(messageId);
+        }
+      } else if (captureMessageId) {
+        const messageId = findMessageIdInSse(text);
+        if (messageId) emitAssistantMessageId(messageId);
+      }
     }
   } catch (e) { /* silently ignore */ }
 }
@@ -224,7 +248,7 @@ async function readResponseForUsage(response, modelName) {
 /**
  * Parse SSE stream to find the final chunk with usage data.
  */
-async function parseSSEUsage(response, modelName) {
+async function parseSSEUsage(response, modelName, captureMessageId) {
   const reader = response.body?.getReader();
   if (!reader) return;
   const decoder = new TextDecoder();
@@ -255,6 +279,12 @@ async function parseSSEUsage(response, modelName) {
       }
     } catch (e) { /* ignore */ }
   }
+
+  // The same stream carries the id of the reply being generated — the id
+  // DeepSeek's own read-aloud button addresses it by.
+  if (!captureMessageId) return;
+  const messageId = findMessageIdInSse(buffer);
+  if (messageId) emitAssistantMessageId(messageId);
 }
 
 function emitTokenUsage(inputTokens, outputTokens, modelName) {
