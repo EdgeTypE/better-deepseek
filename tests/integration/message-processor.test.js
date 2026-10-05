@@ -131,6 +131,7 @@ import {
   handleReasoningBlockCollapse,
   collapseAllOpenReasoningBlocks,
   expandAllCollapsedReasoningBlocks,
+  stopVoicePlayback,
 } from "../../src/content/message-processor.svelte.js";
 
 function createMessageNode(rawText, role = "assistant") {
@@ -148,6 +149,26 @@ function createMessageNode(rawText, role = "assistant") {
   node.appendChild(markdown);
   document.body.appendChild(node);
   return node;
+}
+
+/**
+ * Drive a node the way a live reply is processed: the streaming cursor is on
+ * the page for the first scan, then the reply completes and settles.
+ *
+ * Auto-read only speaks a reply we watched arrive — a reply rendered from
+ * history is already complete on first sight, and reading that aloud was the
+ * bug. Tests that skip this shape never reach the voice path.
+ */
+function streamReply(node) {
+  const cursor = document.createElement("span");
+  cursor.className = "ds-cursor";
+  node.appendChild(cursor);
+
+  processMessageNode(node); // streaming: not finished yet
+  cursor.remove();
+  processMessageNode(node); // complete, but still within the settle window
+  vi.advanceTimersByTime(3000);
+  processMessageNode(node); // settled -> auto-read
 }
 
 describe("message processor integration", () => {
@@ -792,9 +813,7 @@ describe("message processor integration", () => {
     state.settings.voiceMode = true;
     const node = createMessageNode("Hello there");
 
-    processMessageNode(node);
-    vi.advanceTimersByTime(3000);
-    processMessageNode(node);
+    streamReply(node);
 
     expect(speak).toHaveBeenCalledOnce();
     expect(speak.mock.calls[0][0].text).toBe("Hello there");
@@ -816,9 +835,7 @@ describe("message processor integration", () => {
     node.dataset.richText =
       'Formula <span class="katex"><style>#mermaid-svg-1{fill:#ccc;}</style>a2+b2</span> here\n<BDS:VISUALIZER><div>viz</div></BDS:VISUALIZER>';
 
-    processMessageNode(node);
-    vi.advanceTimersByTime(3000);
-    processMessageNode(node);
+    streamReply(node);
 
     expect(speak).toHaveBeenCalledOnce();
     const spoken = speak.mock.calls[0][0].text;
@@ -840,14 +857,19 @@ describe("message processor integration", () => {
     mocks.scheduleMessageScan.mockImplementation((n) => processMessageNode(n));
 
     const node = createMessageNode("Hello there");
+    const cursor = document.createElement("span");
+    cursor.className = "ds-cursor";
+    node.appendChild(cursor);
 
     // First scan lands while the text is still fresh, so `isSettled` is false.
     processMessageNode(node);
     expect(speak).not.toHaveBeenCalled();
 
-    // After this point nothing touches the DOM. In the real app the stream has
-    // stopped mutating, so no scan is queued by the MutationObserver — the only
-    // way the message can ever be read is a re-check the processor arms itself.
+    // The stream ends — but nothing scans the DOM afterwards. In the real app
+    // the stream has stopped mutating, so no scan is queued by the
+    // MutationObserver; the only way the message can ever be read is a re-check
+    // the processor arms itself.
+    cursor.remove();
     vi.advanceTimersByTime(3000);
 
     expect(speak).toHaveBeenCalledOnce();
@@ -864,12 +886,73 @@ describe("message processor integration", () => {
     expect(mocks.scheduleMessageScan).not.toHaveBeenCalled();
   });
 
+  it("does not read the last reply of a conversation that was already there", () => {
+    const speak = vi.fn();
+    window.speechSynthesis = {
+      cancel: vi.fn(),
+      getVoices: () => [{ lang: "en-US" }],
+      speak,
+    };
+    state.settings.voiceMode = true;
+
+    // Nothing ever streams: this is the shape of opening an existing
+    // conversation, whose final answer renders already complete.
+    const node = createMessageNode("An answer from months ago");
+    processMessageNode(node);
+    vi.advanceTimersByTime(3000);
+    processMessageNode(node);
+    vi.advanceTimersByTime(3000);
+    processMessageNode(node);
+
+    expect(speak).not.toHaveBeenCalled();
+    const lines = mocks.devLog.mock.calls.map((call) => String(call[1]));
+    expect(lines.some((line) => line.includes("auto-read skipped"))).toBe(true);
+  });
+
+  it("reads a reply that grew while it was being watched", () => {
+    const speak = vi.fn();
+    window.speechSynthesis = {
+      cancel: vi.fn(),
+      getVoices: () => [{ lang: "en-US" }],
+      speak,
+    };
+    state.settings.voiceMode = true;
+
+    // A partial reply first, then the full text: the growth is what marks it as
+    // generated here rather than loaded from history.
+    const node = createMessageNode("Hello");
+    processMessageNode(node);
+    node.dataset.rawText = "Hello there";
+    processMessageNode(node);
+    vi.advanceTimersByTime(3000);
+    processMessageNode(node);
+
+    expect(speak).toHaveBeenCalledOnce();
+    expect(speak.mock.calls[0][0].text).toBe("Hello there");
+  });
+
+  it("stops playback when the conversation changes", () => {
+    const speak = vi.fn();
+    const cancel = vi.fn();
+    window.speechSynthesis = {
+      cancel,
+      getVoices: () => [{ lang: "en-US" }],
+      speak,
+    };
+    state.settings.voiceMode = true;
+
+    stopVoicePlayback();
+
+    // Both engines have to be silenced: the native stream keeps decoding in the
+    // background and Web Speech keeps talking otherwise.
+    expect(mocks.stopNativeSpeech).toHaveBeenCalled();
+    expect(cancel).toHaveBeenCalled();
+  });
+
   describe("native voice", () => {
     /** Speak the node once and let the native promise chain settle. */
     async function speakOnce(node) {
-      processMessageNode(node);
-      vi.advanceTimersByTime(3000);
-      processMessageNode(node);
+      streamReply(node);
       for (let i = 0; i < 6; i++) await Promise.resolve();
     }
 
@@ -1095,9 +1178,7 @@ describe("message processor integration", () => {
       );
 
       const node = createMessageNode("Hello there");
-      processMessageNode(node);
-      vi.advanceTimersByTime(3000);
-      processMessageNode(node);
+      streamReply(node);
 
       // The read is held only for NATIVE_TARGET_GRACE_MS, not the 10s timeout
       // `loadAllHistory` carries internally.
@@ -1118,9 +1199,7 @@ describe("message processor integration", () => {
       mocks.loadAllHistory.mockImplementation(() => new Promise(() => {}));
 
       const node = createMessageNode("Hello there");
-      processMessageNode(node);
-      vi.advanceTimersByTime(3000);
-      processMessageNode(node);
+      streamReply(node);
 
       // Bounded by the grace, so a hanging request cannot leave the reply mute.
       await vi.advanceTimersByTimeAsync(2500);
@@ -1209,6 +1288,30 @@ describe("message processor integration", () => {
         sessionId: "default",
         messageId: "fresh-2",
       });
+    });
+
+    it("does not fall back to Web Speech when the read was cancelled", async () => {
+      const speak = stubSpeech();
+      mocks.isNativeVoiceSupported.mockReturnValue(true);
+      stubApiMessages([{ message_id: "m2", role: "ASSISTANT" }]);
+
+      // A native attempt that never reaches audio: the user leaves the chat
+      // while the ticket round-trip is still in flight.
+      let settleNative;
+      mocks.speakNativeResponse.mockImplementation(
+        () => new Promise((resolve) => { settleNative = resolve; }),
+      );
+
+      streamReply(createMessageNode("Hello there"));
+      expect(mocks.speakNativeResponse).toHaveBeenCalledOnce();
+
+      stopVoicePlayback();
+      settleNative({ ok: false, reason: "stopped" });
+      for (let i = 0; i < 6; i++) await Promise.resolve();
+
+      // "stopped" is our own teardown, not a native failure — speaking the
+      // reply now would talk over whatever replaced it.
+      expect(speak).not.toHaveBeenCalled();
     });
 
     it("resolves the session id without swallowing a query string", async () => {

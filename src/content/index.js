@@ -36,6 +36,7 @@ import { i18n } from "../lib/i18n.svelte.js";
 import { remoteConfig, REMOTE_CONFIG_EVENT, detectModelType } from "../lib/remote-config.svelte.js";
 import { STORAGE_KEYS, CSS_PRESETS } from "../lib/constants.js";
 import { loadAllHistory, retainOnlyHistorySession } from "./load-all-history.js";
+import { stopVoicePlayback } from "./message-processor.svelte.js";
 
 const CONTENT_BOOTSTRAP_KEY = "__bdsContentBootstrapped";
 
@@ -218,10 +219,23 @@ async function init() {
     setTimeout(() => loadAllHistory(), 500);
   }
 
+  // The conversation the current read-aloud belongs to. Comparing session ids
+  // (rather than the raw href) keeps a query-string change from cutting a read
+  // short while still catching every real switch between chats.
+  let voiceSessionId = (location.href.match(/\/chat\/s\/([^/?#]+)/) || [])[1] || null;
+
   window.addEventListener("bds:urlChanged", () => {
     // Evict every session's cached messages except the current one
     const newId = (location.href.match(/\/chat\/s\/([^/?#]+)/) || [])[1] || null;
     retainOnlyHistorySession(newId);
+
+    // A reply being read aloud belongs to the chat it came from — navigating to
+    // another conversation has to stop it instead of leaving it talking in the
+    // background.
+    if (newId !== voiceSessionId) {
+      voiceSessionId = newId;
+      stopVoicePlayback();
+    }
 
     if ((state.settings.loadAllHistoryOnSession || state.settings.showTimestamps) && location.href.includes("/chat/s/")) {
       loadAllHistory();

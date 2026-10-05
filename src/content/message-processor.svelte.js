@@ -96,6 +96,18 @@ const SETTLE_RECHECK_MARGIN_MS = 120;
  */
 const NATIVE_TARGET_GRACE_MS = 2500;
 
+/**
+ * Bumped whenever playback is cancelled — a newer reply, or leaving the
+ * conversation.
+ *
+ * A native attempt can be cancelled from the outside: `stopNativeSpeech()`
+ * settles it as `{ok: false, reason: "stopped"}`, which the fallback would
+ * otherwise read as "native failed" and start Web Speech on top of whatever
+ * replaced it. Remembering the epoch each attempt started with lets it tell
+ * that *we* ended it, and go quiet instead.
+ */
+let voiceEpoch = 0;
+
 function removePricingContribution(node) {
   const previous = pricingContributions.get(node);
   if (!previous) return;
@@ -673,6 +685,22 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
   const isLatestAssistant = role === "assistant" && (
     context ? context.latestAssistantNode === node : isLatestAssistantMessage(node)
   );
+
+  // --- VOICE MODE: DID WE WATCH THIS REPLY ARRIVE? ---
+  // Auto-read used to speak whichever reply happened to be last and settled, so
+  // simply opening an existing conversation read its final answer aloud. Only a
+  // reply that grew — or showed the streaming cursor — while we were watching is
+  // worth speaking; a reply rendered from history does neither.
+  if (isLatestAssistant) {
+    if (stateData.firstRawLength === undefined) {
+      stateData.firstRawLength = rawText.length;
+    } else if (rawText.length > stateData.firstRawLength) {
+      stateData.voiceStreamed = true;
+    }
+    if (node.querySelector(".ds-cursor") || node.classList.contains("_streaming")) {
+      stateData.voiceStreamed = true;
+    }
+  }
 
   const now = Date.now();
   if (stateData.lastRawText !== rawText) {
@@ -1418,8 +1446,14 @@ function syncVisibilityState(node, isLatestAssistant, stateData, isSettled) {
   }
 
   // --- VOICE OUTPUT (TTS) ---
-  if (isLatestAssistant && isSettled && state.settings.voiceMode && !state.liveMode?.active) {
-    if (!readMessages.has(node)) {
+  if (
+    isLatestAssistant &&
+    isSettled &&
+    state.settings.voiceMode &&
+    !state.liveMode?.active &&
+    !readMessages.has(node)
+  ) {
+    if (stateData.voiceStreamed) {
       readMessages.add(node);
       devLog("Voice", "auto-read fired", {
         chars: (stateData.lastRawText || "").length,
@@ -1429,6 +1463,12 @@ function syncVisibilityState(node, isLatestAssistant, stateData, isSettled) {
         href: location.href,
       });
       playVoiceResponse(stateData.lastRawText);
+    } else if (!stateData.voiceSkipLogged) {
+      // Already complete when we first saw it, so it came from history rather
+      // than from a generation in this page. Logged once so a read that never
+      // happens is not a mystery.
+      stateData.voiceSkipLogged = true;
+      devLog("Voice", "auto-read skipped: reply was already complete when first seen");
     }
   }
 
@@ -1473,19 +1513,23 @@ function applyAutoDirectionToMessage(node) {
  * the Web Speech API — so auto-read always speaks, just with a worse voice.
  */
 function playVoiceResponse(text) {
-  stopNativeSpeech();
+  // Supersedes whatever is speaking. Bumping the epoch first also invalidates
+  // any native attempt still negotiating: its own teardown settles it as
+  // `{ok: false, reason: "stopped"}`, which must not be read as a failure and
+  // answered with Web Speech on top of the read that just started.
+  const epoch = cancelVoicePlayback();
 
   const blocked = nativeVoiceBlockReason(text);
   if (blocked) {
     devLog("Voice", `auto-read: Web Speech — native unavailable (${blocked})`);
-    playVoiceResponseWithWebSpeech(text);
+    playVoiceResponseWithWebSpeech(text, epoch);
     return;
   }
 
   const target = resolveNativeVoiceTarget();
   if (target) {
     devLog("Voice", "auto-read: native", target);
-    speakNativeWithFallback(target, text);
+    speakNativeWithFallback(target, text, epoch);
     return;
   }
 
@@ -1495,19 +1539,47 @@ function playVoiceResponse(text) {
   devLog("Voice", `auto-read: no message id yet (${describeCachedMessages()}), waiting ${NATIVE_TARGET_GRACE_MS}ms`);
   withGrace(loadAllHistory(), NATIVE_TARGET_GRACE_MS)
     .then(() => {
+      if (epoch !== voiceEpoch) return;
       const late = resolveNativeVoiceTarget();
       if (late) {
         devLog("Voice", "auto-read: native (id arrived late)", late);
-        speakNativeWithFallback(late, text);
+        speakNativeWithFallback(late, text, epoch);
       } else {
         devLog("Voice", "auto-read: Web Speech — no message id arrived");
-        playVoiceResponseWithWebSpeech(text);
+        playVoiceResponseWithWebSpeech(text, epoch);
       }
     })
     .catch((error) => {
+      if (epoch !== voiceEpoch) return;
       devLog("Voice", "auto-read: Web Speech — id lookup failed:", error);
-      playVoiceResponseWithWebSpeech(text);
+      playVoiceResponseWithWebSpeech(text, epoch);
     });
+}
+
+/**
+ * Silence whatever is speaking — DeepSeek's own stream and Web Speech alike —
+ * and invalidate every attempt still in flight.
+ *
+ * @returns {number} the new epoch, for callers that must re-check it later.
+ */
+function cancelVoicePlayback() {
+  voiceEpoch += 1;
+  stopNativeSpeech();
+  try { window.speechSynthesis?.cancel(); } catch { /* no Web Speech here */ }
+  return voiceEpoch;
+}
+
+/**
+ * Stop auto-read playback because the user left the conversation.
+ *
+ * A reply being read aloud belongs to the chat it came from; carrying it into
+ * the next chat is never what the reader wanted.
+ */
+export function stopVoicePlayback() {
+  cancelVoicePlayback();
+  if (state.settings.voiceMode) {
+    devLog("Voice", "stopVoicePlayback: the conversation changed");
+  }
 }
 
 /**
@@ -1548,17 +1620,28 @@ function describeCachedMessages() {
 /**
  * Try DeepSeek's own voice, and hand the reply to Web Speech if it does not
  * actually produce audio.
+ *
+ * @param {{sessionId: string, messageId: string}} target
+ * @param {string} text
+ * @param {number} epoch the playback this attempt belongs to.
  */
-function speakNativeWithFallback(target, text) {
+function speakNativeWithFallback(target, text, epoch) {
   speakNativeResponse(target)
     .then((result) => {
       if (result.ok) return;
+      if (epoch !== voiceEpoch) {
+        // Cancelled by us — either a newer reply started or the user left the
+        // conversation. Web Speech here would talk over the replacement.
+        devLog("Voice", "native cancelled before it played:", result.reason);
+        return;
+      }
       devLog("Voice", "falling back to Web Speech:", result.reason);
-      playVoiceResponseWithWebSpeech(text);
+      playVoiceResponseWithWebSpeech(text, epoch);
     })
     .catch((error) => {
+      if (epoch !== voiceEpoch) return;
       devLog("Voice", "unexpected failure:", error);
-      playVoiceResponseWithWebSpeech(text);
+      playVoiceResponseWithWebSpeech(text, epoch);
     });
 }
 
@@ -1647,8 +1730,16 @@ function resolveNativeVoiceTarget() {
 
 /**
  * Play voice response using Web Speech Synthesis.
+ *
+ * @param {string} text
+ * @param {number} [epoch] the playback epoch this call belongs to; a call that
+ *   lost the race to a newer read (or to a navigation away) stays silent.
  */
-function playVoiceResponseWithWebSpeech(text) {
+function playVoiceResponseWithWebSpeech(text, epoch = voiceEpoch) {
+  if (epoch !== voiceEpoch) {
+    devLog("Voice", "Web Speech skipped: playback was cancelled");
+    return;
+  }
   if (typeof window === 'undefined' || !window.speechSynthesis) {
     devLog("Voice", "Web Speech unavailable: no speechSynthesis");
     return;
