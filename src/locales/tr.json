@@ -155,7 +155,7 @@
       "githubTokenHide": "Gizle",
       "githubTokenClear": "Temizle",
       "tokenPriceEstimation": "Token Ücret Tahmini (Deneysel)",
-      "tokenPriceHint": "Mesaj başına tahmini DeepSeek API maliyetini ve toplam oturum maliyetini gösterir. Girdi/çıktı token fiyatları kullanılır. Fiyat verileri dinamik olarak çekilir.",
+      "tokenPriceHint": "Mesaj başına tahmini DeepSeek API maliyetini ve toplam oturum maliyetini gösterir. Girdi/çıktı token fiyatları kullanılır. Fiyatlar off-peak (yoğun olmayan saat) tarifesidir; peak saatlerde (01:00-04:00 ve 06:00-10:00 UTC, Pazartesi-Cuma) maliyet yaklaşık iki katına çıkabilir. Fiyat verileri dinamik olarak çekilir.",
       "collapseLongUserMessages": "Uzun kullanıcı mesajlarını daralt",
       "collapseLongUserMessagesHint": "Çok uzun kullanıcı mesajlarını otomatik olarak daraltarak bir buton aracılığıyla tamamının açılmasını sağlar.",
       "keepReasoningBlocksOpen": "Düşünce bloklarını açık bırak",

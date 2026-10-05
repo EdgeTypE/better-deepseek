@@ -43,6 +43,7 @@ import {
 } from "./live/native-tts.js";
 import { loadAllHistory } from "./load-all-history.js";
 import { devLog } from "../lib/dev-log.js";
+import { EMBEDDED_PRICING } from "../lib/constants.js";
 
 import {
   safeAppendChild,
@@ -1894,13 +1895,32 @@ function calcCostInline(inputTokens, outputTokens, modelName) {
   return calcCostInlineWithCache(inputTokens, 0, outputTokens, modelName);
 }
 
+// Last resort when neither the live table nor the embedded table has the key.
+const FALLBACK_MODEL_PRICING = EMBEDDED_PRICING.models["deepseek-flash"];
+
+/**
+ * Look up a pricing entry without ever returning undefined.
+ *
+ * The cached table can come from a remote payload that predates a model rename
+ * (e.g. it still only carries `deepseek-v4-flash`), so a missing key must
+ * degrade to the embedded rate rather than throw mid-render.
+ */
+function resolvePricingEntry(modelName) {
+  const models = state.embeddedPricing?.models || {};
+  return (
+    models[modelName] ||
+    models["deepseek-flash"] ||
+    models["deepseek-v4-flash"] ||
+    models["deepseek-chat"] ||
+    FALLBACK_MODEL_PRICING
+  );
+}
+
 function calcCostInlineWithCache(inputNewTokens, inputCachedTokens, outputTokens, modelName) {
-  const pricing = state.embeddedPricing;
-  const resolved = detectModelInline(modelName);
-  const m = pricing.models[resolved] || pricing.models["deepseek-v4-flash"];
-  const newCost = (inputNewTokens / 1e6) * m.inputPrice;
-  const cachedCost = (inputCachedTokens / 1e6) * (m.inputCacheHitPrice || 0.007);
-  const outputCost = (outputTokens / 1e6) * m.outputPrice;
+  const m = resolvePricingEntry(detectModelInline(modelName));
+  const newCost = (inputNewTokens / 1e6) * (m.inputPrice || 0.15);
+  const cachedCost = (inputCachedTokens / 1e6) * (m.inputCacheHitPrice || 0.003);
+  const outputCost = (outputTokens / 1e6) * (m.outputPrice || 0.6);
   return { inputCost: newCost + cachedCost, outputCost, totalCost: newCost + cachedCost + outputCost };
 }
 
@@ -1908,15 +1928,15 @@ function detectModelInline(hint) {
   if (hint) {
     const lo = String(hint).toLowerCase();
     if (lo.includes("pro") || lo.includes("reasoner") || lo === "expert") return "deepseek-v4-pro";
-    if (lo.includes("flash") || lo.includes("chat") || lo === "instant") return "deepseek-v4-flash";
+    if (lo.includes("flash") || lo.includes("chat") || lo === "instant") return "deepseek-flash";
   }
   const modelSpan = document.querySelector("._46a12ab");
   if (modelSpan) {
     const text = (modelSpan.textContent || "").toLowerCase();
     if (text === "expert") return "deepseek-v4-pro";
-    if (text === "instant") return "deepseek-v4-flash";
+    if (text === "instant") return "deepseek-flash";
   }
-  return state.pricing.modelName || "deepseek-v4-flash";
+  return state.pricing.modelName || "deepseek-flash";
 }
 
 function extractThinkingTextInline(node) {
@@ -2134,8 +2154,7 @@ function refreshSessionTotalDisplayInline() {
   
   // Context Usage Calculation
   const modelName = detectModelInline(null);
-  const pricingData = state.embeddedPricing;
-  const m = pricingData.models[modelName] || pricingData.models["deepseek-v4-flash"];
+  const m = resolvePricingEntry(modelName);
   const contextLimit = m.contextLength || 1000000;
   const usagePercent = Math.min(1, allTok / contextLimit);
   

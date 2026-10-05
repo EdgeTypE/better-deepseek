@@ -16,12 +16,14 @@ let fetchPromise = null;
  * Resolve the canonical model name from an alias.
  */
 export function resolveModelName(modelName) {
-  if (!modelName) return "deepseek-v4-flash";
+  if (!modelName) return "deepseek-flash";
   const name = String(modelName).toLowerCase();
   const aliases = {
-    "deepseek-chat": "deepseek-v4-flash",
+    "deepseek-v4-flash": "deepseek-flash",
+    "deepseek-v4-flash-vision-exp": "deepseek-flash",
+    "deepseek-chat": "deepseek-flash",
     "deepseek-reasoner": "deepseek-v4-pro",
-    "instant": "deepseek-v4-flash",
+    "instant": "deepseek-flash",
     "expert": "deepseek-v4-pro",
   };
   return aliases[name] || name;
@@ -34,11 +36,19 @@ export function resolveModelName(modelName) {
 export function getModelPricing(modelName) {
   const pricing = pricingCache || EMBEDDED_PRICING;
   const resolved = resolveModelName(modelName);
-  const model = pricing.models[resolved] || pricing.models["deepseek-v4-flash"];
+  // The cached table can be a remote payload that predates a model rename, so
+  // fall back through the legacy keys before giving up.
+  const models = pricing?.models || {};
+  const model =
+    models[resolved] ||
+    models["deepseek-flash"] ||
+    models["deepseek-v4-flash"] ||
+    models["deepseek-chat"] ||
+    EMBEDDED_PRICING.models["deepseek-flash"];
   return {
-    inputPrice: model.inputPrice || 0.22,
-    inputCacheHitPrice: model.inputCacheHitPrice || 0.007,
-    outputPrice: model.outputPrice || 0.66,
+    inputPrice: model.inputPrice || 0.15,
+    inputCacheHitPrice: model.inputCacheHitPrice || 0.003,
+    outputPrice: model.outputPrice || 0.6,
     displayName: model.displayName || resolved,
     contextLength: model.contextLength || 1000000,
   };
@@ -154,14 +164,18 @@ function fetchPageViaServiceWorker(url) {
 /**
  * Parse the DeepSeek pricing page HTML to extract model pricing.
  * Looks for the pricing table on https://api-docs.deepseek.com/quick_start/pricing/
+ *
+ * The page lists three price rows (cache hit / cache miss / output) and, per
+ * row, an OFF-PEAK and a PEAK column — one column per model. We deliberately
+ * read the OFF-PEAK tier: peak is exactly double, and understating the bill is
+ * far less surprising than showing a peak rate while the user is off-peak.
+ *
+ * Exported for tests.
  */
-function parsePricingFromHtml(html) {
+export function parsePricingFromHtml(html) {
   if (!html || typeof html !== "string") return null;
 
   const models = {};
-
-  // Extract the pricing table from the HTML content
-  // The MDX-rendered page contains markdown-style pricing information
 
   // Pattern: Look for model names and pricing data in the text content
   const text = html
@@ -174,20 +188,21 @@ function parsePricingFromHtml(html) {
     .replace(/\s+/g, " ")
     .trim();
 
-  // Extract deepseek-v4-flash pricing
-  // Looking for patterns like: "deepseek-v4-flash" near "$0.22" for input, "$0.66" for output
-  const v4FlashMatch = extractModelPricing(text, "deepseek-v4-flash", "deepseek v4 flash", "flash");
-  if (v4FlashMatch) models["deepseek-v4-flash"] = v4FlashMatch;
+  // Preferred: read the labelled price rows and keep the OFF-PEAK column.
+  Object.assign(models, parseOffPeakPricingRows(text));
 
-  // Extract deepseek-v4-pro pricing
-  const v4ProMatch = extractModelPricing(text, "deepseek-v4-pro", "deepseek v4 pro", "pro");
-  if (v4ProMatch) models["deepseek-v4-pro"] = v4ProMatch;
+  // Fallback: older / differently shaped pricing tables.
+  if (Object.keys(models).length === 0) {
+    const v4FlashMatch = extractModelPricing(text, "deepseek-flash", "deepseek v4.1 flash", "deepseek v4 flash", "flash");
+    if (v4FlashMatch) models["deepseek-flash"] = v4FlashMatch;
 
-  // Try to find pricing by dollar amounts near model names
-  // More robust: find the Pricing table section and parse rows
-  const fallback = parsePricingTableFromText(text);
-  for (const [key, val] of Object.entries(fallback)) {
-    if (!models[key]) models[key] = val;
+    const v4ProMatch = extractModelPricing(text, "deepseek-v4-pro", "deepseek v4 pro", "pro");
+    if (v4ProMatch) models["deepseek-v4-pro"] = v4ProMatch;
+
+    const fallback = parsePricingTableFromText(text);
+    for (const [key, val] of Object.entries(fallback)) {
+      if (!models[key]) models[key] = val;
+    }
   }
 
   if (Object.keys(models).length === 0) return null;
@@ -196,6 +211,74 @@ function parsePricingFromHtml(html) {
     updatedAt: new Date().toISOString().split("T")[0],
     models,
   };
+}
+
+const MONEY = "\\$\\s*(\\d+(?:\\.\\d+)?)";
+const MONEY_ONLY = "\\$\\s*\\d+(?:\\.\\d+)?";
+
+/**
+ * Build the regex for one price row:
+ *   "<LABEL> OFF-PEAK $a $b PEAK $c $d"
+ * where $a/$c are the first model column and $b/$d the second. The PEAK half is
+ * optional so a single-tier table still parses.
+ */
+function buildPriceRowRegex(label) {
+  return new RegExp(
+    `${label}\\s*OFF-PEAK\\s*${MONEY}\\s*${MONEY}(?:\\s*PEAK\\s*${MONEY_ONLY}\\s*${MONEY_ONLY})?`,
+    "i"
+  );
+}
+
+const CACHE_HIT_ROW_RE = buildPriceRowRegex("CACHE HIT\\)?");
+const CACHE_MISS_ROW_RE = buildPriceRowRegex("CACHE MISS\\)?");
+const OUTPUT_ROW_RE = buildPriceRowRegex("OUTPUT TOKENS");
+
+/**
+ * Read the three labelled price rows and return the OFF-PEAK pricing per model.
+ * Returns {} when the page does not carry the expected rows.
+ */
+function parseOffPeakPricingRows(text) {
+  const hit = CACHE_HIT_ROW_RE.exec(text);
+  const miss = CACHE_MISS_ROW_RE.exec(text);
+  const out = OUTPUT_ROW_RE.exec(text);
+  if (!hit || !miss || !out) return {};
+
+  // Per row the amounts are: [off-peak model A, off-peak model B]
+  const offPeak = (m) => [Number(m[1]), Number(m[2])];
+  const rows = [offPeak(hit), offPeak(miss), offPeak(out)];
+
+  // The table lists the cheaper Flash column first, but pick by price so a
+  // column reorder cannot swap the two models.
+  const flashIndex = rows[1][0] <= rows[1][1] ? 0 : 1;
+  const proIndex = flashIndex === 0 ? 1 : 0;
+
+  const models = {};
+  const put = (key, displayName, index) => {
+    const [inputCacheHitPrice, inputPrice, outputPrice] = rows.map((r) => r[index]);
+    if (!(inputCacheHitPrice > 0) || !(inputPrice > 0) || !(outputPrice > 0)) return;
+    models[key] = { displayName, inputPrice, inputCacheHitPrice, outputPrice };
+  };
+  put("deepseek-flash", "DeepSeek-V4.1-Flash", flashIndex);
+  put("deepseek-v4-pro", "DeepSeek-V4-Pro", proIndex);
+
+  return models;
+}
+
+/**
+ * Reduce a flat list of dollar amounts to the off-peak
+ * (cache hit, input, output) triple.
+ *
+ * When both tiers are present the amounts arrive in pairs — peak is always
+ * exactly double off-peak — so sorting and keeping the lower member of every
+ * consecutive pair recovers the off-peak tier whatever order they appeared in.
+ * An odd count means the table lists a single tier; use it as-is.
+ */
+function pickOffPeakAmounts(amounts) {
+  const sorted = [...amounts].sort((a, b) => a - b);
+  if (sorted.length >= 6 && sorted.length % 2 === 0) {
+    return sorted.filter((_, i) => i % 2 === 0);
+  }
+  return sorted;
 }
 
 function extractModelPricing(text, ...keywords) {
@@ -218,16 +301,9 @@ function extractModelPricing(text, ...keywords) {
 
   if (numericAmounts.length < 3) return null;
 
-  // The pricing page typically lists: input cache hit, input cache miss, output
-  // Sort and assign: lowest = cache hit, middle = input, highest = output typically
-  const sorted = [...numericAmounts].sort((a, b) => a - b);
-
-  const cacheHit = sorted[0];
-  const output = sorted[sorted.length - 1];
-  // Input (cache miss) is the main input price
-  const input = sorted.length >= 2
-    ? sorted.find((v) => v > cacheHit && v < output) || sorted[1]
-    : sorted[sorted.length - 2] || sorted[0];
+  // The pricing page lists: input cache hit, input cache miss, output
+  const [cacheHit, input, output] = pickOffPeakAmounts(numericAmounts);
+  if (!(cacheHit > 0) || !(input > 0) || !(output > 0)) return null;
 
   return {
     displayName: keywords[0],
@@ -247,45 +323,29 @@ function parsePricingTableFromText(text) {
 
   const pricingSection = text.substring(pricingIdx);
 
-  // Model patterns with their pricing
   const modelPatterns = [
-    {
-      key: "deepseek-v4-flash",
-      regex: /deepseek.v4.flash|v4\s*flash|flash/i,
-      inputCache: [0.007, 0.014, 0.028],
-      inputMiss: [0.22, 0.44, 1.74],
-      output: [0.66, 1.32, 3.48],
-    },
-    {
-      key: "deepseek-v4-pro",
-      regex: /deepseek.v4.pro|v4\s*pro/i,
-      inputCache: [0.022, 0.044],
-      inputMiss: [0.66, 1.32],
-      output: [1.98, 3.96],
-    },
+    { key: "deepseek-flash", regex: /deepseek.v4\.?1?.flash|deepseek.flash|v4\.?1?\s*flash|flash/i },
+    { key: "deepseek-v4-pro", regex: /deepseek.v4.pro|v4\s*pro/i },
   ];
 
   for (const { key, regex } of modelPatterns) {
-    if (regex.test(pricingSection)) {
-      // Find all dollar amounts associated with this model section
-      const modelStart = pricingSection.search(regex);
-      if (modelStart >= 0) {
-        const modelText = pricingSection.substring(modelStart, modelStart + 400);
-        const amounts = (modelText.match(/\$(\d+\.?\d*)/g) || [])
-          .map((a) => parseFloat(a.replace("$", "")))
-          .filter((n) => !isNaN(n) && n > 0);
+    const modelStart = pricingSection.search(regex);
+    if (modelStart < 0) continue;
 
-        if (amounts.length >= 3) {
-          const sorted = [...amounts].sort((a, b) => a - b);
-          models[key] = {
-            displayName: key === "deepseek-v4-flash" ? "DeepSeek V4 Flash" : "DeepSeek V4 Pro",
-            inputPrice: sorted[1], // second smallest = input cache miss
-            inputCacheHitPrice: sorted[0], // smallest = cache hit
-            outputPrice: sorted[sorted.length - 1], // largest = output
-          };
-        }
-      }
-    }
+    const modelText = pricingSection.substring(modelStart, modelStart + 400);
+    const amounts = (modelText.match(/\$(\d+\.?\d*)/g) || [])
+      .map((a) => parseFloat(a.replace("$", "")))
+      .filter((n) => !isNaN(n) && n > 0);
+
+    if (amounts.length < 3) continue;
+
+    const [inputCacheHitPrice, inputPrice, outputPrice] = pickOffPeakAmounts(amounts);
+    models[key] = {
+      displayName: key === "deepseek-flash" ? "DeepSeek-V4.1-Flash" : "DeepSeek-V4-Pro",
+      inputPrice,
+      inputCacheHitPrice,
+      outputPrice,
+    };
   }
 
   return models;

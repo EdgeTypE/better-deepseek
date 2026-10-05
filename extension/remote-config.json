@@ -131,8 +131,8 @@
       "aliases": ["deepseek-reasoner", "expert", "pro", "reasoner"],
       "displayName": "Expert"
     },
-    "deepseek-v4-flash": {
-      "aliases": ["deepseek-chat", "instant", "flash", "chat"],
+    "deepseek-flash": {
+      "aliases": ["deepseek-v4-flash", "deepseek-v4-flash-vision-exp", "deepseek-chat", "instant", "flash", "chat"],
       "displayName": "Instant"
     }
   },
@@ -149,9 +149,9 @@
     "fetchIntervalMs": 3600000
   },
   "embeddedPricing": {
-    "deepseek-v4-flash": { "input": 0.22, "output": 0.66 },
+    "deepseek-flash": { "input": 0.15, "output": 0.6 },
     "deepseek-v4-pro": { "input": 0.66, "output": 1.98 },
-    "deepseek-chat": { "input": 0.22, "output": 0.66 },
+    "deepseek-chat": { "input": 0.15, "output": 0.6 },
     "deepseek-reasoner": { "input": 0.66, "output": 1.98 }
   },
   "modelInputLimits": {

@@ -137,7 +137,7 @@
       "githubTokenHide": "Hide",
       "githubTokenClear": "Clear",
       "tokenPriceEstimation": "Token Price Estimation (Experimental)",
-      "tokenPriceHint": "Shows estimated DeepSeek API cost per message and session total. Input/output token prices are used for estimation. Pricing data is fetched dynamically with fallbacks.",
+      "tokenPriceHint": "Shows estimated DeepSeek API cost per message and session total. Input/output token prices are used for estimation. Prices are off-peak rates; during peak hours (01:00-04:00 and 06:00-10:00 UTC, Mon-Fri) the cost can be roughly double. Pricing data is fetched dynamically with fallbacks.",
       "deepResearchContextGuard": "Deep Research Context Guard",
       "contextGuardEnabled": "Enable Context Guard",
       "contextGuardEnabledHint": "Stops managed Deep Research before the chat context window is exhausted. Tracks hidden extension prompts, evidence digests, and server-reported usage.",

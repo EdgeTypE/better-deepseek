@@ -137,7 +137,7 @@
       "githubTokenHide": "隐藏",
       "githubTokenClear": "清空",
       "tokenPriceEstimation": "Token 费用估算（实验性）",
-      "tokenPriceHint": "显示每条消息和会话的 DeepSeek API 估算费用，基于输入/输出 token 价格计算。价格数据动态拉取，获取失败时使用备用数据。",
+      "tokenPriceHint": "显示每条消息和会话的 DeepSeek API 估算费用，基于输入/输出 token 价格计算。价格为非高峰（off-peak）费率；高峰时段（UTC 周一至周五 01:00-04:00 与 06:00-10:00）费用可能约为两倍。价格数据动态拉取，获取失败时使用备用数据。",
       "deepResearchContextGuard": "深度研究上下文保护",
       "contextGuardEnabled": "启用上下文保护",
       "contextGuardEnabledHint": "在会话上下文窗口耗尽前自动停止深度研究。该功能会追踪隐藏的扩展提示词、证据摘要以及服务端上报的用量数据。",

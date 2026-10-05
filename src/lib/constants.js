@@ -831,17 +831,17 @@ export const DEFAULT_SYSTEM_PROMPT = [
 
 // ── Embedded Pricing (fallback when external sources unavailable) ──
 export const EMBEDDED_PRICING = {
-  updatedAt: "2026-08-13",
+  updatedAt: "2026-10-05",
   models: {
-    "deepseek-v4-flash": {
-      displayName: "DeepSeek V4 Flash",
-      inputPrice: 0.22,
-      inputCacheHitPrice: 0.007,
-      outputPrice: 0.66,
+    "deepseek-flash": {
+      displayName: "DeepSeek-V4.1-Flash",
+      inputPrice: 0.15,
+      inputCacheHitPrice: 0.003,
+      outputPrice: 0.6,
       contextLength: 1000000,
     },
     "deepseek-v4-pro": {
-      displayName: "DeepSeek V4 Pro",
+      displayName: "DeepSeek-V4-Pro",
       inputPrice: 0.66,
       inputCacheHitPrice: 0.022,
       outputPrice: 1.98,
@@ -849,9 +849,9 @@ export const EMBEDDED_PRICING = {
     },
     "deepseek-chat": {
       displayName: "DeepSeek Chat",
-      inputPrice: 0.22,
-      inputCacheHitPrice: 0.007,
-      outputPrice: 0.66,
+      inputPrice: 0.15,
+      inputCacheHitPrice: 0.003,
+      outputPrice: 0.6,
       contextLength: 1000000,
     },
     "deepseek-reasoner": {
@@ -1103,7 +1103,7 @@ export const DEFAULT_REMOTE_CONFIG = {
   },
   modelMappings: {
     "deepseek-v4-pro": { aliases: ["deepseek-reasoner", "expert", "pro", "reasoner"], displayName: "Expert" },
-    "deepseek-v4-flash": { aliases: ["deepseek-chat", "instant", "flash", "chat"], displayName: "Instant" },
+    "deepseek-flash": { aliases: ["deepseek-v4-flash", "deepseek-v4-flash-vision-exp", "deepseek-chat", "instant", "flash", "chat"], displayName: "Instant" },
   },
   urlPatterns: { chatSession: "/chat/s/", base: "https://chat.deepseek.com/" },
   android: { hideGetAppText: "Get App", hideDrawerAppItemText: "Download mobile App" },
@@ -1112,9 +1112,9 @@ export const DEFAULT_REMOTE_CONFIG = {
     fetchIntervalMs: 3600000,
   },
   embeddedPricing: {
-    "deepseek-v4-flash": { input: 0.22, output: 0.66 },
+    "deepseek-flash": { input: 0.15, output: 0.6 },
     "deepseek-v4-pro": { input: 0.66, output: 1.98 },
-    "deepseek-chat": { input: 0.22, output: 0.66 },
+    "deepseek-chat": { input: 0.15, output: 0.6 },
     "deepseek-reasoner": { input: 0.66, output: 1.98 },
   },
   modelInputLimits: {

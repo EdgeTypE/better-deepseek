@@ -282,6 +282,34 @@ describe("message processor integration", () => {
     expect(state.pricing.sessionInputTokens).toBeLessThan(beforeDispose);
   });
 
+  it("survives a stale remote pricing table that predates the model rename", () => {
+    state.settings.tokenPriceDisplay = true;
+    // What the GitHub copy still served before `deepseek-flash` shipped: only
+    // the legacy keys. The estimator must fall back, not throw.
+    state.embeddedPricing = {
+      updatedAt: "2026-08-13",
+      models: {
+        "deepseek-v4-flash": {
+          inputPrice: 0.22,
+          inputCacheHitPrice: 0.007,
+          outputPrice: 0.66,
+          contextLength: 1000000,
+        },
+      },
+    };
+
+    const node = createMessageNode("hello there", "user");
+    const context = {
+      latestAssistantNode: null,
+      absoluteLastNode: node,
+      systemGenerating: false,
+    };
+
+    expect(() => processMessageNode(node, 0, [node], context)).not.toThrow();
+    expect(state.pricing.sessionInputTokens).toBeGreaterThan(0);
+    expect(state.pricing.sessionTotals.totalCost).toBeGreaterThan(0);
+  });
+
   it("removes stale DOM overlays before mounting a replacement", () => {
     const node = createMessageNode(
       "Intro\n<BDS:VISUALIZER><div>viz</div></BDS:VISUALIZER>",

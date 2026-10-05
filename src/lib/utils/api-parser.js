@@ -44,15 +44,17 @@ export function estimateTokens(text, charsPerToken = 3.5) {
   return Math.max(1, Math.round(String(text).length / charsPerToken));
 }
 
+// Off-peak (non-peak) rates. Peak hours (01:00-04:00 and 06:00-10:00 UTC,
+// Mon-Fri) are roughly double these values.
 const PRICING = {
-  "deepseek-v4-flash": { input: 0.22, cacheHit: 0.007, output: 0.66 },
+  "deepseek-flash": { input: 0.15, cacheHit: 0.003, output: 0.6 },
   "deepseek-v4-pro": { input: 0.66, cacheHit: 0.022, output: 1.98 },
 };
 
 export function calculateCost(usage, model) {
   if (!usage || !model) return { inputCost: 0, outputCost: 0, totalCost: 0, cacheSavings: 0 };
   
-  const pricing = PRICING[model] || PRICING["deepseek-v4-flash"];
+  const pricing = PRICING[model] || PRICING["deepseek-flash"];
   const promptTokens = usage.prompt_tokens || 0;
   const completionTokens = usage.completion_tokens || 0;
   const cacheHit = usage.prompt_cache_hit_tokens || 0;

@@ -34,7 +34,7 @@ import { initDeepResearchRuntime } from "./deep-research.js";
 import { loadDeepCodeState } from "./deep-code.js";
 import { i18n } from "../lib/i18n.svelte.js";
 import { remoteConfig, REMOTE_CONFIG_EVENT, detectModelType } from "../lib/remote-config.svelte.js";
-import { STORAGE_KEYS, CSS_PRESETS } from "../lib/constants.js";
+import { STORAGE_KEYS, CSS_PRESETS, EMBEDDED_PRICING } from "../lib/constants.js";
 import { loadAllHistory, retainOnlyHistorySession } from "./load-all-history.js";
 import { stopVoicePlayback } from "./message-processor.svelte.js";
 
@@ -205,10 +205,16 @@ async function init() {
     }));
   });
 
-  // Dynamically fetch pricing and update embedded fallback
+  // Dynamically fetch pricing and update embedded fallback.
+  // Merge over the embedded table instead of replacing it: the remote copy
+  // (official page or GitHub) can lag behind a model rename shipped in this
+  // build, and a renamed key going missing would blank out pricing entirely.
   initPricing().then((pricing) => {
     if (pricing && pricing.models) {
-      state.embeddedPricing = pricing;
+      state.embeddedPricing = {
+        ...pricing,
+        models: { ...EMBEDDED_PRICING.models, ...pricing.models },
+      };
       scheduleScan();
     }
   }).catch(() => {});

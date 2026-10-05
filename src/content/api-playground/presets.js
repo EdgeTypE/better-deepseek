@@ -1,10 +1,10 @@
 export const PRESETS = [
   {
-    name: "V4 Flash - Basic Chat",
-    description: "Simple non-thinking chat with deepseek-v4-flash",
+    name: "V4.1 Flash - Basic Chat",
+    description: "Simple non-thinking chat with deepseek-flash",
     request: {
       endpoint: "chat/completions",
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         { role: "system", content: "You are a helpful assistant." },
         { role: "user", content: "Hello! How are you?" },
@@ -82,7 +82,7 @@ export const PRESETS = [
     description: "Structured JSON response with explicit schema instruction",
     request: {
       endpoint: "chat/completions",
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         { role: "system", content: 'You are a data extraction assistant. Output valid JSON only. Example: {"name": "...", "age": 25}' },
         { role: "user", content: "Extract info: John Doe is 30 years old and lives in New York." },
@@ -197,7 +197,7 @@ export const PRESETS = [
     description: "Streaming response with usage data",
     request: {
       endpoint: "chat/completions",
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         { role: "system", content: "You are a helpful assistant." },
         { role: "user", content: "Write a short poem about artificial intelligence." },
@@ -267,7 +267,7 @@ export const PRESETS = [
     description: "Examine token log probabilities",
     request: {
       endpoint: "chat/completions",
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         { role: "user", content: "What is the capital of France?" },
       ],
@@ -292,7 +292,7 @@ export const PRESETS = [
     description: "Two turns: model remembers context",
     request: {
       endpoint: "chat/completions",
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       messages: [
         { role: "user", content: "What's the highest mountain in the world?" },
         { role: "assistant", content: "Mount Everest" },

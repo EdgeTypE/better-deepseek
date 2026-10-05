@@ -85,7 +85,7 @@
       class="bds-api-select"
       disabled={request.endpoint === 'models' || request.endpoint === 'user/balance'}
     >
-      <option value="deepseek-v4-flash">deepseek-v4-flash</option>
+      <option value="deepseek-flash">deepseek-flash</option>
       <option value="deepseek-v4-pro">deepseek-v4-pro</option>
     </select>
 
