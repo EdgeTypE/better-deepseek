@@ -97,13 +97,22 @@
   const isAndroidTarget = BDS_TARGET === "android";
 
   // Folder upload uses window.showDirectoryPicker — unavailable in Android
-  // WebView. Voice input is hidden on Android because SpeechRecognition isn't
-  // wired up in WebView; the on-screen keyboard mic is always reachable.
+  // WebView. Voice input has no Web Speech API there either, so it is offered only
+  // when something can actually recognize speech: the native Android bridge
+  // (SpeechBridge.kt, shimmed by src/platform/android-speech.js) or a host that
+  // implements SpeechRecognition itself.
   // On non-Android targets we keep the buttons visible and let the existing
   // runtime fallbacks (toast on missing API) handle older Chromium variants.
   // Android native bridge re-enables folder upload when pickFiles exists.
   const supportsFolderUpload = !isAndroidTarget || isNativeFilePickerAvailable();
-  const supportsVoiceInput = !isAndroidTarget;
+  const hasSpeechRecognition =
+    typeof window !== "undefined" &&
+    Boolean(
+      window.SpeechRecognition ||
+        window.webkitSpeechRecognition ||
+        window.AndroidSpeech,
+    );
+  const supportsVoiceInput = !isAndroidTarget || hasSpeechRecognition;
 
   // ── Remote Config: Model-aware visibility ──
 

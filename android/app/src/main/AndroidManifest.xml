@@ -9,8 +9,9 @@
          "install unknown apps" in Settings, and MainActivity routes them there when the grant is
          missing. Without the declaration the installer intent is refused outright. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- Mic button uses SpeechRecognition (browser API). The permission is
-         declared so future native fallbacks remain possible. -->
+    <!-- Voice capture. The WebView has no Web Speech API, so live voice mode runs on
+         android.speech.SpeechRecognizer through SpeechBridge; the runtime grant is requested
+         from WebChromeClient.onPermissionRequest when the page calls getUserMedia. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Pre-Q downloads land in shared storage. API 29+ uses MediaStore and
          doesn't need this permission. -->
@@ -34,6 +35,16 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:mimeType="*/*" />
+        </intent>
+        <!-- Android 11+ package visibility. Without these declarations the process cannot
+             see the TTS engine or the speech recognition service, and TextToSpeech fails to
+             bind with "speak failed: not bound to TTS engine" even though the services are
+             installed. Both back live voice mode through SpeechBridge. -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
         </intent>
     </queries>
 

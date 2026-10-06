@@ -1,3 +1,6 @@
+import org.gradle.api.tasks.testing.Test
+import java.util.zip.ZipFile
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -9,6 +12,62 @@ plugins {
 // version apart. Left at 0 for local builds, which the updater reads as "not a CI build" and
 // falls back to its timestamp heuristic for.
 val bdsBuildId: Long = (project.findProperty("BdsBuildId") as String?)?.toLongOrNull() ?: 0L
+
+// ── Robolectric + Conscrypt native loading ──────────────────────────────────
+// Robolectric 4.13 registers Conscrypt as the JCE provider in
+// AndroidTestEnvironment.setUpApplicationState(), which runs before any test body.
+// Conscrypt then asks System.loadLibrary for a binary named after the OS it detected,
+// deriving that name with a no-argument String.toLowerCase(). Under a Turkish default
+// locale that turns "Windows" into "wındows" (dotless i), so the JVM looks for
+// "conscrypt_openjdk_jni-wındows-x86_64.dll", finds nothing, and every Robolectric test
+// aborts in beforeTest() with UnsatisfiedLinkError before a single assertion runs.
+//
+// Pinning the test JVM to en-US fixes the name. The loader also needs a place to load
+// the DLL from: it only unpacks the copy bundled in the uber jar when
+// org.conscrypt.native.workdir is set, otherwise it falls back to java.library.path, so on
+// Windows we stage the file there ourselves. Linux and macOS resolve it straight from the
+// jar and need neither workaround.
+fun stageConscryptNativeDir(): File? {
+    if (!System.getProperty("os.name").startsWith("Windows")) return null
+
+    // Conscrypt names its binaries after the JVM's os.arch, not the Windows arch names.
+    val dllSuffix = when (System.getProperty("os.arch")) {
+        "amd64" -> "windows-x86_64"
+        "x86" -> "windows-x86"
+        else -> return null
+    }
+
+    // Take the version Robolectric already resolves, so this can never drift from it.
+    // The Android plugin creates one classpath per variant — debugUnitTestRuntimeClasspath,
+    // releaseUnitTestRuntimeClasspath — so match on that shape rather than a single name.
+    val conscryptJar = configurations
+        .matching { it.name.endsWith("UnitTestRuntimeClasspath") }
+        .mapNotNull { cfg ->
+            runCatching {
+                cfg.resolvedConfiguration.resolvedArtifacts
+                    .firstOrNull { it.moduleVersion.id.group == "org.conscrypt" }
+                    ?.file
+            }.getOrNull()
+        }
+        .firstOrNull()
+        ?: return null
+
+    val entryName = "META-INF/native/conscrypt_openjdk_jni-$dllSuffix.dll"
+    val targetDir = layout.buildDirectory.file("conscrypt-native").get().asFile
+    targetDir.mkdirs()
+    val target = File(targetDir, "conscrypt_openjdk_jni-$dllSuffix.dll")
+
+    ZipFile(conscryptJar).use { zip ->
+        val entry = zip.getEntry(entryName) ?: return null
+        // Re-extract only when missing or stale, so incremental test runs stay cheap.
+        if (!target.exists() || target.length() != entry.size) {
+            zip.getInputStream(entry).use { input ->
+                target.outputStream().use { output -> input.copyTo(output) }
+            }
+        }
+    }
+    return targetDir
+}
 
 android {
     namespace = "com.betterdeepseek.app"
@@ -71,6 +130,29 @@ android {
             isReturnDefaultValues = true
             isIncludeAndroidResources = true
         }
+    }
+}
+
+// Applied to the unit-test JVMs only; instrumented tests run on a real device and are
+// unaffected. doFirst rather than the task body so it runs after the Android plugin has
+// created the per-variant classpaths, and always before the test JVM forks.
+tasks.withType<Test>().configureEach {
+    doFirst {
+        // Pin the locale so results never depend on the developer's system language.
+        // Not cosmetic: a Turkish default locale breaks Conscrypt's native library
+        // lookup, which is what makes every Robolectric test fail on a Turkish machine.
+        systemProperty("user.language", "en")
+        systemProperty("user.country", "US")
+
+        val nativeDir = stageConscryptNativeDir() ?: return@doFirst
+        // Prepend so the staged DLL wins over any stale copy on the path.
+        val current = System.getProperty("java.library.path").orEmpty()
+        systemProperty(
+            "java.library.path",
+            (listOf(nativeDir.absolutePath) + current.split(File.pathSeparator))
+                .filter { it.isNotBlank() }
+                .joinToString(File.pathSeparator)
+        )
     }
 }
 

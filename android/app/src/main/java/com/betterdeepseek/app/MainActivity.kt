@@ -1,8 +1,10 @@
 package com.betterdeepseek.app
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
@@ -12,6 +14,7 @@ import android.util.Log
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
+import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -27,6 +30,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -231,6 +235,27 @@ class MainActivity : ComponentActivity() {
     private lateinit var bridge: WebViewBridge
     private lateinit var cookieManager: CookieManager
     private lateinit var derivedUserAgent: String
+    private lateinit var speechBridge: SpeechBridge
+
+    /**
+     * Mic grant the WebView is waiting on. `getUserMedia` inside the page surfaces as an
+     * [PermissionRequest]; the page's MediaStream promise stays pending until this request
+     * is granted or denied, so the pending request has to outlive the runtime-permission
+     * round trip and be answered once the user replies.
+     */
+    private var pendingAudioPermissionRequest: PermissionRequest? = null
+
+    private val audioPermissionLauncher: ActivityResultLauncher<String> =
+            registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+                val request = pendingAudioPermissionRequest
+                pendingAudioPermissionRequest = null
+                if (request == null) return@registerForActivityResult
+                if (granted) {
+                    request.grant(request.resources)
+                } else {
+                    request.deny()
+                }
+            }
 
     private var popupContainer: FrameLayout? = null
     private var popupWebView: WebView? = null
@@ -333,6 +358,9 @@ class MainActivity : ComponentActivity() {
         window.navigationBarColor = Color.TRANSPARENT
 
         bridge = WebViewBridge(applicationContext)
+        // The Android WebView has no Web Speech API, so live voice mode runs on the
+        // platform TTS / SpeechRecognizer instead. Exposed as `window.AndroidSpeech`.
+        speechBridge = SpeechBridge(applicationContext)
         cookieManager = CookieManager.getInstance()
         pendingPickFilesRequestId = savedInstanceState?.getString(STATE_PENDING_PICK_REQUEST_ID)
         pendingPickFilesMode = savedInstanceState?.getString(STATE_PENDING_PICK_MODE)
@@ -387,9 +415,11 @@ class MainActivity : ComponentActivity() {
                             )
                     applyBdsWebSettings(this, derivedUserAgent)
                     addJavascriptInterface(bridge, BRIDGE_NAME)
+                    addJavascriptInterface(speechBridge, SpeechBridge.BRIDGE_NAME)
                     webViewClient = bdsWebViewClient()
                     webChromeClient = bdsWebChromeClient()
                     bridge.evaluateJs = { script -> evaluateJavascript(script, null) }
+                    speechBridge.evaluateJs = { script -> evaluateJavascript(script, null) }
                     isVerticalScrollBarEnabled = true
                     setBackgroundColor(if (isPageDark) PAGE_BG_DARK else PAGE_BG_LIGHT)
                 }
@@ -519,6 +549,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
+        // A WebView keeps running while the Activity is paused; left alone, live mode would
+        // keep the microphone open and talk over whatever the user switched to.
+        if (::speechBridge.isInitialized) {
+            speechBridge.onHostPaused()
+        }
         if (::cookieManager.isInitialized) {
             cookieManager.flush()
         }
@@ -539,6 +574,12 @@ class MainActivity : ComponentActivity() {
         bridge.onThemeChanged = null
         bridge.evaluateJs = null
         bridge.onPickFiles = null
+        pendingAudioPermissionRequest?.deny()
+        pendingAudioPermissionRequest = null
+        if (::speechBridge.isInitialized) {
+            speechBridge.release()
+            webView.removeJavascriptInterface(SpeechBridge.BRIDGE_NAME)
+        }
         webView.removeJavascriptInterface(BRIDGE_NAME)
         if (::cookieManager.isInitialized) {
             cookieManager.flush()
@@ -601,6 +642,39 @@ class MainActivity : ComponentActivity() {
 
     private fun bdsWebChromeClient() =
             object : WebChromeClient() {
+                /**
+                 * The page's `getUserMedia` arrives here. WebView denies every permission
+                 * request unless the host answers it, so without this override voice capture
+                 * silently failed even though RECORD_AUDIO is declared in the manifest.
+                 *
+                 * Only the microphone is handled; anything else (camera, protected media) is
+                 * refused rather than blanket-granted.
+                 */
+                override fun onPermissionRequest(request: PermissionRequest?) {
+                    val pending = request ?: return
+                    val wantsAudio =
+                            pending.resources.any {
+                                it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
+                            }
+                    if (!wantsAudio) {
+                        pending.deny()
+                        return
+                    }
+                    if (ContextCompat.checkSelfPermission(
+                                    this@MainActivity,
+                                    Manifest.permission.RECORD_AUDIO
+                            ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        pending.grant(pending.resources)
+                        return
+                    }
+                    // Replacing an unanswered request would leave its MediaStream promise
+                    // pending forever, so resolve the stale one before asking again.
+                    pendingAudioPermissionRequest?.deny()
+                    pendingAudioPermissionRequest = pending
+                    audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }
+
                 override fun onShowFileChooser(
                         webView: WebView?,
                         filePathCallback: ValueCallback<Array<Uri>>?,
