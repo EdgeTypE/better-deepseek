@@ -8,6 +8,14 @@ import { cleanTextForSpeech, getBestVoice, softenPunctuationForSpeech, LiveEngin
 import { buildHiddenPrefix, mutatePayload } from "../../src/injected/payload-mutator.js";
 import { disableDeepThinkIfActive, findDeepSeekStopButton } from "../../src/content/scanner.js";
 
+// The native AEC posture drives barge-in thresholds. Mocked here so both
+// postures can be exercised without a device; the real accessor is covered by
+// the android-speech shim tests.
+vi.mock("../../src/platform/android-speech.js", () => ({
+  isAndroidAecActive: vi.fn(() => null),
+}));
+import { isAndroidAecActive } from "../../src/platform/android-speech.js";
+
 describe("Live Mode - cleanTextForSpeech", () => {
   it("strips think blocks", () => {
     const input = "<think>Let me ponder this deeply...</think>Hello, how can I help you today?";
@@ -308,6 +316,9 @@ describe("Live Mode - LiveEngine Lifecycle & State", () => {
     resetAppState();
     document.body.innerHTML = "";
     engine = new LiveEngine();
+    // Default posture: unknown, so the conservative thresholds apply unless a
+    // test opts into AEC explicitly.
+    isAndroidAecActive.mockReturnValue(null);
   });
 
   it("initializes with idle status", () => {
@@ -351,24 +362,145 @@ describe("Live Mode - LiveEngine Lifecycle & State", () => {
     expect(engine.status).toBe("listening");
   });
 
+  it("filters out TTS echo and recognizes genuine voice barge-in", () => {
+    engine.ttsEchoWindow = true;
+    engine.lastChunkStartTime = Date.now() - 1000;
+    engine.recentSpokenChunks = [
+      {
+        text: "merhaba bugün hava çok güzel",
+        words: ["merhaba", "bugün", "hava", "çok", "güzel"],
+        timestamp: Date.now() - 500,
+      },
+    ];
+
+    // A fragment of recent AI speech is rejected as echo
+    expect(engine.isGenuineBargeIn("hava çok güzel")).toBe(false);
+
+    // New/different words from user are accepted as genuine barge-in
+    expect(engine.isGenuineBargeIn("dur bekle bir şey diyeceğim")).toBe(true);
+  });
+
+  it("trusts speech before TTS starts, when there is nothing to echo", () => {
+    engine.ttsEchoWindow = false;
+    engine.lastChunkStartTime = Date.now() - 1000;
+    engine.recentSpokenChunks = [
+      {
+        text: "merhaba bugün hava çok güzel",
+        words: ["merhaba", "bugün", "hava", "çok", "güzel"],
+        timestamp: Date.now() - 500,
+      },
+    ];
+
+    // Nothing is playing, so even a one-word utterance is the user's
+    expect(engine.isGenuineBargeIn("hava")).toBe(true);
+    expect(engine.isGenuineBargeIn("stop")).toBe(true);
+  });
+
+  it("rejects one-word fragments while TTS is audible without AEC", () => {
+    isAndroidAecActive.mockReturnValue(false);
+    engine.ttsEchoWindow = true;
+    engine.lastChunkStartTime = Date.now() - 1000;
+    engine.recentSpokenChunks = [
+      {
+        text: "yapay zeka hayatımızı değiştiriyor",
+        words: ["yapay", "zeka", "hayatımızı", "değiştiriyor"],
+        timestamp: Date.now() - 500,
+      },
+    ];
+
+    // A single mis-recognised word is indistinguishable from echo here, and this
+    // is exactly the case that used to trigger the self-interrupt loop.
+    expect(engine.isGenuineBargeIn("yapay")).toBe(false);
+    expect(engine.isGenuineBargeIn("zeka")).toBe(false);
+  });
+
+  it("trusts short utterances once AEC is cancelling the echo", () => {
+    isAndroidAecActive.mockReturnValue(true);
+    engine.ttsEchoWindow = true;
+    engine.lastChunkStartTime = Date.now() - 1000;
+    engine.recentSpokenChunks = [
+      {
+        text: "evet tamam anladım simdi devam edelim lutfen",
+        words: ["evet", "tamam", "anladım", "simdi", "devam", "edelim", "lutfen"],
+        timestamp: Date.now() - 500,
+      },
+    ];
+
+    // Real replies that reuse the assistant's words must survive.
+    expect(engine.isGenuineBargeIn("evet tamam")).toBe(true);
+    expect(engine.isGenuineBargeIn("devam edelim")).toBe(true);
+    expect(engine.isGenuineBargeIn("peki")).toBe(true);
+
+    // A verbatim repeat is still echo, AEC or not.
+    expect(
+      engine.isGenuineBargeIn("evet tamam anladım simdi devam edelim lutfen"),
+    ).toBe(false);
+  });
+
+  it("rejects a big slice of a chunk as echo at any length", () => {
+    isAndroidAecActive.mockReturnValue(true);
+    engine.ttsEchoWindow = true;
+    engine.lastChunkStartTime = Date.now() - 1000;
+    engine.recentSpokenChunks = [
+      {
+        text: "merhaba bugün hava çok güzel",
+        words: ["merhaba", "bugün", "hava", "çok", "güzel"],
+        timestamp: Date.now() - 500,
+      },
+    ];
+
+    // Most of what was playing: a pickup, not a reply, even with AEC on.
+    expect(engine.isGenuineBargeIn("hava çok güzel")).toBe(false);
+    expect(engine.isGenuineBargeIn("merhaba bugün hava")).toBe(false);
+  });
+
   it("does not interrupt speaking state purely on VAD energy (prevents speaker feedback)", () => {
     engine.status = "speaking";
     engine.handleUserSpeechStart();
     expect(engine.status).toBe("speaking");
   });
 
-  it("filters out TTS echo and recognizes genuine voice barge-in", () => {
+  it("keeps TTS echo out of the transcript so it cannot become the next prompt", () => {
+    isAndroidAecActive.mockReturnValue(true);
+    engine.status = "speaking";
+    engine.ttsEchoWindow = true;
     engine.lastChunkStartTime = Date.now() - 1000;
     engine.recentSpokenChunks = [
-      { text: "merhaba bugün hava çok güzel", timestamp: Date.now() - 500 },
+      {
+        text: "elbette bunu senin için yapabilirim",
+        words: ["elbette", "bunu", "senin", "için", "yapabilirim"],
+        timestamp: Date.now() - 500,
+      },
     ];
 
-    // Substring of recent AI speech is rejected as echo
-    expect(engine.isGenuineBargeIn("hava çok güzel")).toBe(false);
+    let nextPrompt = null;
+    engine.submitUserPrompt = async (text) => {
+      nextPrompt = text;
+    };
 
-    // New/different words from user are accepted as genuine barge-in
-    expect(engine.isGenuineBargeIn("dur bekle bir şey diyeceğim")).toBe(true);
-    expect(engine.isGenuineBargeIn("stop")).toBe(true);
+    // Drive the real recognizer handler by capturing it from initRecognition.
+    const speechSynthesisUtterance = globalThis.SpeechSynthesisUtterance;
+    engine.initRecognition(function FakeRecognition() {
+      this.start = () => {};
+      this.abort = () => {};
+    });
+    const onresult = engine.recognition.onresult;
+
+    // The recognizer reports the assistant's own words while it is audible.
+    onresult({
+      results: [[{ transcript: "elbette bunu senin için yapabilirim" }]],
+    });
+
+    // Echo must not land in the transcript buffer at all: left there it would be
+    // submitted as the user's next prompt once listening resumed.
+    expect(engine.currentTranscript).toBe("");
+
+    // Turn over: listening resumes with a clean buffer, so nothing is submitted.
+    engine.ttsEchoWindow = false;
+    engine.status = "listening";
+    engine.handleUserSilenceStop("test");
+    expect(nextPrompt).toBeNull();
+    expect(speechSynthesisUtterance).toBeDefined();
   });
 
   it("stops and cleans up active session", () => {

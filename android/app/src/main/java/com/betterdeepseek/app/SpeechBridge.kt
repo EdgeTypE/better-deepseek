@@ -2,6 +2,8 @@ package com.betterdeepseek.app
 
 import android.content.Context
 import android.content.Intent
+import android.media.MediaRecorder
+import android.media.audiofx.AcousticEchoCanceler
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -34,6 +36,27 @@ import java.util.Locale
  * like the Web Speech API and forward to this object, so `live-engine.js` and
  * the rest of the codebase stay host-agnostic.
  *
+ * ── Acoustic echo cancellation ──────────────────────────────────────────────
+ *
+ * `SpeechRecognizer` owns its own microphone session: its API has no way to
+ * accept PCM we captured ourselves, so the AEC-enabled stream the page opens
+ * through `getUserMedia` (used by VADProcessor) is invisible to it. Without a
+ * second measure, the recognizer therefore hears the assistant's own TTS
+ * through the speaker, and live mode interprets that echo as the user talking
+ * — interrupting itself in a loop.
+ *
+ * The fix is `EXTRA_AUDIO_SOURCE`: it lets us pick which capture source the
+ * recognizer reads from. `VOICE_COMMUNICATION` is the telephony processing
+ * path, and Android feeds it the platform AEC/NS/AGC chain — including the
+ * reference signal of everything the device is currently playing, our TTS
+ * included. So the recognizer still opens its own session (the API constraint
+ * stands), but what it reads is already echo-suppressed.
+ *
+ * `VOICE_COMMUNICATION` can narrow the stream on some devices (16 kHz mono),
+ * which is why [aecStrategyJson] reports the live choice back to JS: the
+ * barge-in filter in `live-engine.js` tightens or relaxes its thresholds based
+ * on whether AEC is actually in effect.
+ *
  * Contract:
  *   ttsInit(): void                       — idempotent; publishes `voices` when ready
  *   ttsGetVoices(): String                — JSON array, cached after init
@@ -43,13 +66,14 @@ import java.util.Locale
  *   sttStart(lang): void
  *   sttStop(): void                       — graceful stop (delivers the final result)
  *   sttAbort(): void                      — immediate teardown, no final result
+ *   sttAecStrategy(): String              — JSON, current echo-control strategy
  *
  * Native → JS events are delivered as CustomEvents carrying a JSON string in
  * `detail` (Firefox Xray Vision cannot read cross-world objects):
  *
  *   bds:android-tts  { kind: "voices" | "start" | "done" | "error", ... }
  *   bds:android-stt  { kind: "start" | "speechstart" | "speechend" | "partial"
- *                            | "final" | "error" | "end", text?, error? }
+ *                            | "final" | "error" | "end", text?, error?, aec? }
  *
  * Every public method is safe to call from arbitrary JS: inputs are validated
  * and nothing throws across the bridge boundary.
@@ -362,6 +386,59 @@ class SpeechBridge(private val context: Context) {
 
     // ── STT: internals ──────────────────────────────────────────────────────
 
+    /**
+     * Whether the platform reports echo cancellation support.
+     *
+     * `AcousticEchoCanceler.isAvailable()` is a static capability query and needs
+     * no audio session of its own. Resolved once and cached: the answer cannot
+     * change while the app runs, and the probe is not free.
+     */
+    private val aecAvailable: Boolean by lazy {
+        try {
+            AcousticEchoCanceler.isAvailable()
+        } catch (t: Throwable) {
+            Log.w(TAG, "AEC availability probe failed", t)
+            false
+        }
+    }
+
+    /**
+     * Which capture source the recognizer reads from.
+     *
+     * `VOICE_COMMUNICATION` routes through the telephony processing chain, so
+     * the platform AEC/NS/AGC runs on what the recognizer hears — including the
+     * reference of our own TTS playback, which is exactly the echo that used to
+     * trigger the self-interrupt loop. It is only requested when the platform
+     * actually has an echo canceller; otherwise the default source is kept,
+     * because `VOICE_COMMUNICATION` without AEC just narrows the stream for no
+     * benefit.
+     */
+    private fun audioSourceExtra(): Int =
+            if (aecAvailable) MediaRecorder.AudioSource.VOICE_COMMUNICATION
+            else MediaRecorder.AudioSource.VOICE_RECOGNITION
+
+    /**
+     * Describe the current echo-control posture for the JS barge-in filter.
+     *
+     * `aec: true` means the recognizer's stream is echo-suppressed and the
+     * filter can trust short partials as genuine speech. `aec: false` means it
+     * cannot, and `live-engine.js` has to stay conservative.
+     */
+    private fun aecStrategyJson(): JSONObject =
+            JSONObject()
+                    .put("aec", aecAvailable)
+                    .put("source", if (aecAvailable) "voice-communication" else "voice-recognition")
+
+    /** Expose the strategy so the shim can publish it before recognition starts. */
+    @JavascriptInterface
+    fun sttAecStrategy(): String =
+            try {
+                aecStrategyJson().toString()
+            } catch (t: Throwable) {
+                Log.w(TAG, "AEC strategy serialization failed", t)
+                """{"aec":false,"source":"voice-recognition"}"""
+            }
+
     private fun createRecognizer(): SpeechRecognizer =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                             SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
@@ -371,6 +448,20 @@ class SpeechBridge(private val context: Context) {
                 SpeechRecognizer.createSpeechRecognizer(context)
             }
 
+    /**
+     * Build the recognition intent.
+     *
+     * Beyond the language model, three extras matter for live mode:
+     *
+     *  - [RecognizerIntent.EXTRA_AUDIO_SOURCE] picks the AEC-enabled capture
+     *    path (see [audioSourceExtra]); without it the recognizer hears our own
+     *    TTS and the echo loop returns.
+     *  - [RecognizerIntent.EXTRA_PREFER_OFFLINE] keeps recognition on-device
+     *    where the model exists, cutting latency and keeping speech local.
+     *  - The silence-length extras align the engine's own endpointing with the
+     *    timeouts live mode applies on top, so the two stop cutting each other
+     *    off mid-sentence.
+     */
     private fun buildRecognizerIntent(lang: String?): Intent =
             Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(
@@ -381,6 +472,23 @@ class SpeechBridge(private val context: Context) {
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
                 putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
                 if (lang != null) putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
+                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, audioSourceExtra())
+                // Masquerading offensive words mangles the transcript the barge-in
+                // filter compares against, producing false "genuine speech" reads.
+                putExtra(RecognizerIntent.EXTRA_MASK_OFFENSIVE_WORDS, false)
+                putExtra(
+                        RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                        COMPLETE_SILENCE_MS
+                )
+                putExtra(
+                        RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+                        POSSIBLY_COMPLETE_SILENCE_MS
+                )
+                putExtra(
+                        RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
+                        MINIMUM_LENGTH_MS
+                )
             }
 
     private fun tearDownRecognizer(abort: Boolean) {
@@ -401,11 +509,11 @@ class SpeechBridge(private val context: Context) {
     private val recognitionListener =
             object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
-                    dispatchStt(JSONObject().put("kind", "start"))
+                    dispatchStt(JSONObject().put("kind", "start").put("aec", aecAvailable))
                 }
 
                 override fun onBeginningOfSpeech() {
-                    dispatchStt(JSONObject().put("kind", "speechstart"))
+                    dispatchStt(JSONObject().put("kind", "speechstart").put("aec", aecAvailable))
                 }
 
                 override fun onRmsChanged(rmsdB: Float) = Unit
@@ -413,7 +521,7 @@ class SpeechBridge(private val context: Context) {
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
 
                 override fun onEndOfSpeech() {
-                    dispatchStt(JSONObject().put("kind", "speechend"))
+                    dispatchStt(JSONObject().put("kind", "speechend").put("aec", aecAvailable))
                 }
 
                 override fun onPartialResults(partialResults: Bundle?) {
@@ -426,12 +534,18 @@ class SpeechBridge(private val context: Context) {
                             JSONObject()
                                     .put("kind", "partial")
                                     .put("text", lastPartialText)
+                                    .put("aec", aecAvailable)
                     )
                 }
 
                 override fun onResults(results: Bundle?) {
                     val text = firstResult(results) ?: lastPartialText
-                    dispatchStt(JSONObject().put("kind", "final").put("text", text))
+                    dispatchStt(
+                            JSONObject()
+                                    .put("kind", "final")
+                                    .put("text", text)
+                                    .put("aec", aecAvailable)
+                    )
                     finishSession()
                 }
 
@@ -440,6 +554,7 @@ class SpeechBridge(private val context: Context) {
                             JSONObject()
                                     .put("kind", "error")
                                     .put("error", mapRecognizerError(error))
+                                    .put("aec", aecAvailable)
                     )
                     finishSession()
                 }
@@ -549,6 +664,20 @@ class SpeechBridge(private val context: Context) {
 
         const val TTS_EVENT = "bds:android-tts"
         const val STT_EVENT = "bds:android-stt"
+
+        /**
+         * Endpointing hints for the native engine, in milliseconds.
+         *
+         * Live mode applies its own silence timeout (default 1100ms) on top of the
+         * engine's own endpointing. Left at the engine defaults the two disagree:
+         * the engine finalises mid-sentence while the JS timer is still waiting, so
+         * a single utterance arrives split in two and gets submitted twice. These
+         * values keep the engine's window at or above the JS one so the JS timer is
+         * always the one that ends a turn.
+         */
+        private const val COMPLETE_SILENCE_MS = 1200L
+        private const val POSSIBLY_COMPLETE_SILENCE_MS = 1200L
+        private const val MINIMUM_LENGTH_MS = 300L
 
         private const val TAG = "BdsSpeechBridge"
     }

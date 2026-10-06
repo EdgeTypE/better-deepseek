@@ -48,6 +48,16 @@ let utteranceSeq = 0;
 /** Recognition session currently driving the native recognizer, if any. */
 let activeRecognition = null;
 
+/**
+ * Whether the native recognizer's capture path is echo-cancelled.
+ *
+ * `null` until the first recognizer event reports it. `true` means the platform
+ * AEC is running on the recognizer's microphone, so a short partial really is
+ * the user talking; `false` means the recognizer can hear our own TTS and the
+ * barge-in filter has to stay conservative. See `SpeechBridge.kt`.
+ */
+let aecActive = null;
+
 function getBridge() {
   return typeof window !== "undefined" ? window.AndroidSpeech : null;
 }
@@ -264,6 +274,20 @@ class AndroidSpeechRecognition {
     this._listening = true;
     this._finalText = "";
     activeRecognition = this;
+
+    // Ask for the echo-control posture before listening starts. The barge-in
+    // filter consults it to pick thresholds, and waiting for the first `start`
+    // event would leave it blind for the opening partial of every session.
+    try {
+      if (typeof bridge.sttAecStrategy === "function") {
+        const raw = bridge.sttAecStrategy();
+        const strategy = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (strategy && typeof strategy.aec === "boolean") aecActive = strategy.aec;
+      }
+    } catch (err) {
+      console.warn("[BDS] AEC strategy probe failed:", err);
+    }
+
     bridge.sttStart(String(this.lang || ""));
   }
 
@@ -302,6 +326,11 @@ class AndroidSpeechRecognition {
 function handleSttEvent(event) {
   const detail = readDetail(event);
   if (!detail) return;
+
+  // AEC posture rides along on every recognizer event; track it before routing so
+  // the barge-in filter sees the correct thresholds even on the first partial.
+  if (typeof detail.aec === "boolean") aecActive = detail.aec;
+
   const recognition = activeRecognition;
   if (!recognition) return;
 
@@ -337,6 +366,8 @@ function handleSttEvent(event) {
 
     case "final": {
       const text = String(detail.text || "") || recognition._finalText;
+      // Record the engine's verdict so a later `end` with no result payload still
+      // has the confirmed transcript to fall back on.
       recognition._finalText = text;
       if (text.trim() && typeof recognition.onresult === "function") {
         recognition.onresult(
@@ -412,6 +443,18 @@ export function isAndroidSpeechAvailable() {
   return Boolean(getBridge());
 }
 
+/**
+ * Whether the recognizer's capture path is echo-cancelled.
+ *
+ * Returns `null` when unknown (no event has reported it yet, or a real Web
+ * Speech implementation is in use), `true`/`false` once the native side has
+ * told us. `live-engine.js` uses this to pick barge-in thresholds: with AEC on,
+ * a short partial is trustworthy; without it, short partials are presumed echo.
+ */
+export function isAndroidAecActive() {
+  return aecActive;
+}
+
 /** Test-only: drop all installed shims and cached state. */
 export function __resetAndroidSpeechForTests() {
   if (typeof window !== "undefined") {
@@ -423,6 +466,7 @@ export function __resetAndroidSpeechForTests() {
   voices = [];
   utterances.clear();
   activeRecognition = null;
+  aecActive = null;
   utteranceSeq = 0;
 }
 

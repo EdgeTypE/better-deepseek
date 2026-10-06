@@ -24,6 +24,7 @@ import { injectPureTextAndSend } from "../auto.js";
 import { extractMessageRawText } from "../dom/message-text.js";
 import { isSystemGenerating } from "../message-processor.svelte.js";
 import { devLog } from "../../lib/dev-log.js";
+import { isAndroidAecActive } from "../../platform/android-speech.js";
 import { cleanTextForSpeech, getBestVoice, softenPunctuationForSpeech } from "./tts-utils.js";
 
 export { cleanTextForSpeech, getBestVoice, softenPunctuationForSpeech };
@@ -31,6 +32,41 @@ export { cleanTextForSpeech, getBestVoice, softenPunctuationForSpeech };
 /** Upper bound for merging queued sentences into one utterance. Bigger = fewer
  *  hand-offs to the synthesizer = fewer inter-utterance gaps. */
 const TTS_MERGE_LIMIT = 400;
+
+/**
+ * How long after TTS playback starts the microphone is treated as hearing the
+ * speaker rather than the user.
+ *
+ * Timed from the first remote `start` event rather than from the JS speak()
+ * call: the engine queues utterances, so a chunk can sit behind another for a
+ * while, and a window opened at queue time would already have expired by the
+ * time sound actually leaves the speaker.
+ */
+const ECHO_WINDOW_GRACE_MS = 900;
+
+/**
+ * Word count at which a transcript is long enough that coincidentally matching
+ * the assistant's words stops being plausible. Below it, overlap alone is not
+ * treated as proof of echo — a short reply like "evet tamam" can legitimately
+ * reuse words the assistant just said.
+ */
+const COINCIDENCE_SAFE_WORDS = 4;
+
+/**
+ * Share of a spoken chunk a transcript must cover before it counts as echo
+ * rather than a user reply that happens to reuse the same words.
+ *
+ * A pickup usually catches a large slice of what was playing; "evet tamam" is a
+ * couple of words regardless of how long the assistant's sentence was.
+ */
+const FRAGMENT_CHUNK_RATIO = 0.34;
+
+/** Word-overlap ratio above which a long transcript is considered TTS echo. */
+const ECHO_OVERLAP_RATIO_NO_AEC = 0.85;
+const ECHO_OVERLAP_RATIO_WITH_AEC = 0.95;
+
+/** Characters that split a transcript into comparable words. */
+const WORD_SPLIT_RE = /[\s.,!?;:"'()[\]{}—–\-]+/;
 
 export class LiveEngine {
   constructor() {
@@ -62,6 +98,13 @@ export class LiveEngine {
     // Echo cancellation & barge-in tracking
     this.recentSpokenChunks = [];
     this.lastChunkStartTime = 0;
+    /**
+     * While true, the speaker is (or may be) reproducing the assistant's voice,
+     * so anything the recognizer reports is presumed echo until proven otherwise.
+     * Opened on the first remote TTS `start`, closed when the last utterance
+     * settles.
+     */
+    this.ttsEchoWindow = false;
 
     // Fluent TTS Pipeline & State
     this.ttsQueue = [];
@@ -99,6 +142,7 @@ export class LiveEngine {
     this.accumulatedTranscript = "";
     this.currentTranscript = "";
     this.recentSpokenChunks = [];
+    this.ttsEchoWindow = false;
     this._submitLock = false;
     this.lastTranscriptUpdateTime = 0;
 
@@ -220,7 +264,6 @@ export class LiveEngine {
         for (let i = 0; i < event.results.length; i++) {
           sessionText += event.results[i][0].transcript;
         }
-        this.currentTranscript = sessionText;
 
         // ── BARGE-IN INTERRUPTION VIA VOICE ──
         if (this.status === "speaking") {
@@ -229,8 +272,15 @@ export class LiveEngine {
             devLog("Live", `Voice barge-in detected: "${detected}"`);
             this.handleBargeInInterruption();
           }
+          // The speaker is still reproducing the assistant's voice, so nothing the
+          // recognizer reports can be attributed to the user. Bailing out before
+          // `currentTranscript` is touched is what keeps TTS echo out of the turn:
+          // left in the buffer it survives until listening resumes and is then
+          // submitted as the user's next prompt, making the model answer itself.
           return;
         }
+
+        this.currentTranscript = sessionText;
 
         // If listening and user spoke:
         if (this.status === "listening" && sessionText.trim()) {
@@ -311,41 +361,181 @@ export class LiveEngine {
   /**
    * Discriminate between genuine user barge-in and the microphone
    * picking up the speaker's own Text-to-Speech output.
+   *
+   * Two paths, and which one runs is decided by the *host*, not by this file:
+   *
+   *  - **AEC on** (`isAndroidAecActive() === true`): the platform echo canceller
+   *    is cleaning the recognizer's stream, so a short partial really is the
+   *    user talking. Only a substantial overlap with what was just spoken is
+   *    rejected, and short replies ("tamam", "peki") stay trusted.
+   *  - **AEC off / unknown** (every host that is not the Android bridge,
+   *    including the browser extension): the recognizer may be hearing our own
+   *    TTS. The word-overlap test the extension has always used runs here, with
+   *    the same threshold.
+   *
+   * The one thing that must not change is that a transcript with no relation to
+   * what was spoken is *always* genuine — that is what lets "tamam" interrupt
+   * the assistant. Both paths only ever reject on evidence of overlap.
    */
   isGenuineBargeIn(recognizedText) {
     if (!recognizedText || !recognizedText.trim()) return false;
+
+    // TTS is not playing yet, so nothing can be an echo of it: the room is
+    // quiet and any speech is the user's.
+    if (!this.ttsEchoWindow) return true;
 
     // Disregard onset click/transient in the first 400ms of audio chunk
     if (Date.now() - this.lastChunkStartTime < 400) {
       return false;
     }
 
-    const cleanInput = recognizedText.toLowerCase().replace(/[.,!?;:"]/g, "").trim();
-    if (!cleanInput) return false;
+    const inputWords = this.tokenizeForEcho(recognizedText);
+    if (inputWords.length === 0) return false;
 
-    // Check if the recognized words are simply an echo of recent AI speech
+    return !this.matchesRecentSpeech(inputWords, isAndroidAecActive() === true);
+  }
+
+  /** Split a transcript into comparable lowercase words, dropping junk. */
+  tokenizeForEcho(text) {
+    return String(text || "")
+      .toLowerCase()
+      .split(WORD_SPLIT_RE)
+      .map((word) => word.trim())
+      .filter((word) => word.length > 0);
+  }
+
+  /**
+   * Whether the transcript looks like a re-hearing of recent speech.
+   *
+   * Split by whether the platform is cancelling echo:
+   *
+   *  - **AEC off / unknown.** Delegates to the word-overlap test the extension
+   *    has always run, so browser behaviour is unchanged.
+   *  - **AEC on.** The stream is clean, so a substantial fragment of a spoken
+   *    chunk is still echo, but a short genuine reply that happens to reuse the
+   *    assistant's words is trusted.
+   */
+  matchesRecentSpeech(inputWords, aecOn) {
     const now = Date.now();
-    const recentSpoken = this.recentSpokenChunks
-      .filter((c) => now - c.timestamp < 8000)
-      .map((c) => c.text)
-      .join(" ");
+    const recent = this.recentSpokenChunks.filter(
+      (chunk) => now - chunk.timestamp < 8000 && Array.isArray(chunk.words) && chunk.words.length,
+    );
+    if (recent.length === 0) return false;
 
-    if (recentSpoken) {
-      // Substring match
-      if (recentSpoken.includes(cleanInput)) {
-        return false;
+    if (!aecOn) {
+      return this.matchesRecentSpeechLegacy(inputWords, recent);
+    }
+
+    // Does the transcript sit inside one chunk (or across a merge boundary)?
+    const run = this.findRecentRun(inputWords, recent);
+    if (run) {
+      const isAll = inputWords.length >= run.chunkLength;
+      const isMostOfLong = run.chunkLength >= COINCIDENCE_SAFE_WORDS &&
+        inputWords.length / run.chunkLength >= FRAGMENT_CHUNK_RATIO;
+      if (isAll || isMostOfLong) {
+        devLog(
+          "Live",
+          `Barge-in rejected as echo (${inputWords.length}/${run.chunkLength} words): "${inputWords.join(" ")}"`,
+        );
+        return true;
       }
-      // Word overlap match
-      const inputWords = cleanInput.split(/\s+/).filter(Boolean);
-      if (inputWords.length > 0) {
-        const matchingWords = inputWords.filter((w) => recentSpoken.includes(w));
-        if (matchingWords.length / inputWords.length >= 0.75) {
-          return false;
-        }
+      // Short sliver of a chunk, but cancellation is running: trust the user.
+      return false;
+    }
+
+    // Not a contiguous run: only a long near-verbatim transcript is echo.
+    if (inputWords.length >= COINCIDENCE_SAFE_WORDS) {
+      const recentSet = new Set(recent.flatMap((chunk) => chunk.words));
+      const matched = inputWords.filter((word) => recentSet.has(word)).length;
+      const ratio = matched / inputWords.length;
+
+      if (ratio >= ECHO_OVERLAP_RATIO_WITH_AEC) {
+        devLog(
+          "Live",
+          `Barge-in rejected as echo (overlap ${(ratio * 100).toFixed(0)}%, aec=true): "${inputWords.join(" ")}"`,
+        );
+        return true;
       }
     }
 
-    return true;
+    return false;
+  }
+
+  /**
+   * The word-overlap test the extension has always used, reproduced so it
+   * rejects exactly what shipped there and nothing more.
+   *
+   * The original joined recent speech into one string and tested
+   * `recentSpoken.includes(cleanInput)`, then fell back to counting how many
+   * input words appeared in that string (0.75 threshold). Reproduced here on
+   * whole words:
+   *
+   *  - A transcript whose words are all present in what was spoken is echo —
+   *    this is the case that catches a mid-chunk pickup like "hava".
+   *  - Otherwise the 0.75 overlap ratio applies.
+   *
+   * Matching whole words instead of substrings can only ever reject *less*, so
+   * every genuine barge-in the original allowed still gets through. A reply
+   * built from words the assistant never said ("tamam", "peki" after a sentence
+   * about the weather) has zero overlap and is always trusted.
+   */
+  matchesRecentSpeechLegacy(inputWords, recent) {
+    const spokenWords = new Set(recent.flatMap((chunk) => chunk.words));
+    if (spokenWords.size === 0) return false;
+
+    const matched = inputWords.filter((word) => spokenWords.has(word)).length;
+    const ratio = matched / inputWords.length;
+    if (ratio >= ECHO_OVERLAP_RATIO_NO_AEC) {
+      devLog(
+        "Live",
+        `Barge-in rejected as echo (overlap ${(ratio * 100).toFixed(0)}%): "${inputWords.join(" ")}"`,
+      );
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Locate the transcript as a consecutive run inside recent speech.
+   *
+   * Scans each chunk on its own so the caller knows which chunk matched and how
+   * long that chunk was — a fragment is only meaningful relative to its source.
+   * Chunks are also scanned as a joined stream, because `processTTSQueue` merges
+   * queued sentences at playback time and a mid-sentence pickup can straddle the
+   * boundary between two of them.
+   *
+   * @returns {{chunkLength: number} | null} the matched chunk's word count
+   */
+  findRecentRun(inputWords, recent) {
+    if (inputWords.length === 0) return null;
+
+    const scan = (stream) => {
+      const last = stream.length - inputWords.length;
+      for (let start = 0; start <= last; start += 1) {
+        let hit = true;
+        for (let offset = 0; offset < inputWords.length; offset += 1) {
+          if (stream[start + offset] !== inputWords[offset]) {
+            hit = false;
+            break;
+          }
+        }
+        if (hit) return true;
+      }
+      return false;
+    };
+
+    // A single chunk is the usual case, and gives the length the ratio needs.
+    for (const chunk of recent) {
+      if (scan(chunk.words)) return { chunkLength: chunk.words.length };
+    }
+
+    // Merged-chunk boundary: report the combined length so a fragment spanning
+    // two queued sentences is still measured against what was actually spoken.
+    const joined = recent.flatMap((chunk) => chunk.words);
+    if (scan(joined)) return { chunkLength: joined.length };
+
+    return null;
   }
 
   handleUserSpeechStart() {
@@ -782,8 +972,15 @@ export class LiveEngine {
     this.lastChunkStartTime = Date.now();
     this.isSpeakingUtterance = true;
 
+    // Record what the speaker is about to reproduce, as words: the barge-in
+    // filter compares transcripts against this, so it needs the same tokenised
+    // form the recognizer output is reduced to.
     const cleanSpoken = text.toLowerCase().replace(/[.,!?;:"]/g, "").trim();
-    this.recentSpokenChunks.push({ text: cleanSpoken, timestamp: Date.now() });
+    this.recentSpokenChunks.push({
+      text: cleanSpoken,
+      words: this.tokenizeForEcho(text),
+      timestamp: Date.now(),
+    });
     if (this.recentSpokenChunks.length > 12) {
       this.recentSpokenChunks.shift();
     }
@@ -809,10 +1006,18 @@ export class LiveEngine {
 
     this.ensureTtsKeepAlive();
 
+    // Open the echo window once the engine confirms playback really started. A
+    // chunk can sit queued behind another, so opening it here (at queue time)
+    // would sometimes expire before any sound left the speaker.
+    utterance.onstart = () => {
+      this.ttsEchoWindow = true;
+    };
+
     utterance.onend = () => {
       this.activeUtteranceSet.delete(utterance);
       this.activeUtterances = Math.max(0, this.activeUtterances - 1);
       this.isSpeakingUtterance = false;
+      this.closeEchoWindowIfSettled();
 
       if (this.ttsQueue.length > 0) {
         this.processTTSQueue();
@@ -831,6 +1036,7 @@ export class LiveEngine {
       this.activeUtteranceSet.delete(utterance);
       this.activeUtterances = Math.max(0, this.activeUtterances - 1);
       this.isSpeakingUtterance = false;
+      this.closeEchoWindowIfSettled();
 
       if (this.ttsQueue.length > 0) {
         this.processTTSQueue();
@@ -878,12 +1084,30 @@ export class LiveEngine {
     }
   }
 
+  /**
+   * Close the echo window once no TTS output can still be in the air.
+   *
+   * Kept open while another utterance is queued or in flight; the short grace
+   * period covers the tail of the last chunk, since the engine reports `done`
+   * slightly before the speaker has finished ringing out.
+   */
+  closeEchoWindowIfSettled() {
+    if (this.activeUtterances > 0 || this.ttsQueue.length > 0) return;
+    setTimeout(() => {
+      if (this.destroyed) return;
+      if (this.activeUtterances > 0 || this.ttsQueue.length > 0) return;
+      this.ttsEchoWindow = false;
+    }, ECHO_WINDOW_GRACE_MS);
+  }
+
   cancelTTS() {
     this.stopTtsKeepAlive();
     this.ttsQueue = [];
     this.isSpeakingUtterance = false;
     this.activeUtterances = 0;
     this.activeUtteranceSet.clear();
+    // Playback is being torn down, so nothing can be echoing any more.
+    this.ttsEchoWindow = false;
     if (typeof window !== "undefined" && window.speechSynthesis) {
       try {
         window.speechSynthesis.cancel();
@@ -957,6 +1181,7 @@ export class LiveEngine {
     this.accumulatedTranscript = "";
     this.currentTranscript = "";
     this.recentSpokenChunks = [];
+    this.ttsEchoWindow = false;
     this._submitLock = false;
     this.lastTranscriptUpdateTime = 0;
 

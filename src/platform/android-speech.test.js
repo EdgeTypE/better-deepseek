@@ -5,6 +5,7 @@ import {
   ANDROID_SPEECH_EVENTS,
   __resetAndroidSpeechForTests,
   installAndroidSpeech,
+  isAndroidAecActive,
   isAndroidSpeechAvailable,
 } from "./android-speech.js";
 
@@ -18,6 +19,7 @@ function installBridge(overrides = {}) {
     sttStart: vi.fn(),
     sttStop: vi.fn(),
     sttAbort: vi.fn(),
+    sttAecStrategy: vi.fn(() => '{"aec":true,"source":"voice-communication"}'),
     ...overrides,
   };
   window.AndroidSpeech = bridge;
@@ -377,5 +379,53 @@ describe("SpeechRecognition shim", () => {
 
     expect(handlers.onresult).not.toHaveBeenCalled();
     expect(handlers.onend).toHaveBeenCalledTimes(1);
+  });
+
+  it("tracks the native AEC posture from recognizer events", () => {
+    const bridge = installBridge();
+    installAndroidSpeech();
+
+    // Unknown until the native side reports it.
+    expect(isAndroidAecActive()).toBeNull();
+
+    startRecognition(bridge);
+    emitStt({ kind: "start", aec: true });
+    expect(isAndroidAecActive()).toBe(true);
+
+    emitStt({ kind: "partial", text: "hello", aec: false });
+    expect(isAndroidAecActive()).toBe(false);
+  });
+
+  it("probes the AEC posture at start so the first partial is never blind", () => {
+    const bridge = installBridge({
+      sttAecStrategy: vi.fn(() => '{"aec":true,"source":"voice-communication"}'),
+    });
+    installAndroidSpeech();
+
+    startRecognition(bridge);
+
+    // Known before any event arrives.
+    expect(bridge.sttAecStrategy).toHaveBeenCalled();
+    expect(isAndroidAecActive()).toBe(true);
+  });
+
+  it("survives a bridge without the AEC probe", () => {
+    const bridge = installBridge({ sttAecStrategy: undefined });
+    installAndroidSpeech();
+
+    expect(() => startRecognition(bridge)).not.toThrow();
+    expect(isAndroidAecActive()).toBeNull();
+  });
+
+  it("records the final transcript for later use", () => {
+    const bridge = installBridge();
+    installAndroidSpeech();
+    const { recognition } = startRecognition(bridge);
+
+    emitStt({ kind: "final", text: "son metin" });
+
+    // live-engine's final flush reads this to settle a session that ends without
+    // a result payload of its own.
+    expect(recognition._finalText).toBe("son metin");
   });
 });
