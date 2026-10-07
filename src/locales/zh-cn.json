@@ -457,7 +457,8 @@
       "connecting": "正在启动麦克风...",
       "notSupported": "当前浏览器不支持语音识别。",
       "notSupportedDetail": "实时语音模式需要 Web Speech API。请使用 Chrome 或 Edge，或在 Android 应用中打开 Better DeepSeek。",
-      "unsupportedBrowser": "不支持的浏览器"
+      "unsupportedBrowser": "不支持的浏览器",
+      "androidCaveat": "由于一些技术限制，实时语音模式在 Android 上可能无法稳定运行。"
     },
     "codeRunner": {
       "pythonRunner": "Python 运行器",

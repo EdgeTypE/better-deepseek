@@ -461,7 +461,8 @@
       "connecting": "Starting microphone...",
       "notSupported": "Speech recognition is not supported in this browser.",
       "notSupportedDetail": "Live Voice Mode needs the Web Speech API. Try Chrome or Edge, or open Better DeepSeek in the Android app.",
-      "unsupportedBrowser": "Unsupported browser"
+      "unsupportedBrowser": "Unsupported browser",
+      "androidCaveat": "Live mode may not run reliably on Android due to some technical limitations."
     },
     "codeRunner": {
       "pythonRunner": "Python Runner",

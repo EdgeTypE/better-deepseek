@@ -458,7 +458,8 @@
       "connecting": "Mikrofon başlatılıyor...",
       "notSupported": "Tarayıcı ses tanıma özelliğini desteklemiyor.",
       "notSupportedDetail": "Canlı Ses Modu Web Speech API gerektirir. Chrome veya Edge deneyin ya da Android uygulamasında açın.",
-      "unsupportedBrowser": "Desteklenmeyen tarayıcı"
+      "unsupportedBrowser": "Desteklenmeyen tarayıcı",
+      "androidCaveat": "Canlı mod, Android'de bazı teknik kısıtlamalar nedeniyle verimli çalışmayabilir."
     },
     "codeRunner": {
       "pythonRunner": "Python Çalıştırıcı",

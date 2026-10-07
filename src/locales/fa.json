@@ -457,7 +457,8 @@
       "connecting": "در حال راه‌اندازی میکروفون...",
       "notSupported": "مرورگر از تشخیص گفتار پشتیبانی نمی‌کند.",
       "notSupportedDetail": "حالت صوتی زنده به Web Speech API نیاز دارد. Chrome یا Edge را امتحان کنید یا Better DeepSeek را در اپ اندروید باز کنید.",
-      "unsupportedBrowser": "مرورگر پشتیبانی نمی‌شود"
+      "unsupportedBrowser": "مرورگر پشتیبانی نمی‌شود",
+      "androidCaveat": "حالت زنده در اندروید به دلیل برخی محدودیت‌های فنی ممکن است به‌خوبی کار نکند."
     },
     "codeRunner": {
       "pythonRunner": "اجراگر پایتون",

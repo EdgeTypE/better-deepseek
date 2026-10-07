@@ -458,7 +458,8 @@
       "connecting": "Запуск микрофона...",
       "notSupported": "Распознавание речи не поддерживается в этом браузере.",
       "notSupportedDetail": "Голосовому Live-режиму нужен Web Speech API. Попробуйте Chrome или Edge либо откройте Better DeepSeek в приложении для Android.",
-      "unsupportedBrowser": "Браузер не поддерживается"
+      "unsupportedBrowser": "Браузер не поддерживается",
+      "androidCaveat": "Live-режим может работать нестабильно на Android из-за некоторых технических ограничений."
     },
     "codeRunner": {
       "pythonRunner": "Запуск Python",

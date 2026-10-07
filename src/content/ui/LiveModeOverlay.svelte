@@ -27,6 +27,13 @@
    */
   const showText = Boolean(appState?.settings?.liveModeShowText);
 
+  // Replaced at build time by Vite's `define` (see build.js sharedDefine). The
+  // Android build talks to the native speech bridge instead of the Web Speech
+  // API, so Live Mode is measurably less reliable there — carry a small caveat
+  // line that the other targets do not show.
+  const BDS_TARGET = process.env.BDS_TARGET || "chrome";
+  const isAndroidTarget = BDS_TARGET === "android";
+
   const PHASE_LABELS = {
     listening: "liveMode.listening",
     thinking: "liveMode.thinking",
@@ -598,7 +605,12 @@
     </button>
   </footer>
 
-  <p class="bds-live__hint">{t("liveMode.hint")}</p>
+  <div class="bds-live__footnotes">
+    <p class="bds-live__hint">{t("liveMode.hint")}</p>
+    {#if isAndroidTarget}
+      <p class="bds-live__caveat">{t("liveMode.androidCaveat")}</p>
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -1035,14 +1047,39 @@
   .bds-live__end:hover { opacity: 0.88; }
   .bds-live__end:active { transform: scale(0.98); }
 
-  .bds-live__hint {
+  /* The keyboard hint and the Android caveat share one bottom slot so the
+     overlay's `space-between` distribution stays identical to the desktop
+     layout whenever the caveat is absent. */
+  .bds-live__footnotes {
     position: relative;
     z-index: 5;
-    margin: 12px 0 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    margin-top: 12px;
+  }
+
+  .bds-live__hint {
+    margin: 0;
     font-size: 11px;
     letter-spacing: 0.02em;
     color: var(--bds-text-tertiary);
     opacity: 0.85;
+  }
+
+  /* Android-only caveat. Deliberately quiet — it is a heads-up, not an error,
+     and Live Mode still works. Unlike the keyboard hint above it, this stays
+     visible at narrow widths, since phones are exactly where it matters. */
+  .bds-live__caveat {
+    max-width: min(340px, 100%);
+    margin: 0;
+    font-size: 10px;
+    line-height: 1.45;
+    letter-spacing: 0.02em;
+    text-align: center;
+    color: var(--bds-text-tertiary);
+    opacity: 0.7;
   }
 
   /* ══ Responsive ═════════════════════════════════════════════════════ */
