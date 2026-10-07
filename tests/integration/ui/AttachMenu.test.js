@@ -26,6 +26,18 @@ const webMocks = vi.hoisted(() => ({
   fetchAndConvertWebPage: vi.fn(),
 }));
 
+const gitlabMocks = vi.hoisted(() => ({
+  fetchGitLabRepo: vi.fn(),
+}));
+
+const codebergMocks = vi.hoisted(() => ({
+  fetchCodebergRepo: vi.fn(),
+}));
+
+const huggingfaceMocks = vi.hoisted(() => ({
+  fetchHuggingFaceRepo: vi.fn(),
+}));
+
 const projectFileBuilderMocks = vi.hoisted(() => ({
   projectFilesToFile: vi.fn(),
 }));
@@ -47,6 +59,9 @@ vi.mock("../../../src/content/files/folder-reader.js", () => folderMocks);
 vi.mock("../../../src/content/files/github-reader.js", () => githubMocks);
 vi.mock("../../../src/content/files/github-commits.js", () => githubCommitMocks);
 vi.mock("../../../src/content/files/web-reader.js", () => webMocks);
+vi.mock("../../../src/content/files/gitlab-reader.js", () => gitlabMocks);
+vi.mock("../../../src/content/files/codeberg-reader.js", () => codebergMocks);
+vi.mock("../../../src/content/files/huggingface-reader.js", () => huggingfaceMocks);
 vi.mock("../../../src/content/files/project-file-builder.js", () => projectFileBuilderMocks);
 vi.mock("../../../src/content/project-manager.js", () => projectManagerMocks);
 vi.mock("../../../src/content/bridge.js", () => bridgeMocks);
@@ -125,6 +140,9 @@ describe("AttachMenu integration", () => {
     githubMocks.parseGitHubUrl.mockReset();
     githubCommitMocks.fetchGitHubCommits.mockReset();
     webMocks.fetchAndConvertWebPage.mockReset();
+    gitlabMocks.fetchGitLabRepo.mockReset();
+    codebergMocks.fetchCodebergRepo.mockReset();
+    huggingfaceMocks.fetchHuggingFaceRepo.mockReset();
     projectFileBuilderMocks.projectFilesToFile.mockReset();
     bridgeMocks.pushConfigToPage.mockReset();
     document.body.innerHTML = '<textarea id="chat-input"></textarea><button title="Send message"></button>';
@@ -668,6 +686,261 @@ describe("AttachMenu integration", () => {
     expect(nativeInput.files).toHaveLength(0);
     expect(state.ui.showToast).not.toHaveBeenCalled();
     cleanup();
+  });
+
+  describe("Other submenu (keyless repo forges)", () => {
+    function openMainDropdown() {
+      const { target, cleanup } = renderSvelte(AttachMenu, {
+        nativeInput: setupNativeInput(),
+      });
+      target.querySelector(".bds-plus-btn").click();
+      return { target, cleanup };
+    }
+
+    async function openSubmenu() {
+      await flushUi();
+      document
+        .querySelector(".bds-attach-submenu")
+        .dispatchEvent(new MouseEvent("mouseenter"));
+      await flushUi();
+    }
+
+    async function pickForge(name, url) {
+      await openSubmenu();
+      Array.from(document.querySelectorAll(".bds-attach-submenu-item"))
+        .find((item) => item.textContent.includes(name))
+        .click();
+      await flushUi();
+
+      const dialog = document.querySelector(".bds-github-dialog");
+      const input = dialog.querySelector("input");
+      input.value = url;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await flushUi();
+      return dialog;
+    }
+
+    it("opens the submenu on hover and lists the forges", async () => {
+      const { cleanup } = openMainDropdown();
+      await openSubmenu();
+
+      const panel = document.querySelector(".bds-attach-submenu-panel");
+      expect(panel).toBeTruthy();
+      const labels = Array.from(
+        panel.querySelectorAll(".bds-attach-submenu-item"),
+      ).map((item) => item.textContent.trim());
+      expect(labels).toEqual([
+        "GitLab Repo",
+        "Codeberg Repo",
+        "HuggingFace Repo",
+      ]);
+      cleanup();
+    });
+
+    it("keeps the panel hidden until the trigger is hovered", async () => {
+      const { cleanup } = openMainDropdown();
+      await flushUi();
+
+      expect(document.querySelector(".bds-attach-submenu")).toBeTruthy();
+      expect(document.querySelector(".bds-attach-submenu-panel")).toBeNull();
+      cleanup();
+    });
+
+    it("toggles the submenu on click without closing the main menu", async () => {
+      const { cleanup } = openMainDropdown();
+      await flushUi();
+
+      const trigger = document.querySelector(".bds-attach-item--submenu");
+      trigger.click();
+      await flushUi();
+      expect(document.querySelector(".bds-attach-submenu-panel")).toBeTruthy();
+
+      // Re-query: the Svelte block is re-created and the old node is detached.
+      document.querySelector(".bds-attach-item--submenu").click();
+      await flushUi();
+      expect(document.querySelector(".bds-attach-submenu-panel")).toBeNull();
+      // The main dropdown must survive the submenu interaction.
+      expect(document.querySelector(".bds-attach-dropdown")).toBeTruthy();
+      cleanup();
+    });
+
+    it("opens the repo dialog for the chosen forge", async () => {
+      const { cleanup } = openMainDropdown();
+      await pickForge("Codeberg", "");
+
+      const dialog = document.querySelector(".bds-github-dialog");
+      expect(dialog.textContent).toContain("Codeberg Repo");
+      expect(dialog.querySelector("input").placeholder).toContain("codeberg.org");
+      cleanup();
+    });
+
+    it("opens the HuggingFace dialog with its own label and placeholder", async () => {
+      const { cleanup } = openMainDropdown();
+      await pickForge("HuggingFace", "");
+
+      const dialog = document.querySelector(".bds-github-dialog");
+      expect(dialog.textContent).toContain("HuggingFace Repo");
+      expect(dialog.querySelector("input").placeholder).toContain(
+        "huggingface.co",
+      );
+      cleanup();
+    });
+
+    it("imports a HuggingFace repo into the composer", async () => {
+      const file = new File(["contents"], "bert-base-uncased_huggingface.txt", {
+        type: "text/plain",
+      });
+      huggingfaceMocks.fetchHuggingFaceRepo.mockResolvedValue(file);
+
+      const nativeInput = setupNativeInput();
+      const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+      target.querySelector(".bds-plus-btn").click();
+
+      const dialog = await pickForge(
+        "HuggingFace",
+        "https://huggingface.co/google-bert/bert-base-uncased",
+      );
+      dialog.querySelector(".bds-github-btn-import").click();
+      await flushUi();
+
+      expect(huggingfaceMocks.fetchHuggingFaceRepo).toHaveBeenCalledWith(
+        "https://huggingface.co/google-bert/bert-base-uncased",
+        expect.any(Function),
+      );
+      expect(Array.from(nativeInput.files, (f) => f.name)).toEqual([
+        "bert-base-uncased_huggingface.txt",
+      ]);
+      cleanup();
+    });
+
+    it("rejects a huggingface.co short link pasted into another forge dialog", async () => {
+      const { cleanup } = openMainDropdown();
+      const dialog = await pickForge("GitLab", "https://hf.co/google-bert/bert-base-uncased");
+
+      dialog.querySelector(".bds-github-btn-import").click();
+      await flushUi();
+
+      expect(gitlabMocks.fetchGitLabRepo).not.toHaveBeenCalled();
+      expect(huggingfaceMocks.fetchHuggingFaceRepo).not.toHaveBeenCalled();
+      expect(document.querySelector(".bds-github-error").textContent).toContain(
+        "gitlab.com",
+      );
+      cleanup();
+    });
+
+    it("rejects a URL belonging to a different forge before fetching", async () => {
+      const { cleanup } = openMainDropdown();
+      const dialog = await pickForge("GitLab", "https://codeberg.org/owner/repo");
+
+      dialog.querySelector(".bds-github-btn-import").click();
+      await flushUi();
+
+      expect(gitlabMocks.fetchGitLabRepo).not.toHaveBeenCalled();
+      expect(codebergMocks.fetchCodebergRepo).not.toHaveBeenCalled();
+      expect(document.querySelector(".bds-github-error").textContent).toContain(
+        "gitlab.com",
+      );
+      cleanup();
+    });
+
+    it("accepts a shorthand for the open dialog's forge", async () => {
+      // Regression: the placeholders advertise "… or owner/repo" but the guard
+      // resolved the forge by hostname, so `new URL("owner/repo")` threw and
+      // every shorthand was rejected with an error telling the user to use the
+      // very form that had just been refused. A shorthand cannot name a forge
+      // (it is valid for all of them), so the open dialog disambiguates.
+      const cases = [
+        ["GitLab", "group/project", gitlabMocks.fetchGitLabRepo],
+        ["Codeberg", "owner/repo", codebergMocks.fetchCodebergRepo],
+        ["HuggingFace", "google-bert/bert-base-uncased", huggingfaceMocks.fetchHuggingFaceRepo],
+        ["HuggingFace", "datasets/rajpurkar/squad", huggingfaceMocks.fetchHuggingFaceRepo],
+      ];
+
+      for (const [forgeName, shorthand, mock] of cases) {
+        mock.mockResolvedValue(new File(["x"], "out.txt", { type: "text/plain" }));
+        const { cleanup } = openMainDropdown();
+        const dialog = await pickForge(forgeName, shorthand);
+        dialog.querySelector(".bds-github-btn-import").click();
+        await flushUi();
+
+        expect(mock).toHaveBeenCalledWith(shorthand, expect.any(Function));
+        expect(document.querySelector(".bds-github-error")).toBeNull();
+        cleanup();
+      }
+    });
+
+    it("still refuses a scheme-less bare hostname", async () => {
+      // `gitlab.com/a/b` has no scheme, so it looks like a shorthand — but the
+      // readers would read `gitlab.com` as the namespace and import garbage.
+      const { cleanup } = openMainDropdown();
+      const dialog = await pickForge("GitLab", "gitlab.com/a/b");
+
+      dialog.querySelector(".bds-github-btn-import").click();
+      await flushUi();
+
+      expect(gitlabMocks.fetchGitLabRepo).not.toHaveBeenCalled();
+      expect(document.querySelector(".bds-github-error").textContent).toContain(
+        "gitlab.com",
+      );
+      cleanup();
+    });
+
+    it("imports a GitLab repo into the composer", async () => {
+      const file = new File(["contents"], "project_gitlab.txt", {
+        type: "text/plain",
+      });
+      gitlabMocks.fetchGitLabRepo.mockResolvedValue(file);
+
+      const nativeInput = setupNativeInput();
+      const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+      target.querySelector(".bds-plus-btn").click();
+
+      const dialog = await pickForge(
+        "GitLab",
+        "https://gitlab.com/group/project",
+      );
+      dialog.querySelector(".bds-github-btn-import").click();
+      await flushUi();
+
+      expect(gitlabMocks.fetchGitLabRepo).toHaveBeenCalledWith(
+        "https://gitlab.com/group/project",
+        expect.any(Function),
+      );
+      expect(Array.from(nativeInput.files, (f) => f.name)).toEqual([
+        "project_gitlab.txt",
+      ]);
+      cleanup();
+    });
+
+    it("surfaces a fetch failure inside the dialog", async () => {
+      gitlabMocks.fetchGitLabRepo.mockRejectedValue(new Error("boom"));
+
+      const { cleanup } = openMainDropdown();
+      const dialog = await pickForge("GitLab", "https://gitlab.com/a/b");
+      dialog.querySelector(".bds-github-btn-import").click();
+      await flushUi();
+
+      expect(document.querySelector(".bds-github-error").textContent).toContain(
+        "boom",
+      );
+      cleanup();
+    });
+
+    it("keeps the Other entry when the flag is set before mount", async () => {
+      // Pinned to observed behavior: the dropdown is portaled to <body>, so a
+      // live remote-config change does not re-render its contents. This is NOT
+      // specific to `showOther` — `showGithub` behaves identically — and is a
+      // pre-existing limitation of the portal setup, not something this change
+      // introduced. Flag changes are evaluated on mount and on model switch.
+      await remoteConfig.applyRemote({
+        features: { attachMenu: { instantMode: { showOther: false } } },
+      });
+      const { cleanup } = openMainDropdown();
+      await flushModelWatcher();
+
+      expect(document.querySelector(".bds-attach-submenu")).toBeTruthy();
+      cleanup();
+    });
   });
 
   describe("stale native input resolution (F1)", () => {

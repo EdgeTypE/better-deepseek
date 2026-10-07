@@ -108,8 +108,12 @@ test("Upload Folder button is visible in Projects panel on Android", async ({ pa
   ).toBeVisible();
 });
 
-test("hides the voice prompt mic button on Android", async ({ page }) => {
-  await expect(page.locator(".bds-mic-btn")).toHaveCount(0);
+test("offers the voice prompt mic button on Android", async ({ page }) => {
+  // Android WebView ships no Web Speech API, but the native bridge
+  // (SpeechBridge.kt) installs Web Speech shims, so live mode and the mic
+  // button are offered there too. The buttons are additionally gated on the
+  // remote-config `showVoice` flag, which defaults to true.
+  await expect(page.locator(".bds-mic-btn")).toHaveCount(1);
 });
 
 test("Upload File on Android uses native picker bridge and injects markdown", async ({ page }) => {

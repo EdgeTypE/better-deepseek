@@ -87,6 +87,7 @@ describe("RemoteConfigManager", () => {
         showUploadFolder: true,
         showGithub: true,
         showWeb: true,
+        showOther: true,
         showProject: true,
         showVoice: true,
       });

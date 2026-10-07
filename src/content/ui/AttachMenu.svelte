@@ -8,6 +8,12 @@
     normalizeGitHubCommitCount,
   } from "../files/github-commits.js";
   import { fetchAndConvertWebPage } from "../files/web-reader.js";
+  import {
+    REPO_FORGES,
+    resolveRepoForgeKey,
+    describeRepoForgeUrl,
+    isRepoShorthand,
+  } from "../files/repo-forges.js";
   import { projectFilesToFile } from "../files/project-file-builder.js";
   import { openNativeFilePicker } from "../files/native-file-input.js";
   import {
@@ -70,7 +76,22 @@
   let webLoading = $state(false);
   let webError = $state("");
 
+  // "Other" submenu + generic repo dialog state
+  let showOtherSubmenu = $state(false);
+  // Grace timer: a bare mouseleave closes too eagerly — the pointer briefly
+  // leaves the trigger while crossing into the panel, which made the menu
+  // appear to need "dragging" to stay open.
+  let submenuCloseTimer = null;
+  let showRepoDialog = $state(false);
+  let repoForgeKey = $state("");
+  let repoUrl = $state("");
+  let repoStatus = $state("");
+  let repoLoading = $state(false);
+  let repoError = $state("");
+
   let dialogRef;
+  let repoDialogRef;
+  let dropdownRef;
 
   // Project panel (folder button) state
   let showProjectPanel = $state(false);
@@ -134,6 +155,7 @@
   let shouldShowUploadFolder = $state(true);
   let shouldShowGithub = $state(true);
   let shouldShowWeb = $state(true);
+  let shouldShowOther = $state(true);
   let shouldShowProject = $state(true);
   let shouldShowVoice = $state(true);
 
@@ -148,6 +170,7 @@
       shouldShowUploadFolder = show && !!getFlag(`features.attachMenu.${modelKey}.showUploadFolder`);
       shouldShowGithub = show && !!getFlag(`features.attachMenu.${modelKey}.showGithub`);
       shouldShowWeb = show && !!getFlag(`features.attachMenu.${modelKey}.showWeb`);
+      shouldShowOther = show && !!getFlag(`features.attachMenu.${modelKey}.showOther`);
       shouldShowProject = show && !!getFlag(`features.attachMenu.${modelKey}.showProject`);
       shouldShowVoice = show && !!getFlag(`features.attachMenu.${modelKey}.showVoice`);
     } catch (e) {
@@ -190,6 +213,83 @@
 
   function hasGithubToken() {
     return Boolean(String(appState.settings.githubToken || "").trim());
+  }
+
+  function activeRepoForge() {
+    return REPO_FORGES.find((forge) => forge.key === repoForgeKey) || null;
+  }
+
+  function cancelSubmenuClose() {
+    if (submenuCloseTimer) {
+      clearTimeout(submenuCloseTimer);
+      submenuCloseTimer = null;
+    }
+  }
+
+  function openOtherSubmenu() {
+    cancelSubmenuClose();
+    showOtherSubmenu = true;
+  }
+
+  /**
+   * Delay closing so a pointer travelling from the trigger into the panel —
+   * or briefly drifting off either — does not collapse the submenu mid-move.
+   */
+  function scheduleSubmenuClose() {
+    cancelSubmenuClose();
+    submenuCloseTimer = setTimeout(() => {
+      submenuCloseTimer = null;
+      showOtherSubmenu = false;
+    }, 220);
+  }
+
+  function openRepoDialog(forgeKey) {
+    showOtherSubmenu = false;
+    closeMenu();
+    repoForgeKey = forgeKey;
+    repoUrl = "";
+    repoStatus = "";
+    repoError = "";
+    repoLoading = false;
+    showRepoDialog = true;
+  }
+
+  async function submitRepoUrl() {
+    const forge = activeRepoForge();
+    if (!forge || !repoUrl.trim() || repoLoading) return;
+
+    // Guard against the user pasting a mismatched URL (e.g. a GitHub link into
+    // the GitLab dialog) or a bare typo, before we spend a network round-trip.
+    //
+    // A shorthand (`owner/repo`) cannot name a forge — it is valid for all of
+    // them — so it is taken as belonging to the dialog the user already opened.
+    // The readers all parse it; only the URL case needs a hostname check.
+    const detected = resolveRepoForgeKey(repoUrl);
+    const usable = detected ? detected === forge.key : isRepoShorthand(repoUrl);
+    if (!usable) {
+      repoError = t(forge.invalidKey, {
+        url: describeRepoForgeUrl(forge.key),
+      });
+      return;
+    }
+
+    repoError = "";
+    repoLoading = true;
+
+    try {
+      const file = await forge.fetch(repoUrl, (status) => {
+        repoStatus = status;
+      });
+
+      if (file) {
+        showRepoDialog = false;
+        injectFile(file);
+      }
+    } catch (err) {
+      repoError = t(forge.failedKey, { msg: err?.message || "" });
+    } finally {
+      repoLoading = false;
+    }
   }
 
   function stopTTS() {
@@ -499,6 +599,7 @@
     if (shouldShowUploadFolder && supportsFolderUpload) itemCount += 1;
     if (shouldShowGithub) itemCount += 1;
     if (shouldShowWeb) itemCount += 1;
+    itemCount += 1; // "Other" entry is always offered alongside the forges
     const dividerHeight = shouldShowGithub || shouldShowWeb ? 9 : 0;
     return 12 + itemCount * 36 + dividerHeight;
   }
@@ -510,6 +611,8 @@
 
   function closeMenu() {
     isOpen = false;
+    showOtherSubmenu = false;
+    cancelSubmenuClose();
   }
 
   onMount(() => {
@@ -522,7 +625,12 @@
     updateVisibility();
     startModelWatcher();
 
-    const onConfigOrStateUpdate = () => { recheckModelType(); };
+    const onConfigOrStateUpdate = () => {
+      recheckModelType();
+      // A config edit must refresh visibility even when the model type is
+      // unchanged — recheckModelType() deliberately no-ops in that case.
+      updateVisibility();
+    };
     window.addEventListener(REMOTE_CONFIG_EVENT, onConfigOrStateUpdate);
 
     return () => {
@@ -534,16 +642,23 @@
         appState.heroBarRef = null;
       }
       if (modelObserver) modelObserver.disconnect();
+      cancelSubmenuClose();
       recognition?.abort?.();
       stopVAD();
     };
   });
 
   function handleClickOutside(e) {
-    const inMenu = menuRef && menuRef.contains(e.target);
+    // The dropdown is portaled to <body>, so it is NOT a descendant of menuRef.
+    // Checking menuRef alone would treat every click inside the open menu as an
+    // outside click and close it (visible as "the submenu closes the parent").
+    const inMenu =
+      (menuRef && menuRef.contains(e.target)) ||
+      (dropdownRef && dropdownRef.contains(e.target));
     const inDialog = dialogRef && dialogRef.contains(e.target);
+    const inRepoDialog = repoDialogRef && repoDialogRef.contains(e.target);
     const inPanel = projectPanelRef && projectPanelRef.contains(e.target);
-    if (!inMenu && !inDialog && !inPanel) {
+    if (!inMenu && !inDialog && !inRepoDialog && !inPanel) {
       closeMenu();
       showProjectPanel = false;
     }
@@ -551,8 +666,13 @@
 
   function handleEscape(e) {
     if (e.key === "Escape") {
+      if (showOtherSubmenu) {
+        showOtherSubmenu = false;
+        return;
+      }
       if (showGithubDialog && !githubLoading) showGithubDialog = false;
       if (showWebDialog && !webLoading) showWebDialog = false;
+      if (showRepoDialog && !repoLoading) showRepoDialog = false;
       showProjectPanel = false;
       closeMenu();
     }
@@ -931,6 +1051,7 @@
     if (e.key === "Enter") {
       if (type === "github" && !githubLoading) submitGithubUrl();
       if (type === "web" && !webLoading) submitWebUrl();
+      if (type === "repo" && !repoLoading) submitRepoUrl();
     }
   }
 </script>
@@ -1043,6 +1164,7 @@
       class="bds-attach-dropdown"
       style={dropdownStyle}
       use:portal
+      bind:this={dropdownRef}
       onclick={(event) => event.stopPropagation()}
     >
       {#if shouldShowUploadFile}
@@ -1096,8 +1218,7 @@
       {/if}
       {#if shouldShowGithub || shouldShowWeb}
         <div class="bds-attach-divider"></div>
-      {/if}
-      {#if shouldShowGithub}
+      {/if}      {#if shouldShowGithub}
       <button type="button" class="bds-attach-item" onclick={handleGithubImport}>
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -1161,6 +1282,83 @@
         >
         {t('attachMenu.fetchWebPage')}
       </button>
+      {/if}
+
+      {#if shouldShowOther}
+      <!-- "Other" opens a second dropdown with keyless repo forges. -->
+      <!-- The dropdown is portaled to <body>, so `menuRef.contains()` can never
+           match its contents; every click inside must stop propagating or the
+           document-level outside-click handler closes the whole menu. -->
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <div
+        class="bds-attach-submenu"
+        onmouseenter={openOtherSubmenu}
+        onmouseleave={scheduleSubmenuClose}
+        onclick={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          class="bds-attach-item bds-attach-item--submenu"
+          onclick={(event) => {
+            event.stopPropagation();
+            showOtherSubmenu = !showOtherSubmenu;
+          }}
+          aria-haspopup="menu"
+          aria-expanded={showOtherSubmenu}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="bds-item-icon"
+            ><circle cx="12" cy="12" r="3"></circle><path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+            ></path></svg
+          >
+          <span class="bds-attach-item-label"
+            >{t('attachMenu.other')}</span
+          >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="bds-submenu-chevron"
+            ><polyline points="9 18 15 12 9 6"></polyline></svg
+          >
+        </button>
+
+        {#if showOtherSubmenu}
+          <div class="bds-attach-submenu-panel" role="menu">
+            <div class="bds-attach-submenu-surface">
+              {#each REPO_FORGES as forge (forge.key)}
+                <button
+                  type="button"
+                  class="bds-attach-item bds-attach-submenu-item"
+                  role="menuitem"
+                  onclick={(event) => {
+                    event.stopPropagation();
+                    openRepoDialog(forge.key);
+                  }}
+                >
+                  {t(forge.labelKey)}
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
+      </div>
       {/if}
     </div>
   {/if}
@@ -1292,6 +1490,85 @@
           disabled={githubLoading || !githubUrl.trim()}
         >
           {githubLoading ? t('attachMenu.fetching') : t('attachMenu.fetch')}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if showRepoDialog}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <div
+    class="bds-github-overlay"
+    use:portal
+    onclick={(event) => {
+      if (event.target !== event.currentTarget) return;
+      if (!repoLoading) showRepoDialog = false;
+    }}
+  >
+    <div
+      class="bds-github-dialog"
+      bind:this={repoDialogRef}
+      onclick={(event) => event.stopPropagation()}
+      onkeydown={(event) => event.stopPropagation()}
+    >
+      <div class="bds-github-header">
+        <span class="bds-repo-forge-name">
+          {activeRepoForge() ? t(activeRepoForge().labelKey) : ""}
+        </span>
+        {#if !repoLoading}
+          <button
+            type="button"
+            class="bds-github-close"
+            onclick={() => (showRepoDialog = false)}>&times;</button
+          >
+        {/if}
+      </div>
+
+      <div class="bds-github-body">
+        <input
+          class="bds-github-input"
+          type="text"
+          placeholder={activeRepoForge()
+            ? t(activeRepoForge().placeholderKey)
+            : ""}
+          bind:value={repoUrl}
+          onkeydown={(e) => handleDialogKeydown(e, "repo")}
+          disabled={repoLoading}
+          autofocus
+        />
+
+        {#if repoError}
+          <div class="bds-github-error">{repoError}</div>
+        {/if}
+
+        {#if repoStatus && repoLoading}
+          <div class="bds-github-status">
+            <div class="bds-spinner"></div>
+            <span>{repoStatus}</span>
+          </div>
+        {/if}
+      </div>
+
+      <div class="bds-github-footer">
+        <button
+          type="button"
+          class="bds-github-btn bds-github-btn-cancel"
+          onclick={() => {
+            if (!repoLoading) showRepoDialog = false;
+          }}
+          disabled={repoLoading}
+        >
+          {t('attachMenu.close')}
+        </button>
+        <button
+          type="button"
+          class="bds-github-btn bds-github-btn-import"
+          onclick={submitRepoUrl}
+          disabled={repoLoading || !repoUrl.trim()}
+        >
+          {repoLoading ? t('attachMenu.fetching') : t('attachMenu.fetch')}
         </button>
       </div>
     </div>
@@ -1655,6 +1932,73 @@
     height: 1px;
     background: var(--bds-border);
     margin: 4px 6px;
+  }
+
+  /* ─── "Other" submenu (keyless repo forges) ─── */
+
+  .bds-attach-submenu {
+    position: relative;
+  }
+
+  .bds-attach-item--submenu {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .bds-submenu-chevron {
+    margin-left: auto;
+    opacity: 0.6;
+    flex-shrink: 0;
+  }
+
+  .bds-attach-submenu-panel {
+    position: absolute;
+    /* Must sit flush against the trigger. A gap here puts the pointer over
+       neither element while travelling to the panel, which fires mouseleave
+       and closes the submenu before the user can reach it (or any child item).
+       The bridge below covers the leftover border/rounding gap. */
+    left: 100%;
+    bottom: -6px;
+    padding-left: 6px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    z-index: 1000000;
+  }
+
+  /* The visual surface lives on this inner wrapper so the hover bridge
+     (padding-left above) stays invisible while still capturing the pointer. */
+  .bds-attach-submenu-surface {
+    background: var(--bds-bg-panel);
+    border: 1px solid var(--bds-border);
+    border-radius: var(--bds-radius, 14px);
+    box-shadow: var(--bds-shadow);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    min-width: 150px;
+  }
+
+  /* On narrow viewports the panel would overflow off-screen; flip it to the
+     left edge of the trigger instead of clipping. */
+  @media (max-width: 520px) {
+    .bds-attach-submenu-panel {
+      left: auto;
+      right: 100%;
+      padding-left: 0;
+      padding-right: 6px;
+    }
+  }
+
+  .bds-attach-submenu-item {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .bds-repo-forge-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--bds-text-primary);
   }
 
   /* ─── GitHub Dialog ─── */

@@ -7,6 +7,12 @@ import {
 } from "../lib/github-commits.js";
 import { devLog } from "../lib/dev-log.js";
 import { getExtensionVersion } from "../lib/extension-version.js";
+import {
+  isRepoArchiveUrl,
+  canSendRepoToken,
+  isRepoMetadataUrl,
+  isRepoTextUrl,
+} from "../lib/repo-hosts.js";
 
 import { setupContextMenus } from "./context-menu.js";
 
@@ -85,6 +91,55 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === "bds-fetch-github-zip") {
     fetchGithubZip(message.url, message.token)
+      .then((base64) => {
+        sendResponse({ ok: true, base64 });
+      })
+      .catch((error) => {
+        sendResponse({
+          ok: false,
+          error: String(error && error.message ? error.message : error),
+          status:
+            error && Number.isFinite(error.status) ? Number(error.status) : null,
+          authRejected: Boolean(error && error.authRejected),
+        });
+      });
+    return true;
+  }
+
+  if (message.type === "bds-fetch-repo-metadata") {
+    fetchRepoMetadata(message.url)
+      .then((data) => {
+        sendResponse({ ok: true, data });
+      })
+      .catch((error) => {
+        sendResponse({
+          ok: false,
+          error: String(error && error.message ? error.message : error),
+          status:
+            error && Number.isFinite(error.status) ? Number(error.status) : null,
+        });
+      });
+    return true;
+  }
+
+  if (message.type === "bds-fetch-repo-text") {
+    fetchRepoText(message.url)
+      .then((text) => {
+        sendResponse({ ok: true, text });
+      })
+      .catch((error) => {
+        sendResponse({
+          ok: false,
+          error: String(error && error.message ? error.message : error),
+          status:
+            error && Number.isFinite(error.status) ? Number(error.status) : null,
+        });
+      });
+    return true;
+  }
+
+  if (message.type === "bds-fetch-repo-zip") {
+    fetchRepoZip(message.url, message.token)
       .then((base64) => {
         sendResponse({ ok: true, base64 });
       })
@@ -268,18 +323,23 @@ function normalizeGithubCommit(commit) {
 }
 
 function canSendGithubToken(url) {
+  return canSendRepoToken(url);
+}
+
+function repoHostLabel(url) {
   try {
-    return new URL(url).hostname === "codeload.github.com";
+    return new URL(url).hostname;
   } catch {
-    return false;
+    return "Repository host";
   }
 }
 
 async function readZipResponse(resp, url) {
   if (!resp.ok) {
-    throw createGithubFetchError(`GitHub returned ${resp.status} for ${url}`, {
-      status: resp.status,
-    });
+    throw createGithubFetchError(
+      `${repoHostLabel(url)} returned ${resp.status} for ${url}`,
+      { status: resp.status }
+    );
   }
 
   const arrayBuffer = await resp.arrayBuffer();
@@ -333,7 +393,7 @@ async function fetchGithubZip(url, token) {
     }
 
     throw createGithubFetchError(
-      `GitHub returned ${fallbackResponse.status} for ${url}`,
+      `${repoHostLabel(url)} returned ${fallbackResponse.status} for ${url}`,
       {
         status: fallbackResponse.status,
       }
@@ -343,8 +403,120 @@ async function fetchGithubZip(url, token) {
   return await readZipResponse(await fetch(url), url);
 }
 
-export async function fetchGithubCommits(owner, repo, branch, count, token) {
-  const safeOwner = String(owner || "").trim();
+/**
+ * Fetch a repository archive ZIP from an allowlisted forge host.
+ *
+ * The URL is validated against `repo-hosts.js` so a compromised or buggy
+ * content script cannot turn the background worker into an open proxy. Only
+ * hosts flagged `token: true` (GitHub) ever receive our stored credential.
+ */
+export async function fetchRepoZip(url, token) {
+  if (!url) throw new Error("No URL provided.");
+
+  if (!isRepoArchiveUrl(url)) {
+    throw new Error("Refusing to fetch an unrecognized repository host.");
+  }
+
+  const trimmedToken = String(token || "").trim();
+  const shouldUseToken = Boolean(trimmedToken) && canSendRepoToken(url);
+
+  if (shouldUseToken) {
+    let authResponse = null;
+
+    try {
+      authResponse = await fetch(url, {
+        headers: {
+          Authorization: `token ${trimmedToken}`,
+        },
+      });
+
+      if (authResponse.ok) {
+        return await readZipResponse(authResponse, url);
+      }
+
+      if (authResponse.status === 401 || authResponse.status === 403) {
+        throw createGithubFetchError(
+          `Repository host rejected the supplied token for ${url}`,
+          {
+            status: authResponse.status,
+            authRejected: true,
+          }
+        );
+      }
+    } catch (error) {
+      if (error && error.authRejected) {
+        throw error;
+      }
+    }
+
+    const fallbackResponse = await fetch(url);
+    if (fallbackResponse.ok) {
+      return await readZipResponse(fallbackResponse, url);
+    }
+
+    throw createGithubFetchError(
+      `Repository host returned ${fallbackResponse.status} for ${url}`,
+      { status: fallbackResponse.status }
+    );
+  }
+
+  return await readZipResponse(await fetch(url), url);
+}
+
+/**
+ * Fetch repository metadata (currently only the default branch) from an
+ * allowlisted metadata host. Never sends a credential — GitLab's project
+ * endpoint is keyless for public projects.
+ */
+export async function fetchRepoMetadata(url) {
+  if (!url) throw new Error("No URL provided.");
+
+  if (!isRepoMetadataUrl(url)) {
+    throw new Error("Refusing to query an unrecognized metadata host.");
+  }
+
+  const resp = await fetch(url, {
+    headers: { Accept: "application/json" },
+  });
+
+  if (!resp.ok) {
+    throw createGithubFetchError(
+      `${repoHostLabel(url)} returned ${resp.status} for ${url}`,
+      { status: resp.status }
+    );
+  }
+
+  return await resp.json();
+}
+
+/**
+ * Fetch the raw contents of a single repository file from an allowlisted host.
+ *
+ * Some forges refuse bulk archive downloads to anonymous browser requests
+ * (GitLab answers 406), but still serve individual files. Reading a repository
+ * one file at a time is the keyless fallback for those hosts. Never sends a
+ * credential.
+ */
+export async function fetchRepoText(url) {
+  if (!url) throw new Error("No URL provided.");
+
+  if (!isRepoTextUrl(url)) {
+    throw new Error("Refusing to fetch an unrecognized repository host.");
+  }
+
+  const resp = await fetch(url);
+
+  if (!resp.ok) {
+    throw createGithubFetchError(
+      `${repoHostLabel(url)} returned ${resp.status} for ${url}`,
+      { status: resp.status }
+    );
+  }
+
+  return await resp.text();
+}
+
+export async function fetchGithubCommits(owner, repo, branch, count, token) {  const safeOwner = String(owner || "").trim();
   const safeRepo = String(repo || "").trim();
   const safeBranch = String(branch || "").trim() || "main";
   const trimmedToken = String(token || "").trim();
