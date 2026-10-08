@@ -1,0 +1,247 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    name: Web / Extension
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Cache Playwright browsers so they aren't re-downloaded every run
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browser & deps
+        run: npx playwright install --with-deps chromium
+
+      - name: Build Chrome extension
+        run: npm run build:chrome
+
+      - name: Run Vitest suite
+        run: npm run test:unit
+
+      - name: Run Playwright suite
+        run: npm run test:e2e
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage
+          if-no-files-found: ignore
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          if-no-files-found: ignore
+
+      - name: Upload Playwright traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results
+          if-no-files-found: ignore
+
+  firefox-e2e:
+    name: Firefox E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Selenium browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/selenium
+          key: ${{ runner.os }}-selenium-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-selenium-
+
+      - name: Setup Firefox
+        id: setup-firefox
+        uses: browser-actions/setup-firefox@v1
+        with:
+          firefox-version: latest
+
+      - name: Print Firefox version
+        run: ${{ steps.setup-firefox.outputs.firefox-path }} --version
+
+      - name: Build Firefox extension
+        run: npm run build:firefox
+
+      - name: Run Firefox E2E suite
+        run: npm run test:e2e:firefox
+        env:
+          CI: "1"
+          FIREFOX_BIN: ${{ steps.setup-firefox.outputs.firefox-path }}
+
+      - name: Upload Firefox test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-firefox
+          path: test-results-firefox
+          if-no-files-found: ignore
+
+  android:
+    name: Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ANDROID_HOME: ${{ github.workspace }}/.android-sdk
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/.android-sdk
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+          cache-dependency-path: |
+            android/**/*.gradle*
+            android/**/gradle-wrapper.properties
+
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.android-sdk
+          key: ${{ runner.os }}-android-sdk-34-build-tools-34.0.0-v1
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools platforms;android-34 build-tools;34.0.0
+
+      - name: Write Android local.properties
+        run: printf 'sdk.dir=%s\n' "$ANDROID_SDK_ROOT" > android/local.properties
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browser & deps
+        run: npx playwright install --with-deps chromium
+
+      - name: Ensure Gradle wrapper files exist
+        working-directory: android
+        run: |
+          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "Bootstrapping Gradle wrapper..."
+            mkdir -p gradle/wrapper
+            curl -sSL "https://github.com/gradle/gradle/raw/v8.7.0/gradle/wrapper/gradle-wrapper.jar" \
+              -o gradle/wrapper/gradle-wrapper.jar
+            echo "distributionBase=GRADLE_USER_HOME" > gradle/wrapper/gradle-wrapper.properties
+            echo "distributionPath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
+            echo "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.7-bin.zip" >> gradle/wrapper/gradle-wrapper.properties
+            echo "networkTimeout=10000" >> gradle/wrapper/gradle-wrapper.properties
+            echo "validateDistributionUrl=true" >> gradle/wrapper/gradle-wrapper.properties
+            echo "zipStoreBase=GRADLE_USER_HOME" >> gradle/wrapper/gradle-wrapper.properties
+            echo "zipStorePath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
+          fi
+
+      - name: Make Gradle wrapper executable
+        working-directory: android
+        run: chmod +x ./gradlew
+
+      - name: Build Android web bundle
+        run: npm run build:android
+
+      - name: Build Android APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Run Android Playwright simulator suite
+        run: npm run test:e2e:android
+
+      - name: Run Kotlin unit tests
+        working-directory: android
+        run: ./gradlew --no-daemon test
+
+      - name: Upload Android APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: ignore
+
+      - name: Upload Android Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-android
+          path: playwright-report-android
+          if-no-files-found: ignore
+
+      - name: Upload Android Playwright traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-android
+          path: test-results
+          if-no-files-found: ignore
+
+      - name: Upload Android unit test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-unit-test-report
+          path: android/app/build/reports/tests
+          if-no-files-found: ignore
+
+      - name: Upload Android unit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-unit-test-results
+          path: android/app/build/test-results
+          if-no-files-found: ignore

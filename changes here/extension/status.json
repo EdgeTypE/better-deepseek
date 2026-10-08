@@ -1,0 +1,32 @@
+[
+  {
+    "id": "expert-mode-upload-issue-v1",
+    "show": false,
+    "message": "Due to issues with DeepSeek or intentional behavior, file uploading is currently unavailable in Expert mode.",
+    "type": "warning"
+  },
+  {
+    "id": "expert-mode-web-search-removed-v1",
+    "show": false,
+    "message": "DeepSeek removed Web Search from Expert Mode. We are working to bring it back. You can test the developer build from our GitHub repository.",
+    "type": "warning"
+  },
+  {
+    "id": "idea-contributions-v1",
+    "show": false,
+    "message": "Ran out of ideas for what the extension should do next? If you have a suggestion, please share it on GitHub.",
+    "type": "info"
+  },
+  {
+    "id": "deepseek-v4-flash-api-only-v1",
+    "show": false,
+    "message": "FYI, you may have seen on social media that a new version of DeepSeek V4 Flash has been released. This new version is currently API-only; the web version still has the old V4 Flash active. -BDS",
+    "type": "info"
+  },
+  {
+    "id": "deepseek-v4-pro-released-v1",
+    "show": true,
+    "message": "DeepSeek V4 Pro has been released! You can now try it in Expert mode. Upgraded V4 models are now active on the web interface.",
+    "type": "info"
+  }
+]
