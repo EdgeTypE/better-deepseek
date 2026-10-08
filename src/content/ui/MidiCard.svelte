@@ -1,7 +1,7 @@
 <script module>
   /**
    * Shared across every mounted card so that starting one playback silences
-   * whichever card was playing before — otherwise two cards would overlap.
+   * whichever card was playing before, otherwise two cards would overlap.
    */
   let stopActivePlayback = () => {};
 </script>
@@ -9,17 +9,18 @@
 <script>
   import { onDestroy, onMount } from "svelte";
   import { t } from "../../lib/i18n.svelte.js";
+  import { STORAGE_KEYS } from "../../lib/constants.js";
   import { triggerBlobDownload } from "../../lib/utils/download.js";
+  import appState from "../state.js";
   import {
     BEATS_PER_BAR,
     buildMidiFile,
+    createMidiSynth,
     flattenNotes,
     midiFileName,
-    midiToFrequency,
     midiToPitch,
     parseMidiScore,
     programToName,
-    waveformForProgram,
   } from "../../lib/midi.js";
 
   /**
@@ -33,8 +34,11 @@
   /** Palette for the piano roll; index = track index. */
   const TRACK_COLORS = ["#8b5cf6", "#10b981", "#3b82f6", "#f97316", "#ec4899", "#14b8a6", "#eab308"];
 
-  /** Extra time after the last note before playback is considered finished. */
-  const TAIL_SECONDS = 0.35;
+  /**
+   * Extra time after the last note before playback is considered finished.
+   * Long enough for the note releases and most of the reverb tail to sound.
+   */
+  const TAIL_SECONDS = 2;
 
   let parsed = $derived(parseMidiScore(content));
   let notes = $derived(flattenNotes(parsed));
@@ -47,11 +51,30 @@
   let showNotation = $state(false);
   let copied = $state(false);
 
-  // Audio graph handles — deliberately non-reactive so the scheduler never
-  // triggers a re-render mid-playback.
+  /** Clamp anything (a stale setting, a slider string) into a 0-1 level. */
+  const clamp01 = (value, fallback = 1) => {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return fallback;
+    return Math.min(1, Math.max(0, number));
+  };
+
+  /**
+   * Playback level, 0-1. The control lives on the card, but the value is
+   * global: it is stored in `settings.midiVolume`, so every MIDI card in every
+   * chat plays at the level the user last dialled in.
+   */
+  const storedVolume = clamp01(appState.settings.midiVolume);
+  let volume = $state(storedVolume);
+  let muted = $derived(volume === 0);
+  /** Last audible level, so unmuting restores what the user had chosen. */
+  let lastAudibleVolume = storedVolume > 0 ? storedVolume : 1;
+
+  // Audio handles are deliberately non-reactive so the scheduler never
+  // triggers a re-render mid-playback. The synth engine itself lives in
+  // `lib/midi.js`; the card only owns the context, transport and playhead.
   let audioCtx = null;
-  let masterGain = null;
-  let oscillators = [];
+  let synth = null;
+  let session = null;
   let rafId = 0;
   let endTimer = 0;
   let playStart = 0;
@@ -128,15 +151,16 @@
   };
 
   /**
-   * Stop every scheduled voice and drop the master bus.
+   * Stop the current playback session.
    *
    * The `AudioContext` itself is deliberately left open: seeking reschedules
    * playback, and browsers cap how many contexts a page may create, so we open
-   * one per card and close it on unmount.
+   * one per card and close it on unmount. The session fades its own bus out
+   * before unhooking, so stopping never clicks.
    *
    * `reset` distinguishes the two ways playback ends. A pause keeps the position
-   * so the next press resumes; a stop — unmount, another card taking over, the
-   * score running out — rewinds to the beginning.
+   * so the next press resumes; a stop (unmount, another card taking over, the
+   * score running out) rewinds to the beginning.
    */
   function teardown(reset = true) {
     cancelRaf(rafId);
@@ -144,27 +168,9 @@
     clearTimeout(endTimer);
     endTimer = 0;
 
-    for (const oscillator of oscillators) {
-      try {
-        oscillator.stop();
-      } catch {
-        // Already stopped — dropping the master bus is what silences it.
-      }
-      try {
-        oscillator.disconnect();
-      } catch {
-        // Ignore: some engines throw when disconnecting a finished node.
-      }
-    }
-    oscillators = [];
-
-    if (masterGain) {
-      try {
-        masterGain.disconnect();
-      } catch {
-        // Ignore: disconnecting twice is harmless.
-      }
-      masterGain = null;
+    if (session) {
+      session.stop();
+      session = null;
     }
 
     isPlaying = false;
@@ -172,12 +178,19 @@
     progress = progressFor(offsetSeconds);
   }
 
-  /** Release the audio context for good — unmount only. */
+  /** Release the audio context for good. Unmount only. */
   function closeAudio() {
     teardown();
+
+    if (synth) {
+      synth.dispose();
+      synth = null;
+    }
+
     if (audioCtx) {
       try {
-        audioCtx.close();
+        const closing = audioCtx.close();
+        if (closing && typeof closing.catch === "function") closing.catch(() => {});
       } catch {
         // Ignore: closing an already-closed context is harmless.
       }
@@ -211,53 +224,13 @@
 
     const ctx = audioCtx || new AudioCtor();
     audioCtx = ctx;
-    if (typeof ctx.resume === "function") ctx.resume().catch(() => {});
+    if (typeof ctx.resume === "function") Promise.resolve(ctx.resume()).catch(() => {});
 
-    const master = ctx.createGain();
-    master.gain.value = 0.85;
-    master.connect(ctx.destination);
-    masterGain = master;
-
-    const secondsPerBeat = 60 / parsed.tempo;
-    const startAt = ctx.currentTime + 0.12;
-    // Split the headroom across tracks so a five-track score doesn't clip.
-    const trackLevel = 0.26 / Math.max(1, Math.sqrt(playableTracks.length));
-
-    for (const track of parsed.tracks) {
-      const waveform = waveformForProgram(track.program);
-
-      for (const note of track.notes) {
-        const noteStart = note.start * secondsPerBeat;
-        const noteEnd = noteStart + Math.max(0.06, note.duration * secondsPerBeat);
-        // Notes behind the seek point are dropped; one straddling it is clipped
-        // so it still sounds, just shorter.
-        if (noteEnd <= from) continue;
-
-        const at = startAt + Math.max(0, noteStart - from);
-        const length = noteEnd - Math.max(noteStart, from);
-        const peak = Math.max(0.005, trackLevel * (note.velocity / 127));
-
-        const oscillator = ctx.createOscillator();
-        oscillator.type = waveform;
-        oscillator.frequency.setValueAtTime(midiToFrequency(note.pitch), at);
-
-        const envelope = ctx.createGain();
-        const attack = Math.min(0.015, length * 0.25);
-        envelope.gain.setValueAtTime(0, at);
-        envelope.gain.linearRampToValueAtTime(peak, at + attack);
-        envelope.gain.setValueAtTime(peak, at + length * 0.7);
-        envelope.gain.linearRampToValueAtTime(0, at + length);
-
-        oscillator.connect(envelope);
-        envelope.connect(master);
-        oscillator.start(at);
-        oscillator.stop(at + length + 0.02);
-        oscillators.push(oscillator);
-      }
-    }
+    if (!synth) synth = createMidiSynth(ctx);
+    session = synth.start(parsed, { from, volume });
 
     // Offset so that `currentTime - playStart` is elapsed score time.
-    playStart = startAt - from;
+    playStart = session.startTime - from;
     offsetSeconds = from;
     isPlaying = true;
     progress = progressFor(from);
@@ -270,7 +243,7 @@
     }, (total - from + TAIL_SECONDS) * 1000);
   }
 
-  /** Pause in place — the next press resumes from here. */
+  /** Pause in place. The next press resumes from here. */
   function pause() {
     if (audioCtx) offsetSeconds = clamp(audioCtx.currentTime - playStart, 0, Math.max(0, parsed.durationSeconds));
     teardown(false);
@@ -280,6 +253,56 @@
   function togglePlayback() {
     if (isPlaying) pause();
     else play();
+  }
+
+  // ── Volume (global) ──
+
+  /** Push the level into the live session. A no-op while nothing is playing. */
+  function applyVolume() {
+    if (session) session.setVolume(volume);
+  }
+
+  /** Dragging: audible immediately, persisted once the drag ends. */
+  function handleVolumeInput(event) {
+    // The slider is 0-100 so it steps in whole percents; the setting is 0-1.
+    const next = clamp01(Number(event.currentTarget.value) / 100);
+    volume = next;
+    if (next > 0) lastAudibleVolume = next;
+    applyVolume();
+  }
+
+  function handleVolumeChange() {
+    persistVolume();
+  }
+
+  function toggleMute() {
+    const next = volume > 0 ? 0 : lastAudibleVolume || 1;
+    volume = next;
+    if (next > 0) lastAudibleVolume = next;
+    applyVolume();
+    persistVolume();
+  }
+
+  /** Settings are global, so this writes the same key the settings panel writes. */
+  function persistVolume() {
+    appState.settings.midiVolume = volume;
+    if (typeof chrome === "undefined" || !chrome.storage?.local) return;
+    try {
+      chrome.storage.local.set({
+        [STORAGE_KEYS.settings]: JSON.parse(JSON.stringify(appState.settings)),
+      });
+    } catch {
+      // Storage unavailable in some embedded contexts; the in-memory choice still applies.
+    }
+  }
+
+  /** Another card or tab changed the shared level — adopt it. */
+  function syncVolume() {
+    const next = clamp01(appState.settings.midiVolume);
+    if (next === volume) return;
+    volume = next;
+    if (next > 0) lastAudibleVolume = next;
+    applyVolume();
   }
 
   /**
@@ -294,7 +317,7 @@
     const atEnd = target >= 1;
 
     if (isPlaying) {
-      // Jumping to the very end ends playback rather than restarting it — the
+      // Jumping to the very end ends playback rather than restarting it. The
       // next press on play is what replays from the beginning.
       if (atEnd) {
         offsetSeconds = total;
@@ -310,7 +333,7 @@
     progress = target;
   }
 
-  /** The roll is the timeline — clicking anywhere on it seeks to that moment. */
+  /** The roll is the timeline: clicking anywhere on it seeks to that moment. */
   function handleRollClick(event) {
     const rect = event.currentTarget.getBoundingClientRect();
     if (!rect.width) return;
@@ -349,11 +372,14 @@
 
   onMount(() => {
     audioSupported = Boolean(window.AudioContext || window.webkitAudioContext);
+    // The level is global, so another card (or the settings panel) may change it.
+    window.addEventListener("bds:settingsChanged", syncVolume);
   });
 
   onDestroy(() => {
     closeAudio();
     if (stopActivePlayback === teardown) stopActivePlayback = () => {};
+    if (typeof window !== "undefined") window.removeEventListener("bds:settingsChanged", syncVolume);
   });
 </script>
 
@@ -528,15 +554,53 @@
       </div>
     </div>
 
-    <div class="bds-midi-tracks">
-      {#each playableTracks as track}
-        {@const index = parsed.tracks.indexOf(track)}
-        <span class="bds-midi-track">
-          <span class="bds-midi-track-dot" style="background: {trackColor(index)}"></span>
-          <span class="bds-midi-track-name">{trackLabel(track, index)}</span>
-          <span class="bds-midi-track-meta">{programToName(track.program)}</span>
-        </span>
-      {/each}
+    <div class="bds-midi-footer">
+      <div class="bds-midi-volume">
+        <button
+          type="button"
+          class="bds-midi-btn bds-midi-mute"
+          class:active={muted}
+          onclick={toggleMute}
+          aria-pressed={muted}
+          title={muted ? t("midiCard.unmute") : t("midiCard.mute")}
+          aria-label={muted ? t("midiCard.unmute") : t("midiCard.mute")}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+            {#if muted}
+              <line x1="22" y1="9" x2="16" y2="15" />
+              <line x1="16" y1="9" x2="22" y2="15" />
+            {:else}
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+            {/if}
+          </svg>
+        </button>
+
+        <input
+          class="bds-midi-volume-slider"
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value={Math.round(volume * 100)}
+          oninput={handleVolumeInput}
+          onchange={handleVolumeChange}
+          title={t("midiCard.volume")}
+          aria-label={t("midiCard.volume")}
+        />
+      </div>
+
+      <div class="bds-midi-tracks">
+        {#each playableTracks as track}
+          {@const index = parsed.tracks.indexOf(track)}
+          <span class="bds-midi-track">
+            <span class="bds-midi-track-dot" style="background: {trackColor(index)}"></span>
+            <span class="bds-midi-track-name">{trackLabel(track, index)}</span>
+            <span class="bds-midi-track-meta">{programToName(track.program)}</span>
+          </span>
+        {/each}
+      </div>
     </div>
 
     {#if visibleErrors.length}
@@ -655,6 +719,36 @@
     filter: brightness(1.08);
   }
 
+  /*
+   * Volume sits in the footer next to the track legend, never inside the
+   * action-button row. The value is global (settings.midiVolume).
+   */
+  .bds-midi-volume {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .bds-midi-mute {
+    padding: 0 6px;
+  }
+
+  .bds-midi-volume-slider {
+    width: 104px;
+    height: 4px;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    accent-color: var(--bds-accent, #8b5cf6);
+    cursor: pointer;
+  }
+
+  .bds-midi-volume-slider:focus-visible {
+    outline: 2px solid var(--bds-accent, #8b5cf6);
+    outline-offset: 2px;
+  }
+
   .bds-midi-notation {
     margin-top: 12px;
     border: 1px solid var(--bds-border, #e5e7eb);
@@ -720,7 +814,7 @@
     gap: 6px;
   }
 
-  /* Key gutter — the piano-roll reference column. */
+  /* Key gutter, the piano-roll reference column. */
   .bds-midi-gutter {
     position: relative;
     width: 26px;
@@ -800,11 +894,21 @@
     pointer-events: none;
   }
 
+  /* Footer row: playback level on the left, the track legend on the right. */
+  .bds-midi-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    margin-top: 12px;
+  }
+
   .bds-midi-tracks {
     display: flex;
     flex-wrap: wrap;
     gap: 6px 14px;
-    margin-top: 12px;
+    min-width: 0;
   }
 
   .bds-midi-track {

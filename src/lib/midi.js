@@ -1,10 +1,12 @@
 /**
- * Compact MIDI toolkit — text-notation parser + Standard MIDI File writer.
+ * Compact MIDI toolkit: text-notation parser, Standard MIDI File writer and a
+ * dependency-free Web Audio synth engine.
  *
  * Backs the `<BDS:midi>` card. The model emits a short, human-readable score
  * ("C4/4 E4/4 G4/2"), the card plays it through Web Audio and can export a
- * real `.mid` file. Everything here is dependency-free and side-effect-free,
- * so the same code runs in the content script, the sandbox bundle and Vitest.
+ * real `.mid` file. Parsing and file writing are side-effect-free; the synth
+ * only touches the AudioContext it is handed, so the same code runs in the
+ * content script, the sandbox bundle and Vitest.
  *
  * Notation (one statement per line, `#` or `//` starts a comment):
  *
@@ -39,7 +41,7 @@ const MIN_PITCH = 0;
 const MAX_PITCH = 127;
 const MAX_VELOCITY = 127;
 
-/** Note denominators we accept — anything else is a typo, not a rhythm. */
+/** Note denominators we accept. Anything else is a typo, not a rhythm. */
 const VALID_DENOMINATORS = new Set([1, 2, 4, 8, 16, 32]);
 
 /** Semitone offsets inside an octave. */
@@ -128,7 +130,7 @@ export function pitchToMidi(name) {
   return midi;
 }
 
-/** Inverse of {@link pitchToMidi} — always renders with sharps. */
+/** Inverse of {@link pitchToMidi}. Always renders with sharps. */
 export function midiToPitch(midi) {
   const value = Math.round(Number(midi));
   if (!Number.isFinite(value)) return "";
@@ -166,18 +168,183 @@ export function programToName(program) {
   return PROGRAM_NAMES.get(value) || `program ${Number.isFinite(value) ? value : 0}`;
 }
 
+// ── Voices ──
+
 /**
- * Oscillator shape used by the card's synth. Timbre is a nice-to-have here,
- * so this is a coarse three-bucket mapping rather than a full GM table.
+ * Harmonic spectra: the amplitude of partial 1, 2, 3 ... They become
+ * `PeriodicWave`s in the synth, so each instrument starts from a real timbre
+ * instead of a bare sine/saw/square. Arrays are module constants on purpose:
+ * the synth caches built waves by array identity.
  */
-export function waveformForProgram(program) {
-  const value = Number(program) || 0;
-  if (value >= 32 && value <= 39) return "sine"; // basses
-  if (value >= 16 && value <= 23) return "square"; // organs
-  if (value >= 80) return "sawtooth"; // synths
-  if (value >= 56 && value <= 79) return "triangle"; // winds, brass, flute
-  return "triangle"; // piano, guitar, strings, percussion
+const series = (count, fn) => Array.from({ length: count }, (_, i) => fn(i + 1));
+
+const SINE = [1];
+const SAW = series(32, (k) => 1 / k);
+const SQUARE = series(31, (k) => (k % 2 ? 1 / k : 0));
+const PIANO = [1, 0.62, 0.38, 0.27, 0.18, 0.12, 0.085, 0.06, 0.04, 0.028, 0.02, 0.014];
+const EPIANO = [1, 0.15, 0.5, 0.06, 0.2, 0.03, 0.1];
+const HARPSICHORD = series(16, (k) => 1 / Math.pow(k, 0.8));
+const BELL = [1, 0.1, 0.5, 0.05, 0.3, 0.1, 0.2, 0.05, 0.1];
+const ORGAN = [1, 0.85, 0.7, 0.55, 0.35, 0.25, 0.18, 0.12, 0.09];
+const REED_ORGAN = series(14, (k) => 1 / Math.pow(k, 1.1));
+const NYLON = [1, 0.7, 0.5, 0.3, 0.2, 0.12, 0.08, 0.05, 0.03];
+const STEEL = series(18, (k) => 1 / Math.pow(k, 0.9));
+const DRIVEN = series(30, (k) => 1 / Math.pow(k, 0.7));
+const BASS_SOFT = [1, 0.55, 0.3, 0.15, 0.08, 0.04];
+const SAW_BASS = series(20, (k) => 1 / k);
+const BOWED = series(28, (k) => 1 / k);
+const HARP = [1, 0.5, 0.25, 0.12, 0.06, 0.03];
+const TIMPANI = [1, 0.35, 0.15, 0.1];
+const CHOIR = [1, 0.45, 0.95, 0.55, 0.3, 0.18, 0.1, 0.06];
+const BRASS = series(22, (k) => 1 / Math.pow(k, 0.85));
+const SAX = series(16, (k) => (1 / k) * (k % 2 ? 1 : 0.75));
+const DOUBLE_REED = [1, 0.95, 0.8, 0.9, 0.6, 0.5, 0.4, 0.3, 0.2, 0.15, 0.1];
+const CLARINET = [1, 0, 0.75, 0, 0.5, 0, 0.14, 0, 0.18, 0, 0.08];
+const FLUTE = [1, 0.22, 0.08, 0.03, 0.015];
+const PAD = series(18, (k) => 1 / Math.pow(k, 1.2));
+const FX = [1, 0.4, 0.2];
+
+/**
+ * Synth voice parameters.
+ *
+ *   waveform     OscillatorNode type, the fallback when PeriodicWave is missing
+ *   partials     harmonic spectrum, see above
+ *   attack       seconds to reach full level
+ *   decay        seconds for the level to fall from full to `sustain`
+ *   sustain      level held for the rest of the note, fraction of the peak
+ *   release      seconds to fade out after the written end of the note
+ *   cutoff       lowpass corner in Hz at full velocity, around middle C
+ *   sweep        filter start as a multiple of `cutoff` (below 1 = opens up)
+ *   filterTime   seconds the filter takes to travel from start to `cutoff`
+ *   q            lowpass resonance
+ *   keytrack     how much the cutoff follows pitch (0 = fixed, 1 = full)
+ *   detune       cents for a second, detuned oscillator (0 = single)
+ *   vibrato      LFO depth in cents (0 = none), at `vibratoRate` Hz
+ *   noise        level of the noise layer (hammer, pluck, breath)
+ *   noiseDecay   seconds the noise burst lasts, unless `noiseHold`
+ *   noiseHold    noise lasts the whole note (breath, bow)
+ *   noiseTone    noise band centre as a multiple of the note frequency
+ *   sub          level of a sine one octave down
+ *   gain         loudness trim for this family
+ *   pitchDrop    start frequency multiple that glides to pitch (drums)
+ *   decayKey     how much higher notes decay faster (0 = same for all)
+ *   reverb       how much of the track feeds the reverb bus
+ */
+const VOICE_DEFAULTS = {
+  waveform: "sine",
+  partials: SINE,
+  attack: 0.01,
+  decay: 0.4,
+  sustain: 0.6,
+  release: 0.2,
+  cutoff: 4000,
+  sweep: 1,
+  filterTime: 0.2,
+  q: 0.7,
+  keytrack: 0.35,
+  detune: 0,
+  vibrato: 0,
+  vibratoRate: 5.2,
+  noise: 0,
+  noiseDecay: 0.04,
+  noiseHold: false,
+  noiseTone: 4,
+  sub: 0,
+  gain: 1,
+  pitchDrop: 1,
+  decayKey: 0,
+  reverb: 1,
+};
+
+const makeVoice = (overrides) => Object.freeze({ ...VOICE_DEFAULTS, ...overrides });
+
+/**
+ * One voice per General MIDI group, keyed by the highest program it covers.
+ * The list must stay sorted by `to`. `waveform` mirrors the family it replaced
+ * so anything that still asks for a bare oscillator type gets the same answer.
+ */
+const VOICE_FAMILIES = [
+  // Pianos
+  makeVoice({ to: 3, waveform: "triangle", partials: PIANO, attack: 0.003, decay: 3.2, sustain: 0.03, release: 0.28, cutoff: 3600, sweep: 3.2, filterTime: 0.35, q: 0.6, keytrack: 0.7, detune: 2, noise: 0.35, noiseDecay: 0.025, noiseTone: 6, decayKey: 0.55, gain: 0.95 }),
+  // Electric pianos
+  makeVoice({ to: 5, waveform: "triangle", partials: EPIANO, attack: 0.004, decay: 1.6, sustain: 0.12, release: 0.3, cutoff: 5000, sweep: 1.6, filterTime: 0.2, keytrack: 0.4, detune: 3, noise: 0.12, noiseDecay: 0.02, decayKey: 0.3, gain: 0.95 }),
+  // Harpsichord, clavinet
+  makeVoice({ to: 7, waveform: "triangle", partials: HARPSICHORD, attack: 0.002, decay: 0.5, sustain: 0.08, release: 0.08, cutoff: 5200, sweep: 1.6, filterTime: 0.1, keytrack: 0.5, noise: 0.2, noiseDecay: 0.012, decayKey: 0.2, gain: 0.7 }),
+  // Chromatic percussion: celesta, bells, music box, marimba
+  makeVoice({ to: 15, waveform: "sine", partials: BELL, attack: 0.002, decay: 1.6, sustain: 0.01, release: 0.4, cutoff: 7000, sweep: 1.5, filterTime: 0.15, keytrack: 0.6, noise: 0.08, noiseDecay: 0.012, decayKey: 0.5, gain: 0.9, reverb: 1.3 }),
+  // Organs
+  makeVoice({ to: 20, waveform: "square", partials: ORGAN, attack: 0.012, decay: 0.05, sustain: 1, release: 0.09, cutoff: 4200, filterTime: 0.05, detune: 4, gain: 0.7, reverb: 1.1 }),
+  // Accordion, harmonica
+  makeVoice({ to: 23, waveform: "square", partials: REED_ORGAN, attack: 0.03, decay: 0.08, sustain: 0.9, release: 0.1, cutoff: 3200, sweep: 0.7, filterTime: 0.06, detune: 9, vibrato: 6, noise: 0.05, noiseHold: true, gain: 0.75 }),
+  // Plucked guitars
+  makeVoice({ to: 28, waveform: "sawtooth", partials: NYLON, attack: 0.002, decay: 1.4, sustain: 0.05, release: 0.12, cutoff: 2800, sweep: 3.6, filterTime: 0.22, q: 0.9, keytrack: 0.55, detune: 2, noise: 0.4, noiseDecay: 0.02, noiseTone: 5, decayKey: 0.35, gain: 0.95 }),
+  // Driven guitars
+  makeVoice({ to: 31, waveform: "sawtooth", partials: DRIVEN, attack: 0.004, decay: 0.9, sustain: 0.5, release: 0.12, cutoff: 2600, sweep: 2, filterTime: 0.15, q: 1.1, detune: 5, noise: 0.15, noiseDecay: 0.02, gain: 0.55 }),
+  // Acoustic and finger bass
+  makeVoice({ to: 35, waveform: "sine", partials: BASS_SOFT, attack: 0.006, decay: 0.9, sustain: 0.25, release: 0.12, cutoff: 1300, sweep: 2.6, filterTime: 0.18, q: 0.8, keytrack: 0.5, noise: 0.15, noiseDecay: 0.015, noiseTone: 3, decayKey: 0.2, gain: 1.05, reverb: 0.2 }),
+  // Slap and synth bass
+  makeVoice({ to: 39, waveform: "sine", partials: SAW_BASS, attack: 0.004, decay: 0.3, sustain: 0.55, release: 0.1, cutoff: 1100, sweep: 4.5, filterTime: 0.18, q: 2.2, keytrack: 0.5, detune: 6, sub: 0.55, gain: 0.75, reverb: 0.15 }),
+  // Bowed strings
+  makeVoice({ to: 44, waveform: "sawtooth", partials: BOWED, attack: 0.085, decay: 0.3, sustain: 0.88, release: 0.28, cutoff: 3400, sweep: 0.55, filterTime: 0.12, q: 0.6, keytrack: 0.6, detune: 6, vibrato: 14, vibratoRate: 5.4, noise: 0.03, noiseHold: true, gain: 0.8, reverb: 1.1 }),
+  // Pizzicato
+  makeVoice({ to: 45, waveform: "sawtooth", partials: NYLON, attack: 0.002, decay: 0.35, sustain: 0.02, release: 0.08, cutoff: 3000, sweep: 2.5, filterTime: 0.1, keytrack: 0.5, noise: 0.3, noiseDecay: 0.012, gain: 0.9 }),
+  // Harp
+  makeVoice({ to: 46, waveform: "triangle", partials: HARP, attack: 0.002, decay: 1.8, sustain: 0.02, release: 0.3, cutoff: 4200, sweep: 2, filterTime: 0.2, keytrack: 0.5, noise: 0.2, noiseDecay: 0.015, decayKey: 0.4, gain: 0.95, reverb: 1.2 }),
+  // Timpani
+  makeVoice({ to: 47, waveform: "triangle", partials: TIMPANI, attack: 0.002, decay: 1.1, sustain: 0.01, release: 0.25, cutoff: 1400, sweep: 2, filterTime: 0.1, keytrack: 0.2, pitchDrop: 1.18, noise: 0.4, noiseDecay: 0.03, noiseTone: 2, gain: 1.1, reverb: 1.2 }),
+  // String ensembles, synth strings
+  makeVoice({ to: 51, waveform: "sawtooth", partials: BOWED, attack: 0.18, decay: 0.4, sustain: 0.85, release: 0.55, cutoff: 2800, sweep: 0.45, filterTime: 0.35, keytrack: 0.6, detune: 11, vibrato: 9, vibratoRate: 5, gain: 0.7, reverb: 1.3 }),
+  // Choir, voices
+  makeVoice({ to: 54, waveform: "triangle", partials: CHOIR, attack: 0.14, decay: 0.3, sustain: 0.85, release: 0.5, cutoff: 3000, sweep: 0.6, filterTime: 0.2, detune: 7, vibrato: 16, vibratoRate: 5.1, noise: 0.06, noiseHold: true, noiseTone: 2.5, gain: 0.85, reverb: 1.4 }),
+  // Orchestra hit
+  makeVoice({ to: 55, waveform: "triangle", partials: BRASS, attack: 0.01, decay: 0.5, sustain: 0.4, release: 0.3, cutoff: 2600, sweep: 2.2, filterTime: 0.15, detune: 8, gain: 0.7 }),
+  // Brass
+  makeVoice({ to: 63, waveform: "sawtooth", partials: BRASS, attack: 0.045, decay: 0.25, sustain: 0.8, release: 0.14, cutoff: 3200, sweep: 0.32, filterTime: 0.09, q: 0.9, keytrack: 0.5, detune: 4, vibrato: 6, vibratoRate: 5.5, noise: 0.04, noiseDecay: 0.05, gain: 0.7, reverb: 0.9 }),
+  // Saxophones
+  makeVoice({ to: 67, waveform: "square", partials: SAX, attack: 0.04, decay: 0.2, sustain: 0.8, release: 0.12, cutoff: 2600, sweep: 0.5, filterTime: 0.1, keytrack: 0.5, detune: 3, vibrato: 12, vibratoRate: 5.3, noise: 0.1, noiseHold: true, noiseTone: 3, gain: 0.8 }),
+  // Oboe, english horn, bassoon
+  makeVoice({ to: 70, waveform: "square", partials: DOUBLE_REED, attack: 0.05, decay: 0.2, sustain: 0.8, release: 0.12, cutoff: 2400, sweep: 0.6, filterTime: 0.1, keytrack: 0.5, vibrato: 9, noise: 0.05, noiseHold: true, gain: 0.75 }),
+  // Clarinet
+  makeVoice({ to: 71, waveform: "square", partials: CLARINET, attack: 0.035, decay: 0.15, sustain: 0.85, release: 0.1, cutoff: 2800, sweep: 0.5, filterTime: 0.1, keytrack: 0.5, vibrato: 5, noise: 0.06, noiseHold: true, gain: 0.8 }),
+  // Flutes and pipes
+  makeVoice({ to: 79, waveform: "triangle", partials: FLUTE, attack: 0.06, decay: 0.15, sustain: 0.85, release: 0.14, cutoff: 5200, sweep: 0.6, filterTime: 0.1, keytrack: 0.5, vibrato: 10, vibratoRate: 5, noise: 0.2, noiseHold: true, noiseTone: 2.5, gain: 0.9, reverb: 1.2 }),
+  // Square lead
+  makeVoice({ to: 80, waveform: "sawtooth", partials: SQUARE, attack: 0.01, decay: 0.2, sustain: 0.75, release: 0.18, cutoff: 4200, sweep: 2.2, filterTime: 0.18, q: 1.6, keytrack: 0.5, detune: 9, vibrato: 4, gain: 0.55 }),
+  // Other synth leads
+  makeVoice({ to: 87, waveform: "sawtooth", partials: SAW, attack: 0.01, decay: 0.2, sustain: 0.75, release: 0.18, cutoff: 4200, sweep: 2.2, filterTime: 0.18, q: 1.6, keytrack: 0.5, detune: 9, vibrato: 4, gain: 0.6 }),
+  // Synth pads
+  makeVoice({ to: 95, waveform: "sawtooth", partials: PAD, attack: 0.45, decay: 0.5, sustain: 0.85, release: 0.9, cutoff: 2200, sweep: 0.4, filterTime: 0.8, q: 0.8, keytrack: 0.5, detune: 13, vibrato: 3, gain: 0.65, reverb: 1.5 }),
+  // Synth effects
+  makeVoice({ to: 103, waveform: "sawtooth", partials: BELL, attack: 0.25, decay: 0.8, sustain: 0.5, release: 0.9, cutoff: 3000, sweep: 0.5, filterTime: 0.6, detune: 10, vibrato: 5, gain: 0.7, reverb: 1.6 }),
+  // Sitar, banjo, shamisen, koto, kalimba
+  makeVoice({ to: 108, waveform: "triangle", partials: STEEL, attack: 0.002, decay: 0.8, sustain: 0.04, release: 0.12, cutoff: 3600, sweep: 2.4, filterTime: 0.15, keytrack: 0.5, detune: 3, noise: 0.3, noiseDecay: 0.015, gain: 0.85 }),
+  // Bagpipe, fiddle, shanai
+  makeVoice({ to: 111, waveform: "triangle", partials: DOUBLE_REED, attack: 0.04, decay: 0.15, sustain: 0.9, release: 0.1, cutoff: 3000, sweep: 0.7, keytrack: 0.5, detune: 8, vibrato: 9, gain: 0.7 }),
+  // Percussive
+  makeVoice({ to: 119, waveform: "sine", partials: BELL, attack: 0.002, decay: 0.35, sustain: 0.01, release: 0.1, cutoff: 3500, sweep: 2, filterTime: 0.08, keytrack: 0.3, pitchDrop: 1.35, noise: 0.35, noiseDecay: 0.02, gain: 0.9 }),
+  // Sound effects
+  makeVoice({ to: 127, waveform: "triangle", partials: FX, attack: 0.15, decay: 0.5, sustain: 0.4, release: 0.6, cutoff: 2000, noise: 0.15, noiseHold: true, gain: 0.6, reverb: 1.5 }),
+];
+
+/** Piano, the fallback for an out-of-range program number. */
+const DEFAULT_VOICE = VOICE_FAMILIES[0];
+
+/**
+ * Synthesis parameters for a General MIDI program number. Out-of-range values
+ * fall back to the piano voice, so the card can never be handed a broken spec.
+ */
+export function voiceForProgram(program) {
+  const value = Number(program);
+  const safe = Number.isFinite(value) ? Math.min(127, Math.max(0, Math.round(value))) : 0;
+  return VOICE_FAMILIES.find((family) => safe <= family.to) || DEFAULT_VOICE;
 }
+
+/** Oscillator shape used as the fallback timbre. */
+export function waveformForProgram(program) {
+  return voiceForProgram(program).waveform;
+}
+
+// ── Parser ──
 
 /**
  * Parse the compact notation into a playable score.
@@ -263,7 +430,7 @@ export function parseMidiScore(text) {
 
     // `track` opens a new track. It is normally the first word on the line, but a
     // model that forgets a newline can glue the header onto the end of a note
-    // line ("… [E5,G5,B5]/2 track Bass instrument=bass"). Read that as a new
+    // line ("... [E5,G5,B5]/2 track Bass instrument=bass"). Read that as a new
     // statement, otherwise the header becomes note tokens and the track is lost.
     // This runs after the directive check so a title like "Night Track" is safe.
     const headerAt = findTrackHeaderAt(line);
@@ -365,7 +532,7 @@ function splitTokens(line) {
  *
  * Models routinely drop the space between two notes, e.g.
  * `[C4,E4,G4]/4[C4,E4,G4]/4`. Without this the whole run is reported as one
- * unrecognised token and every note in it is lost — but the engine's contract is
+ * unrecognised token and every note in it is lost, but the engine's contract is
  * that a partly broken score still plays, so recovering the run matters.
  *
  * Returns `[chunk]` unchanged when it cannot be decomposed, so genuinely bad
@@ -405,7 +572,7 @@ function splitGluedTokens(chunk) {
  * `track Melody instrument=electric piano` all work.
  *
  * An unquoted value runs until the next `key=` pair or the end of the line,
- * because most instrument names are multi-word — matching a single `\S+`
+ * because most instrument names are multi-word: matching a single `\S+`
  * silently truncated "electric piano" to "electric". Quotes still win when
  * present, so `instrument="synth pad" rest=...` stays unambiguous.
  */
@@ -544,6 +711,455 @@ export function flattenNotes(score) {
   return flat;
 }
 
+// ── Synth engine ──
+
+/** Reverb: a synthetic hall, mixed in under the dry signal. */
+const REVERB_SECONDS = 2.2;
+const REVERB_PREDELAY = 0.014;
+const REVERB_DECAY_RATE = 3.4;
+const WET_LEVEL = 0.26;
+
+/** Early reflections for the impulse response: [seconds, amplitude]. */
+const EARLY_REFLECTIONS = [
+  [0.019, 0.8],
+  [0.031, 0.65],
+  [0.047, 0.5],
+  [0.063, 0.38],
+];
+
+/** Fade applied to the master bus when a session stops, then the graph is freed. */
+const FADE_TIME_CONSTANT = 0.03;
+const FADE_STOP_SECONDS = 0.25;
+const FADE_CLEANUP_MS = 350;
+
+/**
+ * Ceiling of the master bus. The user's volume (0-1) scales this rather than
+ * replacing it, so a full-volume score keeps the headroom the compressor was
+ * tuned against.
+ */
+const MAX_MASTER_GAIN = 0.9;
+
+/** Ramp used for live volume changes, short enough to feel instant, long enough not to click. */
+const VOLUME_RAMP_SECONDS = 0.03;
+
+/** How far tracks are spread from the centre of the stereo field. */
+const PAN_SPREAD = 0.5;
+
+/** Notes shorter than this after a seek clip are not worth scheduling. */
+const MIN_AUDIBLE_SECONDS = 0.02;
+
+const MIDDLE_C = 261.63;
+
+const clampNumber = (value, min, max) => Math.min(max, Math.max(min, value));
+
+/** Even stereo slots for playable tracks, damped so nothing is hard-panned. */
+function trackPans(tracks) {
+  const playable = tracks.flatMap((track, index) => (track.notes.length ? [index] : []));
+  const positions = tracks.map(() => 0);
+  const span = Math.max(1, playable.length - 1);
+
+  playable.forEach((index, order) => {
+    positions[index] = playable.length > 1 ? ((order / span) * 2 - 1) * PAN_SPREAD : 0;
+  });
+
+  return positions;
+}
+
+/**
+ * Build a synth bound to one AudioContext.
+ *
+ * Everything expensive and reusable (periodic waves, the noise buffer, the
+ * reverb impulse) is created lazily once per synth. `start()` schedules a whole
+ * score and hands back a session that can be stopped with a click-free fade.
+ *
+ * Signal path per track:
+ *   osc(s) -> lowpass filter -> envelope -> track bus -> panner -> dry bus
+ *                                                              \-> reverb send
+ * The noise layer joins the track bus and the sub oscillator joins the
+ * envelope. All buses meet in a master gain, then a compressor, so dense
+ * chords and multi-track scores glue together instead of clipping.
+ *
+ * @param {BaseAudioContext} ctx
+ */
+export function createMidiSynth(ctx) {
+  const sampleRate = ctx.sampleRate || 44100;
+  const maxFrequency = Math.min(18000, sampleRate * 0.45);
+  const canShapeWaves = typeof ctx.createPeriodicWave === "function";
+  const waves = new Map();
+  let noiseBuffer = null;
+  let impulseBuffer = null;
+
+  /** Periodic wave for a partials array, cached by array identity. */
+  function waveFor(partials) {
+    let wave = waves.get(partials);
+    if (wave) return wave;
+
+    const real = new Float32Array(partials.length + 1);
+    const imag = new Float32Array(partials.length + 1);
+    partials.forEach((amplitude, index) => {
+      imag[index + 1] = amplitude;
+    });
+
+    wave = ctx.createPeriodicWave(real, imag);
+    waves.set(partials, wave);
+    return wave;
+  }
+
+  /** Two seconds of white noise, looped by whoever needs longer. */
+  function getNoise() {
+    if (noiseBuffer) return noiseBuffer;
+
+    const length = Math.round(sampleRate * 2);
+    const buffer = ctx.createBuffer(1, length, sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
+
+    noiseBuffer = buffer;
+    return buffer;
+  }
+
+  /**
+   * Hall-like impulse response: a few early reflections, then stereo noise that
+   * decays exponentially and gets darker as it goes, the way air and soft
+   * surfaces absorb highs first. The convolver normalises the level.
+   */
+  function getImpulse() {
+    if (impulseBuffer) return impulseBuffer;
+
+    const length = Math.max(1, Math.round(sampleRate * REVERB_SECONDS));
+    const preDelay = Math.min(length - 1, Math.round(sampleRate * REVERB_PREDELAY));
+    const buffer = ctx.createBuffer(2, length, sampleRate);
+
+    for (let channel = 0; channel < 2; channel++) {
+      const data = buffer.getChannelData(channel);
+      let lowpassed = 0;
+
+      for (let i = preDelay; i < length; i++) {
+        const t = (i - preDelay) / sampleRate;
+        const envelope = Math.exp(-t * REVERB_DECAY_RATE);
+        const brightness = 0.08 + 0.85 * Math.exp(-t * 2.2);
+        const buildUp = Math.min(1, t * 60);
+        lowpassed += (Math.random() * 2 - 1 - lowpassed) * brightness;
+        data[i] = lowpassed * envelope * buildUp;
+      }
+
+      for (const [seconds, amplitude] of EARLY_REFLECTIONS) {
+        const at = preDelay + Math.round(sampleRate * seconds) + channel * 9;
+        if (at < length) data[at] += amplitude;
+      }
+    }
+
+    impulseBuffer = buffer;
+    return buffer;
+  }
+
+  /**
+   * Schedule a score.
+   *
+   * @param {ReturnType<typeof parseMidiScore>} score
+   * @param {{ from?: number, delay?: number, volume?: number }} [options] `from`
+   *   is the score position in seconds, `delay` the lead time before the first
+   *   sound, `volume` the master level (0-1, default 1).
+   * @returns {{ startTime: number, stop: () => void, setVolume: (value: number) => void }}
+   */
+  function start(score, { from = 0, delay = 0.12, volume = 1 } = {}) {
+    const tracks = Array.isArray(score?.tracks) ? score.tracks : [];
+    const tempo = Number(score?.tempo) > 0 ? Number(score.tempo) : DEFAULT_TEMPO;
+    const secondsPerBeat = 60 / tempo;
+    const total = Math.max(0, Number(score?.durationSeconds) || 0);
+    const startAt = ctx.currentTime + delay;
+
+    const nodes = [];
+    const sources = [];
+    const keep = (node) => {
+      nodes.push(node);
+      return node;
+    };
+
+    // Master chain: master gain -> compressor -> speakers.
+    const master = keep(ctx.createGain());
+    master.gain.value = MAX_MASTER_GAIN * clampNumber(volume, 0, 1);
+
+    if (typeof ctx.createDynamicsCompressor === "function") {
+      const compressor = keep(ctx.createDynamicsCompressor());
+      compressor.threshold.value = -14;
+      compressor.knee.value = 18;
+      compressor.ratio.value = 4;
+      compressor.attack.value = 0.004;
+      compressor.release.value = 0.22;
+      master.connect(compressor);
+      compressor.connect(ctx.destination);
+    } else {
+      master.connect(ctx.destination);
+    }
+
+    const dry = keep(ctx.createGain());
+    dry.gain.value = 1;
+    dry.connect(master);
+
+    // Shared reverb bus. High-passed so low notes do not turn to mud.
+    let reverbIn = null;
+    if (typeof ctx.createConvolver === "function" && typeof ctx.createBuffer === "function") {
+      const convolver = keep(ctx.createConvolver());
+      convolver.normalize = true;
+      convolver.buffer = getImpulse();
+
+      const highpass = keep(ctx.createBiquadFilter());
+      highpass.type = "highpass";
+      highpass.frequency.value = 180;
+
+      const wet = keep(ctx.createGain());
+      wet.gain.value = WET_LEVEL;
+
+      convolver.connect(highpass);
+      highpass.connect(wet);
+      wet.connect(master);
+      reverbIn = convolver;
+    }
+
+    const playable = tracks.filter((track) => track.notes.length).length;
+    const trackLevel = 0.26 / Math.max(1, Math.sqrt(playable));
+    const pans = trackPans(tracks);
+    const lfoStop = startAt + Math.max(0, total - from) + 4;
+
+    tracks.forEach((track, trackIndex) => {
+      if (!track.notes.length) return;
+
+      const timbre = voiceForProgram(track.program);
+      const useWave = canShapeWaves && timbre.partials && timbre.partials.length > 0;
+
+      const bus = keep(ctx.createGain());
+      bus.gain.value = trackLevel * timbre.gain;
+
+      let tail = bus;
+      if (typeof ctx.createStereoPanner === "function") {
+        const panner = keep(ctx.createStereoPanner());
+        panner.pan.value = pans[trackIndex];
+        bus.connect(panner);
+        tail = panner;
+      }
+      tail.connect(dry);
+
+      if (reverbIn && timbre.reverb > 0) {
+        const send = keep(ctx.createGain());
+        send.gain.value = timbre.reverb;
+        tail.connect(send);
+        send.connect(reverbIn);
+      }
+
+      // One shared vibrato LFO per track, wired into every oscillator's detune.
+      let vibrato = null;
+      if (timbre.vibrato > 0) {
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = timbre.vibratoRate;
+        const depth = keep(ctx.createGain());
+        depth.gain.value = timbre.vibrato;
+        lfo.connect(depth);
+        lfo.start(startAt);
+        lfo.stop(lfoStop);
+        sources.push(lfo);
+        vibrato = depth;
+      }
+
+      const cents = timbre.detune ? [-timbre.detune, timbre.detune] : [0];
+      const stackScale = cents.length > 1 ? 0.62 : 1;
+
+      for (const note of track.notes) {
+        const noteStart = note.start * secondsPerBeat;
+        const noteEnd = noteStart + Math.max(0.06, note.duration * secondsPerBeat);
+        // Notes behind the seek point are dropped; one straddling it is clipped
+        // so it still sounds, just shorter.
+        if (noteEnd <= from) continue;
+
+        const at = startAt + Math.max(0, noteStart - from);
+        const length = noteEnd - Math.max(noteStart, from);
+        if (length < MIN_AUDIBLE_SECONDS) continue;
+        const noteOff = at + length;
+
+        const frequency = midiToFrequency(note.pitch);
+        const pitchRatio = frequency / MIDDLE_C;
+        const velocity = clampNumber(note.velocity / 127, 0.02, 1);
+        const peak = Math.max(0.015, Math.pow(velocity, 1.25)) * stackScale;
+
+        // Brightness follows both pitch and how hard the note is struck.
+        const cutoff = clampNumber(
+          timbre.cutoff * Math.pow(pitchRatio, timbre.keytrack) * (0.5 + 0.5 * velocity),
+          200,
+          maxFrequency
+        );
+        const filterStart = clampNumber(cutoff * timbre.sweep, 200, maxFrequency);
+
+        const filter = keep(ctx.createBiquadFilter());
+        filter.type = "lowpass";
+        filter.Q.value = timbre.q;
+        filter.frequency.setValueAtTime(filterStart, at);
+        filter.frequency.exponentialRampToValueAtTime(cutoff, at + Math.max(0.02, timbre.filterTime));
+
+        // Envelope. The decay is an exponential fall; if the note ends partway
+        // through it, release starts from wherever the curve had got to, so a
+        // short piano note does not jump to its sustain level.
+        const attackTime = Math.max(0.001, Math.min(timbre.attack, length * 0.5));
+        const attackEnd = at + attackTime;
+        const decayTime = clampNumber(timbre.decay * Math.pow(pitchRatio, -timbre.decayKey), 0.08, 8);
+        const sustainRatio = Math.max(0.0005, timbre.sustain);
+        const decaySpan = clampNumber(noteOff - attackEnd, 0, decayTime);
+        const endAt = noteOff + timbre.release;
+
+        const envelope = keep(ctx.createGain());
+        let level = peak;
+        envelope.gain.setValueAtTime(0, at);
+        envelope.gain.linearRampToValueAtTime(peak, attackEnd);
+        if (decaySpan > 0.001) {
+          level = Math.max(0.0002, peak * Math.pow(sustainRatio, decaySpan / decayTime));
+          envelope.gain.exponentialRampToValueAtTime(level, attackEnd + decaySpan);
+        }
+        envelope.gain.setValueAtTime(level, noteOff);
+        envelope.gain.exponentialRampToValueAtTime(0.0001, endAt);
+        envelope.gain.setValueAtTime(0, endAt);
+
+        filter.connect(envelope);
+        envelope.connect(bus);
+
+        for (const offset of cents) {
+          const oscillator = ctx.createOscillator();
+          if (useWave) oscillator.setPeriodicWave(waveFor(timbre.partials));
+          else oscillator.type = timbre.waveform;
+
+          // Drums start sharp and glide down onto the written pitch.
+          if (timbre.pitchDrop !== 1) {
+            oscillator.frequency.setValueAtTime(frequency * timbre.pitchDrop, at);
+            oscillator.frequency.exponentialRampToValueAtTime(frequency, at + 0.07);
+          } else {
+            oscillator.frequency.setValueAtTime(frequency, at);
+          }
+          oscillator.detune.setValueAtTime(offset, at);
+          if (vibrato) vibrato.connect(oscillator.detune);
+
+          oscillator.connect(filter);
+          oscillator.start(at);
+          oscillator.stop(endAt + 0.05);
+          sources.push(oscillator);
+        }
+
+        // Sub oscillator, unfiltered, riding the same envelope.
+        if (timbre.sub > 0) {
+          const sub = ctx.createOscillator();
+          sub.type = "sine";
+          sub.frequency.setValueAtTime(frequency / 2, at);
+          const subGain = keep(ctx.createGain());
+          subGain.gain.value = timbre.sub;
+          sub.connect(subGain);
+          subGain.connect(envelope);
+          sub.start(at);
+          sub.stop(endAt + 0.05);
+          sources.push(sub);
+        }
+
+        // Noise layer: hammer thump, pluck snap or sustained breath.
+        if (timbre.noise > 0) {
+          const source = ctx.createBufferSource();
+          source.buffer = getNoise();
+          source.loop = true;
+
+          const band = keep(ctx.createBiquadFilter());
+          band.type = "bandpass";
+          band.frequency.value = clampNumber(frequency * timbre.noiseTone, 300, maxFrequency);
+          band.Q.value = 0.9;
+
+          const noiseGain = keep(ctx.createGain());
+          const noiseLevel = Math.max(0.0005, timbre.noise * Math.pow(velocity, 1.25) * 0.5);
+          noiseGain.gain.setValueAtTime(0, at);
+          noiseGain.gain.linearRampToValueAtTime(noiseLevel, at + Math.min(0.01, attackTime + 0.004));
+
+          let noiseEnd;
+          if (timbre.noiseHold) {
+            noiseGain.gain.setValueAtTime(noiseLevel, noteOff);
+            noiseEnd = endAt;
+          } else {
+            noiseEnd = at + Math.max(0.015, timbre.noiseDecay);
+          }
+          noiseGain.gain.exponentialRampToValueAtTime(0.0001, noiseEnd);
+          noiseGain.gain.setValueAtTime(0, noiseEnd);
+
+          source.connect(band);
+          band.connect(noiseGain);
+          noiseGain.connect(bus);
+          source.start(at, Math.random() * 1.5);
+          source.stop(noiseEnd + 0.05);
+          sources.push(source);
+        }
+      }
+    });
+
+    let stopped = false;
+
+    return {
+      startTime: startAt,
+      stop() {
+        if (stopped) return;
+        stopped = true;
+
+        // Fade the master first and let the voices die underneath it. Stopping
+        // oscillators outright, or disconnecting a convolver mid-tail, steps the
+        // signal to zero and clicks.
+        const now = ctx.currentTime;
+        try {
+          master.gain.cancelScheduledValues(now);
+          master.gain.setValueAtTime(master.gain.value, now);
+          master.gain.setTargetAtTime(0, now, FADE_TIME_CONSTANT);
+        } catch {
+          // Ignore: a closing context rejects automation.
+        }
+
+        for (const source of sources) {
+          try {
+            source.stop(now + FADE_STOP_SECONDS);
+          } catch {
+            // Already stopped.
+          }
+        }
+
+        setTimeout(() => {
+          for (const node of nodes) {
+            try {
+              node.disconnect();
+            } catch {
+              // Ignore: some engines throw when disconnecting a finished node.
+            }
+          }
+        }, FADE_CLEANUP_MS);
+      },
+      /**
+       * Live master level, 0-1. Ramped instead of set so dragging a volume
+       * slider never clicks. A stopped session ignores it — its nodes are
+       * already on their way out, and its fade must not be undone.
+       */
+      setVolume(next) {
+        if (stopped) return;
+
+        const target = MAX_MASTER_GAIN * clampNumber(next, 0, 1);
+        const now = ctx.currentTime;
+        try {
+          master.gain.cancelScheduledValues(now);
+          master.gain.setValueAtTime(master.gain.value, now);
+          master.gain.linearRampToValueAtTime(target, now + VOLUME_RAMP_SECONDS);
+        } catch {
+          master.gain.value = target;
+        }
+      },
+    };
+  }
+
+  /** Drop cached buffers and waves. The AudioContext itself is not touched. */
+  function dispose() {
+    waves.clear();
+    noiseBuffer = null;
+    impulseBuffer = null;
+  }
+
+  return { start, dispose };
+}
+
 // ── Standard MIDI File writer ──
 
 /** Encode a number as a MIDI variable-length quantity (1-4 bytes). */
@@ -591,7 +1207,7 @@ function buildTrackChunk(body) {
 
 /**
  * MIDI channels for score tracks. Channel 9 is the GM percussion channel, so it
- * is skipped — a melody landing on it would turn into drums.
+ * is skipped: a melody landing on it would turn into drums.
  */
 function channelForTrack(index) {
   const slot = index % 15; // 0-8 and 10-15 are melodic channels
@@ -650,7 +1266,7 @@ export function buildMidiFile(score) {
       timed.push({ tick: endTick, rank: 0, data: [0x80 | channel, pitch, 0x40] });
     }
 
-    // Note-offs first at equal ticks, then by pitch — the ordering every DAW
+    // Note-offs first at equal ticks, then by pitch: the ordering every DAW
     // expects when a repeated note ends and restarts on the same tick.
     timed.sort((a, b) => a.tick - b.tick || a.rank - b.rank || a.data[1] - b.data[1]);
 

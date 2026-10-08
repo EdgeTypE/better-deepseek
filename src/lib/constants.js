@@ -976,6 +976,9 @@ export const DEFAULT_SETTINGS = {
   voiceURI: "",
   autoSubmitVoice: true,
   vadSilenceTimeout: 1100,
+  // Master volume (0-1) for <BDS:midi> playback. Global on purpose: every MIDI
+  // card in every chat plays at the same level the user last set.
+  midiVolume: 1,
   // Live Voice Mode: overlay shows the assistant's reply as text. Off by default —
   // voice-only. The user's own speech is never rendered, either way.
   liveModeShowText: false,

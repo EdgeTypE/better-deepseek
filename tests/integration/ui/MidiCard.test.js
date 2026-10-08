@@ -8,6 +8,8 @@ vi.mock("../../../src/lib/utils/download.js", () => ({
 }));
 
 import MidiCard from "../../../src/content/ui/MidiCard.svelte";
+import appState from "../../../src/content/state.js";
+import { STORAGE_KEYS } from "../../../src/lib/constants.js";
 import { renderSvelte, flushUi } from "../../helpers/svelte.js";
 
 const SCORE = [
@@ -19,15 +21,42 @@ const SCORE = [
   "C2/1",
 ].join("\n");
 
-/** AudioContext stub — jsdom has none, and the card must stay silent without one. */
+/**
+ * AudioContext stub — jsdom has none, and the card must stay silent without one.
+ * It covers every node the synth engine in `lib/midi.js` builds. `createPeriodicWave`
+ * is deliberately absent: without it the engine falls back to a plain
+ * `oscillator.type`, which is what the assertions below pin.
+ */
 class FakeAudioParam {
-  setValueAtTime() {}
-  linearRampToValueAtTime() {}
+  constructor(value = 0) {
+    this.value = value;
+    this.ramps = [];
+  }
+
+  cancelScheduledValues() {}
+
+  setValueAtTime(value) {
+    this.value = value;
+  }
+
+  linearRampToValueAtTime(value) {
+    this.value = value;
+    this.ramps.push(value);
+  }
+
+  exponentialRampToValueAtTime(value) {
+    this.value = value;
+  }
+
+  setTargetAtTime(value) {
+    this.value = value;
+  }
 }
 
 class FakeAudioContext {
   constructor() {
     this.currentTime = 0;
+    this.sampleRate = 44100;
     this.destination = {};
     created.contexts.push(this);
   }
@@ -36,6 +65,7 @@ class FakeAudioContext {
     const oscillator = {
       type: "",
       frequency: new FakeAudioParam(),
+      detune: new FakeAudioParam(),
       connect() {},
       disconnect() {},
       start: vi.fn(),
@@ -46,7 +76,39 @@ class FakeAudioContext {
   }
 
   createGain() {
-    return { gain: new FakeAudioParam(), connect() {}, disconnect() {} };
+    const node = { gain: new FakeAudioParam(1), connect() {}, disconnect() {} };
+    created.gains.push(node);
+    return node;
+  }
+
+  createBiquadFilter() {
+    return {
+      type: "",
+      Q: new FakeAudioParam(1),
+      frequency: new FakeAudioParam(0),
+      connect() {},
+      disconnect() {},
+    };
+  }
+
+  createStereoPanner() {
+    return { pan: new FakeAudioParam(0), connect() {}, disconnect() {} };
+  }
+
+  createBuffer(channels, length) {
+    const channelsData = Array.from({ length: channels }, () => new Float32Array(length));
+    return { getChannelData: (channel) => channelsData[channel] };
+  }
+
+  createBufferSource() {
+    return {
+      buffer: null,
+      loop: false,
+      connect() {},
+      disconnect() {},
+      start: vi.fn(),
+      stop: vi.fn(),
+    };
   }
 
   resume() {
@@ -58,7 +120,8 @@ class FakeAudioContext {
   }
 }
 
-const created = { oscillators: [], contexts: [] };
+/** `gains[0]` is the master bus of the most recent session — the engine builds it first. */
+const created = { oscillators: [], contexts: [], gains: [] };
 
 /** Give the roll a real box so click positions map to a fraction of the width. */
 function makeRollMeasurable(target) {
@@ -89,6 +152,9 @@ describe("MidiCard", () => {
     document.body.innerHTML = "";
     created.oscillators = [];
     created.contexts = [];
+    created.gains = [];
+    // The level is a shared setting, so a test that moves it must not leak.
+    appState.settings.midiVolume = 1;
   });
 
   afterEach(() => {
@@ -243,7 +309,9 @@ describe("MidiCard", () => {
     playButton.click();
     await flushUi();
 
-    expect(created.oscillators).toHaveLength(4);
+    // Piano is a two-oscillator voice (detuned pair), bass a single one:
+    // 3 melody notes + 1 bass note = 3 * 2 + 1.
+    expect(created.oscillators).toHaveLength(7);
     expect(created.oscillators[0].type).toBe("triangle"); // piano
     expect(created.oscillators[0].frequency.setValueAtTime).toBeDefined();
     expect(target.querySelector(".bds-midi-playhead")).not.toBeNull();
@@ -279,8 +347,9 @@ describe("MidiCard", () => {
     buttonByTitle(target, "Play").click();
     await flushUi();
 
-    // Only the two notes reaching past 1.38s are rescheduled.
-    expect(created.oscillators).toHaveLength(2);
+    // Only the notes reaching past 1.38s are rescheduled: one piano note
+    // (two oscillators) and the bass line (one).
+    expect(created.oscillators).toHaveLength(3);
     cleanup();
   });
 
@@ -307,14 +376,15 @@ describe("MidiCard", () => {
 
     buttonByTitle(target, "Play").click();
     await flushUi();
-    expect(created.oscillators).toHaveLength(4);
+    expect(created.oscillators).toHaveLength(7);
 
     const roll = makeRollMeasurable(target);
     created.oscillators = [];
     clickRoll(roll, 100); // halfway: the first two notes are already behind us
     await flushUi();
 
-    expect(created.oscillators).toHaveLength(2);
+    // One piano note (two oscillators) plus the bass line (one).
+    expect(created.oscillators).toHaveLength(3);
     cleanup();
   });
 
@@ -367,8 +437,111 @@ describe("MidiCard", () => {
     buttonByTitle(target, "Play").click();
     await flushUi();
 
-    expect(created.oscillators).toHaveLength(4);
+    expect(created.oscillators).toHaveLength(7);
     expect(roll.getAttribute("aria-valuenow")).toBe("0");
     cleanup();
+  });
+
+  it("starts the volume slider at the globally stored level", async () => {
+    appState.settings.midiVolume = 0.4;
+
+    const { target, cleanup } = render(SCORE);
+    await flushUi();
+
+    expect(target.querySelector(".bds-midi-volume-slider").value).toBe("40");
+    cleanup();
+  });
+
+  it("keeps the volume control out of the action-button row", async () => {
+    const { target, cleanup } = render(SCORE);
+    await flushUi();
+
+    // The slider lives in the footer, next to the track legend.
+    expect(target.querySelector(".bds-midi-footer .bds-midi-volume")).not.toBeNull();
+    expect(target.querySelector(".bds-midi-actions .bds-midi-volume")).toBeNull();
+    expect([...target.querySelectorAll(".bds-midi-actions button")].map((b) => b.getAttribute("title"))).toEqual([
+      "Play",
+      "Loop",
+      "Download .mid",
+      "View notation",
+    ]);
+    cleanup();
+  });
+
+  it("scales the master gain while playing, then persists the level", async () => {
+    vi.stubGlobal("AudioContext", FakeAudioContext);
+
+    const { target, cleanup } = render(SCORE);
+    await flushUi();
+
+    buttonByTitle(target, "Play").click();
+    await flushUi();
+    expect(created.gains[0].gain.value).toBeCloseTo(0.9); // full volume
+
+    const slider = target.querySelector(".bds-midi-volume-slider");
+    slider.value = "30";
+    slider.dispatchEvent(new Event("input", { bubbles: true }));
+    await flushUi();
+
+    // Audible immediately, but nothing written yet — the drag is not over.
+    expect(created.gains[0].gain.value).toBeCloseTo(0.27);
+    expect(appState.settings.midiVolume).toBe(1);
+
+    slider.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushUi();
+
+    expect(appState.settings.midiVolume).toBeCloseTo(0.3);
+    const stored = await chrome.storage.local.get(STORAGE_KEYS.settings);
+    expect(stored[STORAGE_KEYS.settings].midiVolume).toBeCloseTo(0.3);
+    cleanup();
+  });
+
+  it("mutes to silence and restores the level it had before", async () => {
+    appState.settings.midiVolume = 0.5;
+    vi.stubGlobal("AudioContext", FakeAudioContext);
+
+    const { target, cleanup } = render(SCORE);
+    await flushUi();
+
+    const muteButton = buttonByTitle(target, "Mute");
+    expect(muteButton.getAttribute("aria-pressed")).toBe("false");
+
+    buttonByTitle(target, "Play").click();
+    await flushUi();
+    expect(created.gains[0].gain.value).toBeCloseTo(0.45);
+
+    muteButton.click();
+    await flushUi();
+    expect(created.gains[0].gain.value).toBe(0);
+    expect(target.querySelector(".bds-midi-volume-slider").value).toBe("0");
+    expect(appState.settings.midiVolume).toBe(0);
+
+    buttonByTitle(target, "Unmute").click();
+    await flushUi();
+    expect(created.gains[0].gain.value).toBeCloseTo(0.45);
+    expect(appState.settings.midiVolume).toBeCloseTo(0.5);
+    cleanup();
+  });
+
+  it("shares one level between cards", async () => {
+    const first = render(SCORE);
+    const second = render(SCORE);
+    await flushUi();
+
+    const slider = first.target.querySelector(".bds-midi-volume-slider");
+    slider.value = "20";
+    slider.dispatchEvent(new Event("input", { bubbles: true }));
+    slider.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushUi();
+
+    expect(appState.settings.midiVolume).toBeCloseTo(0.2);
+
+    // The settings event is what carries the change to the other card.
+    window.dispatchEvent(new CustomEvent("bds:settingsChanged"));
+    await flushUi();
+
+    expect(second.target.querySelector(".bds-midi-volume-slider").value).toBe("20");
+    first.cleanup();
+    second.cleanup();
   });
 });
