@@ -749,6 +749,28 @@
       "expand": "Expand chart",
       "collapse": "Collapse chart"
     },
+    "midiCard": {
+      "defaultTitle": "MIDI Composition",
+      "play": "Play",
+      "pause": "Pause",
+      "seek": "Timeline — click or use the arrow keys to seek",
+      "loop": "Loop",
+      "downloadMidi": "Download .mid",
+      "viewNotation": "View notation",
+      "hideNotation": "Hide notation",
+      "notationLabel": "Note notation",
+      "copyNotation": "Copy",
+      "copied": "Copied!",
+      "trackOne": "{{count}} track",
+      "trackMany": "{{count}} tracks",
+      "noteOne": "{{count}} note",
+      "noteMany": "{{count}} notes",
+      "untitledTrack": "Track {{index}}",
+      "renderError": "Could not read this score",
+      "emptyHint": "No notes found. Expected lines such as \"tempo: 120\", \"track Melody instrument=piano\" or \"C4/4 E4/4 G4/2\".",
+      "lineError": "Line {{line}}: {{message}}",
+      "audioUnavailable": "Audio playback is not available here — you can still download the .mid file."
+    },
     "previewPanel": {
       "close": "Close",
       "download": "Download .html"

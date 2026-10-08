@@ -745,6 +745,28 @@
       "expand": "گسترش نمودار",
       "collapse": "جمع کردن نمودار"
     },
+    "midiCard": {
+      "defaultTitle": "آهنگ MIDI",
+      "play": "پخش",
+      "pause": "مکث",
+      "seek": "خط زمانی — برای پرش کلیک کنید یا از کلیدهای جهت استفاده کنید",
+      "loop": "تکرار",
+      "downloadMidi": "دانلود .mid",
+      "viewNotation": "نمایش نت",
+      "hideNotation": "پنهان کردن نت",
+      "notationLabel": "نت‌نویسی",
+      "copyNotation": "کپی",
+      "copied": "کپی شد!",
+      "trackOne": "{{count}} ترک",
+      "trackMany": "{{count}} ترک",
+      "noteOne": "{{count}} نت",
+      "noteMany": "{{count}} نت",
+      "untitledTrack": "ترک {{index}}",
+      "renderError": "این قطعه خوانده نشد",
+      "emptyHint": "هیچ نتی یافت نشد. خطوطی مانند «tempo: 120»، «track Melody instrument=piano» یا «C4/4 E4/4 G4/2» انتظار می‌رود.",
+      "lineError": "خط {{line}}: {{message}}",
+      "audioUnavailable": "پخش صدا در این محیط در دسترس نیست — همچنان می‌توانید فایل .mid را دانلود کنید."
+    },
     "previewPanel": {
       "close": "بستن",
       "download": "دانلود .html"

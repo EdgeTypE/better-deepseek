@@ -357,7 +357,8 @@ export function normalizeTaggedCodeContent(content, tagName) {
     name === "character_create" ||
     name === "skill_create" ||
     name === "auto:code_runner" ||
-    name === "chart"
+    name === "chart" ||
+    name === "midi"
   ) {
     output = unwrapMarkdownCodeFence(output);
   }

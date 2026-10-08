@@ -31,6 +31,7 @@ const RENDERABLE_TOOLS = new Set([
   "excel",
   "docx",
   "chart",
+  "midi",
   "ask_question",
   "character_create",
   "skill_create",

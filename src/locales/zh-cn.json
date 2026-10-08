@@ -745,6 +745,28 @@
       "expand": "展开图表",
       "collapse": "折叠图表"
     },
+    "midiCard": {
+      "defaultTitle": "MIDI 乐曲",
+      "play": "播放",
+      "pause": "暂停",
+      "seek": "时间轴 — 点击或使用方向键跳转",
+      "loop": "循环",
+      "downloadMidi": "下载 .mid",
+      "viewNotation": "查看记谱",
+      "hideNotation": "隐藏记谱",
+      "notationLabel": "记谱文本",
+      "copyNotation": "复制",
+      "copied": "已复制！",
+      "trackOne": "{{count}} 个声部",
+      "trackMany": "{{count}} 个声部",
+      "noteOne": "{{count}} 个音符",
+      "noteMany": "{{count}} 个音符",
+      "untitledTrack": "声部 {{index}}",
+      "renderError": "无法解析这段乐谱",
+      "emptyHint": "未找到音符。应使用类似 \"tempo: 120\"、\"track Melody instrument=piano\" 或 \"C4/4 E4/4 G4/2\" 的行。",
+      "lineError": "第 {{line}} 行：{{message}}",
+      "audioUnavailable": "当前环境无法播放音频 — 仍可下载 .mid 文件。"
+    },
     "previewPanel": {
       "close": "关闭",
       "download": "下载 .html 文件"

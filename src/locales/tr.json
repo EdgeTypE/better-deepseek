@@ -746,6 +746,28 @@
       "expand": "Grafiği genişlet",
       "collapse": "Grafiği daralt"
     },
+    "midiCard": {
+      "defaultTitle": "MIDI Bestesi",
+      "play": "Çal",
+      "pause": "Duraklat",
+      "seek": "Zaman çizelgesi — atlamak için tıklayın veya ok tuşlarını kullanın",
+      "loop": "Döngü",
+      "downloadMidi": ".mid indir",
+      "viewNotation": "Notayı göster",
+      "hideNotation": "Notayı gizle",
+      "notationLabel": "Nota yazımı",
+      "copyNotation": "Kopyala",
+      "copied": "Kopyalandı!",
+      "trackOne": "{{count}} kanal",
+      "trackMany": "{{count}} kanal",
+      "noteOne": "{{count}} nota",
+      "noteMany": "{{count}} nota",
+      "untitledTrack": "Kanal {{index}}",
+      "renderError": "Bu beste okunamadı",
+      "emptyHint": "Nota bulunamadı. \"tempo: 120\", \"track Melody instrument=piano\" veya \"C4/4 E4/4 G4/2\" gibi satırlar bekleniyor.",
+      "lineError": "Satır {{line}}: {{message}}",
+      "audioUnavailable": "Bu ortamda ses çalma kullanılamıyor — .mid dosyasını yine de indirebilirsiniz."
+    },
     "previewPanel": {
       "close": "Kapat",
       "download": ".html İndir"

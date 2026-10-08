@@ -746,6 +746,28 @@
       "expand": "Развернуть график",
       "collapse": "Свернуть график"
     },
+    "midiCard": {
+      "defaultTitle": "MIDI-композиция",
+      "play": "Играть",
+      "pause": "Пауза",
+      "seek": "Шкала времени — щёлкните или используйте стрелки для перемотки",
+      "loop": "Повтор",
+      "downloadMidi": "Скачать .mid",
+      "viewNotation": "Показать ноты",
+      "hideNotation": "Скрыть ноты",
+      "notationLabel": "Запись нот",
+      "copyNotation": "Копировать",
+      "copied": "Скопировано!",
+      "trackOne": "{{count}} дорожка",
+      "trackMany": "{{count}} дорожек",
+      "noteOne": "{{count}} нота",
+      "noteMany": "{{count}} нот",
+      "untitledTrack": "Дорожка {{index}}",
+      "renderError": "Не удалось прочитать эту партитуру",
+      "emptyHint": "Ноты не найдены. Ожидаются строки вида «tempo: 120», «track Melody instrument=piano» или «C4/4 E4/4 G4/2».",
+      "lineError": "Строка {{line}}: {{message}}",
+      "audioUnavailable": "Воспроизведение звука здесь недоступно — файл .mid всё равно можно скачать."
+    },
     "previewPanel": {
       "close": "Закрыть",
       "download": "Скачать .html"
