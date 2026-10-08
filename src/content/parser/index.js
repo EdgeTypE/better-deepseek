@@ -80,6 +80,12 @@ function stripMarkdownLinks(text) {
 /**
  * Compute ranges of fenced code blocks and inline code in text.
  * Used to exclude BDS tags inside code blocks from tool processing.
+ *
+ * Returned in document order. Fences are collected first and inline spans
+ * second, so the concatenation is not ordered by position on its own — and the
+ * callers that splice the text assume ascending, non-overlapping ranges. An
+ * out-of-order range makes `substring(lastPos, start)` swap its arguments and
+ * re-emit everything between them, duplicating the message body (issue #188).
  */
 function computeCodeBlockRanges(text) {
   const ranges = [];
@@ -102,7 +108,7 @@ function computeCodeBlockRanges(text) {
     }
   }
 
-  return ranges;
+  return ranges.sort((a, b) => a.start - b.start);
 }
 
 /**
@@ -685,8 +691,14 @@ export function parseBdsMessage(rawText, isSettled = false) {
     let protectedVT = '';
     let lastPos = 0;
     for (const { start, end } of vtRanges) {
-      protectedVT += visibleText.substring(lastPos, start);
-      const codeContent = visibleText.substring(start, end);
+      // Ranges arrive in document order, so `start` is normally at or past
+      // `lastPos`. `substring` swaps its arguments when it is not, re-emitting
+      // the span between them — trimming the overlap keeps a stale range from
+      // duplicating the message body (issue #188).
+      const from = Math.max(start, lastPos);
+      if (end <= from) continue;
+      protectedVT += visibleText.substring(lastPos, from);
+      const codeContent = visibleText.substring(from, end);
       protectedVT += codeContent.replace(/<(\/?(?:BDS:|BetterDeepSeek))/gi, '&lt;$1');
       lastPos = end;
     }
