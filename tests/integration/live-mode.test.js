@@ -299,6 +299,57 @@ describe("Live Mode - disableDeepThinkIfActive & findDeepSeekStopButton", () => 
     expect(result).toBe(false);
   });
 
+  it("clicks the active DeepThink chip when its label and icon are localized (Lottie)", () => {
+    // Live Turkish DOM: Lottie icon (no static `M7.0643`) and no English label,
+    // so the chip is only identifiable by the icon's stable centre dot.
+    const btn = document.createElement("div");
+    btn.className = "f79352dc ds-toggle-button ds-toggle-button--m ds-toggle-button--selected";
+    btn.innerHTML = `
+      <div class="ds-toggle-button__icon"><div class="ds-icon">
+        <div class="ds-lottie-toggle-icon" aria-hidden="true">
+          <svg viewBox="0 0 16 16">
+            <path fill="rgb(15,17,20)" fill-opacity="1" d=" M8,6.769999980926514 C8.678836822509766,7.321163177490234"></path>
+            <path stroke-width="1.4" fill-opacity="0" d=" M10.730999946594238,5.269000053405762 C13.935999870300293,8.473999977111816"></path>
+          </svg>
+        </div>
+      </div></div>
+      <span>Derin Düşünme</span>
+    `;
+    let clicked = false;
+    btn.addEventListener("click", () => { clicked = true; });
+    document.body.appendChild(btn);
+
+    const result = disableDeepThinkIfActive();
+    expect(result).toBe(true);
+    expect(clicked).toBe(true);
+  });
+
+  it("never clicks the selected Search chip when DeepThink cannot be identified", () => {
+    // The Search chip is selected and shares every structural marker with
+    // DeepThink apart from its icon, so an icon miss must stay a no-op rather
+    // than fall back to "the selected mode chip".
+    const btn = document.createElement("div");
+    btn.className = "f79352dc ds-toggle-button ds-toggle-button--m ds-toggle-button--selected";
+    btn.innerHTML = `
+      <div class="ds-toggle-button__icon"><div class="ds-icon">
+        <div class="ds-lottie-toggle-icon" aria-hidden="true">
+          <svg viewBox="0 0 16 16">
+            <path stroke-width="1.4" fill-opacity="0" d=" M7.999599933624268,14.849200248718262 C9.598299980163574,11.78279972076416"></path>
+            <path stroke-width="1.4" fill-opacity="0" d=" M1.6399999856948853,8 C1.6399999856948853,8 14.359999656677246,8"></path>
+          </svg>
+        </div>
+      </div></div>
+      <span>Akıllı Arama</span>
+    `;
+    let clicked = false;
+    btn.addEventListener("click", () => { clicked = true; });
+    document.body.appendChild(btn);
+
+    const result = disableDeepThinkIfActive();
+    expect(result).toBe(false);
+    expect(clicked).toBe(false);
+  });
+
   it("finds stop button correctly", () => {
     const stopBtn = document.createElement("button");
     stopBtn.setAttribute("aria-label", "Stop generating");

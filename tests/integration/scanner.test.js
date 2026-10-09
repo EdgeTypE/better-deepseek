@@ -401,6 +401,81 @@ describe("scanner input controls", () => {
     expect(mountMock.mock.calls[0][0]).toBe(deepResearchToggleMock);
   });
 
+  it("mounts the composer chips in the mode row when the native toggle icons are Lottie and the labels are localized", async () => {
+    // Live Turkish DOM: the mode chips are Lottie-animated (no static
+    // `M7.0643` icon path) and carry no English label, so DeepThink cannot be
+    // identified by icon or text. The file input lives in a *separate* sibling
+    // cluster, which is what the chips used to fall back to.
+    document.body.innerHTML = `
+      <div id="composer">
+        <textarea id="chat-input" placeholder="Mesaj Gönder"></textarea>
+        <div id="mode-row">
+          <div tabindex="0" aria-pressed="false" class="f79352dc ds-toggle-button ds-toggle-button--m">
+            <div class="ds-toggle-button__icon">
+              <div class="ds-icon">
+                <div class="ds-lottie-toggle-icon" aria-hidden="true">
+                  <svg viewBox="0 0 16 16"><path d=" M8,6.769999980926514 C8.678836822509766,7.321163177490234"></path></svg>
+                </div>
+              </div>
+            </div>
+            <span>Derin Düşünme</span>
+          </div>
+          <div tabindex="0" aria-pressed="false" class="f79352dc ds-toggle-button ds-toggle-button--m">
+            <div class="ds-toggle-button__icon">
+              <div class="ds-icon">
+                <div class="ds-lottie-toggle-icon" aria-hidden="true">
+                  <svg viewBox="0 0 16 16"><path d=" M1.6399999856948853,8 C1.6399999856948853,8 14.359999656677246,8"></path></svg>
+                </div>
+              </div>
+            </div>
+            <span>Akıllı Arama</span>
+          </div>
+        </div>
+        <div id="attach-row">
+          <input type="file" multiple />
+        </div>
+      </div>
+    `;
+    const { scanInputArea } = await import("../../src/content/scanner.js");
+
+    scanInputArea();
+
+    const modeRow = document.querySelector("#mode-row");
+    const attachRow = document.querySelector("#attach-row");
+
+    expect(modeRow.querySelector(".bds-deep-research-mount")).toBeTruthy();
+    expect(modeRow.querySelector(".bds-deep-code-mount")).toBeTruthy();
+    expect(attachRow.querySelector(".bds-deep-research-mount")).toBeNull();
+    expect(attachRow.querySelector(".bds-deep-code-mount")).toBeNull();
+  });
+
+  it("re-homes the composer chips when they were mounted in the attach cluster", async () => {
+    document.body.innerHTML = `
+      <div id="composer">
+        <textarea id="chat-input" placeholder="Mesaj Gönder"></textarea>
+        <div id="mode-row">
+          <div tabindex="0" aria-pressed="false" class="ds-toggle-button ds-toggle-button--m">
+            <div class="ds-toggle-button__icon"><svg viewBox="0 0 16 16"><path d=" M8,6.769999980926514"></path></svg></div>
+            <span>Derin Düşünme</span>
+          </div>
+        </div>
+        <div id="attach-row">
+          <div class="bds-deep-research-mount" style="display: contents;"></div>
+          <input type="file" multiple />
+        </div>
+      </div>
+    `;
+    const { scanInputArea } = await import("../../src/content/scanner.js");
+
+    scanInputArea();
+
+    const modeRow = document.querySelector("#mode-row");
+    const attachRow = document.querySelector("#attach-row");
+
+    expect(attachRow.querySelector(".bds-deep-research-mount")).toBeNull();
+    expect(modeRow.querySelector(":scope > .bds-deep-research-mount")).toBeTruthy();
+  });
+
   it("rejects login/auth form — no deep research mount", async () => {
     document.body.innerHTML = `
       <div id="login-form">

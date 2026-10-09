@@ -25,6 +25,7 @@ import { injectShareDialogWarning } from "./dom/share-dialog-injector.js";
 import { setDeepResearchEnabled } from "./deep-research.js";
 import { setDeepCodeEnabled, loadDeepCodeState } from "./deep-code.js";
 import { resolveComposerVisibility } from "../lib/composer-visibility.js";
+import { isNativeComposerModeToggle } from "../lib/composer-dom.js";
 import { REMOTE_CONFIG_EVENT } from "../lib/remote-config.svelte.js";
 import { tryExecuteRawInput } from "./commands/executor.js";
 import { checkPendingHandoff } from "./commands/context-handoff.js";
@@ -750,6 +751,8 @@ function findDeepResearchControlsWrapper(fileInput, fallbackWrapper) {
 }
 
 function findNativePromptActionRow() {
+  // Native mode chips (DeepThink / Search) anchor the row. They are matched by
+  // structure rather than by icon or label — see src/lib/composer-dom.js.
   const editor = findComposerEditor();
   const controls = Array.from(
     document.querySelectorAll(
@@ -766,7 +769,7 @@ function findNativePromptActionRow() {
       continue;
     }
 
-    if (!isDeepThinkControl(control)) {
+    if (!isDeepThinkControl(control) && !isNativeComposerModeToggle(control)) {
       continue;
     }
 
@@ -811,20 +814,32 @@ function isAfterNode(reference, candidate) {
   return Boolean(reference.compareDocumentPosition(candidate) & following);
 }
 
+/**
+ * DeepThink-only icon signatures.
+ *
+ * `M7.0643` is the legacy static icon. DeepSeek has since moved the chip icons
+ * to Lottie animations (`.ds-lottie-toggle-icon`) whose rendered paths are
+ * rewritten on every frame, so that signature no longer appears in the live DOM.
+ * The one stable part of the DeepThink icon is its filled centre dot — the
+ * animated strokes around it change constantly, and the Search icon has no such
+ * dot, which is what tells the two chips apart without reading either label.
+ *
+ * A miss here is safe: Live Mode already forces `thinking_enabled: false` in the
+ * outgoing payload (see src/injected/payload-mutator.js), so this DOM click is
+ * UI hygiene. Clicking the *wrong* chip would be far worse than not clicking,
+ * which is why this stays icon-based instead of falling back to chip order.
+ */
+const DEEPTHINK_ICON_SELECTORS = [
+  'svg path[d*="M7.0643"]',
+  'svg path[d*="M8,6.769999980926514"]',
+];
+
 function isDeepThinkControl(control) {
-  // Match by class and SVG path (preferred, language-independent)
-  const hasToggleClass = control.classList?.contains("ds-toggle-button") || 
-                         control.querySelector?.(".ds-toggle-button");
-  if (hasToggleClass && control.querySelector?.('svg path[d*="M7.0643"]')) {
+  if (DEEPTHINK_ICON_SELECTORS.some((selector) => control.querySelector?.(selector))) {
     return true;
   }
 
-  // Fallback to direct SVG path match
-  if (control.querySelector?.('svg path[d*="M7.0643"]')) {
-    return true;
-  }
-
-  // Fallback for test environments (English label text)
+  // English label fallback (localized labels do not match)
   const text = normalizePromptControlText(control.textContent);
   const label = normalizePromptControlText(
     `${control.getAttribute("aria-label") || ""} ${control.getAttribute("title") || ""}`,

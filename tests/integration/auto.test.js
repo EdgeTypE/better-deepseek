@@ -603,6 +603,52 @@ describe("auto integration", () => {
     await expect(sendResult).resolves.toBe(true);
   });
 
+  it("never treats a localized native mode chip as the send button", async () => {
+    // The mode chip carries a localized label ("Akıllı Arama" instead of
+    // "Search"), so the English label list cannot exclude it. It is the last
+    // icon control in the composer here, which is the case the
+    // `allowGenericLastIcon` fallback would otherwise hand back as "the send
+    // button" — the send arrow itself uses a path no send-icon list knows.
+    document.body.innerHTML = `
+      <div id="composer">
+        <textarea id="chat-input"></textarea>
+        <input type="file" multiple />
+        <div id="send-cluster">
+          <button type="button" id="send-arrow"><svg><path d="M4 4h4v4"></path></svg></button>
+        </div>
+        <div id="mode-row">
+          <div role="button" tabindex="0" aria-pressed="true" class="f79352dc ds-toggle-button ds-toggle-button--m ds-toggle-button--selected" aria-label="Akıllı Arama">
+            <div class="ds-toggle-button__icon">
+              <div class="ds-lottie-toggle-icon" aria-hidden="true">
+                <svg viewBox="0 0 16 16"><path stroke-width="1.4" fill-opacity="0" d=" M1.6399999856948853,8 C1.6399999856948853,8 14.359999656677246,8"></path></svg>
+              </div>
+            </div>
+            <span>Akıllı Arama</span>
+          </div>
+        </div>
+      </div>
+    `;
+    const input = document.querySelector('input[type="file"]');
+    Object.defineProperty(input, "files", {
+      configurable: true,
+      writable: true,
+      value: [],
+    });
+    const chip = document.querySelector(".ds-toggle-button");
+    const send = document.querySelector("#send-arrow");
+    [chip, send].forEach((button) => {
+      button.click = vi.fn();
+    });
+
+    const { injectPureTextAndSend } = await importAutoModule();
+    const sendResult = injectPureTextAndSend("<BetterDeepSeek>\n[BDS:AUTO] Text transition\n</BetterDeepSeek>");
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(chip.click).not.toHaveBeenCalled();
+    expect(send.click).toHaveBeenCalledOnce();
+    await expect(sendResult).resolves.toBe(true);
+  });
+
   it("does not click a header share icon that uses a send-like paper-plane path", async () => {
     document.body.innerHTML = `
       <button type="button" id="header-share" aria-label="Share">

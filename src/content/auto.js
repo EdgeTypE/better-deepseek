@@ -17,6 +17,10 @@ import { PPTX_SKILL } from "../lib/office-skills/pptx.js";
 import { DOCX_SKILL } from "../lib/office-skills/docx.js";
 import { extractHttpUrl, normalizeHttpUrl } from "../lib/utils/url-normalizer.js";
 import { extractMcpResultText } from "../lib/mcp-result.js";
+import {
+  isBdsInjectedControl,
+  isNativeComposerModeToggle,
+} from "../lib/composer-dom.js";
 
 const TOOL_TO_SKILL = {
   PPTX: { tag: "pptx", skill: PPTX_SKILL },
@@ -994,6 +998,7 @@ function hasSendLikeIcon(button) {
 
 function isBdsControlButton(button) {
   return (
+    isBdsInjectedControl(button) ||
     button.classList.contains("bds-plus-btn") ||
     button.classList.contains("bds-deep-research-toggle") ||
     isBdsOwnedElement(button) ||
@@ -1001,9 +1006,23 @@ function isBdsControlButton(button) {
   );
 }
 
+/**
+ * Controls that must never be mistaken for the send button.
+ *
+ * The label checks below only ever matched DeepSeek's English (and, for "send",
+ * Chinese) wording, so in any other locale a native attach / mode chip stayed in
+ * the candidate list and the `allowGenericLastIcon` fallback in
+ * `findIconOnlySendButtonInRoot` could hand back a control that is not the send
+ * button. Structure comes first now — the native mode chips via
+ * `isNativeComposerModeToggle` and anything injected via `isBdsControlButton` —
+ * and the labels stay as a last-resort net for native buttons we cannot identify
+ * structurally (the primary send detection is icon-path based and already
+ * locale-independent; see `hasKnownSendIconPath`).
+ */
 function isNonSendComposerControl(button, label) {
   return (
     isBdsControlButton(button) ||
+    isNativeComposerModeToggle(button) ||
     label.includes("attach") ||
     label.includes("upload") ||
     label.includes("file") ||
