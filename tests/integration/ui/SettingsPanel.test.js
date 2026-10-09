@@ -430,6 +430,52 @@ describe("SettingsPanel import-all compatibility", () => {
     );
     cleanup();
   });
+
+  it("overrides composer button visibility and persists the tri-state value", async () => {
+    const { target, cleanup } = renderSvelte(SettingsPanel);
+    await flushUi();
+
+    // 3 top-level buttons (attach menu, DeepResearch, DeepCode) + 9 attach items.
+    const rows = target.querySelectorAll(".bds-composer-row");
+    expect(rows.length).toBe(12);
+
+    // Nothing overridden yet → no reset affordances.
+    expect(target.querySelectorAll(".bds-composer-reset").length).toBe(0);
+
+    // Row index 2 is the Deep Code master toggle (locale-independent).
+    const deepCodeRow = rows[2];
+    const deepCodeInput = deepCodeRow.querySelector('input[type="checkbox"]');
+    expect(deepCodeInput.checked).toBe(true);
+
+    // Turning it off creates an explicit override.
+    deepCodeInput.checked = false;
+    deepCodeInput.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushUi();
+
+    expect(target.querySelectorAll(".bds-composer-reset").length).toBe(1);
+
+    target.querySelector("#bds-save-settings").click();
+    await flushUi();
+
+    expect(chrome.storage.local.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bds_settings: expect.objectContaining({
+          composerVisibility: expect.objectContaining({
+            deepCode: false,
+            attachMenu: null,
+            deepResearch: null,
+          }),
+        }),
+      }),
+    );
+
+    // Reset drops the override so the item follows remote config again.
+    target.querySelector(".bds-composer-reset").click();
+    await flushUi();
+    expect(target.querySelectorAll(".bds-composer-reset").length).toBe(0);
+    expect(rows[2].querySelector('input[type="checkbox"]').checked).toBe(true);
+    cleanup();
+  });
 });
 
 

@@ -18,6 +18,12 @@
   import { makeId } from "../../lib/utils/helpers.js";
   import SnippetList from "./SnippetList.svelte";
   import { collapseAllOpenReasoningBlocks, expandAllCollapsedReasoningBlocks } from "../message-processor.svelte.js";
+  import {
+    ATTACH_ITEM_KEYS,
+    normalizeComposerVisibility,
+    readComposerDefaults,
+  } from "../../lib/composer-visibility.js";
+  import { REMOTE_CONFIG_EVENT } from "../../lib/remote-config.svelte.js";
 
   let { onapiplayground, onimportdata, onsave } = $props();
 
@@ -267,6 +273,12 @@
   let mcpTestingIndex = $state(-1);
   let mcpInlineMaxChars = $state(Number(appState.settings.mcpInlineMaxChars) || 8000);
   let disableTipBox = $state(Boolean(appState.settings.disableTipBox));
+  // Composer-button visibility overrides (tri-state: null = follow remote).
+  let composerVisibility = $state(
+    normalizeComposerVisibility(appState.settings.composerVisibility),
+  );
+  let composerDefaults = $state(readComposerDefaults());
+  let subComposerOpen = $state(false);
   let advancedSearchQuery = $state("");
   let autocompleteSelectedIndex = $state(-1);
   let savedSectionStates = $state(null);
@@ -375,6 +387,78 @@
     searchProviderRows = next;
   }
 
+  // ── Composer button visibility ──
+  // Remote config (features.composerButtons) supplies the defaults; the user
+  // can override any of them. An override wins, so a later remote update does
+  // not clobber the user's choice. See src/lib/composer-visibility.js.
+
+  const COMPOSER_ITEM_LABEL_KEYS = {
+    showPlus: "attachMenu.buttonTitle",
+    showUploadFile: "attachMenu.uploadFile",
+    showUploadFolder: "attachMenu.uploadFolder",
+    showGithub: "attachMenu.githubRepo",
+    showWeb: "attachMenu.fetchWebPage",
+    showOther: "attachMenu.other",
+    showProject: "attachMenu.attachProject",
+    showVoice: "attachMenu.voicePrompt",
+    showLiveMode: "attachMenu.liveMode",
+  };
+
+  function composerItemLabel(key) {
+    return t(COMPOSER_ITEM_LABEL_KEYS[key] || key);
+  }
+
+  function composerSubKey(path) {
+    return path.startsWith("attachItems.") ? path.slice("attachItems.".length) : null;
+  }
+
+  /** Effective value: the override when set, otherwise the remote default. */
+  function composerEffective(path) {
+    const sub = composerSubKey(path);
+    if (sub !== null) {
+      return composerVisibility.attachItems[sub] ?? composerDefaults.attachItems[sub];
+    }
+    return composerVisibility[path] ?? composerDefaults[path];
+  }
+
+  /** True when the path is explicitly overridden (not following remote). */
+  function isComposerOverridden(path) {
+    const sub = composerSubKey(path);
+    if (sub !== null) return composerVisibility.attachItems[sub] !== null;
+    return composerVisibility[path] !== null;
+  }
+
+  function setComposerOverride(path, value) {
+    const next = normalizeComposerVisibility(composerVisibility);
+    const sub = composerSubKey(path);
+    if (sub !== null) next.attachItems[sub] = value;
+    else next[path] = value;
+    composerVisibility = next;
+  }
+
+  /** Flip the effective state — the first flip always creates an override. */
+  function toggleComposerOverride(path) {
+    setComposerOverride(path, !composerEffective(path));
+  }
+
+  /** Drop the override so the item follows remote config again. */
+  function resetComposerOverride(path) {
+    setComposerOverride(path, null);
+  }
+
+  /**
+   * Tooltip for the reset button. The remote default lives here (not in a
+   * per-row subtitle) so every row stays a single line — the switch already
+   * shows the effective state, which IS the remote default until overridden.
+   */
+  function composerResetTitle(path) {
+    const sub = composerSubKey(path);
+    const def = sub !== null
+      ? composerDefaults.attachItems[sub]
+      : composerDefaults[path];
+    return `${t('settings.composerResetDefault')} · ${def ? t('settings.composerDefaultOn') : t('settings.composerDefaultOff')}`;
+  }
+
   function captureFormSnapshot() {
     return JSON.stringify({
       autoFiles, autoZip, voiceMode, nativeVoice, voiceLanguage, autoSubmitVoice,
@@ -389,7 +473,8 @@
       searchProviders: enabledSearchProviderIds(),
       mcpInlineMaxChars,
       locale, syncLocale, collapseLongUserMessages, keepReasoningBlocksOpen,
-      loadAllHistoryOnSession, customCSS, disableTipBox
+      loadAllHistoryOnSession, customCSS, disableTipBox,
+      composerVisibility: normalizeComposerVisibility(composerVisibility)
     });
   }
 
@@ -738,6 +823,11 @@
     { key: 'subChat', labelKey: 'settings.subChat', settingKeys: [
       'settings.collapseLongUserMessages', 'settings.keepReasoningBlocksOpen', 'settings.loadAllHistoryOnSession', 'settings.chatSessionCap',
     ]},
+    { key: 'subComposer', labelKey: 'settings.subComposer', settingKeys: [
+      'settings.composerHint', 'settings.composerAttachMenu',
+      'settings.composerDeepResearch', 'settings.composerDeepCode',
+      'settings.composerAttachItems', 'settings.composerResetDefault',
+    ]},
     { key: 'subProjects', labelKey: 'settings.subProjects', settingKeys: [
       'settings.projectAutoContext', 'settings.processGitignore',
       'settings.autoDownloadFiles', 'settings.autoDownloadZip',
@@ -825,6 +915,7 @@
 
   function snapshotSectionStates() {
     return {
+      subComposer: subComposerOpen,
       subLanguage: subLanguageOpen, subChat: subChatOpen,
       subProjects: subProjectsOpen, subInjection: subInjectionOpen,
       subResearch: subResearchOpen, subVoice: subVoiceOpen,
@@ -836,6 +927,7 @@
 
   function restoreSectionStates(states) {
     if (!states) return;
+    subComposerOpen = states.subComposer;
     subLanguageOpen = states.subLanguage; subChatOpen = states.subChat;
     subProjectsOpen = states.subProjects; subInjectionOpen = states.subInjection;
     subResearchOpen = states.subResearch; subVoiceOpen = states.subVoice;
@@ -856,6 +948,7 @@
     wasSearchActive = searchActive;
     if (!searchActive) return;
     const matchingKeys = new Set(filteredSearchSections?.map(s => s.sectionKey) || []);
+    subComposerOpen = matchingKeys.has('subComposer');
     subLanguageOpen = matchingKeys.has('subLanguage');
     subChatOpen = matchingKeys.has('subChat');
     subProjectsOpen = matchingKeys.has('subProjects');
@@ -940,6 +1033,8 @@
     syncLocale = Boolean(appState.settings.syncLocale);
     customCSS = appState.settings.customCSS || "";
     disableTipBox = Boolean(appState.settings.disableTipBox);
+    composerVisibility = normalizeComposerVisibility(appState.settings.composerVisibility);
+    composerDefaults = readComposerDefaults();
     mcpInlineMaxChars = Number(appState.settings.mcpInlineMaxChars) || 8000;
     cssSnippets = [...appState.cssSnippets];
     if (snippetListRef) snippetListRef.refresh();
@@ -1048,6 +1143,12 @@
       lastCheckedDate = data.bds_locale_update_last_checked || "";
     });
     formSnapshot = captureFormSnapshot();
+    // Keep the "remote default" hints current while the panel is open.
+    const onRemoteConfig = () => {
+      composerDefaults = readComposerDefaults();
+    };
+    window.addEventListener(REMOTE_CONFIG_EVENT, onRemoteConfig);
+    return () => window.removeEventListener(REMOTE_CONFIG_EVENT, onRemoteConfig);
   });
 
   async function checkLanguageUpdates() {
@@ -1186,6 +1287,7 @@
     appState.settings.syncLocale = syncLocale;
     appState.settings.customCSS = customCSS;
     appState.settings.disableTipBox = disableTipBox;
+    appState.settings.composerVisibility = normalizeComposerVisibility(composerVisibility);
     appState.settings.mcpInlineMaxChars = Math.max(500, Math.min(100000, Math.round(Number(mcpInlineMaxChars) || 8000)));
 
     await chrome.storage.local.set({
@@ -1874,6 +1976,7 @@
   {/if}
   <div class="bds-advanced-inner">
     <!-- Each sub-section visibility is controlled by isSectionMatch() when search is active -->
+
     {#if isSectionMatch('subLanguage')}
     <button type="button" class="bds-sub-toggle" class:open={subLanguageOpen} onclick={() => subLanguageOpen = !subLanguageOpen} aria-expanded={subLanguageOpen}>
       {t('settings.subLanguage')}
@@ -1978,6 +2081,65 @@
             {t('settings.chatSessionCapHint')}
           </p>
         </div>
+      </div>
+    </div>
+    {/if}
+
+    {#if isSectionMatch('subComposer')}
+    <button type="button" class="bds-sub-toggle" class:open={subComposerOpen} onclick={() => subComposerOpen = !subComposerOpen} aria-expanded={subComposerOpen}>
+      {t('settings.subComposer')}
+      <span class="bds-chevron">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+    </button>
+    <div class="bds-sub-content" class:open={subComposerOpen}>
+      <div class="bds-sub-inner">
+        <p class="bds-composer-hint">{t('settings.composerHint')}</p>
+
+        {#each [
+          { path: 'attachMenu', label: t('settings.composerAttachMenu') },
+          { path: 'deepResearch', label: t('settings.composerDeepResearch') },
+          { path: 'deepCode', label: t('settings.composerDeepCode') },
+        ] as row (row.path)}
+          <div class="bds-toggle-row bds-composer-row">
+            <span class="bds-toggle-label">{row.label}</span>
+            <span class="bds-composer-controls">
+              {#if isComposerOverridden(row.path)}
+                <button type="button" class="bds-composer-reset" title={composerResetTitle(row.path)} aria-label={composerResetTitle(row.path)} onclick={() => resetComposerOverride(row.path)}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path>
+                  </svg>
+                </button>
+              {/if}
+              <label class="bds-switch">
+                <input type="checkbox" checked={composerEffective(row.path)} onchange={(e) => setComposerOverride(row.path, e.target.checked)} />
+                <span class="bds-switch-track"></span>
+              </label>
+            </span>
+          </div>
+        {/each}
+
+        <div class="bds-composer-items-title">{t('settings.composerAttachItems')}</div>
+        {#each ATTACH_ITEM_KEYS as key (key)}
+          <div class="bds-toggle-row bds-composer-row">
+            <span class="bds-toggle-label">{composerItemLabel(key)}</span>
+            <span class="bds-composer-controls">
+              {#if isComposerOverridden('attachItems.' + key)}
+                <button type="button" class="bds-composer-reset" title={composerResetTitle('attachItems.' + key)} aria-label={composerResetTitle('attachItems.' + key)} onclick={() => resetComposerOverride('attachItems.' + key)}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path>
+                  </svg>
+                </button>
+              {/if}
+              <label class="bds-switch">
+                <input type="checkbox" checked={composerEffective('attachItems.' + key)} onchange={(e) => setComposerOverride('attachItems.' + key, e.target.checked)} />
+                <span class="bds-switch-track"></span>
+              </label>
+            </span>
+          </div>
+        {/each}
       </div>
     </div>
     {/if}
@@ -2745,6 +2907,57 @@
 {/if}
 
 <style>
+  .bds-composer-hint {
+    font-size: 10px;
+    opacity: 0.55;
+    margin: 0 0 2px;
+    line-height: 1.35;
+  }
+
+  /* Single-line rows. The drawer's inner width is ~350px and every row here is
+     label + optional reset + switch, so no per-row subtitle — the remote
+     default is in the reset tooltip and the switch already shows the state. */
+  .bds-sub-content .bds-composer-row {
+    padding: 3px 0;
+  }
+
+  .bds-composer-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+  }
+
+  .bds-composer-reset {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    background: none;
+    border: 1px solid var(--bds-border);
+    border-radius: 5px;
+    color: var(--bds-text-secondary);
+    cursor: pointer;
+    flex: 0 0 auto;
+    transition: color var(--bds-transition), border-color var(--bds-transition);
+  }
+
+  .bds-composer-reset:hover {
+    color: var(--bds-text-primary);
+    border-color: var(--bds-text-secondary);
+  }
+
+  .bds-composer-items-title {
+    font-size: 10px;
+    font-weight: 600;
+    opacity: 0.55;
+    margin: 10px 0 1px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
   .bds-css-editor {
     border-bottom-left-radius: 0 !important;
     border-bottom-right-radius: 0 !important;

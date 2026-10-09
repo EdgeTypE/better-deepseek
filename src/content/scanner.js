@@ -24,6 +24,8 @@ import { hideTagsInSidebar, hideTagsInHeader, hideBdsTagsInPopovers } from "./ta
 import { injectShareDialogWarning } from "./dom/share-dialog-injector.js";
 import { setDeepResearchEnabled } from "./deep-research.js";
 import { setDeepCodeEnabled, loadDeepCodeState } from "./deep-code.js";
+import { resolveComposerVisibility } from "../lib/composer-visibility.js";
+import { REMOTE_CONFIG_EVENT } from "../lib/remote-config.svelte.js";
 import { tryExecuteRawInput } from "./commands/executor.js";
 import { checkPendingHandoff } from "./commands/context-handoff.js";
 import Autocomplete from "./commands/Autocomplete.svelte";
@@ -553,6 +555,10 @@ export function scanInputArea() {
     return;
   }
 
+  // Remote config supplies the defaults; settings.composerVisibility can
+  // override any of them (see src/lib/composer-visibility.js).
+  const visibility = resolveComposerVisibility(state.settings);
+
   const insertBeforeNode = findDeepResearchInsertAnchor(
     deepResearchWrapper,
     fileInput,
@@ -564,14 +570,16 @@ export function scanInputArea() {
     nativeButton.style.setProperty("display", "none", "important");
   }
 
-  const deepResearchMountPoint = ensureComposerMount(
-    deepResearchWrapper,
-    "bds-deep-research-mount",
-    ".bds-deep-research-toggle",
-    insertBeforeNode,
-  );
-  if (!deepResearchMountPoint.dataset.bdsMounted) {
-    mount(DeepResearchToggle, {
+  const deepResearchMountPoint = visibility.deepResearch
+    ? ensureComposerMount(
+        deepResearchWrapper,
+        "bds-deep-research-mount",
+        ".bds-deep-research-toggle",
+        insertBeforeNode,
+      )
+    : null;
+  if (deepResearchMountPoint && !deepResearchMountPoint.dataset.bdsMounted) {
+    deepResearchMountPoint.__bdsInstance = mount(DeepResearchToggle, {
       target: deepResearchMountPoint,
       props: {
         enabled: state.deepResearch.enabled,
@@ -579,10 +587,12 @@ export function scanInputArea() {
       },
     });
     deepResearchMountPoint.dataset.bdsMounted = "1";
+  } else if (!visibility.deepResearch) {
+    unmountComposerMount("bds-deep-research-mount");
   }
 
   const isAndroidTarget = process.env.BDS_TARGET === "android";
-  if (!isAndroidTarget) {
+  if (!isAndroidTarget && visibility.deepCode) {
     const deepCodeMountPoint = ensureComposerMount(
       deepResearchWrapper,
       "bds-deep-code-mount",
@@ -590,7 +600,7 @@ export function scanInputArea() {
       insertBeforeNode,
     );
     if (!deepCodeMountPoint.dataset.bdsMounted) {
-      mount(DeepCodeToggle, {
+      deepCodeMountPoint.__bdsInstance = mount(DeepCodeToggle, {
         target: deepCodeMountPoint,
         props: {
           enabled: state.deepCode.enabled,
@@ -600,6 +610,8 @@ export function scanInputArea() {
       });
       deepCodeMountPoint.dataset.bdsMounted = "1";
     }
+  } else if (!isAndroidTarget) {
+    unmountComposerMount("bds-deep-code-mount");
   }
 
   if (!fileInput || !wrapper) {
@@ -961,6 +973,28 @@ function findNativeFileInputTrigger(fileInput) {
   return isButtonLike ? candidate : null;
 }
 
+/**
+ * Tear down a composer mount's Svelte component without removing the mount
+ * element. Keeping the (now empty) element in place avoids DOM churn and keeps
+ * the insert-anchor bookkeeping stable; `ensureComposerMount` re-uses it on the
+ * next mount. Used when a composer button is hidden by remote config or by a
+ * user override.
+ */
+function unmountComposerMount(className) {
+  const el = document.querySelector(`.${className}`);
+  if (!el) return;
+  const instance = el.__bdsInstance;
+  if (instance) {
+    try {
+      unmount(instance);
+    } catch (e) {
+      console.warn(`[BDS] Failed to unmount ${className}:`, e);
+    }
+    el.__bdsInstance = null;
+  }
+  delete el.dataset.bdsMounted;
+}
+
 function ensureComposerMount(wrapper, className, descendantSelector, beforeNode) {
   let mountPoint = Array.from(wrapper.children).find((child) =>
     child.classList && child.classList.contains(className)
@@ -1171,6 +1205,12 @@ export function startUrlWatcher() {
   });
 
   window.addEventListener("bds:settingsChanged", () => {
+    scheduleScan();
+  });
+
+  // Remote config carries the composer-button defaults, so a config update
+  // must re-evaluate whether the DeepResearch / DeepCode chips should mount.
+  window.addEventListener(REMOTE_CONFIG_EVENT, () => {
     scheduleScan();
   });
 

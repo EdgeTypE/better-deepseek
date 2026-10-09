@@ -1,6 +1,10 @@
 <script>
   import { onMount } from "svelte";
   import { remoteConfig, getFlag, getConfig, detectModelType, REMOTE_CONFIG_EVENT } from "../../lib/remote-config.svelte.js";
+  import { currentTarget } from "../../lib/composer-visibility.js";
+
+  // Composer defaults are per build target; edit this bundle's branch.
+  const composerPrefix = `features.composerButtons.targets.${currentTarget()}`;
 
   let visible = $state(false);
   let currentModel = $state("—");
@@ -11,12 +15,6 @@
   function show() { visible = true; }
   function hide() { visible = false; }
   function toggle() { visible = !visible; }
-  function attachMenuModelKey(model) {
-    if (model === "vision") return "visionMode";
-    if (model === "expert") return "expertMode";
-    if (model === "deepthink") return "deepthinkMode";
-    return "instantMode";
-  }
 
   function refresh() {
     currentModel = detectModelType() || "unknown";
@@ -188,19 +186,19 @@
       {/if}
 
       {#if activeTab === "attach"}
+        <!-- Defaults for the composer-button visibility setting. The legacy
+             features.attachMenu.* keys are deprecated and no longer read, so
+             they are intentionally not exposed here. -->
         <div class="bds-cdgroup">
-          <div class="bds-cdgroup-title">AttachMenu — {currentModel} mode</div>
-          {#each ["enabled", "show", "showPlus", "showUploadFile", "showUploadFolder", "showGithub", "showWeb", "showProject", "showVoice"] as flag}
+          <div class="bds-cdgroup-title">Composer Buttons — {currentTarget()}</div>
+          {#each ["attachMenu", "deepResearch", "deepCode"] as flag}
             <div class="bds-cdrow">
               <span class="bds-cdkey">{keyDisplay(flag)}</span>
               <label class="bds-cdtoggle">
                 <input
                   type="checkbox"
-                  checked={getEffective("features.attachMenu." + attachMenuModelKey(currentModel) + "." + flag)}
-                  onchange={(e) => {
-                    const p = "features.attachMenu." + attachMenuModelKey(currentModel) + "." + flag;
-                    setBool(p, e.target.checked);
-                  }}
+                  checked={getEffective(composerPrefix + "." + flag)}
+                  onchange={(e) => setBool(composerPrefix + "." + flag, e.target.checked)}
                 />
                 <span class="bds-cdslider"></span>
               </label>
@@ -209,15 +207,15 @@
         </div>
 
         <div class="bds-cdgroup">
-          <div class="bds-cdgroup-title">Expert Mode (independent override)</div>
-          {#each ["show", "showPlus", "showUploadFile", "showUploadFolder", "showGithub", "showWeb", "showProject", "showVoice"] as flag}
+          <div class="bds-cdgroup-title">Attach Menu Items — {currentTarget()}</div>
+          {#each ["showPlus", "showUploadFile", "showUploadFolder", "showGithub", "showWeb", "showOther", "showProject", "showVoice", "showLiveMode"] as flag}
             <div class="bds-cdrow">
               <span class="bds-cdkey">{keyDisplay(flag)}</span>
               <label class="bds-cdtoggle">
                 <input
                   type="checkbox"
-                  checked={getEffective("features.attachMenu.expertMode." + flag)}
-                  onchange={(e) => setBool("features.attachMenu.expertMode." + flag, e.target.checked)}
+                  checked={getEffective(composerPrefix + ".attachItems." + flag)}
+                  onchange={(e) => setBool(composerPrefix + ".attachItems." + flag, e.target.checked)}
                 />
                 <span class="bds-cdslider"></span>
               </label>

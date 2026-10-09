@@ -6,9 +6,16 @@
  */
 
 import { DEFAULT_SETTINGS, EMBEDDED_PRICING, CHARS_PER_TOKEN, DEFAULT_REMOTE_CONFIG } from "../lib/constants.js";
+import { normalizeComposerVisibility } from "../lib/composer-visibility.js";
 
 const state = {
-  settings: { ...DEFAULT_SETTINGS },
+  settings: {
+    ...DEFAULT_SETTINGS,
+    // Clone the nested default so mutating one never corrupts DEFAULT_SETTINGS.
+    composerVisibility: normalizeComposerVisibility(
+      DEFAULT_SETTINGS.composerVisibility,
+    ),
+  },
   embeddedPricing: EMBEDDED_PRICING,
   charsPerToken: CHARS_PER_TOKEN,
   skills: [],

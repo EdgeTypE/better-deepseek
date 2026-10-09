@@ -27,10 +27,13 @@ await __BDS_CONFIG__.toggleDebugPanel();
 await __BDS_CONFIG__.raw();
 
 // Read a specific flag
-await __BDS_CONFIG__.getFlag("features.attachMenu.enabled");
+// Composer defaults are per build target — read this bundle's branch.
+await __BDS_CONFIG__.getFlag("features.composerButtons.targets.chrome.attachMenu");
 
 // Override a feature flag at runtime
-await __BDS_CONFIG__.applyRemote({ features: { attachMenu: { enabled: false } } });
+await __BDS_CONFIG__.applyRemote({
+  features: { composerButtons: { targets: { chrome: { deepCode: false } } } },
+});
 ```
 
 
@@ -107,7 +110,7 @@ Always mounted on init; hidden by default (`visible = false`). Toggle via `bds:t
 | Tab | Content |
 |-----|---------|
 | **Features** | All feature flags from `configSnapshot.features` with toggle switches. Nested objects render as indented sub-rows. Non-boolean values display as read-only text. |
-| **AttachMenu** | Current-model-aware attachMenu flags (derived from `detectModelType()`). Separate independent override section for Expert Mode. |
+| **AttachMenu** | Defaults for the composer-button visibility setting, scoped to this build target: `features.composerButtons.targets.<chrome\|firefox\|android>.*`. That branch holds the three top-level buttons (`attachMenu` / `deepResearch` / `deepCode`) plus the mode-agnostic attach items under `.attachItems.*`, and replaces the shared `features.composerButtons.*` keys entirely. The shared keys and the legacy `features.attachMenu.*` keys are deprecated (kept for older clients / unknown targets) and are not exposed here. |
 | **Raw JSON** | Pending overrides (left pane) + merged config snapshot (right pane). |
 
 ### State Machine

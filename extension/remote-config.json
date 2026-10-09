@@ -5,6 +5,48 @@
     "description": "Remote configuration for Better DeepSeek. Edit this file to control feature flags, DOM selectors, API paths, and other tunables without releasing a new extension version."
   },
   "features": {
+    "composerButtons": {
+      "attachMenu": true,
+      "deepResearch": true,
+      "deepCode": false,
+      "attachItems": {
+        "showPlus": true,
+        "showUploadFile": true,
+        "showUploadFolder": true,
+        "showGithub": true,
+        "showWeb": true,
+        "showOther": true,
+        "showProject": true,
+        "showVoice": true,
+        "showLiveMode": true
+      },
+      "targets": {
+        "chrome": {
+          "attachMenu": true, "deepResearch": true, "deepCode": false,
+          "attachItems": {
+            "showPlus": true, "showUploadFile": true, "showUploadFolder": true,
+            "showGithub": true, "showWeb": true, "showOther": true, "showProject": true,
+            "showVoice": true, "showLiveMode": true
+          }
+        },
+        "firefox": {
+          "attachMenu": true, "deepResearch": true, "deepCode": false,
+          "attachItems": {
+            "showPlus": true, "showUploadFile": true, "showUploadFolder": true,
+            "showGithub": true, "showWeb": true, "showOther": true, "showProject": true,
+            "showVoice": false, "showLiveMode": false
+          }
+        },
+        "android": {
+          "attachMenu": true, "deepResearch": true, "deepCode": false,
+          "attachItems": {
+            "showPlus": true, "showUploadFile": true, "showUploadFolder": true,
+            "showGithub": true, "showWeb": true, "showOther": true, "showProject": true,
+            "showVoice": false, "showLiveMode": true
+          }
+        }
+      }
+    },
     "attachMenu": {
       "enabled": true,
       "expertMode": { "show": true, "showPlus": true, "showUploadFile": true, "showUploadFolder": true, "showGithub": true, "showWeb": true, "showOther": true, "showProject": true, "showVoice": true },

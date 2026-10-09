@@ -36,6 +36,7 @@
   import { BRIDGE_EVENTS } from "../../lib/constants.js";
   import { t } from "../../lib/i18n.svelte.js";
   import { getFlag, getConfig, REMOTE_CONFIG_EVENT, detectModelType } from "../../lib/remote-config.svelte.js";
+  import { resolveComposerVisibility } from "../../lib/composer-visibility.js";
   import { VADProcessor } from "../vad-processor.js";
   import { findActiveFileInput } from "../scanner.js";
   import { sendFileWithMessage } from "../auto.js";
@@ -158,21 +159,26 @@
   let shouldShowOther = $state(true);
   let shouldShowProject = $state(true);
   let shouldShowVoice = $state(true);
+  let shouldShowLiveMode = $state(true);
 
   function updateVisibility() {
     try {
-      const enabled = getFlag("features.attachMenu.enabled");
-      const modelKey = currentModelType === "vision" ? "visionMode" : currentModelType === "expert" ? "expertMode" : currentModelType === "instant" ? "instantMode" : "deepthinkMode";
-      shouldShowAttach = !!(enabled && getFlag(`features.attachMenu.${modelKey}.show`));
+      // Remote config supplies the defaults; settings.composerVisibility can
+      // override any of them (see src/lib/composer-visibility.js). An explicit
+      // user override wins, so a remote update never flips a user's choice.
+      const vis = resolveComposerVisibility(appState.settings);
+      shouldShowAttach = vis.attachMenu;
       const show = shouldShowAttach;
-      shouldShowPlus = show && !!getFlag(`features.attachMenu.${modelKey}.showPlus`);
-      shouldShowUploadFile = show && !!getFlag(`features.attachMenu.${modelKey}.showUploadFile`);
-      shouldShowUploadFolder = show && !!getFlag(`features.attachMenu.${modelKey}.showUploadFolder`);
-      shouldShowGithub = show && !!getFlag(`features.attachMenu.${modelKey}.showGithub`);
-      shouldShowWeb = show && !!getFlag(`features.attachMenu.${modelKey}.showWeb`);
-      shouldShowOther = show && !!getFlag(`features.attachMenu.${modelKey}.showOther`);
-      shouldShowProject = show && !!getFlag(`features.attachMenu.${modelKey}.showProject`);
-      shouldShowVoice = show && !!getFlag(`features.attachMenu.${modelKey}.showVoice`);
+      shouldShowPlus = show && vis.attachItems.showPlus;
+      shouldShowUploadFile = show && vis.attachItems.showUploadFile;
+      shouldShowUploadFolder = show && vis.attachItems.showUploadFolder;
+      shouldShowGithub = show && vis.attachItems.showGithub;
+      shouldShowWeb = show && vis.attachItems.showWeb;
+      shouldShowOther = show && vis.attachItems.showOther;
+      shouldShowProject = show && vis.attachItems.showProject;
+      // Voice Prompt (mic) and Live Voice Mode are separate switches.
+      shouldShowVoice = show && vis.attachItems.showVoice;
+      shouldShowLiveMode = show && vis.attachItems.showLiveMode;
     } catch (e) {
       console.warn("[BDS] Failed to evaluate attach menu visibility:", e);
     }
@@ -632,12 +638,16 @@
       updateVisibility();
     };
     window.addEventListener(REMOTE_CONFIG_EVENT, onConfigOrStateUpdate);
+    // Settings carry the user overrides, so a save from the settings panel
+    // must re-evaluate visibility too.
+    window.addEventListener("bds:settingsChanged", onConfigOrStateUpdate);
 
     return () => {
       destroyed = true;
       document.removeEventListener("click", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
       window.removeEventListener(REMOTE_CONFIG_EVENT, onConfigOrStateUpdate);
+      window.removeEventListener("bds:settingsChanged", onConfigOrStateUpdate);
       if (appState.heroBarRef?.refresh === refreshProjectPanel) {
         appState.heroBarRef = null;
       }
@@ -1103,7 +1113,7 @@
   </button>
   {/if}
 
-  {#if shouldShowVoice && supportsVoiceInput}
+  {#if shouldShowLiveMode && supportsVoiceInput}
     <button
       class="bds-live-mode-btn"
       onclick={startLiveMode}
@@ -1129,7 +1139,9 @@
         <path d="M22 12h-2"></path>
       </svg>
     </button>
+  {/if}
 
+  {#if shouldShowVoice && supportsVoiceInput}
     <button
       class="bds-mic-btn {isRecording ? 'bds-recording' : ''}"
       onclick={toggleSpeechRecognition}

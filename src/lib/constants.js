@@ -1016,6 +1016,28 @@ export const DEFAULT_SETTINGS = {
   loadAllHistoryOnSession: false,
   showTimestamps: false,
   disableTipBox: false,
+  // Composer button visibility overrides. Each value is tri-state:
+  //   null  = follow remote config (features.composerButtons)
+  //   true  = force show
+  //   false = force hide
+  // An explicit override wins over remote config, so a remote update never
+  // clobbers a choice the user made. See src/lib/composer-visibility.js.
+  composerVisibility: {
+    attachMenu: null,
+    deepResearch: null,
+    deepCode: null,
+    attachItems: {
+      showPlus: null,
+      showUploadFile: null,
+      showUploadFolder: null,
+      showGithub: null,
+      showWeb: null,
+      showOther: null,
+      showProject: null,
+      showVoice: null,
+      showLiveMode: null,
+    },
+  },
 };
 
 // ── Default Remote Config (built-in fallback) ──
@@ -1025,6 +1047,71 @@ export const DEFAULT_SETTINGS = {
 export const DEFAULT_REMOTE_CONFIG = {
   features: {
     apiPlayground: { enabled: true },
+    // ── Composer button visibility (current model) ──
+    // Defaults for the advanced "composer buttons" setting. A user override
+    // (settings.composerVisibility) wins over these, so remote updates never
+    // clobber a user's explicit show/hide choice.
+    //
+    // The keys directly below are the *shared* defaults, used as the fallback
+    // when the running target has no branch of its own (an unrecognised/future
+    // target, or a stored config that predates the target layer). The client
+    // reads `targets.<target>` — that branch replaces these entirely.
+    composerButtons: {
+      attachMenu: true,
+      deepResearch: true,
+      deepCode: true,
+      attachItems: {
+        showPlus: true,
+        showUploadFile: true,
+        showUploadFolder: true,
+        showGithub: true,
+        showWeb: true,
+        showOther: true,
+        showProject: true,
+        showVoice: true,
+        showLiveMode: true,
+      },
+      // ── Per build target (chrome / firefox / android) ──
+      // The branch for this bundle replaces the shared defaults entirely, so
+      // every branch must list every key. composer-visibility.test.js asserts
+      // that, and that extension/remote-config.json mirrors these.
+      targets: {
+        chrome: {
+          attachMenu: true, deepResearch: true, deepCode: true,
+          attachItems: {
+            showPlus: true, showUploadFile: true, showUploadFolder: true,
+            showGithub: true, showWeb: true, showOther: true, showProject: true,
+            showVoice: true, showLiveMode: true,
+          },
+        },
+        // Firefox ships SpeechRecognition disabled by default
+        // (`dom.webspeech.recognition.enable`), so the mic and Live Voice Mode
+        // have no engine to talk to. Hide them rather than show dead buttons.
+        firefox: {
+          attachMenu: true, deepResearch: true, deepCode: true,
+          attachItems: {
+            showPlus: true, showUploadFile: true, showUploadFolder: true,
+            showGithub: true, showWeb: true, showOther: true, showProject: true,
+            showVoice: false, showLiveMode: false,
+          },
+        },
+        // Android app (WebView). Voice works through the native bridge
+        // (SpeechBridge.kt), so the buttons stay. Flip showVoice/showLiveMode
+        // here if the in-app controls ever prove redundant next to the
+        // keyboard's own dictation.
+        android: {
+          attachMenu: true, deepResearch: true, deepCode: true,
+          attachItems: {
+            showPlus: true, showUploadFile: true, showUploadFolder: true,
+            showGithub: true, showWeb: true, showOther: true, showProject: true,
+            showVoice: true, showLiveMode: true,
+          },
+        },
+      },
+    },
+    // ── Deprecated: superseded by composerButtons ──
+    // Kept in remote config (and here) so older clients keep working. The
+    // current client no longer reads these; do not add new keys here.
     attachMenu: {
       enabled: true,
       expertMode: { show: true, showPlus: true, showUploadFile: true, showUploadFolder: true, showGithub: true, showWeb: true, showOther: true, showProject: true, showVoice: true },

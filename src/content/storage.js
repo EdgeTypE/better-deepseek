@@ -17,6 +17,7 @@ import { makeId } from "../lib/utils/helpers.js";
 import { setHtmlToMarkdownMaxDepth } from "./dom/message-text.js";
 import { i18n } from "../lib/i18n.svelte.js";
 import { remoteConfig } from "../lib/remote-config.svelte.js";
+import { normalizeComposerVisibility } from "../lib/composer-visibility.js";
 
 // ── Load ──
 
@@ -51,6 +52,11 @@ export async function loadStateFromStorage() {
   };
   state.settings.customSystemPrompts = normalizeCustomSystemPrompts(state.settings.customSystemPrompts);
   state.settings.systemPromptEntries = normalizeSystemPromptEntries(state.settings.systemPromptEntries);
+  // Fresh object every load: the override map must never alias the shared
+  // DEFAULT_SETTINGS nested default.
+  state.settings.composerVisibility = normalizeComposerVisibility(
+    state.settings.composerVisibility,
+  );
 
   setHtmlToMarkdownMaxDepth(state.settings.htmlToMarkdownMaxDepth);
   setMaxChatSessions(state.settings.maxChatSessions);
@@ -517,6 +523,9 @@ export function bindStorageChangeListener() {
       };
       state.settings.customSystemPrompts = normalizeCustomSystemPrompts(state.settings.customSystemPrompts);
       state.settings.systemPromptEntries = normalizeSystemPromptEntries(state.settings.systemPromptEntries);
+      state.settings.composerVisibility = normalizeComposerVisibility(
+        state.settings.composerVisibility,
+      );
       setHtmlToMarkdownMaxDepth(state.settings.htmlToMarkdownMaxDepth);
       setMaxChatSessions(state.settings.maxChatSessions);
 

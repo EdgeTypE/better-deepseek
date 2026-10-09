@@ -73,6 +73,17 @@ import { resetAppState } from "../../helpers/app-state.js";
 import { renderSvelte, flushUi } from "../../helpers/svelte.js";
 import { dispatchPickResult } from "../../helpers/native-pick-protocol.js";
 
+/**
+ * Apply remote composer defaults to the test target's branch. Tests run with
+ * BDS_TARGET unset, which resolves to "chrome"; the per-target branch — not the
+ * shared keys — is what the client reads.
+ */
+function applyComposerDefaults(branch) {
+  return remoteConfig.applyRemote({
+    features: { composerButtons: { targets: { chrome: branch } } },
+  });
+}
+
 function setupNativeInput() {
   const nativeInput = document.createElement("input");
   nativeInput.type = "file";
@@ -208,27 +219,16 @@ describe("AttachMenu integration", () => {
     cleanup();
   });
 
-  it("uses visionMode visibility flags when Vision mode is selected", async () => {
-    document.body.insertAdjacentHTML("beforeend", `
-      <div role="radiogroup">
-        <div role="radio" data-model-type="instant" aria-checked="false">Instant</div>
-        <div role="radio" data-model-type="vision" aria-checked="true">Vision</div>
-      </div>
-    `);
-    remoteConfig.applyRemote({
-      features: {
-        attachMenu: {
-          visionMode: {
-            show: true,
-            showPlus: false,
-            showUploadFile: false,
-            showUploadFolder: false,
-            showGithub: false,
-            showWeb: false,
-            showProject: true,
-            showVoice: true,
-          },
-        },
+  it("reads attach-menu item defaults from features.composerButtons", async () => {
+    applyComposerDefaults({
+      attachItems: {
+        showPlus: false,
+        showUploadFile: false,
+        showUploadFolder: false,
+        showGithub: false,
+        showWeb: false,
+        showProject: true,
+        showVoice: true,
       },
     });
     const nativeInput = setupNativeInput();
@@ -240,6 +240,78 @@ describe("AttachMenu integration", () => {
     expect(target.querySelector(".bds-project-btn")).toBeTruthy();
     expect(target.querySelector(".bds-mic-btn")).toBeTruthy();
     expect(target.querySelector(".bds-plus-btn")).toBeNull();
+    cleanup();
+  });
+
+  it("controls Voice Prompt and Live Mode from separate settings", async () => {
+    // Remote defaults leave both on.
+    applyComposerDefaults({ attachItems: { showVoice: true, showLiveMode: true } });
+
+    // Hiding Live Mode must leave the mic (Voice Prompt) untouched.
+    state.settings.composerVisibility.attachItems.showLiveMode = false;
+    const live = renderSvelte(AttachMenu, { nativeInput: setupNativeInput() });
+    await flushModelWatcher();
+    expect(live.target.querySelector(".bds-live-mode-btn")).toBeNull();
+    expect(live.target.querySelector(".bds-mic-btn")).toBeTruthy();
+    live.cleanup();
+
+    // Hiding Voice Prompt must leave Live Mode untouched.
+    state.settings.composerVisibility.attachItems.showLiveMode = null;
+    state.settings.composerVisibility.attachItems.showVoice = false;
+    const voice = renderSvelte(AttachMenu, { nativeInput: setupNativeInput() });
+    await flushModelWatcher();
+    expect(voice.target.querySelector(".bds-mic-btn")).toBeNull();
+    expect(voice.target.querySelector(".bds-live-mode-btn")).toBeTruthy();
+    voice.cleanup();
+  });
+
+  it("hides the whole attach menu when the composerButtons default is off", async () => {
+    applyComposerDefaults({ attachMenu: false });
+    const nativeInput = setupNativeInput();
+    const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+
+    await flushModelWatcher();
+
+    expect(target.querySelector(".bds-attach-wrapper")).toBeNull();
+    cleanup();
+  });
+
+  it("a user override wins over remote config and survives later remote updates", async () => {
+    // Remote default says hide the attach menu.
+    applyComposerDefaults({ attachMenu: false });
+    // The user explicitly turns it on.
+    state.settings.composerVisibility.attachMenu = true;
+
+    const nativeInput = setupNativeInput();
+    const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+    await flushModelWatcher();
+    expect(target.querySelector(".bds-attach-wrapper")).toBeTruthy();
+
+    // Remote flips on, then off again — the override must not be clobbered.
+    applyComposerDefaults({ attachMenu: true });
+    await flushUi();
+    expect(target.querySelector(".bds-attach-wrapper")).toBeTruthy();
+
+    applyComposerDefaults({ attachMenu: false });
+    await flushUi();
+    expect(target.querySelector(".bds-attach-wrapper")).toBeTruthy();
+    cleanup();
+  });
+
+  it("follows remote config again once the user override is cleared", async () => {
+    applyComposerDefaults({ attachMenu: false });
+    state.settings.composerVisibility.attachMenu = true;
+
+    const nativeInput = setupNativeInput();
+    const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+    await flushModelWatcher();
+    expect(target.querySelector(".bds-attach-wrapper")).toBeTruthy();
+
+    // Clearing the override (null) restores following remote config.
+    state.settings.composerVisibility.attachMenu = null;
+    window.dispatchEvent(new CustomEvent("bds:settingsChanged"));
+    await flushUi();
+    expect(target.querySelector(".bds-attach-wrapper")).toBeNull();
     cleanup();
   });
 
@@ -926,19 +998,14 @@ describe("AttachMenu integration", () => {
       cleanup();
     });
 
-    it("keeps the Other entry when the flag is set before mount", async () => {
-      // Pinned to observed behavior: the dropdown is portaled to <body>, so a
-      // live remote-config change does not re-render its contents. This is NOT
-      // specific to `showOther` — `showGithub` behaves identically — and is a
-      // pre-existing limitation of the portal setup, not something this change
-      // introduced. Flag changes are evaluated on mount and on model switch.
-      await remoteConfig.applyRemote({
-        features: { attachMenu: { instantMode: { showOther: false } } },
-      });
+    it("honors the composerButtons default set before mount", async () => {
+      // Visibility no longer depends on the detected model type: the
+      // mode-agnostic composerButtons defaults apply to every mode.
+      await applyComposerDefaults({ attachItems: { showOther: false } });
       const { cleanup } = openMainDropdown();
       await flushModelWatcher();
 
-      expect(document.querySelector(".bds-attach-submenu")).toBeTruthy();
+      expect(document.querySelector(".bds-attach-submenu")).toBeNull();
       cleanup();
     });
   });
