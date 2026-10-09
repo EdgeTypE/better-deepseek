@@ -1,5 +1,27 @@
 export const VERSION_HISTORY = [
   {
+    version: "0.1.15",
+    date: "2026-10-09",
+    title: "BDS Live, Context Menu & Music",
+    features: [
+      {
+        type: "voice",
+        title: "BDS Live (Experimental)",
+        description: "You can now talk to DeepSeek and have a real conversation with it. We recommend using headphones."
+      },
+      {
+        type: "feature",
+        title: "Context Menu Actions",
+        description: "Added \"Ask DeepSeek\" and \"Summarize with DeepSeek\" to the browser's right-click menu."
+      },
+      {
+        type: "feature",
+        title: "Music Generation",
+        description: "BDS can now compose music and melodies for you. (Don't set your expectations too high!)"
+      }
+    ]
+  },
+  {
     version: "0.1.14",
     date: "2026-09-19",
     title: "Advanced Charts, Persian Language & Improvements",
