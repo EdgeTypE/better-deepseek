@@ -1054,6 +1054,33 @@ describe("message processor integration", () => {
       expect(speak.mock.calls[0][0].text).toBe("Hello there");
     });
 
+    it("speaks Web Speech in the OUTPUT language, independent of the input language", async () => {
+      const speak = stubSpeech();
+      // User speaks Persian but wants the reply spoken in English.
+      state.settings.voiceLanguage = "fa-IR";
+      state.settings.voiceOutputLanguage = "en-US";
+      mocks.isNativeVoiceSupported.mockReturnValue(false);
+      stubApiMessages(null);
+
+      await speakOnce(createMessageNode("Hello there"));
+
+      expect(speak).toHaveBeenCalledOnce();
+      expect(speak.mock.calls[0][0].lang).toBe("en-US");
+    });
+
+    it("falls back to the INPUT language for Web Speech when no output language is set", async () => {
+      const speak = stubSpeech();
+      state.settings.voiceLanguage = "tr-TR";
+      state.settings.voiceOutputLanguage = "";
+      mocks.isNativeVoiceSupported.mockReturnValue(false);
+      stubApiMessages(null);
+
+      await speakOnce(createMessageNode("Hello there"));
+
+      expect(speak).toHaveBeenCalledOnce();
+      expect(speak.mock.calls[0][0].lang).toBe("tr-TR");
+    });
+
     it("falls back to Web Speech when native rejects", async () => {
       const speak = stubSpeech();
       mocks.isNativeVoiceSupported.mockReturnValue(true);

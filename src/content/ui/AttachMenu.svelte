@@ -38,6 +38,7 @@
   import { getFlag, getConfig, REMOTE_CONFIG_EVENT, detectModelType } from "../../lib/remote-config.svelte.js";
   import { resolveComposerVisibility } from "../../lib/composer-visibility.js";
   import { VADProcessor } from "../vad-processor.js";
+  import { resolveInputLanguage } from "../live/tts-utils.js";
   import { findActiveFileInput } from "../scanner.js";
   import { sendFileWithMessage } from "../auto.js";
 
@@ -344,8 +345,8 @@
     restartAttempts = 0;
 
     recognition = new SpeechRecognition();
-    recognition.lang =
-      appState.settings.voiceLanguage || navigator.language || "en-US";
+    // STT language is the INPUT language.
+    recognition.lang = resolveInputLanguage(appState.settings);
     recognition.interimResults = true;
     recognition.continuous = false;
 

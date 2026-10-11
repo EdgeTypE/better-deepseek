@@ -35,7 +35,12 @@ import {
 } from "./dom/host.js";
 import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun, handleAutoMcpCall, handleAutoFileRead, handleAutoSearchInDirectory, handleAutoListDir, findChatEditor } from "./auto.js";
 import { handleManagedAutoContinuation, isManagedRunActive, trySynthesizeReport } from "./deep-research.js";
-import { cleanTextForSpeech, getBestVoice, softenPunctuationForSpeech } from "./live/tts-utils.js";
+import {
+  cleanTextForSpeech,
+  getBestVoice,
+  softenPunctuationForSpeech,
+  resolveOutputLanguage,
+} from "./live/tts-utils.js";
 import {
   isNativeVoiceSupported,
   speakNativeResponse,
@@ -1753,7 +1758,8 @@ function playVoiceResponseWithWebSpeech(text, epoch = voiceEpoch) {
   }
 
   const utterance = new SpeechSynthesisUtterance(softenPunctuationForSpeech(cleanText));
-  utterance.lang = state.settings.voiceLanguage || navigator.language || 'en-US';
+  // TTS uses the OUTPUT language; falls back to the STT/input language.
+  utterance.lang = resolveOutputLanguage(state.settings);
   utterance.rate = 1.05;
   utterance.pitch = 1.0;
   

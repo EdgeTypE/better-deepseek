@@ -25,9 +25,14 @@ import { extractMessageRawText } from "../dom/message-text.js";
 import { isSystemGenerating } from "../message-processor.svelte.js";
 import { devLog } from "../../lib/dev-log.js";
 import { isAndroidAecActive } from "../../platform/android-speech.js";
-import { cleanTextForSpeech, getBestVoice, softenPunctuationForSpeech } from "./tts-utils.js";
+import {
+  cleanTextForSpeech,
+  getBestVoice,
+  softenPunctuationForSpeech,
+  resolveInputLanguage,
+} from "./tts-utils.js";
 
-export { cleanTextForSpeech, getBestVoice, softenPunctuationForSpeech };
+export { cleanTextForSpeech, getBestVoice, softenPunctuationForSpeech, resolveInputLanguage };
 
 /** Upper bound for merging queued sentences into one utterance. Bigger = fewer
  *  hand-offs to the synthesizer = fewer inter-utterance gaps. */
@@ -134,7 +139,8 @@ export class LiveEngine {
 
   async start() {
     this.destroyed = false;
-    this.speechLang = state.settings.voiceLanguage || navigator.language || "en-US";
+    // STT language is the INPUT language; TTS uses resolveOutputLanguage separately.
+    this.speechLang = resolveInputLanguage(state.settings);
     state.liveMode.active = true;
     state.liveMode.status = "listening";
     state.liveMode.isMuted = false;

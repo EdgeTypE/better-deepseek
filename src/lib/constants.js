@@ -969,10 +969,18 @@ export const DEFAULT_SETTINGS = {
   // back to the Web Speech API whenever the native path is unavailable — no
   // AudioDecoder (Firefox), no ticket, unsupported language, or a stream error.
   nativeVoice: true,
+  // ── Speech-to-Text (INPUT) language ──
+  // Language the user speaks. Drives SpeechRecognition.lang in Live Mode and the
+  // attach-menu dictation mic. See also voiceOutputLanguage for TTS.
   voiceLanguage: (typeof navigator !== 'undefined' ? navigator.language : 'en-US'),
   // False until the user is asked to pick a speech language on first Live Mode /
   // voice-input use. The one-off prompt flips this so it never nags again.
   voiceLanguageChosen: false,
+  // ── Text-to-Speech (OUTPUT) language ──
+  // Language the assistant's reply is spoken in. Empty string means "same as
+  // voiceLanguage" (the historical single-language behaviour), so existing users
+  // see no change until they explicitly pick a different output voice.
+  voiceOutputLanguage: "",
   voiceURI: "",
   autoSubmitVoice: true,
   vadSilenceTimeout: 1100,

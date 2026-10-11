@@ -5,6 +5,7 @@ import state from "../../src/content/state.js";
 import { resetAppState } from "../helpers/app-state.js";
 import { DEFAULT_SYSTEM_PROMPT, LIVE_MODE_SYSTEM_PROMPT } from "../../src/lib/constants.js";
 import { cleanTextForSpeech, getBestVoice, softenPunctuationForSpeech, LiveEngine } from "../../src/content/live/live-engine.js";
+import { resolveInputLanguage, resolveOutputLanguage } from "../../src/content/live/tts-utils.js";
 import { buildHiddenPrefix, mutatePayload } from "../../src/injected/payload-mutator.js";
 import { disableDeepThinkIfActive, findDeepSeekStopButton } from "../../src/content/scanner.js";
 
@@ -640,3 +641,33 @@ describe("Live Mode - TTS Queue & Merging", () => {
   });
 });
 
+
+
+describe("Speech language resolution (STT vs TTS)", () => {
+  it("resolves the INPUT language from voiceLanguage", () => {
+    expect(resolveInputLanguage({ voiceLanguage: "fa-IR" })).toBe("fa-IR");
+  });
+
+  it("resolves the OUTPUT language from voiceOutputLanguage when set", () => {
+    const settings = { voiceLanguage: "fa-IR", voiceOutputLanguage: "en-US" };
+    expect(resolveInputLanguage(settings)).toBe("fa-IR");
+    expect(resolveOutputLanguage(settings)).toBe("en-US");
+  });
+
+  it("falls back to the INPUT language when voiceOutputLanguage is empty", () => {
+    const settings = { voiceLanguage: "fa-IR", voiceOutputLanguage: "" };
+    expect(resolveOutputLanguage(settings)).toBe("fa-IR");
+  });
+
+  it("falls back to the INPUT language when voiceOutputLanguage is undefined", () => {
+    const settings = { voiceLanguage: "tr-TR" };
+    expect(resolveOutputLanguage(settings)).toBe("tr-TR");
+  });
+
+  it("lets the user speak one language and hear another", () => {
+    const settings = { voiceLanguage: "fa-IR", voiceOutputLanguage: "en-US" };
+    expect(resolveInputLanguage(settings)).not.toBe(resolveOutputLanguage(settings));
+    expect(resolveInputLanguage(settings)).toBe("fa-IR");
+    expect(resolveOutputLanguage(settings)).toBe("en-US");
+  });
+});
