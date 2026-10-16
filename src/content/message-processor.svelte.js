@@ -701,6 +701,11 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
     if (node.querySelector(".ds-cursor") || node.classList.contains("_streaming")) {
       stateData.voiceStreamed = true;
     }
+    // Same signal gates memory writes below: a reply rendered from history
+    // must not re-apply (and so resurrect) memories the user already deleted.
+    if (stateData.voiceStreamed) {
+      stateData.liveObserved = true;
+    }
   }
 
   const now = Date.now();
@@ -968,7 +973,10 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
   // Check if we already have an overlay for this node
   const existing = messageOverlays.get(node);
 
-  if (parsed.memoryWrites.length) {
+  // Only apply memory writes from a reply we watched arrive. Opening an old
+  // chat renders already-complete replies; re-applying their memory_write tags
+  // would bring back entries the user deleted in Settings (#187).
+  if (parsed.memoryWrites.length && stateData.liveObserved) {
     upsertMemories(parsed.memoryWrites);
   }
 

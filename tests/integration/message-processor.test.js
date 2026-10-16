@@ -362,7 +362,7 @@ describe("message processor integration", () => {
         '<BDS:character_create name="Mage">wise</BDS:character_create>',
     );
 
-    processMessageNode(node);
+    streamReply(node);
 
     expect(mocks.upsertMemories).toHaveBeenCalledWith([
       { key: "user_name", value: "Alex", importance: "always" },
@@ -370,6 +370,18 @@ describe("message processor integration", () => {
     expect(mocks.upsertCharacters).toHaveBeenCalledWith([
       { name: "Mage", usage: "", content: "wise" },
     ]);
+  });
+
+  it("does not re-apply memory writes from a reply rendered from history (#187)", () => {
+    const node = createMessageNode(
+      '<BDS:memory_write key_name="user_name" value="Alex" importance="always" />',
+    );
+
+    processMessageNode(node);
+    vi.advanceTimersByTime(3000);
+    processMessageNode(node);
+
+    expect(mocks.upsertMemories).not.toHaveBeenCalled();
   });
 
   it("fires AUTO handlers only for the absolute last settled message", () => {
