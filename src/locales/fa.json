@@ -870,6 +870,7 @@
     "sidebarMenu": {
       "tags": "برچسب‌ها (BDS)",
       "exportChat": "خروجی گفتگو (BDS)",
+      "exportAll": "خروجی کل گفتگو (BDS)",
       "getBdsApp": "دریافت برنامه BDS",
       "whatsNew": "چه چیز جدید است؟"
     },

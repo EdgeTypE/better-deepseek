@@ -870,6 +870,7 @@
     "sidebarMenu": {
       "tags": "标签（BDS）",
       "exportChat": "导出聊天（BDS）",
+      "exportAll": "导出全部聊天（BDS）",
       "getBdsApp": "获取 BDS 应用",
       "whatsNew": "更新内容"
     },

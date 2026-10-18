@@ -441,6 +441,41 @@ test("exports a chat as markdown from the sidebar menu", async ({ page }) => {
   expect(artifact.suggestedFilename()).toMatch(/\.md$/);
 });
 
+test("exports the whole chat via Export All without opening selection mode", async ({ page }) => {
+  await page.goto("https://chat.deepseek.com/chat/s/mock-chat-1");
+  await page.waitForSelector("#bds-toggle");
+
+  await addUserMessage(page, "Does Export All need selection mode?");
+  await addAssistantMessage(page, "No — it downloads the entire transcript directly.");
+
+  // Hover and open chat menu
+  const chatItem = page.locator('.mock-chat-item:has(a[data-session-id="mock-chat-1"])');
+  await chatItem.hover();
+
+  const menuBtn = chatItem.locator('div._2090548');
+  await menuBtn.click({ force: true });
+  await page.waitForTimeout(500);
+
+  const exportAllOption = page.locator(".bds-export-all-option");
+  await expect(exportAllOption).toBeVisible({ timeout: 10000 });
+
+  // The format list stays collapsed until the entry is clicked
+  const markdownOption = page.locator('.bds-export-all-format[data-bds-format="markdown"]');
+  await expect(markdownOption).toBeHidden();
+
+  await exportAllOption.click();
+  await expect(markdownOption).toBeVisible();
+
+  const download = page.waitForEvent("download");
+  await markdownOption.click();
+  const artifact = await download;
+
+  expect(artifact.suggestedFilename()).toMatch(/\.md$/);
+
+  // The whole-session path never enters selection mode
+  await expect(page.locator(".bds-selection-bar")).toHaveCount(0);
+});
+
 test("hides the Get App promotional button when the Android hide script runs", async ({ page }) => {
   const container = page.locator('[data-testid="get-app-container"]');
   await expect(container).toBeVisible();

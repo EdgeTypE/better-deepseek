@@ -14,6 +14,14 @@ const SELECTION_ICON = `
   <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
 </svg>`;
 
+// Export All Icon
+const EXPORT_ALL_ICON = `
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3v12"/>
+  <polyline points="7 10 12 15 17 10"/>
+  <line x1="5" y1="21" x2="19" y2="21"/>
+</svg>`;
+
 // Tag Icon
 const TAG_ICON = `
 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -30,6 +38,17 @@ const DOWNLOAD_ICON = `
 </svg>`;
 
 const GET_BDS_APP_URL = "https://github.com/EdgeTypE/better-deepseek/releases";
+
+/**
+ * Whole-chat export formats offered under "Export All".
+ * Labels reuse the selection overlay's format row.
+ */
+const EXPORT_ALL_FORMATS = [
+  { format: "markdown", labelKey: "selectionOverlay.markdown" },
+  { format: "pdf", labelKey: "selectionOverlay.pdf" },
+  { format: "html", labelKey: "selectionOverlay.html" },
+  { format: "image", labelKey: "selectionOverlay.image" },
+];
 
 const WHATS_NEW_ICON = `
 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -132,6 +151,74 @@ async function handleExportAction(format) {
   }
 }
 
+/**
+ * Build the "Export All" entry and its collapsible format list.
+ * The parent only toggles the list; each format item exports the whole
+ * session through the same path as the direct sidebar exports, so "all"
+ * never depends on the selection flow.
+ *
+ * @returns {{ parent: HTMLElement, formats: HTMLElement[] }}
+ */
+function createExportAllOptions() {
+  const formats = EXPORT_ALL_FORMATS
+    .filter(({ format }) => format !== "pdf" || !hasAndroidBridge())
+    .map(({ format, labelKey }) => {
+      const option = createMenuOption(i18n.t(labelKey), "", "bds-export-all-format", () => {
+        // Dismiss the dropdown before exporting, same as the Tags action.
+        document.body.click();
+        handleExportAction(format);
+      });
+      option.dataset.bdsFormat = format;
+      option.style.display = "none";
+      return option;
+    });
+
+  const parent = createMenuOption(
+    i18n.t("sidebarMenu.exportAll"),
+    EXPORT_ALL_ICON,
+    "bds-export-all-option",
+    () => toggleExportAllList(parent)
+  );
+
+  const caret = document.createElement("span");
+  caret.className = "bds-export-all-caret";
+  caret.textContent = "›";
+  caret.style.cssText = "margin-left:6px; opacity:0.55; transition:transform 0.15s ease;";
+  parent.querySelector(".ds-dropdown-menu-option__label")?.appendChild(caret);
+
+  return { parent, formats };
+}
+
+/** Same gating the selection overlay uses for its PDF button. */
+function hasAndroidBridge() {
+  return typeof window.AndroidBridge?.downloadBlob === "function";
+}
+
+/** Collapse or expand the format list that follows the "Export All" entry. */
+function toggleExportAllList(parentOption) {
+  const expanded = parentOption.dataset.bdsExpanded === "true";
+  parentOption.dataset.bdsExpanded = String(!expanded);
+  parentOption.classList.toggle("bds-export-all-option--open", !expanded);
+
+  const caret = parentOption.querySelector(".bds-export-all-caret");
+  if (caret) caret.style.transform = expanded ? "" : "rotate(90deg)";
+
+  for (const option of formatOptionsAfter(parentOption)) {
+    option.style.display = expanded ? "none" : "";
+  }
+}
+
+/** Format options inserted directly after a parent option. */
+function formatOptionsAfter(parentOption) {
+  const options = [];
+  let sibling = parentOption.nextElementSibling;
+  while (sibling && sibling.classList.contains("bds-export-all-format")) {
+    options.push(sibling);
+    sibling = sibling.nextElementSibling;
+  }
+  return options;
+}
+
 function injectOptions(menu) {
   if (menu.querySelector(".bds-export-option")) return;
 
@@ -161,13 +248,19 @@ function injectOptions(menu) {
     handleExportAction("selection");
   });
 
-  // Insert: Tags first, then Export, both before Delete
+  const exportAll = createExportAllOptions();
+
+  // Insert: Tags first, then Export and Export All (with its format list), all before Delete
   tagsOption.style.borderTop = "1px solid rgba(0,0,0,0.05)";
   tagsOption.style.marginTop = "4px";
   tagsOption.style.paddingTop = "8px";
 
   menu.insertBefore(tagsOption, insertBefore);
   menu.insertBefore(exportOption, insertBefore);
+  menu.insertBefore(exportAll.parent, insertBefore);
+  for (const option of exportAll.formats) {
+    menu.insertBefore(option, insertBefore);
+  }
 }
 
 function injectSettingsDrawerOptions(menu) {

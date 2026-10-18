@@ -874,6 +874,7 @@
     "sidebarMenu": {
       "tags": "Tags (BDS)",
       "exportChat": "Export Chat (BDS)",
+      "exportAll": "Export All (BDS)",
       "getBdsApp": "Get BDS App",
       "whatsNew": "What's New?"
     },

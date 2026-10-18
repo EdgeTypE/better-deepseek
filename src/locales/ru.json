@@ -904,6 +904,7 @@
     "sidebarMenu": {
       "tags": "Теги (BDS)",
       "exportChat": "Экспорт чата (BDS)",
+      "exportAll": "Экспорт всего чата (BDS)",
       "getBdsApp": "Получить BDS App",
       "whatsNew": "Что нового?"
     },
