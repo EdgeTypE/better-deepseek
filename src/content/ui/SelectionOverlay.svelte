@@ -3,10 +3,15 @@
   import { exportSession, collectMessages } from "../tools/exporter.js";
   import { scheduleScan } from "../scanner.js";
   import { loadAllHistory } from "../load-all-history.js";
+  import { readCachedMessages, getSessionIdFromUrl } from "../tools/history-cache.js";
   import { t } from "../../lib/i18n.svelte.js";
+
+  /** How long Select All waits for the session's cache record to appear. */
+  const SELECT_ALL_CACHE_WAIT_MS = 300;
 
   let selectionMode = $state(appState.selectionMode);
   let selectedCount = $state(0);
+  let allSelected = $state(false);
 
   // Bridge presence is fixed at page load — not reactive.
   const isAndroid = typeof window !== "undefined" &&
@@ -19,7 +24,10 @@
     };
 
     const handleSelectionChange = () => {
-      selectedCount = appState.selectedMessageIds.size;
+      // A checkbox toggle can only address a rendered message, so it narrows a
+      // whole-session selection back to what the DOM shows.
+      narrowToRenderedMessages();
+      syncSelectionState();
     };
 
     window.addEventListener("bds:urlChanged", handleUrlChange);
@@ -32,7 +40,7 @@
         if (selectionMode) {
            document.body.classList.add("bds-selection-mode-active");
            // Sync count when opening
-           selectedCount = appState.selectedMessageIds.size;
+           syncSelectionState();
            // Ensure checkboxes are injected
            scheduleScan();
         } else {
@@ -53,6 +61,7 @@
     appState.selectedMessageIds.clear();
     selectionMode = false;
     selectedCount = 0;
+    allSelected = false;
     document.body.classList.remove("bds-selection-mode-active");
 
     // Uncheck all checkboxes
@@ -63,39 +72,92 @@
     window.dispatchEvent(new CustomEvent("bds:selectionChanged"));
   }
 
-  async function selectAll() {
-    const apiMessages = appState.settings.loadAllHistoryOnSession
-      ? await loadAllHistory()
-      : null;
+  function selectionCheckboxes() {
+    return Array.from(document.querySelectorAll(".bds-selection-checkbox"));
+  }
 
-    const checkboxes = document.querySelectorAll(".bds-selection-checkbox");
-    const apiIds = apiMessages?.length
-      ? apiMessages.map(m => m.message_id).filter(Boolean)
-      : [];
+  /**
+   * Is the selection the whole conversation rather than a set of rendered
+   * messages? Session ids come from the history cache / API; DOM nodes carry
+   * their own `msg-…` ids.
+   */
+  function isSessionSelection() {
+    const ids = Array.from(appState.selectedMessageIds);
+    return ids.length > 0 && ids.every(id => !String(id).startsWith("msg-"));
+  }
 
-    if (apiIds.length > 0) {
-      // API-based: use server message_ids (no duplication with DOM random IDs)
-      const allSelected = apiIds.every(id => appState.selectedMessageIds.has(id));
-      appState.selectedMessageIds.clear();
-      checkboxes.forEach(cb => { cb.checked = !allSelected; });
-      if (!allSelected) {
-        for (const id of apiIds) appState.selectedMessageIds.add(id);
+  function syncSelectionState() {
+    selectedCount = appState.selectedMessageIds.size;
+    allSelected = selectedCount > 0 &&
+      (isSessionSelection() || selectedCount === selectionCheckboxes().length);
+  }
+
+  /**
+   * Drop a whole-session selection back to the rendered messages once the user
+   * unticks one: a session-wide export would ignore that untick.
+   */
+  function narrowToRenderedMessages() {
+    if (!isSessionSelection()) return;
+
+    const checkboxes = selectionCheckboxes();
+    if (!checkboxes.length || checkboxes.every(cb => cb.checked)) return;
+
+    appState.selectedMessageIds.clear();
+    for (const cb of checkboxes) {
+      if (!cb.checked) continue;
+      const id = cb.getAttribute("data-bds-message-id");
+      if (id) appState.selectedMessageIds.add(id);
+    }
+  }
+
+  /**
+   * Ids of the whole conversation, oldest first: the IndexedDB history cache
+   * first (no network, full session), then the API when the user opted into
+   * loading history. Empty when neither is available, so the caller falls back
+   * to the rendered messages.
+   */
+  async function sessionMessageIds() {
+    const sessionId = getSessionIdFromUrl();
+    if (sessionId) {
+      const cached = await readCachedMessages(sessionId, { waitMs: SELECT_ALL_CACHE_WAIT_MS });
+      if (cached.status === "hit" && cached.chatMessages.length) {
+        return cached.chatMessages
+          .map(msg => msg.message_id)
+          .filter(id => id != null)
+          .map(String);
       }
-    } else {
-      // Fallback: DOM-only (original behavior)
-      const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-      checkboxes.forEach(cb => {
-        cb.checked = !allChecked;
-        const id = cb.getAttribute("data-bds-message-id");
-        if (!allChecked) {
-          appState.selectedMessageIds.add(id);
-        } else {
-          appState.selectedMessageIds.delete(id);
-        }
-      });
     }
 
-    selectedCount = appState.selectedMessageIds.size;
+    if (!appState.settings.loadAllHistoryOnSession) return [];
+
+    const apiMessages = await loadAllHistory();
+    return apiMessages?.length
+      ? apiMessages.map(msg => msg.message_id).filter(id => id != null).map(String)
+      : [];
+  }
+
+  async function selectAll() {
+    const checkboxes = selectionCheckboxes();
+    const deselecting = allSelected;
+
+    appState.selectedMessageIds.clear();
+    checkboxes.forEach(cb => { cb.checked = !deselecting; });
+
+    if (!deselecting) {
+      for (const id of await sessionMessageIds()) {
+        appState.selectedMessageIds.add(id);
+      }
+    }
+
+    // No session-wide history available: select what is rendered.
+    if (!appState.selectedMessageIds.size) {
+      for (const cb of checkboxes) {
+        const id = cb.getAttribute("data-bds-message-id");
+        if (cb.checked && id) appState.selectedMessageIds.add(id);
+      }
+    }
+
+    syncSelectionState();
     window.dispatchEvent(new CustomEvent("bds:selectionChanged"));
   }
 
@@ -105,8 +167,10 @@
       return;
     }
 
-    // exportSession already calls loadAllHistory() internally when setting is on
-    await exportSession(format, Array.from(appState.selectedMessageIds));
+    // Whole-session selection exports everything the history cache holds;
+    // a per-message selection keeps the id filter.
+    const ids = isSessionSelection() ? null : Array.from(appState.selectedMessageIds);
+    await exportSession(format, ids);
     cancelSelection();
   }
 </script>
@@ -122,7 +186,7 @@
           <span class="bds-selection-label">{t('selectionOverlay.selected')}</span>
         </div>
         <button class="bds-btn-ghost" onclick={selectAll}>
-          {document.querySelectorAll(".bds-selection-checkbox").length === selectedCount ? t('selectionOverlay.deselectAll') : t('selectionOverlay.selectAll')}
+          {allSelected ? t('selectionOverlay.deselectAll') : t('selectionOverlay.selectAll')}
         </button>
       </div>
 

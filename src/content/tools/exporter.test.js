@@ -43,6 +43,29 @@ describe("exporter helpers", () => {
     ]);
   });
 
+  it("strips control blocks from api and cached message content", async () => {
+    const { collectMessagesFromApi } = await import("./exporter.js");
+
+    const messages = collectMessagesFromApi([
+      {
+        message_id: 1,
+        role: "USER",
+        fragments: [
+          { type: "REQUEST", content: "<BetterDeepSeek>system</BetterDeepSeek>\n\nAsk" },
+        ],
+      },
+      {
+        message_id: 2,
+        role: "ASSISTANT",
+        fragments: [
+          { type: "RESPONSE", content: "<BDS:VISUALIZER>secret</BDS:VISUALIZER>\n\nAnswer" },
+        ],
+      },
+    ]);
+
+    expect(messages.map((msg) => msg.content)).toEqual(["Ask", "Answer"]);
+  });
+
   it("formats markdown with title and assistant sections", async () => {
     const { formatMarkdown } = await import("./exporter.js");
     const result = formatMarkdown([

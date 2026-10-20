@@ -1,6 +1,7 @@
 /**
  * Session Exporter Utility
- * Handles collecting messages and formatting them for export (MD, PDF).
+ * Collects messages (API / IndexedDB cache / DOM) and formats them for export
+ * (MD, PDF, HTML, Image).
  */
 
 import { collectMessageNodes, detectMessageRole } from "../scanner.js";
@@ -11,10 +12,14 @@ import { simpleHash } from "../../lib/utils/hash.js";
 import { t } from "../../lib/i18n.svelte.js";
 import html2canvas from "html2canvas";
 import { loadAllHistory, isLoadInProgress } from "../load-all-history.js";
+import { readCachedMessages, getSessionIdFromUrl } from "./history-cache.js";
 import state from "../state.js";
 
 const MAX_CANVAS_DIMENSION = 32767;
 const EXPORT_SCALE = 2;
+
+/** How long to wait for the session's IndexedDB cache record to appear. */
+const CACHE_WAIT_MS = 800;
 
 /**
  * Collect all messages from the current chat session.
@@ -96,10 +101,11 @@ export function extractBdsCards(node) {
  * @returns {Array<{role:string, content:string, id:string|null, node:null, bdsCards:[]}>}
  */
 export function collectMessagesFromApi(apiMessages, filterIds = null) {
-  const filterSet = filterIds ? new Set(filterIds) : null;
+  // Selection ids are strings; API/cache message ids can be numeric.
+  const filterSet = filterIds ? new Set(filterIds.map(String)) : null;
 
   return apiMessages
-    .filter(msg => !filterSet || filterSet.has(msg.message_id))
+    .filter(msg => !filterSet || (msg.message_id != null && filterSet.has(String(msg.message_id))))
     .map(msg => {
       const role = msg.role === "ASSISTANT" ? "assistant" : "user";
       const fragments = msg.fragments || [];
@@ -117,10 +123,15 @@ export function collectMessagesFromApi(apiMessages, filterIds = null) {
         content = msg.content;
       }
 
+      // History payloads are raw: they still carry the extension's own blocks
+      // (the <BetterDeepSeek> prompt, <BDS:…> tags) that the page hides in the
+      // DOM. Strip them so every format and role exports the visible transcript.
+      content = sanitizeVisibleText(content);
+
       return {
         role,
         content,
-        id: msg.message_id || null,
+        id: msg.message_id != null ? String(msg.message_id) : null,
         node: null,
         bdsCards: [],
       };
@@ -192,29 +203,77 @@ function isDarkMode() {
 }
 
 /**
+ * Read the session's cached history payload and return it only when it can be
+ * trusted: a hit that covers at least the rendered messages (mid-stream the
+ * cache can trail the DOM). `requireFullSnapshot: false` skips the coverage
+ * check for id-filtered exports, where a match is exact either way.
+ *
+ * @param {{ requireFullSnapshot?: boolean }} [options]
+ * @returns {Promise<Array|null>}
+ */
+async function readTrustedCacheMessages({ requireFullSnapshot = true } = {}) {
+  const sessionId = getSessionIdFromUrl();
+  if (!sessionId) return null;
+
+  const cached = await readCachedMessages(sessionId, { waitMs: CACHE_WAIT_MS });
+  if (cached.status !== "hit" || !cached.chatMessages.length) return null;
+
+  // Mid-stream the cache can trail the rendered DOM.
+  if (requireFullSnapshot && cached.chatMessages.length < collectMessageNodes().length) {
+    return null;
+  }
+
+  return cached.chatMessages;
+}
+
+/**
+ * Collect messages from DeepSeek's IndexedDB history cache, or null when it
+ * can't be trusted (DOM-scoped selection ids, no session in the URL, missing
+ * record, or fewer messages than the DOM has already rendered).
+ *
+ * @param {string[]|null} filterIds
+ * @returns {Promise<Array|null>}
+ */
+async function collectMessagesFromCache(filterIds = null) {
+  // "msg-…" ids only exist in the DOM.
+  if (filterIds?.length && filterIds.some(id => String(id).startsWith("msg-"))) {
+    return null;
+  }
+
+  const cachedMessages = await readTrustedCacheMessages({
+    requireFullSnapshot: !filterIds?.length,
+  });
+  if (!cachedMessages) return null;
+
+  const messages = collectMessagesFromApi(cachedMessages, filterIds);
+  return messages.length ? messages : null;
+}
+
+/**
  * Export the current session.
  * @param {'markdown' | 'pdf' | 'html' | 'image'} format 
  * @param {string[]} [filterIds] Optional list of message IDs to include
  */
 export async function exportSession(format, filterIds = null) {
-  let messages;
+  // DeepSeek's local cache holds the full session history.
+  let messages = await collectMessagesFromCache(filterIds);
 
-  // If load-on-demand is enabled, try to load all history first so the export
-  // includes messages that DeepSeek's lazy-load hasn't rendered yet.
-  if (state.settings.loadAllHistoryOnSession) {
+  // If the cache missed and load-on-demand is enabled, try the API so the
+  // export includes messages that DeepSeek's lazy-load hasn't rendered yet.
+  if ((!messages || !messages.length) && state.settings.loadAllHistoryOnSession) {
     const apiMessages = await loadAllHistory();
     if (apiMessages && apiMessages.length > 0) {
       messages = collectMessagesFromApi(apiMessages, filterIds);
     }
   }
 
-  // Fall back to DOM-based collection if API data wasn't available
+  // Fall back to DOM-based collection if API / cache data wasn't available
   if (!messages || !messages.length) {
     const hasDomIds = filterIds?.length ? filterIds.some(id => String(id).startsWith("msg-")) : true;
     if (hasDomIds) {
       messages = collectMessages(filterIds);
     } else {
-      console.warn("[BDS] API data loaded but no messages matched the filter. Try exporting without select-all, or reload the page.");
+      console.warn("[BDS] History data was available but no messages matched the filter. Try exporting without select-all, or reload the page.");
       return;
     }
   }
