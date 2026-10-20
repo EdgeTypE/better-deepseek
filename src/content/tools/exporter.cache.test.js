@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./history-cache.js", () => ({
   readCachedMessages: vi.fn(),
+  getSessionIdFromUrl: vi.fn(() => "test-session"),
 }));
 
 vi.mock("../scanner.js", () => ({

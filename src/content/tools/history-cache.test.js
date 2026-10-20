@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   HISTORY_CACHE_DB,
   HISTORY_CACHE_STORE,
+  getSessionIdFromUrl,
   readCachedMessages,
 } from "./history-cache.js";
 
@@ -292,5 +293,22 @@ describe("readCachedMessages", () => {
       expect(result.status).toBe("hit");
       expect(result.chatMessages.map((m) => m.message_id)).toEqual([1, 2, 3, 4, 5]);
     });
+  });
+});
+
+describe("getSessionIdFromUrl", () => {
+  it("extracts the session id from a chat URL", () => {
+    expect(getSessionIdFromUrl("https://chat.deepseek.com/chat/s/abc-123")).toBe("abc-123");
+  });
+
+  it("stops at a query string or hash", () => {
+    expect(getSessionIdFromUrl("https://chat.deepseek.com/chat/s/abc-123?foo=1")).toBe("abc-123");
+    expect(getSessionIdFromUrl("https://chat.deepseek.com/chat/s/abc-123#msg-2")).toBe("abc-123");
+  });
+
+  it("returns null off-session", () => {
+    expect(getSessionIdFromUrl("https://chat.deepseek.com/")).toBeNull();
+    expect(getSessionIdFromUrl("")).toBeNull();
+    expect(getSessionIdFromUrl(undefined)).toBeNull();
   });
 });

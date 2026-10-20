@@ -904,7 +904,6 @@
     "sidebarMenu": {
       "tags": "Etiketler (BDS)",
       "exportChat": "Sohbeti Dışa Aktar (BDS)",
-      "exportAll": "Tüm Sohbeti Dışa Aktar (BDS)",
       "getBdsApp": "BDS Uygulamasını İndir",
       "whatsNew": "Neler Yeni?"
     },

@@ -12,7 +12,7 @@ import { simpleHash } from "../../lib/utils/hash.js";
 import { t } from "../../lib/i18n.svelte.js";
 import html2canvas from "html2canvas";
 import { loadAllHistory, isLoadInProgress } from "../load-all-history.js";
-import { readCachedMessages } from "./history-cache.js";
+import { readCachedMessages, getSessionIdFromUrl } from "./history-cache.js";
 import state from "../state.js";
 
 const MAX_CANVAS_DIMENSION = 32767;
@@ -212,8 +212,7 @@ function isDarkMode() {
  * @returns {Promise<Array|null>}
  */
 async function readTrustedCacheMessages({ requireFullSnapshot = true } = {}) {
-  const match = String(location.href || "").match(/\/chat\/s\/([^/?#]+)/);
-  const sessionId = match ? match[1] : null;
+  const sessionId = getSessionIdFromUrl();
   if (!sessionId) return null;
 
   const cached = await readCachedMessages(sessionId, { waitMs: CACHE_WAIT_MS });

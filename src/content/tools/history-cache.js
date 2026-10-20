@@ -23,6 +23,19 @@ function sleep(ms) {
 }
 
 /**
+ * Session id of a `/chat/s/<id>` URL, or null off-session.
+ *
+ * Stops at `?`/`#` so the id matches the keys the rest of the extension uses.
+ *
+ * @param {string} [href]
+ * @returns {string|null}
+ */
+export function getSessionIdFromUrl(href = globalThis.location?.href) {
+  const match = String(href || "").match(/\/chat\/s\/([^/?#]+)/);
+  return match ? match[1] : null;
+}
+
+/**
  * Read the cached history payload for a session.
  *
  * @param {string} sessionId

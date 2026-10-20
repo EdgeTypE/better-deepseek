@@ -163,23 +163,21 @@ describe("SidebarMenuInjector", () => {
   });
 
   describe("menu injection via MutationObserver", () => {
-    it("injects Tags, Export, and Export All options when .ds-dropdown-menu is appended to DOM", async () => {
+    it("injects Tags and Export options when .ds-dropdown-menu is appended to DOM", async () => {
       const menu = buildDropdownMenu();
       await vi.waitFor(() => {
         expect(menu.querySelector(".bds-tags-option")).not.toBeNull();
         expect(menu.querySelector(".bds-export-option")).not.toBeNull();
-        expect(menu.querySelector(".bds-export-all-option")).not.toBeNull();
       });
     });
 
-    it("places Tags, Export, and Export All options before Delete", async () => {
+    it("places Tags and Export options before Delete", async () => {
       const menu = buildDropdownMenu();
       await vi.waitFor(() => expect(menu.querySelector(".bds-tags-option")).not.toBeNull());
 
       const opts = Array.from(menu.querySelectorAll(".ds-dropdown-menu-option"));
       const tagsIdx = opts.findIndex((o) => o.classList.contains("bds-tags-option"));
       const exportIdx = opts.findIndex((o) => o.classList.contains("bds-export-option"));
-      const exportAllIdx = opts.findIndex((o) => o.classList.contains("bds-export-all-option"));
       const deleteIdx = opts.findIndex((o) =>
         o.querySelector(".ds-dropdown-menu-option__label")?.textContent
           .toLowerCase()
@@ -188,30 +186,8 @@ describe("SidebarMenuInjector", () => {
 
       expect(tagsIdx).toBeGreaterThanOrEqual(0);
       expect(exportIdx).toBeGreaterThanOrEqual(0);
-      expect(exportAllIdx).toBeGreaterThan(exportIdx);
       expect(tagsIdx).toBeLessThan(deleteIdx);
       expect(exportIdx).toBeLessThan(deleteIdx);
-      expect(exportAllIdx).toBeLessThan(deleteIdx);
-    });
-
-    it("keeps the Export All format list between Export All and Delete", async () => {
-      const menu = buildDropdownMenu();
-      await vi.waitFor(() => expect(menu.querySelector(".bds-export-all-option")).not.toBeNull());
-
-      const opts = Array.from(menu.querySelectorAll(".ds-dropdown-menu-option"));
-      const exportAllIdx = opts.findIndex((o) => o.classList.contains("bds-export-all-option"));
-      const formatIdxs = opts
-        .map((o, i) => (o.classList.contains("bds-export-all-format") ? i : -1))
-        .filter((i) => i >= 0);
-      const deleteIdx = opts.findIndex((o) =>
-        o.querySelector(".ds-dropdown-menu-option__label")?.textContent
-          .toLowerCase()
-          .includes("delete")
-      );
-
-      expect(formatIdxs).toHaveLength(4);
-      expect(formatIdxs[0]).toBe(exportAllIdx + 1);
-      expect(Math.max(...formatIdxs)).toBeLessThan(deleteIdx);
     });
 
     it("does not inject BDS options twice into the same menu", async () => {
@@ -224,8 +200,6 @@ describe("SidebarMenuInjector", () => {
 
       expect(menu.querySelectorAll(".bds-tags-option")).toHaveLength(1);
       expect(menu.querySelectorAll(".bds-export-option")).toHaveLength(1);
-      expect(menu.querySelectorAll(".bds-export-all-option")).toHaveLength(1);
-      expect(menu.querySelectorAll(".bds-export-all-format")).toHaveLength(4);
     });
 
     it("injects into nested .ds-dropdown-menu added as child of another node", async () => {
@@ -236,131 +210,6 @@ describe("SidebarMenuInjector", () => {
       document.body.appendChild(wrapper);
 
       await vi.waitFor(() => expect(menu.querySelector(".bds-export-option")).not.toBeNull());
-    });
-  });
-
-  describe("Export All", () => {
-    async function openMenu() {
-      const menu = buildDropdownMenu();
-      await vi.waitFor(() => expect(menu.querySelector(".bds-export-all-option")).not.toBeNull());
-      return menu;
-    }
-
-    function mockLocation(href) {
-      const original = Object.getOwnPropertyDescriptor(window, "location");
-      Object.defineProperty(window, "location", {
-        configurable: true,
-        value: { href },
-      });
-      return () => Object.defineProperty(window, "location", original);
-    }
-
-    it("keeps the format list collapsed until Export All is clicked", async () => {
-      const menu = await openMenu();
-      const parent = menu.querySelector(".bds-export-all-option");
-      const formats = () => Array.from(menu.querySelectorAll(".bds-export-all-format"));
-
-      expect(formats().every((option) => option.style.display === "none")).toBe(true);
-
-      parent.click();
-      expect(formats().every((option) => option.style.display === "")).toBe(true);
-      expect(parent.dataset.bdsExpanded).toBe("true");
-
-      parent.click();
-      expect(formats().every((option) => option.style.display === "none")).toBe(true);
-      expect(parent.dataset.bdsExpanded).toBe("false");
-    });
-
-    it("offers every format except PDF on the Android bridge", async () => {
-      window.AndroidBridge = { downloadBlob: vi.fn() };
-      try {
-        const menu = await openMenu();
-
-        const formats = Array.from(menu.querySelectorAll(".bds-export-all-format"));
-        expect(formats.map((option) => option.dataset.bdsFormat)).toEqual([
-          "markdown",
-          "html",
-          "image",
-        ]);
-      } finally {
-        delete window.AndroidBridge;
-      }
-    });
-
-    it("exports the whole chat in the chosen format when the captured chat is open", async () => {
-      const url = "https://chat.deepseek.com/chat/s/current";
-      const restoreLocation = mockLocation(url);
-      try {
-        const { link } = buildChatLink(url);
-        link.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-
-        const menu = await openMenu();
-        menu.querySelector(".bds-export-all-option").click();
-        menu.querySelector('[data-bds-format="markdown"]').click();
-
-        await vi.waitFor(() =>
-          expect(exporterMocks.exportSession).toHaveBeenCalledWith("markdown")
-        );
-        expect(pendingExportMocks.setPendingExport).not.toHaveBeenCalled();
-      } finally {
-        restoreLocation();
-      }
-    });
-
-    it("queues a pending export when the chosen chat is not the open one", async () => {
-      const restoreLocation = mockLocation("https://chat.deepseek.com/chat/s/current");
-      try {
-        const { link } = buildChatLink("https://chat.deepseek.com/chat/s/other");
-        link.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-
-        const menu = await openMenu();
-        menu.querySelector(".bds-export-all-option").click();
-        menu.querySelector('[data-bds-format="pdf"]').click();
-
-        await vi.waitFor(() =>
-          expect(pendingExportMocks.setPendingExport).toHaveBeenCalledWith(
-            "https://chat.deepseek.com/chat/s/other",
-            "pdf"
-          )
-        );
-        expect(exporterMocks.exportSession).not.toHaveBeenCalled();
-      } finally {
-        restoreLocation();
-      }
-    });
-
-    it("keeps the original Export Chat entry on selection mode", async () => {
-      const url = "https://chat.deepseek.com/chat/s/current";
-      const restoreLocation = mockLocation(url);
-      try {
-        const { link } = buildChatLink(url);
-        link.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-
-        const menu = await openMenu();
-        const toggled = vi.fn();
-        window.addEventListener("bds:toggleSelectionMode", toggled);
-
-        menu.querySelector(".bds-export-option").click();
-
-        await vi.waitFor(() => expect(toggled).toHaveBeenCalled());
-        expect(exporterMocks.exportSession).not.toHaveBeenCalled();
-        expect(pendingExportMocks.setPendingExport).not.toHaveBeenCalled();
-      } finally {
-        restoreLocation();
-      }
-    });
-
-    it("warns when a format is chosen with no captured URL", async () => {
-      const menu = await openMenu();
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-      menu.querySelector(".bds-export-all-option").click();
-      menu.querySelector('[data-bds-format="markdown"]').click();
-
-      await new Promise((r) => setTimeout(r, 50));
-      expect(exporterMocks.exportSession).not.toHaveBeenCalled();
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("[BDS]"));
-      warnSpy.mockRestore();
     });
   });
 
