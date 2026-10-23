@@ -16,6 +16,7 @@
   import { openNativeFilePicker } from "../files/native-file-input.js";
   import { encryptData, decryptData } from "../../lib/utils/crypto.js";
   import { makeId } from "../../lib/utils/helpers.js";
+  import { triggerBlobDownload } from "../../lib/utils/download.js";
   import SnippetList from "./SnippetList.svelte";
   import { collapseAllOpenReasoningBlocks, expandAllCollapsedReasoningBlocks } from "../message-processor.svelte.js";
   import {
@@ -561,12 +562,12 @@
         blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       }
 
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `bds_backup_${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+      // Route through the shared helper: on Android a hand-rolled
+      // `<a download>` is a no-op (WebView has no DownloadListener for blob:
+      // URLs), so the backup silently vanished while the success toast still
+      // fired (#208). The helper hands the bytes to AndroidBridge.downloadBlob,
+      // which writes into MediaStore.Downloads.
+      triggerBlobDownload(blob, `bds_backup_${new Date().toISOString().slice(0, 10)}.json`);
 
       closeExportAllModal();
       if (appState.ui) appState.ui.showToast(t('drawer.exportDone'));
