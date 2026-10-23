@@ -80,6 +80,22 @@ describe("storage integration", () => {
     expect(state.savedItems[0].conversationTitle).toBe("Conv1");
   });
 
+  it("drops the retired collapse-long-user-messages setting on load", async () => {
+    setChromeStorage({
+      [STORAGE_KEYS.settings]: {
+        collapseLongUserMessages: false,
+        systemPromptTemplateVersion: SYSTEM_PROMPT_TEMPLATE_VERSION,
+        downloadBehaviorVersion: DOWNLOAD_BEHAVIOR_VERSION,
+      },
+    });
+
+    await loadStateFromStorage();
+
+    expect(state.settings).not.toHaveProperty("collapseLongUserMessages");
+    const stored = (await chrome.storage.local.get(STORAGE_KEYS.settings))[STORAGE_KEYS.settings];
+    expect(stored).not.toHaveProperty("collapseLongUserMessages");
+  });
+
   it("upgrades legacy system prompts and download behavior", async () => {
     setChromeStorage({
       [STORAGE_KEYS.settings]: {

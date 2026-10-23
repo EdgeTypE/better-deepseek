@@ -219,7 +219,6 @@
   );
   let tokenPriceDisplay = $state(Boolean(appState.settings.tokenPriceDisplay));
   let showTimestamps = $state(Boolean(appState.settings.showTimestamps));
-  let collapseLongUserMessages = $state(Boolean(appState.settings.collapseLongUserMessages));
   let keepReasoningBlocksOpen = $state(appState.settings.keepReasoningBlocksOpen ?? true);
   let loadAllHistoryOnSession = $state(Boolean(appState.settings.loadAllHistoryOnSession));
   let projectRagEnabled = $state(Boolean(appState.settings.projectRagEnabled));
@@ -472,7 +471,7 @@
       deepResearchDeepFetch,
       searchProviders: enabledSearchProviderIds(),
       mcpInlineMaxChars,
-      locale, syncLocale, collapseLongUserMessages, keepReasoningBlocksOpen,
+      locale, syncLocale, keepReasoningBlocksOpen,
       loadAllHistoryOnSession, customCSS, disableTipBox,
       composerVisibility: normalizeComposerVisibility(composerVisibility)
     });
@@ -821,7 +820,7 @@
       'settings.resetFactory', 'settings.preferredLang',
     ]},
     { key: 'subChat', labelKey: 'settings.subChat', settingKeys: [
-      'settings.collapseLongUserMessages', 'settings.keepReasoningBlocksOpen', 'settings.loadAllHistoryOnSession', 'settings.chatSessionCap',
+      'settings.keepReasoningBlocksOpen', 'settings.loadAllHistoryOnSession', 'settings.chatSessionCap',
     ]},
     { key: 'subComposer', labelKey: 'settings.subComposer', settingKeys: [
       'settings.composerHint', 'settings.composerAttachMenu',
@@ -1016,7 +1015,6 @@
     maxChatSessions = Number(appState.settings.maxChatSessions) || 500;
     tokenPriceDisplay = Boolean(appState.settings.tokenPriceDisplay);
     showTimestamps = Boolean(appState.settings.showTimestamps);
-    collapseLongUserMessages = Boolean(appState.settings.collapseLongUserMessages);
     keepReasoningBlocksOpen = appState.settings.keepReasoningBlocksOpen ?? true;
     loadAllHistoryOnSession = Boolean(appState.settings.loadAllHistoryOnSession);
     projectRagEnabled = Boolean(appState.settings.projectRagEnabled);
@@ -1266,7 +1264,6 @@
     const previousKeepReasoningBlocksOpen = appState.settings.keepReasoningBlocksOpen ?? true;
     appState.settings.tokenPriceDisplay = tokenPriceDisplay;
     appState.settings.showTimestamps = showTimestamps;
-    appState.settings.collapseLongUserMessages = collapseLongUserMessages;
     appState.settings.keepReasoningBlocksOpen = keepReasoningBlocksOpen;
     appState.settings.loadAllHistoryOnSession = loadAllHistoryOnSession;
     appState.settings.projectRagEnabled = projectRagEnabled;
@@ -2045,14 +2042,6 @@
     </button>
     <div class="bds-sub-content" class:open={subChatOpen}>
       <div class="bds-sub-inner">
-        <div class="bds-toggle-row">
-          <span class="bds-toggle-label">{t('settings.collapseLongUserMessages')}</span>
-          <label class="bds-switch">
-            <input id="bds-collapse-user-messages" type="checkbox" bind:checked={collapseLongUserMessages} />
-            <span class="bds-switch-track"></span>
-          </label>
-        </div>
-
         <div class="bds-toggle-row">
           <span class="bds-toggle-label">{t('settings.keepReasoningBlocksOpen')}</span>
           <label class="bds-switch">

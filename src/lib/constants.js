@@ -995,7 +995,6 @@ export const DEFAULT_SETTINGS = {
   locale: "en",
   syncLocale: true,
   processGitignoreOnUpload: true,
-  collapseLongUserMessages: true,
   keepReasoningBlocksOpen: true,
   injectSystemDateTime: true,
   skipDeletionConfirmation: false,
