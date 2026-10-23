@@ -1,6 +1,7 @@
 <script>
   import { marked } from "marked";
   import { triggerBlobDownload } from "../../lib/utils/download.js";
+  import { createPrintFrame } from "../../lib/utils/print-frame.js";
 
   let { runId = "", markdown = "" } = $props();
   let normalizedMarkdown = $derived(stripLeadingBlankLines(markdown));
@@ -123,19 +124,7 @@
 </body>
 </html>`;
 
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "none";
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write(printDoc);
-    doc.close();
+    const iframe = createPrintFrame(printDoc);
 
     iframe.contentWindow.focus();
 

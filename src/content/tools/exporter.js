@@ -8,6 +8,7 @@ import { collectMessageNodes, detectMessageRole } from "../scanner.js";
 import { extractMessageMarkdown, extractMessageRawText } from "../dom/message-text.js";
 import { sanitizeVisibleText } from "../parser/text-sanitizer.js";
 import { triggerTextDownload, triggerBlobDownload } from "../../lib/utils/download.js";
+import { createPrintFrame } from "../../lib/utils/print-frame.js";
 import { simpleHash } from "../../lib/utils/hash.js";
 import { t } from "../../lib/i18n.svelte.js";
 import html2canvas from "html2canvas";
@@ -303,18 +304,6 @@ export async function exportSession(format, filterIds = null) {
  * Export to PDF by creating a temporary window and printing.
  */
 function exportToPdf(messages, title, dark = false) {
-  // Use a hidden iframe to trigger the print dialog without a new tab
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
-  iframe.style.border = "none";
-  iframe.id = "bds-print-iframe";
-  
-  document.body.appendChild(iframe);
-
   const html = `
 <!DOCTYPE html>
 <html lang="en" class="${dark ? "dark" : ""}">
@@ -622,10 +611,7 @@ function exportToPdf(messages, title, dark = false) {
 </html>
   `;
 
-  const doc = iframe.contentWindow.document;
-  doc.open();
-  doc.write(html);
-  doc.close();
+  const iframe = createPrintFrame(html);
 
   // Wait for resources (fonts) and then print
   iframe.contentWindow.focus();
