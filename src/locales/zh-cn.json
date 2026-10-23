@@ -172,6 +172,8 @@
       "loadAllHistoryHint": "自动滚动至对话顶部以触发 DeepSeek 的懒加载机制，确保全部消息均可导出并纳入费用计算。处理长对话时可能较慢，默认关闭。",
       "showTimestamps": "显示消息时间戳",
       "showTimestampsHint": "在聊天中显示每条消息的精确收发时间。",
+      "contextMenuEnabled": "显示浏览器右键菜单项",
+      "contextMenuEnabledHint": "在浏览器右键菜单中添加“询问 DeepSeek”和“用 DeepSeek 总结”。关闭后菜单保持原样。",
       "save": "保存设置",
       "ragChunks": "RAG 最大注入片段数",
       "ragChunks3": "3 个片段（约 600 词）",

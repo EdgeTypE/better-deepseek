@@ -87,7 +87,14 @@ export async function updateContextMenuItems() {
   });
 
   const data = await chrome.storage.local.get("bds_settings");
-  const locale = resolveEffectiveLocale(data?.bds_settings);
+  const settings = data?.bds_settings || {};
+
+  // removeAll() above already dropped the items, so bailing out here is the
+  // whole "disabled" path: nothing is re-created and the next right-click
+  // shows the plain native menu. No browser restart required.
+  if (settings.contextMenuEnabled === false) return;
+
+  const locale = resolveEffectiveLocale(settings);
   const labels = getLocalizedLabels(locale);
 
   // 1. Text selection context: "Ask DeepSeek"
@@ -185,7 +192,8 @@ export function setupContextMenus() {
         const newSettings = changes.bds_settings.newValue || {};
         if (
           oldSettings.locale !== newSettings.locale ||
-          oldSettings.syncLocale !== newSettings.syncLocale
+          oldSettings.syncLocale !== newSettings.syncLocale ||
+          oldSettings.contextMenuEnabled !== newSettings.contextMenuEnabled
         ) {
           updateContextMenuItems();
         }

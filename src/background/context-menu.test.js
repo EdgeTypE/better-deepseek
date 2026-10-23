@@ -95,6 +95,23 @@ describe("context-menu", () => {
         expect.any(Function)
       );
     });
+
+    it("removes existing items and creates none when contextMenuEnabled is false", async () => {
+      setChromeStorage({
+        bds_settings: { locale: "en", syncLocale: false, contextMenuEnabled: false },
+      });
+      await updateContextMenuItems();
+
+      expect(chrome.contextMenus.removeAll).toHaveBeenCalled();
+      expect(chrome.contextMenus.create).not.toHaveBeenCalled();
+    });
+
+    it("still creates the items when the setting is absent (default on)", async () => {
+      setChromeStorage({ bds_settings: { locale: "en", syncLocale: false } });
+      await updateContextMenuItems();
+
+      expect(chrome.contextMenus.create).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("handleContextMenuClick", () => {
@@ -156,6 +173,37 @@ describe("context-menu", () => {
       setupContextMenus();
       expect(chrome.runtime.onInstalled.addListener).toHaveBeenCalled();
       expect(chrome.contextMenus.onClicked.addListener).toHaveBeenCalled();
+    });
+
+    it("rebuilds the menus when contextMenuEnabled flips", async () => {
+      // Start disabled so the initial rebuild from setupContextMenus() is a no-op.
+      setChromeStorage({
+        bds_settings: { locale: "en", syncLocale: false, contextMenuEnabled: false },
+      });
+      setupContextMenus();
+      // Let the initial rebuild triggered by setupContextMenus() settle before
+      // clearing mocks, otherwise it races with the flip below.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const listener = chrome.storage.onChanged.addListener.mock.calls.at(-1)[0];
+      chrome.contextMenus.create.mockClear();
+
+      setChromeStorage({
+        bds_settings: { locale: "en", syncLocale: false, contextMenuEnabled: true },
+      });
+      listener(
+        {
+          bds_settings: {
+            oldValue: { contextMenuEnabled: false },
+            newValue: { contextMenuEnabled: true },
+          },
+        },
+        "local"
+      );
+
+      await vi.waitFor(() => {
+        expect(chrome.contextMenus.create).toHaveBeenCalledTimes(2);
+      });
     });
   });
 });

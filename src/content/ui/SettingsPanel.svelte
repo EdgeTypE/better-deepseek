@@ -272,6 +272,7 @@
   let mcpTestingIndex = $state(-1);
   let mcpInlineMaxChars = $state(Number(appState.settings.mcpInlineMaxChars) || 8000);
   let disableTipBox = $state(Boolean(appState.settings.disableTipBox));
+  let contextMenuEnabled = $state(appState.settings.contextMenuEnabled ?? true);
   // Composer-button visibility overrides (tri-state: null = follow remote).
   let composerVisibility = $state(
     normalizeComposerVisibility(appState.settings.composerVisibility),
@@ -472,7 +473,7 @@
       searchProviders: enabledSearchProviderIds(),
       mcpInlineMaxChars,
       locale, syncLocale, keepReasoningBlocksOpen,
-      loadAllHistoryOnSession, customCSS, disableTipBox,
+      loadAllHistoryOnSession, customCSS, disableTipBox, contextMenuEnabled,
       composerVisibility: normalizeComposerVisibility(composerVisibility)
     });
   }
@@ -851,6 +852,7 @@
     { key: 'subIntegrations', labelKey: 'settings.subIntegrations', settingKeys: [
       'settings.markdownMaxDepth', 'settings.githubToken',
       'settings.tokenPriceEstimation', 'settings.showTimestamps',
+      'settings.contextMenuEnabled',
     ]},
     { key: 'subCSS', labelKey: 'settings.subCSS', settingKeys: [
       'settings.customCSS', 'settings.cssPresets',
@@ -1031,6 +1033,7 @@
     syncLocale = Boolean(appState.settings.syncLocale);
     customCSS = appState.settings.customCSS || "";
     disableTipBox = Boolean(appState.settings.disableTipBox);
+    contextMenuEnabled = appState.settings.contextMenuEnabled ?? true;
     composerVisibility = normalizeComposerVisibility(appState.settings.composerVisibility);
     composerDefaults = readComposerDefaults();
     mcpInlineMaxChars = Number(appState.settings.mcpInlineMaxChars) || 8000;
@@ -1284,6 +1287,7 @@
     appState.settings.syncLocale = syncLocale;
     appState.settings.customCSS = customCSS;
     appState.settings.disableTipBox = disableTipBox;
+    appState.settings.contextMenuEnabled = contextMenuEnabled;
     appState.settings.composerVisibility = normalizeComposerVisibility(composerVisibility);
     appState.settings.mcpInlineMaxChars = Math.max(500, Math.min(100000, Math.round(Number(mcpInlineMaxChars) || 8000)));
 
@@ -2534,6 +2538,17 @@
         </div>
         <p style="font-size: 10px; opacity: 0.5; margin: -8px 0 8px; padding-left: 0;">
           {t('settings.showTimestampsHint')}
+        </p>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.contextMenuEnabled')}</span>
+          <label class="bds-switch">
+            <input id="bds-context-menu-enabled" type="checkbox" bind:checked={contextMenuEnabled} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+        <p style="font-size: 10px; opacity: 0.5; margin: -8px 0 8px; padding-left: 0;">
+          {t('settings.contextMenuEnabledHint')}
         </p>
       </div>
     </div>

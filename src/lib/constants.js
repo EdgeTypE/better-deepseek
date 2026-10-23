@@ -1015,6 +1015,10 @@ export const DEFAULT_SETTINGS = {
   loadAllHistoryOnSession: false,
   showTimestamps: false,
   disableTipBox: false,
+  // Browser right-click entries ("Ask DeepSeek" / "Summarize with DeepSeek").
+  // Off means the background worker tears both items down and never re-creates
+  // them, leaving the native context menu untouched.
+  contextMenuEnabled: true,
   // Composer button visibility overrides. Each value is tri-state:
   //   null  = follow remote config (features.composerButtons)
   //   true  = force show
