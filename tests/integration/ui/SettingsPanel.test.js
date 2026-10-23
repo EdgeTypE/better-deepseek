@@ -395,6 +395,46 @@ describe("SettingsPanel import-all compatibility", () => {
     cleanup();
   });
 
+
+  it("saves separate input (STT) and output (TTS) speech languages", async () => {
+    const { target, cleanup } = renderSvelte(SettingsPanel);
+    await flushUi();
+
+    const selects = Array.from(target.querySelectorAll("select.bds-select"));
+    // Input select: the one whose options include fa-IR and that is NOT the
+    // output select (the output select has the "same as input" empty option).
+    const inputSelect = selects.find(
+      (sel) =>
+        Array.from(sel.options).some((opt) => opt.value === "fa-IR") &&
+        !Array.from(sel.options).some((opt) => opt.value === ""),
+    );
+    const outputSelect = selects.find((sel) =>
+      Array.from(sel.options).some((opt) => opt.value === ""),
+    );
+    expect(inputSelect).toBeDefined();
+    expect(outputSelect).toBeDefined();
+
+    // Speak Persian, hear English.
+    inputSelect.value = "fa-IR";
+    inputSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    outputSelect.value = "en-US";
+    outputSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushUi();
+
+    target.querySelector("#bds-save-settings").click();
+    await flushUi();
+
+    expect(chrome.storage.local.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bds_settings: expect.objectContaining({
+          voiceLanguage: "fa-IR",
+          voiceOutputLanguage: "en-US",
+        }),
+      }),
+    );
+    cleanup();
+  });
+
   it("toggles keepReasoningBlocksOpen setting and saves to chrome storage", async () => {
     state.settings.keepReasoningBlocksOpen = true;
     const { target, cleanup } = renderSvelte(SettingsPanel);
