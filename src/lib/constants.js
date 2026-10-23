@@ -1094,16 +1094,18 @@ export const DEFAULT_REMOTE_CONFIG = {
             showVoice: false, showLiveMode: false,
           },
         },
-        // Android app (WebView). Voice works through the native bridge
-        // (SpeechBridge.kt), so the buttons stay. Flip showVoice/showLiveMode
-        // here if the in-app controls ever prove redundant next to the
-        // keyboard's own dictation.
+        // Android app (WebView). Live Voice Mode stays — it runs on the native
+        // bridge (SpeechBridge.kt) and has no equivalent in the host UI. The
+        // mic is redundant next to the keyboard's own dictation, and the
+        // project (folder) button is dropped from the composer row, so both are
+        // off here and in extension/remote-config.json. Folder *upload* stays:
+        // it goes through the native picker and is a tested Android path.
         android: {
           attachMenu: true, deepResearch: true, deepCode: true,
           attachItems: {
             showPlus: true, showUploadFile: true, showUploadFolder: true,
-            showGithub: true, showWeb: true, showOther: true, showProject: true,
-            showVoice: true, showLiveMode: true,
+            showGithub: true, showWeb: true, showOther: true, showProject: false,
+            showVoice: false, showLiveMode: true,
           },
         },
       },

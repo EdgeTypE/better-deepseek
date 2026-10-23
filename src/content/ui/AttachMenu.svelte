@@ -37,6 +37,7 @@
   import { t } from "../../lib/i18n.svelte.js";
   import { getFlag, getConfig, REMOTE_CONFIG_EVENT, detectModelType } from "../../lib/remote-config.svelte.js";
   import { resolveComposerVisibility } from "../../lib/composer-visibility.js";
+  import { needsCarousel } from "../../lib/composer-layout.js";
   import { VADProcessor } from "../vad-processor.js";
   import { findActiveFileInput } from "../scanner.js";
   import { sendFileWithMessage } from "../auto.js";
@@ -160,6 +161,140 @@
   let shouldShowProject = $state(true);
   let shouldShowVoice = $state(true);
   let shouldShowLiveMode = $state(true);
+
+  // #210: DeepSeek styles its own composer buttons with `!important` rules whose
+  // selectors outrank a scoped component class (e.g. `.row button:not(:last-child)`
+  // is 0,2,1 against our 0,2,0), so no stylesheet declaration of ours can win —
+  // the buttons collapsed to ~12px and the fixed-size icons overlapped. Inline
+  // `!important` sits above every stylesheet, so the layout is pinned here and
+  // the CSS block stays as the pre-mount fallback.
+  const PINNED_BUTTONS = [
+    [".bds-plus-btn", "32px"],
+    [".bds-project-btn", "30px"],
+    [".bds-live-mode-btn", "32px"],
+    [".bds-mic-btn", "32px"],
+  ];
+  // The carousel: at a 299px viewport the bar is 174px and already needs ~126px
+  // for the native chips plus ~40px for send, so our 134px group cannot sit next
+  // to them — the chips were squeezed to 0 and painted over our buttons. Instead
+  // of stacking a second row (rejected) or squeezing anything, the whole bottom
+  // line becomes one horizontally scrollable strip: chips, our buttons, and the
+  // send button pinned to the right edge.
+  const CAROUSEL_HOST = [
+    ["overflow-x", "auto"],
+    ["overflow-y", "hidden"],
+    ["flex-wrap", "nowrap"],
+    ["scrollbar-width", "none"],
+    ["overscroll-behavior-x", "contain"],
+    ["-webkit-overflow-scrolling", "touch"],
+  ];
+  const CAROUSEL_SEND = ["position", "sticky", "right", "0", "z-index", "2"];
+
+  let carouselActive = false;
+
+  function composerNodes() {
+    const el = menuRef;
+    // The mount point is `display: contents`, so the wrapper's grandparent is
+    // the native actions row and its parent is the bar holding chips + actions.
+    const bar = el?.parentElement?.parentElement;
+    const host = bar?.parentElement;
+    return { el, bar, host, chips: bar?.previousElementSibling, send: bar?.lastElementChild };
+  }
+
+  function findSurfaceColor(host) {
+    for (let node = host; node && node !== document.body; node = node.parentElement) {
+      const bg = getComputedStyle(node).backgroundColor;
+      if (bg && bg !== "transparent" && bg !== "rgba(0, 0, 0, 0)") return bg;
+    }
+    return "";
+  }
+
+  function measureComposer() {
+    const { el, bar, host, chips, send } = composerNodes();
+    if (!el || !bar || !host || !host.clientWidth) return;
+    const sendW = send?.getBoundingClientRect().width || 0;
+    // The chips row is `flex: 1 1 auto` and collapses to 0 under pressure, so
+    // its box says nothing about what it needs — measure its children instead.
+    let chipsW = 0;
+    if (chips && chips.children.length) {
+      const first = chips.firstElementChild.getBoundingClientRect();
+      const last = chips.lastElementChild.getBoundingClientRect();
+      chipsW = Math.max(0, last.right - first.left);
+    }
+    const next = needsCarousel({
+      groupWidth: el.scrollWidth,
+      sendWidth: sendW,
+      chipsWidth: chipsW,
+      hostWidth: host.clientWidth,
+    });
+    if (next !== carouselActive) setCarousel(next);
+  }
+
+  function setCarousel(on) {
+    const { el, host, chips, send } = composerNodes();
+    if (!el || !host) return;
+    carouselActive = on;
+    if (on) {
+      for (const [prop, value] of CAROUSEL_HOST) {
+        host.style.setProperty(prop, value, "important");
+      }
+      // Stop the native chips from absorbing the shrink; they keep their size
+      // and simply scroll out of view instead of collapsing onto our buttons.
+      chips?.style.setProperty("flex", "0 0 auto", "important");
+      if (send) {
+        send.style.setProperty("position", "sticky", "important");
+        send.style.setProperty("right", "0", "important");
+        send.style.setProperty("z-index", "2", "important");
+        const surface = findSurfaceColor(host);
+        if (surface) send.style.setProperty("background", surface, "important");
+      }
+    } else {
+      for (const [prop] of CAROUSEL_HOST) host.style.removeProperty(prop);
+      chips?.style.removeProperty("flex");
+      for (const prop of CAROUSEL_SEND) send?.style.removeProperty(prop);
+      send?.style.removeProperty("background");
+    }
+    pinComposerLayout();
+  }
+
+  function pinComposerLayout() {
+    const el = menuRef;
+    if (!el) return;
+    el.style.setProperty("display", "inline-flex", "important");
+    // In carousel mode the strip must keep its natural width and let the host
+    // scroll; otherwise it shrinks inside the bar and scrolls internally.
+    el.style.setProperty("flex", carouselActive ? "0 0 auto" : "0 1 auto", "important");
+    el.style.setProperty("min-width", "0", "important");
+    el.style.setProperty("max-width", "100%", "important");
+    el.style.setProperty("overflow-x", carouselActive ? "visible" : "auto", "important");
+    el.style.setProperty("overflow-y", carouselActive ? "visible" : "hidden", "important");
+    for (const [selector, size] of PINNED_BUTTONS) {
+      const btn = el.querySelector(selector);
+      if (!btn) continue;
+      btn.style.setProperty("flex", "0 0 auto", "important");
+      btn.style.setProperty("width", size, "important");
+      btn.style.setProperty("height", size, "important");
+      btn.style.setProperty("box-sizing", "border-box", "important");
+      btn.style.setProperty("display", "flex", "important");
+      btn.style.setProperty("align-items", "center", "important");
+      btn.style.setProperty("justify-content", "center", "important");
+    }
+  }
+
+  function applyComposerLayout() {
+    pinComposerLayout();
+    measureComposer();
+  }
+
+  $effect(() => {
+    // ResizeObserver covers the row narrowing; it misses a button being hidden
+    // when the wrapper keeps the same box, so re-measure on the visible set too.
+    void shouldShowPlus;
+    void shouldShowProject;
+    void shouldShowLiveMode;
+    void shouldShowVoice;
+    applyComposerLayout();
+  });
 
   function updateVisibility() {
     try {
@@ -631,6 +766,15 @@
     updateVisibility();
     startModelWatcher();
 
+    // The composer row is DeepSeek's, so the only way to notice it running out
+    // of width is to watch the boxes we do not own. The bar's parent changes
+    // width with the viewport, which is what decides inline vs own row.
+    const scrollObserver =
+      typeof ResizeObserver === "function" ? new ResizeObserver(applyComposerLayout) : null;
+    if (menuRef) scrollObserver?.observe(menuRef);
+    const host = composerNodes().host;
+    if (host) scrollObserver?.observe(host);
+
     const onConfigOrStateUpdate = () => {
       recheckModelType();
       // A config edit must refresh visibility even when the model type is
@@ -652,6 +796,9 @@
         appState.heroBarRef = null;
       }
       if (modelObserver) modelObserver.disconnect();
+      scrollObserver?.disconnect();
+      // The carousel lives on host elements, so hand them back untouched.
+      if (carouselActive) setCarousel(false);
       cancelSubmenuClose();
       recognition?.abort?.();
       stopVAD();
@@ -1785,12 +1932,42 @@
 {/if}
 
 <style>
+  /* The composer row is DeepSeek's, not ours (#210). Two host behaviours had to
+     be beaten here:
+
+     1. Its button rules are `!important` and more specific than a scoped class
+        (`.row button:not(:last-child)` is 0,2,1 against our 0,2,0), so a plain
+        declaration loses and the buttons collapse to ~12px, icons overlapping.
+        Hence `!important` — and the same values are pinned inline by
+        `pinComposerLayout()` because inline `!important` is the only level the
+        host cannot outrank.
+     2. When the bar runs out of width the group must never compress. It keeps
+        its 32px buttons and either scrolls on its own (wide bars) or lets the
+        whole bottom line become a carousel (see `needsCarousel`). */
   .bds-attach-wrapper {
     position: relative;
-    display: inline-flex;
+    display: inline-flex !important;
     align-items: center;
-    justify-content: center;
+    /* flex-start, not center: a centred overflow would put the first buttons
+       out of reach on the scroll container's start edge. */
+    justify-content: flex-start;
     margin-right: 6px;
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+    max-width: 100%;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    /* Room for the recording ring and the hover scale; the negative block
+       margin cancels the added height so the row geometry is unchanged. */
+    padding: 2px;
+    margin-block: -2px;
+  }
+
+  .bds-attach-wrapper::-webkit-scrollbar {
+    display: none;
   }
 
   .bds-plus-btn {
@@ -1804,6 +1981,10 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    /* Never shrink: the icon is a fixed 20px SVG, so a compressed box makes it
+       overlap the neighbouring button instead of scaling down. `!important`
+       because the host's `:not()`-based button rules outrank this class. */
+    flex: 0 0 auto !important;
     transition:
       background-color var(--bds-transition, 0.18s ease),
       transform 0.1s ease;
@@ -1831,6 +2012,7 @@
     cursor: pointer;
     transition: all var(--bds-transition, 0.18s ease);
     margin-right: 2px;
+    flex: 0 0 auto !important;
   }
 
   .bds-live-mode-btn:hover {
@@ -1852,6 +2034,7 @@
     cursor: pointer;
     transition: all var(--bds-transition, 0.18s ease);
     margin-right: 2px;
+    flex: 0 0 auto !important;
   }
 
   .bds-mic-btn:hover {
@@ -2301,7 +2484,7 @@
     justify-content: center;
     cursor: pointer;
     transition: background-color var(--bds-transition, 0.18s ease);
-    flex-shrink: 0;
+    flex: 0 0 auto !important;
     padding: 0;
   }
 

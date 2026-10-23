@@ -41,7 +41,7 @@
           "attachMenu": true, "deepResearch": true, "deepCode": false,
           "attachItems": {
             "showPlus": true, "showUploadFile": true, "showUploadFolder": true,
-            "showGithub": true, "showWeb": true, "showOther": true, "showProject": true,
+            "showGithub": true, "showWeb": true, "showOther": true, "showProject": false,
             "showVoice": false, "showLiveMode": true
           }
         }

@@ -179,13 +179,19 @@ describe("composer-visibility", () => {
       vi.unstubAllEnvs();
     });
 
-    it("keeps chrome and android untouched by the firefox exceptions", () => {
-      for (const target of ["chrome", "android"]) {
-        vi.stubEnv("BDS_TARGET", target);
-        const defaults = readComposerDefaults();
-        expect(defaults.attachItems.showVoice).toBe(true);
-        expect(defaults.attachItems.showLiveMode).toBe(true);
-      }
+    it("keeps the firefox exceptions out of the other targets", () => {
+      vi.stubEnv("BDS_TARGET", "chrome");
+      const chromeDefaults = readComposerDefaults();
+      expect(chromeDefaults.attachItems.showVoice).toBe(true);
+      expect(chromeDefaults.attachItems.showLiveMode).toBe(true);
+
+      // Android is its own case: Live Voice Mode stays, the mic and the
+      // project (folder) button do not.
+      vi.stubEnv("BDS_TARGET", "android");
+      const androidDefaults = readComposerDefaults();
+      expect(androidDefaults.attachItems.showLiveMode).toBe(true);
+      expect(androidDefaults.attachItems.showVoice).toBe(false);
+      expect(androidDefaults.attachItems.showProject).toBe(false);
       vi.unstubAllEnvs();
     });
 
@@ -251,7 +257,18 @@ describe("composer-visibility", () => {
       expect(shipped.targets.firefox.attachItems.showVoice).toBe(false);
       expect(shipped.targets.firefox.attachItems.showLiveMode).toBe(false);
       expect(shipped.targets.chrome.attachItems.showVoice).toBe(true);
-      expect(shipped.targets.android.attachItems.showLiveMode).toBe(true);
+
+      // Android keeps Live Voice Mode (native bridge) but drops the mic — the
+      // keyboard already dictates — and the project (folder) button from the
+      // composer row. Folder *upload* stays: it uses the native picker. Both
+      // the published file and the built-in branch must agree: the built-in is
+      // what a fresh install runs on until the first fetch lands.
+      for (const branch of [shipped.targets.android, builtin.targets.android]) {
+        expect(branch.attachItems.showVoice).toBe(false);
+        expect(branch.attachItems.showProject).toBe(false);
+        expect(branch.attachItems.showLiveMode).toBe(true);
+        expect(branch.attachItems.showUploadFolder).toBe(true);
+      }
     });
   });
 
