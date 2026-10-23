@@ -410,6 +410,7 @@ export async function pushConfigToPage() {
       })),
       activeCharacter: state.characters.find(c => c.active) || null,
       preferredLang: String(state.settings.preferredLang || ""),
+      voiceLanguage: String(state.settings.voiceLanguage || ""),
       disableSystemPrompt: Boolean(state.settings.disableSystemPrompt),
       disableMemory: Boolean(state.settings.disableMemory),
       systemPromptInjectionFrequency: String(state.settings.systemPromptInjectionFrequency || "first"),

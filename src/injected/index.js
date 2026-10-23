@@ -208,6 +208,13 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
   
   window.addEventListener(EVENTS.markVoiceMessage, () => {
     state.isNextVoiceMessage = true;
+    // Safety TTL: the flag is consumed by the very next completion request,
+    // but if that request is never sent (send fails, user aborts), a latched
+    // flag would silently mis-label an unrelated later message as
+    // "send using voice recorder tool" in the injected payload.
+    setTimeout(() => {
+      state.isNextVoiceMessage = false;
+    }, 30000);
   });
 
   // ── Listen for on-demand history messages request ──

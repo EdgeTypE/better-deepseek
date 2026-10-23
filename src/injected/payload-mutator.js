@@ -339,6 +339,16 @@ export function buildHiddenPrefix(
 
   if (state.config?.isLiveMode) {
     blocks.push(`<BetterDeepSeek>\n${LIVE_MODE_SYSTEM_PROMPT}\n</BetterDeepSeek>`);
+    // The speech language is chosen in the language modal (STT/TTS), but the
+    // model was never told which language to reply in — replies could come in
+    // the wrong language even though recognition ran in the right one. Pin
+    // the response language to the voice language on every live turn.
+    const voiceLanguage = String(state.config.voiceLanguage || "").trim();
+    if (voiceLanguage) {
+      blocks.push(
+        `<BetterDeepSeek>\nAlways respond in ${voiceLanguage}. The user speaks and expects to hear this language.\n</BetterDeepSeek>`
+      );
+    }
   }
 
   const deepResearchBlock = buildDeepResearchPlanningBlock(
