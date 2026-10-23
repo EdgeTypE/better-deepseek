@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import QuestionPanel from "../../../src/content/ui/QuestionPanel.svelte";
+import { parseBdsMessage } from "../../../src/content/parser/index.js";
 import appState from "../../../src/content/state.js";
 import { resetAppState } from "../../helpers/app-state.js";
 import { renderSvelte, flushUi } from "../../helpers/svelte.js";
@@ -332,6 +333,33 @@ describe("QuestionPanel integration", () => {
 
     expect(document.querySelector("#chat-input").value).toContain("Gamma");
     expect(document.querySelector('button[title="Send message"]').click).toHaveBeenCalled();
+    cleanup();
+  });
+
+  it("shows the formula source instead of the raw KaTeX markup (issue #209)", async () => {
+    const katex = [
+      '<span class="katex"><span class="katex-mathml">',
+      '<math><semantics><mrow><mi>a</mi><mi>b</mi></mrow>',
+      '<annotation encoding="application/x-tex">ab</annotation></semantics></math>',
+      '</span><span class="katex-html" aria-hidden="true">',
+      '<span class="base">ab</span></span></span>',
+    ].join("");
+    const payload = JSON.stringify([
+      { id: "q1", question: `String ${katex}. What follows?`, type: "test", options: ["Yes"] },
+    ]);
+    const parsed = parseBdsMessage(`<BDS:ask_question>${payload}</BDS:ask_question>`);
+
+    const { cleanup } = renderSvelte(QuestionPanel);
+    await flushUi();
+    window.dispatchEvent(
+      new CustomEvent("bds-ask-questions", { detail: { questions: parsed.askQuestions } }),
+    );
+    await vi.advanceTimersByTimeAsync(150);
+    await flushUi();
+
+    const heading = document.querySelector(".bds-question-header h3");
+    expect(heading.textContent).toBe("String ab. What follows?");
+    expect(heading.querySelector("span")).toBeNull();
     cleanup();
   });
 });

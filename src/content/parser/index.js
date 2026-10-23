@@ -19,6 +19,7 @@ import { parseLooseJson } from "./json-repair.js";
 import { parseMemoryWrite } from "./memory-parser.js";
 import { sanitizeVisibleText } from "./text-sanitizer.js";
 import { extractHttpUrl } from "../../lib/utils/url-normalizer.js";
+import { normalizeQuestions } from "../../lib/utils/question-text.js";
 import { stripAutoLinkArtifacts } from "./link-artifacts.js";
 import { resolveMcpArgs, scanMcpTags } from "./mcp-args.js";
 
@@ -322,7 +323,9 @@ export function parseBdsMessage(rawText, isSettled = false) {
     if (name === "ask_question") {
       const parsed = parseLooseJson(content);
       if (Array.isArray(parsed.value)) {
-        result.askQuestions = parsed.value;
+        // Question text is model output and can carry HTML (a KaTeX dump, most
+        // often) — the panel shows it as text, so reduce it here. Issue #209.
+        result.askQuestions = normalizeQuestions(parsed.value);
       }
       if (parsed.error) {
         console.error("Failed to parse ask_question JSON:", parsed.error);

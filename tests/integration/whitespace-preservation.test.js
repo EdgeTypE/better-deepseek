@@ -1273,5 +1273,23 @@ describe("parseBdsMessage — multiple diverse tag types", () => {
       expect(result.renderableBlocks).toHaveLength(1);
       expect(result.renderableBlocks[0].name).toBe("ask_question");
     });
+
+    it("reduces a KaTeX dump in the question text to the formula source", () => {
+      // Issue #209: the model pasted DeepSeek's rendered KaTeX HTML into the
+      // JSON string and the panel printed it verbatim.
+      const katex = [
+        '<span class="katex"><span class="katex-mathml">',
+        '<math><semantics><mrow><mi>a</mi><mi>b</mi></mrow>',
+        '<annotation encoding="application/x-tex">ab</annotation></semantics></math>',
+        '</span><span class="katex-html" aria-hidden="true">',
+        '<span class="base">ab</span></span></span>',
+      ].join("");
+      const payload = JSON.stringify([
+        { id: "q1", question: `String ${katex}. What follows?`, type: "test", options: ["Yes"] },
+      ]);
+      const result = parseBdsMessage(`<BDS:ask_question>${payload}</BDS:ask_question>`);
+
+      expect(result.askQuestions[0].question).toBe("String ab. What follows?");
+    });
   });
 });

@@ -33,6 +33,7 @@
   import { triggerTextDownload } from "../../lib/utils/download.js";
   import { resolveSearchProviders } from "../files/search-reader.js";
   import { applyAutoDirection } from "../../lib/utils/bidi-direction.js";
+  import { normalizeQuestions } from "../../lib/utils/question-text.js";
 
 
   /** 
@@ -178,7 +179,9 @@
 
   function parseQuestions(content) {
     const parsed = parseLooseJson(content);
-    return Array.isArray(parsed.value) ? parsed.value : [];
+    // The overlay re-parses the block instead of reusing the panel's state, so
+    // the markup cleanup has to happen on this path too (issue #209).
+    return normalizeQuestions(parsed.value);
   }
 
   function typeLabel(type) {
