@@ -811,6 +811,7 @@
     "ragPreview": {
       "title": "RAG matched files",
       "moreFiles": "+{{count}} more files",
+      "showAll": "+{{count}} more",
       "lines": "Lines {{start}}–{{end}}"
     },
     "mcp": {

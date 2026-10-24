@@ -808,6 +808,7 @@
     "ragPreview": {
       "title": "RAG eşleşen dosyalar",
       "moreFiles": "+{{count}} dosya daha",
+      "showAll": "+{{count}} daha",
       "lines": "Satır {{start}}–{{end}}"
     },
     "mcp": {

@@ -807,6 +807,7 @@
     "ragPreview": {
       "title": "RAG 匹配文件",
       "moreFiles": "还有 {{count}} 个文件",
+      "showAll": "还有 {{count}} 个",
       "lines": "第 {{start}}–{{end}} 行"
     },
     "mcp": {

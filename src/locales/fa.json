@@ -807,6 +807,7 @@
     "ragPreview": {
       "title": "فایل‌های منطبق RAG",
       "moreFiles": "+{{count}} فایل دیگر",
+      "showAll": "+{{count}} مورد دیگر",
       "lines": "خطوط {{start}}–{{end}}"
     },
     "mcp": {

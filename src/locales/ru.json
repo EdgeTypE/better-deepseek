@@ -808,6 +808,7 @@
     "ragPreview": {
       "title": "RAG — сопоставленные файлы",
       "moreFiles": "ещё +{{count}} файл(а/ов)",
+      "showAll": "ещё +{{count}}",
       "lines": "Строки {{start}}–{{end}}"
     },
     "mcp": {
