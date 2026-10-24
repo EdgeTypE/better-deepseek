@@ -651,16 +651,7 @@ export function scanInputArea() {
     toggleMountPoint.dataset.bdsMounted = "1";
   }
 
-  const ragMountPoint = ensureComposerMount(
-    wrapper,
-    "bds-rag-preview-mount",
-    ".bds-rag-preview",
-    fileInput,
-  );
-  if (!ragMountPoint.dataset.bdsMounted) {
-    mount(RagPreview, { target: ragMountPoint });
-    ragMountPoint.dataset.bdsMounted = "1";
-  }
+  mountRagPreview(wrapper, fileInput);
 
   markComposerControlsMounted(wrapper);
 }
@@ -1008,6 +999,46 @@ function unmountComposerMount(className) {
     el.__bdsInstance = null;
   }
   delete el.dataset.bdsMounted;
+}
+
+/**
+ * The RAG preview is the one composer component that does NOT live inside its
+ * mount point: it moves its own root into the chat container, above the
+ * composer, because the composer row is a tight flex line.
+ *
+ * That breaks the `data-bds-mounted` guard. The native composer is re-created
+ * on most re-renders, so `ensureComposerMount` builds a fresh, empty mount
+ * point while the previous panel — teleported out of the old one — is still in
+ * the chat container. Guarding on the mount point therefore mounted a new copy
+ * on every pass and the copies stacked up above the composer (#197).
+ *
+ * Guard on the panel itself instead: keep the live instance and only re-mount
+ * when its DOM has actually left the document (conversation navigation).
+ */
+let ragPreviewInstance = null;
+
+function mountRagPreview(wrapper, beforeNode) {
+  if (ragPreviewInstance && document.querySelector(".bds-rag-preview")) {
+    return;
+  }
+
+  if (ragPreviewInstance) {
+    try {
+      unmount(ragPreviewInstance);
+    } catch (e) {
+      console.warn("[BDS] Failed to unmount RAG preview:", e);
+    }
+    ragPreviewInstance = null;
+  }
+
+  const host = ensureComposerMount(
+    wrapper,
+    "bds-rag-preview-mount",
+    ".bds-rag-preview",
+    beforeNode,
+  );
+  ragPreviewInstance = mount(RagPreview, { target: host });
+  host.dataset.bdsMounted = "1";
 }
 
 function ensureComposerMount(wrapper, className, descendantSelector, beforeNode) {

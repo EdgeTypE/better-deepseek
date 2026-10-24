@@ -4,6 +4,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { resetAppState } from "../helpers/app-state.js";
 
 const mountMock = vi.hoisted(() => vi.fn(() => ({})));
+const unmountMock = vi.hoisted(() => vi.fn());
 const deepResearchToggleMock = vi.hoisted(() => ({ name: "DeepResearchToggle" }));
 const deepCodeToggleMock = vi.hoisted(() => ({ name: "DeepCodeToggle" }));
 const attachMenuMock = vi.hoisted(() => ({ name: "AttachMenu" }));
@@ -18,6 +19,7 @@ const resetMessagePricingMock = vi.hoisted(() => vi.fn());
 
 vi.mock("svelte", () => ({
   mount: mountMock,
+  unmount: unmountMock,
 }));
 
 vi.mock("../../src/content/message-processor.svelte.js", () => ({
@@ -74,6 +76,8 @@ describe("scanner input controls", () => {
   beforeEach(() => {
     resetAppState();
     mountMock.mockClear();
+    mountMock.mockImplementation(() => ({}));
+    unmountMock.mockClear();
     document.body.innerHTML = "";
   });
 
@@ -125,6 +129,77 @@ describe("scanner input controls", () => {
     expect(wrapper).toBeTruthy();
     expect(wrapper.style.display).toBe("contents");
     expect(wrapper.parentElement).toBe(document.querySelector("#actions"));
+  });
+
+  it("keeps a single RAG preview when the native composer is re-created", async () => {
+    document.body.innerHTML = `
+      <div id="chat-list"></div>
+      <div id="composer">
+        <input type="file" multiple />
+      </div>
+    `;
+    const { scanInputArea } = await import("../../src/content/scanner.js");
+    const chatList = document.querySelector("#chat-list");
+
+    // The real component teleports its root out of the composer mount point
+    // into the chat container, so the mount point dying with a re-rendered
+    // composer leaves the panel behind.
+    mountMock.mockImplementation((component, { target }) => {
+      if (component !== ragPreviewMock) return {};
+      const panel = document.createElement("div");
+      panel.className = "bds-rag-preview";
+      target.appendChild(panel);
+      chatList.prepend(panel);
+      return {};
+    });
+
+    const ragMounts = () => mountMock.mock.calls.filter(([c]) => c === ragPreviewMock).length;
+
+    scanInputArea();
+    expect(ragMounts()).toBe(1);
+    expect(document.querySelectorAll(".bds-rag-preview").length).toBe(1);
+
+    // Simulate the native composer subtree being replaced by a re-render.
+    const replaced = document.createElement("div");
+    replaced.id = "composer";
+    replaced.innerHTML = '<input type="file" multiple />';
+    document.body.replaceChild(replaced, document.querySelector("#composer"));
+
+    scanInputArea();
+    scanInputArea();
+
+    expect(ragMounts()).toBe(1);
+    expect(document.querySelectorAll(".bds-rag-preview").length).toBe(1);
+  });
+
+  it("re-mounts the RAG preview after the chat container is replaced", async () => {
+    document.body.innerHTML = `
+      <div id="chat-list"></div>
+      <div id="composer">
+        <input type="file" multiple />
+      </div>
+    `;
+    const { scanInputArea } = await import("../../src/content/scanner.js");
+
+    mountMock.mockImplementation((component, { target }) => {
+      if (component !== ragPreviewMock) return {};
+      const panel = document.createElement("div");
+      panel.className = "bds-rag-preview";
+      target.appendChild(panel);
+      document.querySelector("#chat-list").prepend(panel);
+      return {};
+    });
+
+    scanInputArea();
+    expect(document.querySelectorAll(".bds-rag-preview").length).toBe(1);
+
+    // Navigation wipes the chat container together with the teleported panel.
+    document.querySelector("#chat-list").replaceChildren();
+
+    scanInputArea();
+
+    expect(unmountMock).toHaveBeenCalled();
+    expect(document.querySelectorAll(".bds-rag-preview").length).toBe(1);
   });
 
   it("does not mount Deep Code when target is Android", async () => {

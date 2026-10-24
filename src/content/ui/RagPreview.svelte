@@ -1,3 +1,17 @@
+<script module>
+  /**
+   * Only one panel may be live at a time.
+   *
+   * The component moves its root out of the composer mount point into the chat
+   * container (see `attachToContainer`), so when the native composer is
+   * re-created the mount point dies while this instance keeps its DOM, its
+   * textarea listener and its poll timer. The scanner then mounts a fresh copy
+   * and the copies stack up above the composer (#197). Disposing the previous
+   * instance on mount keeps the panel single even if a mount slips through.
+   */
+  let activePanel = null;
+</script>
+
 <script>
   import { onMount, onDestroy } from "svelte";
   import { slide } from "svelte/transition";
@@ -13,6 +27,28 @@
   let textarea = $state(null);
   let rootEl = $state(null);
   let expandedFiles = $state(new Set());
+
+  let disposed = false;
+
+  /**
+   * Tear down this instance without relying on the scanner holding an unmount
+   * handle: drop the detached root, the poll timer and the textarea listener.
+   * Svelte's `onDestroy` never runs for an instance the scanner forgot.
+   */
+  function dispose() {
+    if (disposed) return;
+    disposed = true;
+    clearInterval(pollInterval);
+    clearTimeout(debounceTimer);
+    if (prevListenerTextarea) {
+      prevListenerTextarea.removeEventListener("input", handleInput);
+      prevListenerTextarea = null;
+    }
+    if (rootEl) rootEl.remove();
+    if (activePanel === panelHandle) activePanel = null;
+  }
+
+  const panelHandle = { dispose };
 
   const DEBOUNCE_MS = 350;
   const MIN_QUERY_LENGTH = 8;
@@ -140,6 +176,8 @@
   }
 
   onMount(() => {
+    activePanel?.dispose();
+    activePanel = panelHandle;
     textarea = attachListener();
     attachToContainer();
     pollInterval = setInterval(() => {
@@ -149,11 +187,7 @@
   });
 
   onDestroy(() => {
-    clearInterval(pollInterval);
-    clearTimeout(debounceTimer);
-    if (prevListenerTextarea) {
-      prevListenerTextarea.removeEventListener("input", handleInput);
-    }
+    dispose();
   });
 </script>
 
