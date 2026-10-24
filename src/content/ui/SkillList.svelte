@@ -3,6 +3,7 @@
   import { pushConfigToPage } from "../bridge.js";
   import { STORAGE_KEYS } from "../../lib/constants.js";
   import { makeId } from "../../lib/utils/helpers.js";
+  import { triggerBlobDownload } from "../../lib/utils/download.js";
   import { openNativeFilePicker } from "../files/native-file-input.js";
   import { IMPORT_FORMAT, detectImportFormat, parseJsonDocument } from "../files/import-format.js";
   import { t } from "../../lib/i18n.svelte.js";
@@ -23,12 +24,7 @@
   function exportSkills() {
     const data = JSON.stringify(appState.skills, null, 2);
     const blob = new Blob([data], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "bds_skills.json";
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(blob, "bds_skills.json");
   }
 
   function triggerImport() {

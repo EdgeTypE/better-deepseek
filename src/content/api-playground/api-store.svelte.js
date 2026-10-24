@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from "../../lib/constants.js";
 import { makeId } from "../../lib/utils/helpers.js";
+import { triggerBlobDownload } from "../../lib/utils/download.js";
 import { getDefaultRequest } from "./presets.js";
 
 const STORAGE_KEY_HISTORY = "bds_api_playground_history";
@@ -216,12 +217,7 @@ export function createApiStore() {
   function exportHistory() {
     const data = JSON.stringify(history, null, 2);
     const blob = new Blob([data], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `api-playground-history-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(blob, `api-playground-history-${Date.now()}.json`);
   }
 
   function loadRequestFromSaved(saved) {

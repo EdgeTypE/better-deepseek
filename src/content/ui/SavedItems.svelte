@@ -2,6 +2,7 @@
   import appState from "../state.js";
   import { STORAGE_KEYS } from "../../lib/constants.js";
   import { makeId } from "../../lib/utils/helpers.js";
+  import { triggerBlobDownload } from "../../lib/utils/download.js";
   import { injectPureTextAndSend } from "../auto.js";
   import { t } from "../../lib/i18n.svelte.js";
   import SnippetDialog from "./SnippetDialog.svelte";
@@ -131,11 +132,7 @@
   function exportAll() {
     const data = JSON.stringify(appState.savedItems, null, 2);
     const blob = new Blob([data], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "bds_saved_items.json";
-    a.click();
-    URL.revokeObjectURL(blob);
+    triggerBlobDownload(blob, "bds_saved_items.json");
   }
 
   function triggerImport() {

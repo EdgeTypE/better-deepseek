@@ -1,5 +1,6 @@
 <script>
   import { t } from "../../lib/i18n.svelte.js";
+  import { triggerBlobDownload } from "../../lib/utils/download.js";
 
   /**
    * @type {{
@@ -47,14 +48,7 @@
   function handleDownload() {
     if (!content) return;
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = displayName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(blob, displayName);
   }
 
   function toggleContent() {

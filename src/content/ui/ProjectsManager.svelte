@@ -13,6 +13,7 @@
   } from "../project-manager.js";
   import { pushConfigToPage } from "../bridge.js";
   import { pickFolderSelection } from "../../lib/utils/folder-picker.js";
+  import { triggerBlobDownload } from "../../lib/utils/download.js";
   import { openNativeFilePicker } from "../files/native-file-input.js";
   import {
     isNativeFilePickerAvailable,
@@ -448,12 +449,7 @@
 
   function exportFile(file) {
     const blob = new Blob([file.content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = file.name.split("/").pop();
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(blob, file.name.split("/").pop());
   }
 
   function exportAll() {
@@ -466,13 +462,8 @@
       text += file.content;
     }
     const blob = new Blob([text], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
     const safeName = selectedProject.name.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
-    a.download = `${safeName}_all_files.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(blob, `${safeName}_all_files.txt`);
   }
 </script>
 

@@ -3,6 +3,7 @@
   import { STORAGE_KEYS } from "../../lib/constants.js";
   import { normalizeMemories } from "../storage.js";
   import { openNativeFilePicker } from "../files/native-file-input.js";
+  import { triggerBlobDownload } from "../../lib/utils/download.js";
   import { onMount } from "svelte";
   import { t } from "../../lib/i18n.svelte.js";
   import MemoryImportModal from "./MemoryImport.svelte";
@@ -30,12 +31,7 @@
   function exportMemories() {
     const data = JSON.stringify(appState.memories, null, 2);
     const blob = new Blob([data], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "bds_memories.json";
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(blob, "bds_memories.json");
   }
 
   function triggerImport() {
