@@ -364,6 +364,14 @@
       "cancel": "İptal",
       "exportHint": "Lütfen önce dışa aktarmak istediğiniz mesajları seçin."
     },
+    "quoteContext": {
+      "addContext": "Bağlam ekle",
+      "added": "Bağlam olarak eklendi",
+      "hint": "Bir sonraki mesajına eklenir",
+      "remove": "Bağlamı kaldır",
+      "expand": "Alıntının tamamını göster",
+      "collapse": "Alıntıyı daralt"
+    },
     "questionPanel": {
       "of": "{{current}} / {{total}}",
       "dismiss": "Kapat",

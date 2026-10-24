@@ -19,6 +19,8 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
     deepResearchConfigUpdate: "bds:deep-research-config-update",
     requestConfig: "bds:request-config",
     markVoiceMessage: "bds:mark-voice-message",
+    quoteContext: "bds:quote-context",
+    quoteContextConsumed: "bds:quote-context-consumed",
     sessionData: "bds:session-data",
   };
 
@@ -126,6 +128,12 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
     currentSessionChar: null, // memory cache for default ID transition
     activeCompletionRequests: 0,
     isNextVoiceMessage: false,
+    /**
+     * Excerpt picked from a previous answer. One-shot: the next mutated
+     * request consumes it and clears it, exactly like `isNextVoiceMessage`.
+     * @type {{ text: string } | null}
+     */
+    pendingQuoteContext: null,
     /** @type {string|null} Bearer token captured from API requests */
     authToken: findAuthTokenInStorage(),
     /** @type {function(string): void} Store the Authorization header value */
@@ -208,6 +216,21 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
   
   window.addEventListener(EVENTS.markVoiceMessage, () => {
     state.isNextVoiceMessage = true;
+  });
+
+  // The excerpt is one-shot, so an empty detail is how the content script
+  // withdraws it (card dismissed, session changed) before it is consumed.
+  window.addEventListener(EVENTS.quoteContext, (event) => {
+    let detail = event && event.detail ? event.detail : null;
+    if (typeof detail === "string") {
+      try {
+        detail = JSON.parse(detail);
+      } catch {
+        detail = null;
+      }
+    }
+    const text = String(detail?.text || "").trim();
+    state.pendingQuoteContext = text ? { text } : null;
   });
 
   // ── Listen for on-demand history messages request ──

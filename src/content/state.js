@@ -75,6 +75,12 @@ const state = {
   selectionMode: false,
   /** @type {Set<string>} Set of message IDs or indices */
   selectedMessageIds: new Set(),
+  /**
+   * Excerpt the user picked from an answer ("add context"). Shown as a card in
+   * the composer and attached to the next request only — never persisted.
+   * @type {{ text: string } | null}
+   */
+  quoteContext: null,
   whatsNewPending: false,
   /** @type {Object<string, string[]>} session ID -> tag names */
   chatTags: {},

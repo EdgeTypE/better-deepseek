@@ -36,6 +36,10 @@ export const BRIDGE_EVENTS = {
   requestConfig: "bds:request-config",
   networkState: "bds:network-state",
   markVoiceMessage: "bds:mark-voice-message",
+  /** One-shot excerpt the user picked from an answer; consumed by the next request. */
+  quoteContext: "bds:quote-context",
+  /** Emitted by the injected script once the excerpt has been attached. */
+  quoteContextConsumed: "bds:quote-context-consumed",
 };
 
 // ── Versioning ──

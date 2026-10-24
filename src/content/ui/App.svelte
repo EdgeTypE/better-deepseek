@@ -6,6 +6,7 @@
   import DeepResearchRevisionPanel from "./DeepResearchRevisionPanel.svelte";
   import WhatsNewModal from "./WhatsNewModal.svelte";
   import SelectionOverlay from "./SelectionOverlay.svelte";
+  import QuoteContext from "./QuoteContext.svelte";
   import StatusBanner from "./StatusBanner.svelte";
   import AnnouncementBanner from "./AnnouncementBanner.svelte";
   import PreviewPanel from "./PreviewPanel.svelte";
@@ -247,6 +248,7 @@
 {/if}
 
 <SelectionOverlay />
+<QuoteContext />
 <StatusBanner />
 <AnnouncementBanner />
 <PreviewPanel

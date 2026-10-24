@@ -363,6 +363,14 @@
       "cancel": "取消",
       "exportHint": "请先选择要导出的消息。"
     },
+    "quoteContext": {
+      "addContext": "添加为上下文",
+      "added": "已添加为上下文",
+      "hint": "将随下一条消息一起发送",
+      "remove": "移除上下文",
+      "expand": "展开完整片段",
+      "collapse": "收起片段"
+    },
     "questionPanel": {
       "of": "{{current}} / {{total}}",
       "dismiss": "关闭",

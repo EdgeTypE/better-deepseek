@@ -364,6 +364,14 @@
       "cancel": "Cancel",
       "exportHint": "Please select the messages you want to export first."
     },
+    "quoteContext": {
+      "addContext": "Add context",
+      "added": "Added as context",
+      "hint": "Attached to your next message",
+      "remove": "Remove context",
+      "expand": "Show full excerpt",
+      "collapse": "Collapse excerpt"
+    },
     "questionPanel": {
       "of": "{{current}} of {{total}}",
       "dismiss": "Dismiss",

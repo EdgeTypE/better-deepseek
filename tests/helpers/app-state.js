@@ -35,6 +35,7 @@ export function resetAppState(overrides = {}) {
   state.heroBarRef = null;
   state.chatSessions = [];
   state.savedItems = [];
+  state.quoteContext = null;
   state.activeQuestions = null;
   state.activeQuestionsUrl = null;
   state.deepResearch = {

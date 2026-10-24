@@ -7,7 +7,8 @@
 
 import { buildOfficeSkillsBlock } from "../lib/office-skills/index.js";
 import { searchActiveProjectRAG, formatRagInjections } from "../lib/rag-engine.js";
-import { LIVE_MODE_SYSTEM_PROMPT } from "../lib/constants.js";
+import { buildQuoteContextBlock } from "../lib/quote-context.js";
+import { LIVE_MODE_SYSTEM_PROMPT, BRIDGE_EVENTS } from "../lib/constants.js";
 
 /**
  * @param {object} payload - The parsed JSON request body
@@ -454,6 +455,16 @@ export function buildHiddenPrefix(
     state.isNextVoiceMessage = false;
   }
 
+  // Excerpt the user picked from an earlier answer. Consumed here so it can
+  // never ride along with a second request; the content script removes the
+  // card when it hears the event.
+  const quoteBlock = buildQuoteContextBlock(state.pendingQuoteContext);
+  if (quoteBlock) {
+    blocks.push(quoteBlock);
+    state.pendingQuoteContext = null;
+    notifyQuoteContextConsumed();
+  }
+
   // Inject project context if first turn OR if project changed
   const project = state.config && state.config.activeProject;
   if (project) {
@@ -505,6 +516,17 @@ export function buildHiddenPrefix(
   }
 
   return blocks.join("\n\n");
+}
+
+/**
+ * Tell the content script the excerpt has been attached, so the card above the
+ * composer can disappear instead of pretending it is still pending.
+ */
+function notifyQuoteContextConsumed() {
+  if (typeof window === "undefined" || !window.dispatchEvent) {
+    return;
+  }
+  window.dispatchEvent(new CustomEvent(BRIDGE_EVENTS.quoteContextConsumed));
 }
 
 function buildDeepResearchPlanningBlock(userPrompt, conversationId, state) {
