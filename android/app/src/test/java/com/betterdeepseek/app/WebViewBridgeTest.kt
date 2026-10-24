@@ -308,6 +308,24 @@ class WebViewBridgeTest {
     }
 
     @Test
+    fun `setKeepScreenOn forwards both states to the window callback`() {
+        val states = mutableListOf<Boolean>()
+        bridge.onKeepScreenOnChanged = { enabled -> states.add(enabled) }
+
+        bridge.setKeepScreenOn(true)
+        bridge.setKeepScreenOn(false)
+
+        assertEquals(listOf(true, false), states)
+    }
+
+    @Test
+    fun `setKeepScreenOn without a host callback is a no-op`() {
+        bridge.onKeepScreenOnChanged = null
+        // Must not throw: the interface is callable from arbitrary page JS.
+        bridge.setKeepScreenOn(true)
+    }
+
+    @Test
     fun `getSystemLocale returns current Android locale tag`() {
         val previous = Locale.getDefault()
         try {

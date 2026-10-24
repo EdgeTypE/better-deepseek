@@ -81,6 +81,9 @@ function buildAndroidBridgeBootstrap() {
         downloadBlob(base64, mimeType, fileName) {
           downloads.push({ base64, mimeType, fileName });
         },
+        setKeepScreenOn(enabled) {
+          window.__bdsKeepScreenOn = Boolean(enabled);
+        },
         pickFiles(mode, requestId) {
           const handler = window.__bdsNativeFilePicker;
           const eventName = "__bds_native_files_picked_" + requestId;

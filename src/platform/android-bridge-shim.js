@@ -19,6 +19,8 @@
  *   getSystemLocale(): String
  *   downloadBlob(base64, mimeType, fileName): void
  *   reportTheme(isDark: Boolean): void  // live bar-icon colour update; persistence via setStorage
+ *   setKeepScreenOn(enabled: Boolean): void  // FLAG_KEEP_SCREEN_ON while generating
+ *     // driven by src/content/keep-awake.js; no-op shim wrapper needed here
  *   pickFiles(mode: String, requestId: String): void
  *     // mode: "files" | "folder" | "files+images" | "folder+images";
  *     // v2/v2.1 result delivered as a CustomEvent series:

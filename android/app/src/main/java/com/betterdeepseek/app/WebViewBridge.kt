@@ -249,6 +249,23 @@ class WebViewBridge(
         onThemeChanged?.invoke(isDark)
     }
 
+    /**
+     * Set by MainActivity to toggle `FLAG_KEEP_SCREEN_ON` on the Activity window. Kept as a
+     * callback (not a Window reference) so the bridge never holds the Activity.
+     */
+    @Volatile var onKeepScreenOnChanged: ((enabled: Boolean) -> Unit)? = null
+
+    /**
+     * Called by JS while DeepSeek is generating. Long multi-step runs routinely outlive the
+     * display timeout, and a sleeping screen pauses the WebView mid-stream, which strands the
+     * response. Holding the wake flag only while a response is streaming keeps the battery cost
+     * bounded to the generation itself.
+     */
+    @JavascriptInterface
+    fun setKeepScreenOn(enabled: Boolean) {
+        onKeepScreenOnChanged?.invoke(enabled)
+    }
+
     /** Returns the Android system locale for JS locale detection inside WebView. */
     @JavascriptInterface
     fun getSystemLocale(): String {

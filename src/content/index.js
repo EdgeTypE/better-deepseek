@@ -38,6 +38,9 @@ import { refreshRemoteConfigIfDue, DEFAULT_FETCH_INTERVAL_MS } from "../lib/remo
 import { STORAGE_KEYS, CSS_PRESETS, EMBEDDED_PRICING } from "../lib/constants.js";
 import { loadAllHistory, retainOnlyHistorySession } from "./load-all-history.js";
 import { stopVoicePlayback } from "./message-processor.svelte.js";
+// keep-awake only depends on message-processor, so importing it here leaves the
+// module evaluation order of everything above untouched.
+import { startKeepAwakeWatcher } from "./keep-awake.js";
 
 const CONTENT_BOOTSTRAP_KEY = "__bdsContentBootstrapped";
 
@@ -123,6 +126,7 @@ async function init() {
   });
   startStatusMonitor();
   startThemeWatcher();
+  startKeepAwakeWatcher();
 
   // Keep state.remoteConfig in sync when the RemoteConfigManager updates
   window.addEventListener(REMOTE_CONFIG_EVENT, () => {

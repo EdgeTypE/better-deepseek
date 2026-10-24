@@ -13,6 +13,7 @@ import android.provider.Settings
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
@@ -445,6 +446,12 @@ class MainActivity : ComponentActivity() {
             isAppearanceLightNavigationBars = !isPageDark
         }
 
+        // Keep the display awake while a response streams (see WebViewBridge.setKeepScreenOn).
+        // Window flags are per-window, so the callback is dropped in onDestroy with the window.
+        bridge.onKeepScreenOnChanged = { enabled ->
+            runOnUiThread { setWindowKeepScreenOn(enabled) }
+        }
+
         bridge.onThemeChanged = { isDark ->
             runOnUiThread {
                 val bg = if (isDark) PAGE_BG_DARK else PAGE_BG_LIGHT
@@ -572,6 +579,7 @@ class MainActivity : ComponentActivity() {
         updateProgressDialog?.dismiss()
         updateProgressDialog = null
         bridge.onThemeChanged = null
+        bridge.onKeepScreenOnChanged = null
         bridge.evaluateJs = null
         bridge.onPickFiles = null
         pendingAudioPermissionRequest?.deny()
@@ -597,6 +605,20 @@ class MainActivity : ComponentActivity() {
         val url = data.toString()
         if (url.startsWith("https://chat.deepseek.com")) {
             webView.loadUrl(url)
+        }
+    }
+
+    /**
+     * Hold the display awake while a response streams. UI thread only.
+     *
+     * The flag is cleared by the content script when generation ends, and by [bdsWebViewClient]
+     * when the WebView lands on a page that carries no injected JS.
+     */
+    private fun setWindowKeepScreenOn(enabled: Boolean) {
+        if (enabled) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
     }
 
@@ -636,6 +658,10 @@ class MainActivity : ComponentActivity() {
                     if (url.isNullOrEmpty()) return
                     if (url.startsWith("https://chat.deepseek.com")) {
                         injectBdsScripts(view)
+                    } else {
+                        // The wake lock belongs to the injected content script; on any other
+                        // page there is no JS left that could release it, so the host does.
+                        setWindowKeepScreenOn(false)
                     }
                 }
             }
