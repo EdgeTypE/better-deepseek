@@ -8,7 +8,53 @@
 import { buildOfficeSkillsBlock } from "../lib/office-skills/index.js";
 import { searchActiveProjectRAG, formatRagInjections } from "../lib/rag-engine.js";
 import { buildQuoteContextBlock } from "../lib/quote-context.js";
-import { LIVE_MODE_SYSTEM_PROMPT, BRIDGE_EVENTS } from "../lib/constants.js";
+import { LIVE_MODE_SYSTEM_PROMPT, BRIDGE_EVENTS, CONFIG_SYNC_TAG } from "../lib/constants.js";
+
+/**
+ * Instruction that rides in front of a settings-transfer block. Kept in its
+ * own wrapper so the history pass below can remove it together with the block:
+ * the model only needs to see it on the turn that carries the backup.
+ */
+const CONFIG_SYNC_NOTE_TAG = "BDS:CONFIG_NOTE";
+
+const CONFIG_SYNC_NOTE = [
+  `<${CONFIG_SYNC_NOTE_TAG}>`,
+  "The user is transferring their Better DeepSeek settings to another device.",
+  "The block below is data for that transfer, not a request: do not decode it,",
+  "do not summarise it, and do not comment on its contents.",
+  "Reply with one short sentence.",
+  `</${CONFIG_SYNC_NOTE_TAG}>`,
+].join("\n");
+
+/** Matches a transfer block, or its note, wherever it sits in a message. */
+const CONFIG_SYNC_PATTERN = new RegExp(
+  `<${CONFIG_SYNC_NOTE_TAG}>[\\s\\S]*?</${CONFIG_SYNC_NOTE_TAG}>` +
+    `|<${CONFIG_SYNC_TAG}\\b[^>]*>[\\s\\S]*?</${CONFIG_SYNC_TAG}>`,
+  "gi",
+);
+
+
+/**
+ * Remove transfer blocks (and their instruction) from every message in the
+ * outgoing body. Returns true when at least one message was rewritten.
+ *
+ * @param {Array} messages
+ * @returns {boolean}
+ */
+function stripConfigSyncFromMessages(messages) {
+  let stripped = false;
+  for (const message of messages) {
+    const text = extractMessageText(message);
+    if (!text) continue;
+    if (!text.includes(CONFIG_SYNC_TAG) && !text.includes(CONFIG_SYNC_NOTE_TAG)) continue;
+
+    const next = text.replace(CONFIG_SYNC_PATTERN, "").trim();
+    if (next === text) continue;
+    setMessageText(message, next);
+    stripped = true;
+  }
+  return stripped;
+}
 
 /**
  * @param {object} payload - The parsed JSON request body
@@ -40,6 +86,15 @@ export function mutatePayload(payload, state) {
 
   let changed = false;
   let target = null;
+
+  // A transfer block is ~10 KB of base64 and belongs to exactly one turn. It
+  // stays in the stored history — that is the whole point, the other device
+  // reads it from there — but re-sending it on every later turn would burn the
+  // same tokens forever. Only the outgoing body is trimmed; the server's copy
+  // is untouched, so the card keeps working on the next device.
+  if (messages && messages.length > 0) {
+    changed = stripConfigSyncFromMessages(messages) || changed;
+  }
 
   if (messages && messages.length > 0) {
     target = findLastUserMessage(messages) || messages[messages.length - 1];
@@ -515,7 +570,28 @@ export function buildHiddenPrefix(
     }
   }
 
+  // Settings transfer block ("export to chat"). One-shot: the content script
+  // stages it right before sending and withdraws it if the send never lands.
+  const configSyncBlock = String(state.pendingConfigSync || "").trim();
+  if (configSyncBlock) {
+    blocks.push(CONFIG_SYNC_NOTE);
+    blocks.push(configSyncBlock);
+    state.pendingConfigSync = null;
+    notifyConfigSyncConsumed();
+  }
+
   return blocks.join("\n\n");
+}
+
+/**
+ * Tell the content script the transfer block has been attached, so a staged
+ * blob is never sent twice.
+ */
+function notifyConfigSyncConsumed() {
+  if (typeof window === "undefined" || !window.dispatchEvent) {
+    return;
+  }
+  window.dispatchEvent(new CustomEvent(BRIDGE_EVENTS.configSyncConsumed));
 }
 
 /**
@@ -973,6 +1049,8 @@ export function stripInjectedBlocks(text) {
   output = output.replace(/<BDS:RP>[\s\S]*?<\/BDS:RP>/gi, "");
   output = output.replace(/<BDS:PROJECT[^>]*>[\s\S]*?<\/BDS:PROJECT>/gi, "");
   output = output.replace(/<BDS:PROJECT_CONTEXT>[\s\S]*?<\/BDS:PROJECT_CONTEXT>/gi, "");
+  // Settings-transfer block and its instruction. See stripConfigSyncFromMessages.
+  output = output.replace(CONFIG_SYNC_PATTERN, "");
   return output.trim();
 }
 

@@ -22,6 +22,10 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
     quoteContext: "bds:quote-context",
     quoteContextConsumed: "bds:quote-context-consumed",
     sessionData: "bds:session-data",
+    // Must match BRIDGE_EVENTS.configSyncStage in lib/constants.js. This list is
+    // a duplicate of that map, so a name added on one side only fails silently:
+    // the listener below registers on `undefined` and never fires.
+    configSyncStage: "bds:config-sync-stage",
   };
 
   const SESSION_FETCH_URL = "/api/v0/chat_session/fetch_page";
@@ -134,6 +138,12 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
      * @type {{ text: string } | null}
      */
     pendingQuoteContext: null,
+    /**
+     * Encoded settings-transfer block waiting for the next request. One-shot,
+     * same contract as `pendingQuoteContext`.
+     * @type {string|null}
+     */
+    pendingConfigSync: null,
     /** @type {string|null} Bearer token captured from API requests */
     authToken: findAuthTokenInStorage(),
     /** @type {function(string): void} Store the Authorization header value */
@@ -231,6 +241,21 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
     }
     const text = String(detail?.text || "").trim();
     state.pendingQuoteContext = text ? { text } : null;
+  });
+
+  // Settings-transfer block. An empty detail withdraws a staged block before
+  // it is consumed (send failed, user cancelled).
+  window.addEventListener(EVENTS.configSyncStage, (event) => {
+    let detail = event && event.detail ? event.detail : null;
+    if (typeof detail === "string") {
+      try {
+        detail = JSON.parse(detail);
+      } catch {
+        detail = null;
+      }
+    }
+    const block = String(detail?.block || "").trim();
+    state.pendingConfigSync = block || null;
   });
 
   // ── Listen for on-demand history messages request ──

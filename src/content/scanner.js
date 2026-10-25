@@ -29,6 +29,7 @@ import { isNativeComposerModeToggle } from "../lib/composer-dom.js";
 import { REMOTE_CONFIG_EVENT } from "../lib/remote-config.svelte.js";
 import { tryExecuteRawInput } from "./commands/executor.js";
 import { checkPendingHandoff } from "./commands/context-handoff.js";
+import { ensureConfigSyncCards } from "./config-sync/card.js";
 import Autocomplete from "./commands/Autocomplete.svelte";
 import CommandsHelp from "./commands/CommandsHelp.svelte";
 
@@ -491,6 +492,10 @@ function scanPage() {
     hideTagsInHeader();
     hideBdsTagsInPopovers();
     injectShareDialogWarning();
+    // Cheap after the first pass: it only re-anchors cards whose message left
+    // the DOM, and reads the history cache once per session (plus a short retry
+    // window after each new turn).
+    ensureConfigSyncCards(knownNodes.length);
   });
 }
 

@@ -40,7 +40,23 @@ export const BRIDGE_EVENTS = {
   quoteContext: "bds:quote-context",
   /** Emitted by the injected script once the excerpt has been attached. */
   quoteContextConsumed: "bds:quote-context-consumed",
+  /**
+   * One-shot settings-transfer block. The content script stages the encoded
+   * blob; the injected script prepends it to the next request body and clears
+   * it, exactly like the quote excerpt.
+   */
+  configSyncStage: "bds:config-sync-stage",
+  /** Emitted by the injected script once the transfer block has been attached. */
+  configSyncConsumed: "bds:config-sync-consumed",
 };
+
+/**
+ * Tag that carries a settings backup inside a chat message.
+ *
+ * Declared here (not in `lib/config-sync.js`) because the injected bundle must
+ * read it without pulling that module's fflate/crypto imports along.
+ */
+export const CONFIG_SYNC_TAG = "BDS:CONFIG";
 
 // ── Versioning ──
 export const SYSTEM_PROMPT_TEMPLATE_VERSION = 16;
