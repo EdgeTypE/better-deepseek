@@ -52,6 +52,33 @@ class WebViewBridgeDeliveryTest {
     }
 
     @Test
+    fun `deliverPickedFiles serializes staged blob refs with size and mime`() {
+        bridge.deliverPickedFiles(
+                "req-1",
+                listOf(
+                        PickedFile(
+                                "doc.pdf",
+                                "",
+                                WebViewBridge.PICKED_BLOB_ENCODING,
+                                "application/pdf",
+                                42L,
+                                "ref-1",
+                        )
+                ),
+                emptyList(),
+                null,
+        )
+
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+
+        val file = reassemblePayload(scripts).getJSONArray("files").getJSONObject(0)
+        assertEquals(WebViewBridge.PICKED_BLOB_ENCODING, file.getString("encoding"))
+        assertEquals("application/pdf", file.getString("mime"))
+        assertEquals(42L, file.getLong("size"))
+        assertEquals("ref-1", file.getString("ref"))
+    }
+
+    @Test
     fun `deliverPickedFiles serializes encoding and mime only when present`() {
         bridge.deliverPickedFiles(
                 "req-1",

@@ -14,6 +14,7 @@ import android.provider.OpenableColumns
 import android.util.Base64
 import android.util.Log
 import android.webkit.JavascriptInterface
+import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
@@ -23,6 +24,8 @@ import java.io.FileOutputStream
 import java.io.InputStream
 import java.util.Locale
 import java.nio.charset.Charset
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -38,6 +41,10 @@ internal data class PickedFile(
         val content: String,
         val encoding: String? = null,
         val mime: String? = null,
+        /** Byte length of the original file; only set for [WebViewBridge.PICKED_BLOB_ENCODING]. */
+        val size: Long? = null,
+        /** Native staging key the page pulls chunks from; only set for the blob encoding. */
+        val ref: String? = null,
 )
 
 /** Native-picked file that could not be delivered to JavaScript. */
@@ -82,6 +89,11 @@ internal fun readBoundedBytes(stream: InputStream, capBytes: Long): BoundedReadR
     }
 }
 
+/**
+ * Text-only classification for folder picks and their tests. Single-file picks go through
+ * [WebViewBridge.readPickedContentUri], which stages binary documents as blobs instead of
+ * rejecting them.
+ */
 internal fun classifyPickedFile(
         name: String,
         byteSize: Long,
@@ -138,6 +150,32 @@ internal fun encodePickedImage(
 internal fun mimeForImageName(name: String): String {
     val ext = fileExtension(name)
     return WebViewBridge.IMAGE_MIME_TYPES[ext] ?: "application/octet-stream"
+}
+
+/**
+ * True when the picked bytes must travel as an opaque blob instead of UTF-8 text.
+ *
+ * A document extension decides on its own: a PDF with an uncompressed body may contain no NUL
+ * byte at all, and decoding it as text would silently corrupt the file the user asked for. Any
+ * other extension falls back to content sniffing, which keeps extensionless text files
+ * (Dockerfile, LICENSE) on the text path.
+ */
+internal fun looksBinaryFile(name: String, bytes: ByteArray): Boolean {
+    if (fileExtension(name) in WebViewBridge.BINARY_EXTENSIONS) return true
+    for (byte in bytes) {
+        if (byte.toInt() == 0) return true
+    }
+    return false
+}
+
+internal fun mimeForPickedName(name: String): String {
+    val ext = fileExtension(name)
+    WebViewBridge.MIME_TYPES[ext]?.let {
+        return it
+    }
+    return runCatching { MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) }
+            .getOrNull()
+            ?: "application/octet-stream"
 }
 
 internal fun classifyFolderImageCap(name: String, acceptedImageCount: Int): PickedItemResult? {
@@ -201,6 +239,9 @@ class WebViewBridge(
 
     private val prefs: SharedPreferences =
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    /** Binary pick payloads waiting for the page to pull them in chunks. */
+    private val pickedBlobs = ConcurrentHashMap<String, ByteArray>()
 
     private val httpClient: OkHttpClient =
             httpClient
@@ -314,6 +355,8 @@ class WebViewBridge(
                         put("content", file.content)
                         if (file.encoding != null) put("encoding", file.encoding)
                         if (file.mime != null) put("mime", file.mime)
+                        if (file.size != null) put("size", file.size)
+                        if (file.ref != null) put("ref", file.ref)
                     }
             )
         }
@@ -383,20 +426,90 @@ class WebViewBridge(
             return PickedItemResult.Skipped(name, "too-large")
         }
 
-        val content =
+        val bytes =
                 try {
                     context.contentResolver.openInputStream(uri)?.use { stream ->
                         val read = readBoundedBytes(stream, MAX_PICKED_FILE_SIZE)
                         if (read.overflowed) {
                             return PickedItemResult.Skipped(name, "too-large")
                         }
-                        String(read.bytes, Charsets.UTF_8)
+                        read.bytes
                     }
                 } catch (t: Throwable) {
                     Log.w(TAG, "readPickedContentUri failed for $uri", t)
                     null
                 }
-        return classifyPickedFile(name, length, content, requireKnownExtension = false)
+        if (bytes == null) return PickedItemResult.Skipped(name, "unreadable")
+
+        // Documents such as PDFs are staged natively and pulled by the page in chunks: inlining a
+        // 50 MB file as base64 into the delivery payload would need several hundred megabytes of
+        // transient strings on both sides of the bridge.
+        if (looksBinaryFile(name, bytes)) {
+            return PickedItemResult.Ok(
+                    PickedFile(
+                            name = name,
+                            content = "",
+                            encoding = PICKED_BLOB_ENCODING,
+                            mime = resolvePickedMimeType(uri, name),
+                            size = bytes.size.toLong(),
+                            ref = registerPickedBlob(bytes),
+                    )
+            )
+        }
+        return PickedItemResult.Ok(PickedFile(name, String(bytes, Charsets.UTF_8)))
+    }
+
+    private fun resolvePickedMimeType(uri: Uri, name: String): String {
+        val fromResolver =
+                runCatching { context.contentResolver.getType(uri) }.getOrNull()?.trim().orEmpty()
+        if (fromResolver.isNotEmpty() && fromResolver != "application/octet-stream") {
+            return fromResolver
+        }
+        return mimeForPickedName(name)
+    }
+
+    /**
+     * Stages binary bytes for the page. Only the most recent pick is kept: a new pick discards
+     * whatever the previous one left behind (see [clearPickedBlobs]).
+     */
+    internal fun registerPickedBlob(bytes: ByteArray): String {
+        val ref = UUID.randomUUID().toString()
+        pickedBlobs[ref] = bytes
+        return ref
+    }
+
+    internal fun clearPickedBlobs() {
+        pickedBlobs.clear()
+    }
+
+    /**
+     * Returns one base64 slice of a staged blob, or null past the end (and for unknown refs).
+     * The page decodes each slice straight into a preallocated array, so no single string ever
+     * holds the whole file.
+     */
+    @JavascriptInterface
+    fun readPickedBlobChunk(ref: String?, offset: Int?, length: Int?): String? {
+        val key = sanitizeBlobRef(ref) ?: return null
+        val blob = pickedBlobs[key] ?: return null
+        val start = offset ?: return null
+        if (start < 0 || start >= blob.size) return null
+        val wanted =
+                (length ?: MAX_PICKED_BLOB_CHUNK_BYTES).coerceIn(1, MAX_PICKED_BLOB_CHUNK_BYTES)
+        val end = minOf(blob.size, start + wanted)
+        return java.util.Base64.getEncoder().encodeToString(blob.copyOfRange(start, end))
+    }
+
+    @JavascriptInterface
+    fun releasePickedBlob(ref: String?) {
+        val key = sanitizeBlobRef(ref) ?: return
+        pickedBlobs.remove(key)
+    }
+
+    private fun sanitizeBlobRef(ref: String?): String? {
+        val value = ref?.trim().orEmpty()
+        if (value.isEmpty() || value.length > 64) return null
+        if (!value.all { it.isLetterOrDigit() || it == '-' }) return null
+        return value
     }
 
     internal fun readPickedFolderTree(treeUri: Uri, acceptImages: Boolean = false): PickReadResult {
@@ -482,13 +595,13 @@ class WebViewBridge(
             return PickedItemResult.Skipped(relPath, "unsupported-type")
         }
         val length = file.length()
-        if (length > MAX_PICKED_FILE_SIZE) {
+        if (length > MAX_FOLDER_TEXT_FILE_SIZE) {
             return PickedItemResult.Skipped(relPath, "too-large")
         }
         val content =
                 try {
                     context.contentResolver.openInputStream(file.uri)?.use { stream ->
-                        val read = readBoundedBytes(stream, MAX_PICKED_FILE_SIZE)
+                        val read = readBoundedBytes(stream, MAX_FOLDER_TEXT_FILE_SIZE)
                         if (read.overflowed) {
                             return PickedItemResult.Skipped(relPath, "too-large")
                         }
@@ -1171,13 +1284,54 @@ class WebViewBridge(
         // so getLastKnownIsDark() and the polyfill share the same SharedPreferences key.
         internal const val KEY_LAST_PAGE_DARK = "bds_page_is_dark"
 
-        /** Max bytes per native-picked text file. */
-        internal const val MAX_PICKED_FILE_SIZE = 2L * 1024 * 1024
+        /**
+         * Max bytes per native-picked file. Matches DeepSeek's own 50 MB upload ceiling: the
+         * picker must not be stricter than the site, or a PDF the site would accept dies here.
+         */
+        internal const val MAX_PICKED_FILE_SIZE = 50L * 1024 * 1024
 
         /** Max bytes per native-picked image file. */
         internal const val MAX_PICKED_IMAGE_SIZE = 8L * 1024 * 1024
 
+        /** Raw bytes handed to the page per bridge call while pulling a staged blob. */
+        internal const val MAX_PICKED_BLOB_CHUNK_BYTES = 512 * 1024
+
+        /** [PickedFile.encoding] marker for a blob the page pulls with [readPickedBlobChunk]. */
+        internal const val PICKED_BLOB_ENCODING = "base64-ref"
+
+        /**
+         * Extensions that always travel as opaque bytes, whatever their content looks like.
+         * Content sniffing alone is not enough: a PDF whose body happens to contain no NUL byte
+         * would be decoded as text and silently corrupted.
+         */
+        internal val BINARY_EXTENSIONS =
+                setOf(
+                        "pdf", "doc", "docx", "odt", "rtf", "xls", "xlsx", "ods", "ppt", "pptx",
+                        "odp", "epub", "zip", "rar", "7z", "gz", "tar", "bin"
+                )
+
+        /** Explicit MIME map: device MimeTypeMap tables are not guaranteed to know documents. */
+        internal val MIME_TYPES =
+                mapOf(
+                        "pdf" to "application/pdf",
+                        "doc" to "application/msword",
+                        "docx" to "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "xls" to "application/vnd.ms-excel",
+                        "xlsx" to "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "ppt" to "application/vnd.ms-powerpoint",
+                        "pptx" to "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        "epub" to "application/epub+zip",
+                        "rtf" to "application/rtf",
+                        "zip" to "application/zip",
+                )
+
         internal const val MAX_FOLDER_IMAGES = 10
+
+        /**
+         * Per-file cap inside a picked folder. Folder picks are concatenated into one workspace
+         * text file, so they keep the old, much smaller budget.
+         */
+        internal const val MAX_FOLDER_TEXT_FILE_SIZE = 2L * 1024 * 1024
 
         internal const val MAX_PICK_CHUNK_CHARS = 200_000
 

@@ -618,6 +618,40 @@ describe("AttachMenu integration", () => {
     cleanup();
   });
 
+  it("injects a native-picked PDF as a typed File on Android (#214)", async () => {
+    const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x00, 0x2d]);
+    installAndroidBridgeMock(() => ({
+      files: [
+        {
+          name: "doc.pdf",
+          content: "",
+          encoding: "base64-ref",
+          mime: "application/pdf",
+          size: bytes.length,
+          ref: "ref-1",
+        },
+      ],
+      skipped: [],
+    }));
+    window.AndroidBridge.readPickedBlobChunk = vi.fn((ref, offset, length) =>
+      btoa(String.fromCharCode(...bytes.subarray(offset, offset + length))),
+    );
+    window.AndroidBridge.releasePickedBlob = vi.fn();
+    const nativeInput = setupNativeInput();
+    const { target, cleanup } = renderSvelte(AttachMenu, { nativeInput });
+
+    target.querySelector(".bds-plus-btn").click();
+    await flushUi();
+    getAttachItemByText("Upload File").click();
+    await flushNativePick();
+
+    expect(Array.from(nativeInput.files, (file) => [file.name, file.type, file.size])).toEqual([
+      ["doc.pdf", "application/pdf", bytes.length],
+    ]);
+    expect(window.AndroidBridge.releasePickedBlob).toHaveBeenCalledWith("ref-1");
+    cleanup();
+  });
+
   it("toasts imagesRequireVision when native skips images outside Vision mode", async () => {
     installModelSwitcher("instant");
     installAndroidBridgeMock(() => ({
@@ -681,7 +715,7 @@ describe("AttachMenu integration", () => {
 
     expect(nativeInput.files).toHaveLength(0);
     expect(state.ui.showToast).toHaveBeenCalledWith(
-      "Nothing was attached - the selected file(s) are unsupported, too large (over 2 MB), or binary.",
+      "Nothing was attached - the selected file(s) were skipped (too large, unreadable, or not supported here).",
     );
     cleanup();
   });

@@ -400,8 +400,8 @@
       "dismiss": "Kapat"
     },
     "attachMenu": {
-      "noFilesPicked": "Hiçbir şey eklenmedi - seçilen dosya(lar) desteklenmiyor, çok büyük (2 MB üzeri) veya ikili dosya.",
-      "someFilesSkipped": "Seçilen {{total}} dosyadan {{skipped}} tanesi eklenemedi (desteklenmiyor, çok büyük veya ikili).",
+      "noFilesPicked": "Hiçbir şey eklenmedi - seçilen dosya(lar) atlandı (çok büyük, okunamıyor veya burada desteklenmiyor).",
+      "someFilesSkipped": "Seçilen {{total}} dosyadan {{skipped}} tanesi eklenemedi (çok büyük, okunamıyor veya burada desteklenmiyor).",
       "folderNoTextFiles": "Seçilen klasörde desteklenen metin dosyası bulunamadı.",
       "pickTimeout": "Dosya seçici sonuç döndürmedi. Lütfen tekrar deneyin.",
       "imagesRequireVision": "Görseller yalnızca Vision modunda eklenebilir.",

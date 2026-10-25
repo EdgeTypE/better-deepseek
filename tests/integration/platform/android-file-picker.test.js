@@ -5,6 +5,7 @@ import {
   buildFolderFileFromNative,
   isNativeFilePickerAvailable,
   nativePickFiles,
+  PICKED_BLOB_ENCODING,
   PICK_ERRORS,
   pickedEntryToFile,
 } from "../../../src/platform/android-file-picker.js";
@@ -447,5 +448,77 @@ describe("pickedEntryToFile", () => {
     expect(file.name).toBe("notes.md");
     expect(file.type).toBe("text/plain");
     expect(await readBlobText(file)).toBe("# Notes");
+  });
+
+  describe("staged binary payloads", () => {
+    afterEach(() => {
+      delete window.AndroidBridge;
+    });
+
+    it("pulls every chunk into one file and releases the ref", async () => {
+      const bytes = new Uint8Array([1, 2, 3, 4, 5, 6, 7]);
+      const slices = [
+        Buffer.from(bytes.slice(0, 4)).toString("base64"),
+        Buffer.from(bytes.slice(4)).toString("base64"),
+      ];
+      const calls = [];
+      const releasePickedBlob = vi.fn();
+      window.AndroidBridge = {
+        readPickedBlobChunk: vi.fn((ref, offset, length) => {
+          calls.push({ ref, offset, length });
+          return slices[calls.length - 1] ?? null;
+        }),
+        releasePickedBlob,
+      };
+
+      const file = pickedEntryToFile({
+        name: "doc.pdf",
+        content: "",
+        encoding: PICKED_BLOB_ENCODING,
+        mime: "application/pdf",
+        size: bytes.length,
+        ref: "ref-1",
+      });
+
+      expect(file.name).toBe("doc.pdf");
+      expect(file.type).toBe("application/pdf");
+      expect(file.size).toBe(bytes.length);
+      expect(Array.from(await readBlobBytes(file))).toEqual(Array.from(bytes));
+      expect(calls[0]).toEqual({ ref: "ref-1", offset: 0, length: bytes.length });
+      expect(releasePickedBlob).toHaveBeenCalledWith("ref-1");
+    });
+
+    it("keeps the bytes read so far when the bridge stops early", async () => {
+      window.AndroidBridge = {
+        readPickedBlobChunk: vi.fn((ref, offset) =>
+          offset === 0 ? Buffer.from([9, 8]).toString("base64") : null,
+        ),
+        releasePickedBlob: vi.fn(),
+      };
+
+      const file = pickedEntryToFile({
+        name: "doc.pdf",
+        encoding: PICKED_BLOB_ENCODING,
+        mime: "application/pdf",
+        size: 10,
+        ref: "ref-2",
+      });
+
+      expect(file.size).toBe(2);
+      expect(Array.from(await readBlobBytes(file))).toEqual([9, 8]);
+    });
+
+    it("falls back to an empty typed file without a bridge", () => {
+      const file = pickedEntryToFile({
+        name: "doc.pdf",
+        encoding: PICKED_BLOB_ENCODING,
+        mime: "application/pdf",
+        size: 10,
+        ref: "ref-3",
+      });
+
+      expect(file.type).toBe("application/pdf");
+      expect(file.size).toBe(0);
+    });
   });
 });

@@ -2,9 +2,13 @@
  * Native Android file/folder picker bridge.
  *
  * Wraps AndroidBridge.pickFiles in a Promise API. The native side opens an
- * unrestricted Android document picker and returns text-file contents to JS,
- * which avoids WebView accept/MIME filtering problems for extensions such as
- * .md on Android builds that do not know text/markdown.
+ * unrestricted Android document picker and returns file contents to JS, which
+ * avoids WebView accept/MIME filtering problems for extensions such as .md on
+ * Android builds that do not know text/markdown.
+ *
+ * Text files arrive inline. Binary documents (PDF, Office, archives) arrive as
+ * [PICKED_BLOB_ENCODING] entries staged natively: the page pulls them back in
+ * fixed-size slices so neither side ever builds one huge base64 string.
  */
 
 export function isNativeFilePickerAvailable() {
@@ -14,6 +18,12 @@ export function isNativeFilePickerAvailable() {
     typeof window.AndroidBridge.pickFiles === "function"
   );
 }
+
+/** Must match WebViewBridge.MAX_PICKED_BLOB_CHUNK_BYTES. */
+const PICKED_BLOB_CHUNK_BYTES = 512 * 1024;
+
+/** Native staging marker; see WebViewBridge.PICKED_BLOB_ENCODING. */
+export const PICKED_BLOB_ENCODING = "base64-ref";
 
 const PICK_LAUNCH_TIMEOUT_MS = 10000;
 const PICK_RETURN_GRACE_MS = 30000;
@@ -222,11 +232,81 @@ export function nativePickFiles(mode = "files") {
   });
 }
 
+function decodeBase64Into(target, offset, base64) {
+  const binary = atob(base64);
+  const limit = Math.min(binary.length, target.length - offset);
+  for (let index = 0; index < limit; index += 1) {
+    target[offset + index] = binary.charCodeAt(index);
+  }
+  return limit;
+}
+
+/**
+ * Rebuilds a native-staged binary file. The bridge slices are pulled
+ * synchronously and decoded straight into one preallocated buffer, so peak
+ * memory is the file itself rather than a base64 copy of it.
+ */
+function buildStagedBlobFile(entry, name) {
+  const type = entry?.mime || "application/octet-stream";
+  const size = Number(entry?.size);
+  const bridge = typeof window !== "undefined" ? window.AndroidBridge : null;
+  if (
+    !bridge ||
+    typeof bridge.readPickedBlobChunk !== "function" ||
+    !Number.isFinite(size) ||
+    size <= 0
+  ) {
+    return new File([], name, { type });
+  }
+
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  try {
+    while (offset < size) {
+      const wanted = Math.min(PICKED_BLOB_CHUNK_BYTES, size - offset);
+      const chunk = bridge.readPickedBlobChunk(entry.ref, offset, wanted);
+      if (typeof chunk !== "string" || chunk.length === 0) break;
+      const written = decodeBase64Into(bytes, offset, chunk);
+      if (written === 0) break;
+      offset += written;
+    }
+  } finally {
+    if (typeof bridge.releasePickedBlob === "function") {
+      try {
+        bridge.releasePickedBlob(entry.ref);
+      } catch {
+        // Bridge torn down mid-read; the native side drops staged blobs per pick anyway.
+      }
+    }
+  }
+
+  const payload = offset === size ? bytes : bytes.subarray(0, offset);
+  return new File([payload], name, { type });
+}
+
+/** Drops a staged blob the caller decided not to use, so the native side frees it. */
+export function releasePickedEntry(entry) {
+  if (entry?.encoding !== PICKED_BLOB_ENCODING) return;
+  const bridge = typeof window !== "undefined" ? window.AndroidBridge : null;
+  if (!bridge || typeof bridge.releasePickedBlob !== "function") return;
+  try {
+    bridge.releasePickedBlob(entry.ref);
+  } catch {
+    // Bridge gone; the next pick clears staged blobs anyway.
+  }
+}
+
 export function pickedEntryToFile(entry) {
   const name = entry?.name || "picked_file";
+  if (entry?.encoding === PICKED_BLOB_ENCODING) {
+    return buildStagedBlobFile(entry, name);
+  }
   if (entry?.encoding === "base64") {
     const binary = atob(String(entry.content || ""));
-    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
     return new File([bytes], name, {
       type: entry.mime || "application/octet-stream",
     });
@@ -238,7 +318,8 @@ export function buildFolderFileFromNative(files, folderName) {
   if (!files || files.length === 0) return null;
 
   const tree = buildPathTree(files.map((file) => file.name));
-  const textFiles = files.filter((file) => file.encoding !== "base64");
+  // Only inline text entries carry content; images (base64) and staged blobs stay out.
+  const textFiles = files.filter((file) => !file.encoding);
   let content =
     "Directory Tree:\n" +
     renderPathTree(tree) +

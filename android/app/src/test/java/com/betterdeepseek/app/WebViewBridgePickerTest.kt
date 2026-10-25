@@ -43,7 +43,7 @@ class WebViewBridgePickerTest {
         val result =
                 classifyPickedFile(
                         "notes.md",
-                        3L * 1024 * 1024,
+                        WebViewBridge.MAX_PICKED_FILE_SIZE + 1,
                         "# hi",
                         requireKnownExtension = false,
                 )
@@ -95,18 +95,77 @@ class WebViewBridgePickerTest {
 
     @Test
     fun `classifyPickedFile skips NUL content without allowlisted extension in files mode as unsupported-type`() {
-        val result = classifyPickedFile("doc.pdf", -1, "a\u0000b", requireKnownExtension = false)
+        val result = classifyPickedFile("doc.pdf", -1, "a\u0000b", requireKnownExtension = true)
 
         assertSkipped(result, "doc.pdf", "unsupported-type")
     }
 
     @Test
-    fun `classifyPickedFile skips content exceeding the byte cap after decode as too-large`() {
-        val content = "a".repeat((WebViewBridge.MAX_PICKED_FILE_SIZE + 1).toInt())
+    fun `looksBinaryFile stages document extensions even without NUL bytes`() {
+        assertTrue(looksBinaryFile("doc.pdf", "plain ascii body".toByteArray()))
+        assertTrue(looksBinaryFile("report.DOCX", byteArrayOf(1, 2, 3)))
+    }
 
-        val result = classifyPickedFile("notes.md", -1, content, requireKnownExtension = false)
+    @Test
+    fun `looksBinaryFile keeps extensionless text on the text path`() {
+        assertFalse(looksBinaryFile("Dockerfile", "FROM busybox\n".toByteArray()))
+        assertTrue(looksBinaryFile("Dockerfile", byteArrayOf(0x46, 0x00, 0x46)))
+    }
 
-        assertSkipped(result, "notes.md", "too-large")
+    @Test
+    fun `mimeForPickedName resolves documents without a device MIME table`() {
+        assertEquals("application/pdf", mimeForPickedName("doc.pdf"))
+        assertEquals(
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                mimeForPickedName("report.docx"),
+        )
+    }
+
+    @Test
+    fun `readPickedBlobChunk returns base64 slices and null past the end`() {
+        val bytes = ByteArray(10) { it.toByte() }
+        val ref = bridge.registerPickedBlob(bytes)
+
+        val head = bridge.readPickedBlobChunk(ref, 0, 4)
+        assertArrayEquals(bytes.copyOfRange(0, 4), Base64.getDecoder().decode(head))
+
+        val tail = bridge.readPickedBlobChunk(ref, 8, WebViewBridge.MAX_PICKED_BLOB_CHUNK_BYTES)
+        assertArrayEquals(bytes.copyOfRange(8, 10), Base64.getDecoder().decode(tail))
+
+        assertNull(bridge.readPickedBlobChunk(ref, 10, 4))
+        assertNull(bridge.readPickedBlobChunk("missing-ref", 0, 4))
+        assertNull(bridge.readPickedBlobChunk("bad ref!", 0, 4))
+        assertNull(bridge.readPickedBlobChunk(null, 0, 4))
+    }
+
+    @Test
+    fun `readPickedBlobChunk clamps oversized slice requests`() {
+        val bytes = ByteArray(4) { it.toByte() }
+        val ref = bridge.registerPickedBlob(bytes)
+
+        val chunk = bridge.readPickedBlobChunk(ref, 0, Int.MAX_VALUE)
+
+        assertArrayEquals(bytes, Base64.getDecoder().decode(chunk))
+    }
+
+    @Test
+    fun `releasePickedBlob drops the staged payload`() {
+        val ref = bridge.registerPickedBlob(byteArrayOf(1, 2, 3))
+
+        bridge.releasePickedBlob(ref)
+
+        assertNull(bridge.readPickedBlobChunk(ref, 0, 4))
+    }
+
+    @Test
+    fun `clearPickedBlobs drops every staged payload`() {
+        val first = bridge.registerPickedBlob(byteArrayOf(1))
+        val second = bridge.registerPickedBlob(byteArrayOf(2))
+
+        bridge.clearPickedBlobs()
+
+        assertNull(bridge.readPickedBlobChunk(first, 0, 1))
+        assertNull(bridge.readPickedBlobChunk(second, 0, 1))
     }
 
     @Test

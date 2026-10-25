@@ -287,6 +287,9 @@ class MainActivity : ComponentActivity() {
                 bridge.deliverPickStatus(requestId, "reading")
                 Thread {
                     try {
+                        // Only the current pick's staged blobs matter; anything left over from a
+                        // previous pick is dead weight in the heap (up to 50 MB per file).
+                        bridge.clearPickedBlobs()
                         val files = mutableListOf<PickedFile>()
                         val skipped = mutableListOf<SkippedFile>()
                         for (uri in uris) {
