@@ -34,7 +34,20 @@ export const PICK_ERRORS = {
   TIMEOUT: "picker-timeout",
   STALLED: "read-stalled",
   MALFORMED: "malformed-payload",
+  BLOB_UNAVAILABLE: "blob-unavailable",
+  BLOB_INCOMPLETE: "blob-incomplete",
 };
+
+/**
+ * A staged blob that cannot be rebuilt must fail loudly. Returning an empty File instead is how
+ * a zero-byte PDF reached DeepSeek and surfaced as "No text extracted".
+ */
+function blobError(code, details) {
+  console.error("[BDS] staged blob read failed", { code, ...details });
+  const error = new Error("");
+  error.code = code;
+  return error;
+}
 
 export function nativePickFiles(mode = "files") {
   return new Promise((resolve, reject) => {
@@ -250,13 +263,11 @@ function buildStagedBlobFile(entry, name) {
   const type = entry?.mime || "application/octet-stream";
   const size = Number(entry?.size);
   const bridge = typeof window !== "undefined" ? window.AndroidBridge : null;
-  if (
-    !bridge ||
-    typeof bridge.readPickedBlobChunk !== "function" ||
-    !Number.isFinite(size) ||
-    size <= 0
-  ) {
-    return new File([], name, { type });
+  if (!bridge || typeof bridge.readPickedBlobChunk !== "function") {
+    throw blobError(PICK_ERRORS.BLOB_UNAVAILABLE, { name, size });
+  }
+  if (!Number.isFinite(size) || size <= 0) {
+    throw blobError(PICK_ERRORS.BLOB_UNAVAILABLE, { name, size });
   }
 
   const bytes = new Uint8Array(size);
@@ -280,8 +291,10 @@ function buildStagedBlobFile(entry, name) {
     }
   }
 
-  const payload = offset === size ? bytes : bytes.subarray(0, offset);
-  return new File([payload], name, { type });
+  if (offset !== size) {
+    throw blobError(PICK_ERRORS.BLOB_INCOMPLETE, { name, size, offset });
+  }
+  return new File([bytes], name, { type });
 }
 
 /** Drops a staged blob the caller decided not to use, so the native side frees it. */

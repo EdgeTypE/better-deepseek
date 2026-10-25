@@ -488,7 +488,7 @@ describe("pickedEntryToFile", () => {
       expect(releasePickedBlob).toHaveBeenCalledWith("ref-1");
     });
 
-    it("keeps the bytes read so far when the bridge stops early", async () => {
+    it("throws instead of attaching a truncated file when the bridge stops early", () => {
       window.AndroidBridge = {
         readPickedBlobChunk: vi.fn((ref, offset) =>
           offset === 0 ? Buffer.from([9, 8]).toString("base64") : null,
@@ -496,29 +496,38 @@ describe("pickedEntryToFile", () => {
         releasePickedBlob: vi.fn(),
       };
 
-      const file = pickedEntryToFile({
-        name: "doc.pdf",
-        encoding: PICKED_BLOB_ENCODING,
-        mime: "application/pdf",
-        size: 10,
-        ref: "ref-2",
-      });
+      let caught;
+      try {
+        pickedEntryToFile({
+          name: "doc.pdf",
+          encoding: PICKED_BLOB_ENCODING,
+          mime: "application/pdf",
+          size: 10,
+          ref: "ref-2",
+        });
+      } catch (error) {
+        caught = error;
+      }
 
-      expect(file.size).toBe(2);
-      expect(Array.from(await readBlobBytes(file))).toEqual([9, 8]);
+      expect(caught?.code).toBe(PICK_ERRORS.BLOB_INCOMPLETE);
+      expect(window.AndroidBridge.releasePickedBlob).toHaveBeenCalledWith("ref-2");
     });
 
-    it("falls back to an empty typed file without a bridge", () => {
-      const file = pickedEntryToFile({
-        name: "doc.pdf",
-        encoding: PICKED_BLOB_ENCODING,
-        mime: "application/pdf",
-        size: 10,
-        ref: "ref-3",
-      });
+    it("throws when the bridge cannot serve chunks at all", () => {
+      let caught;
+      try {
+        pickedEntryToFile({
+          name: "doc.pdf",
+          encoding: PICKED_BLOB_ENCODING,
+          mime: "application/pdf",
+          size: 10,
+          ref: "ref-3",
+        });
+      } catch (error) {
+        caught = error;
+      }
 
-      expect(file.type).toBe("application/pdf");
-      expect(file.size).toBe(0);
+      expect(caught?.code).toBe(PICK_ERRORS.BLOB_UNAVAILABLE);
     });
   });
 });

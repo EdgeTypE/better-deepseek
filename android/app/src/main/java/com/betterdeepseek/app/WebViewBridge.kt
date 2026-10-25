@@ -486,17 +486,20 @@ class WebViewBridge(
      * Returns one base64 slice of a staged blob, or null past the end (and for unknown refs).
      * The page decodes each slice straight into a preallocated array, so no single string ever
      * holds the whole file.
+     *
+     * `offset`/`length` are primitive ints on purpose: the WebView bridge only exposes methods
+     * whose parameters are primitives, String, Object or arrays. Boxed `Int?` compiles to
+     * `java.lang.Integer`, the method is then silently dropped from `window.AndroidBridge`, and
+     * the page gets a zero-byte file (issue #214 follow-up: "No text extracted").
      */
     @JavascriptInterface
-    fun readPickedBlobChunk(ref: String?, offset: Int?, length: Int?): String? {
+    fun readPickedBlobChunk(ref: String?, offset: Int, length: Int): String? {
         val key = sanitizeBlobRef(ref) ?: return null
         val blob = pickedBlobs[key] ?: return null
-        val start = offset ?: return null
-        if (start < 0 || start >= blob.size) return null
-        val wanted =
-                (length ?: MAX_PICKED_BLOB_CHUNK_BYTES).coerceIn(1, MAX_PICKED_BLOB_CHUNK_BYTES)
-        val end = minOf(blob.size, start + wanted)
-        return java.util.Base64.getEncoder().encodeToString(blob.copyOfRange(start, end))
+        if (offset < 0 || offset >= blob.size) return null
+        val wanted = length.coerceIn(1, MAX_PICKED_BLOB_CHUNK_BYTES)
+        val end = minOf(blob.size, offset + wanted)
+        return java.util.Base64.getEncoder().encodeToString(blob.copyOfRange(offset, end))
     }
 
     @JavascriptInterface

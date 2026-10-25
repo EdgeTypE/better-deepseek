@@ -122,6 +122,24 @@ class WebViewBridgePickerTest {
     }
 
     @Test
+    fun `readPickedBlobChunk uses primitive parameters the WebView bridge can expose`() {
+        // Regression guard for #214: boxed Int compiles to java.lang.Integer, the bridge then
+        // drops the method from window.AndroidBridge and the page silently builds a zero-byte
+        // file ("No text extracted").
+        val method =
+                WebViewBridge::class
+                        .java
+                        .getMethod(
+                                "readPickedBlobChunk",
+                                String::class.java,
+                                Int::class.javaPrimitiveType,
+                                Int::class.javaPrimitiveType,
+                        )
+
+        assertEquals(String::class.java, method.returnType)
+    }
+
+    @Test
     fun `readPickedBlobChunk returns base64 slices and null past the end`() {
         val bytes = ByteArray(10) { it.toByte() }
         val ref = bridge.registerPickedBlob(bytes)
