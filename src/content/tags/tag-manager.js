@@ -1,18 +1,35 @@
 /**
  * Tag Manager — CRUD operations for chat session tags.
  *
- * Tags are stored in chrome.storage.local and synced to DeepSeek's
- * title via the update_title API. No tokens are stored — the content
- * script's fetch sends page cookies automatically via host_permissions.
+ * Tags are stored in chrome.storage.local and mirrored into DeepSeek's title
+ * by driving the native rename UI (no tokens are stored, no API shape is
+ * assumed). The sidebar keeps the authoritative title in
+ * `data-bds-full-title`; `discoverTags` seeds state from titles found on the
+ * server, and must never undo a local write — see #213.
  */
 
 import state from "../state.js";
 import { STORAGE_KEYS } from "../../lib/constants.js";
+import { safeSetTextContent, safeSetAttribute, safeRemoveAttribute } from "../dom/dom-safety.js";
 
 // ── Tag pattern in titles ──
 // Tags are appended as: "Base Title <tag1> <tag2>"
 const TAG_SUFFIX_REGEX = /(\s+<[^<>]+>)+\s*$/;
 const SINGLE_TAG_REGEX = /<([^<>]+)>/g;
+
+const TITLE_SELECTOR = ".c08e6e93";
+const FULL_TITLE_ATTR = "data-bds-full-title";
+
+// ── Discovery guards (#213) ──
+// `discoverTags` writes into the same store the UI reads, so it must never be
+// able to undo a local write. Two guards:
+//   pendingWrites   — a setTags() is in flight for this session; the sidebar
+//                     still shows the pre-write title, ignore it entirely.
+//   lastAppliedTitle— reconcile a given title string only once. The scan runs
+//                     on every pass and re-reads the same stale title, which
+//                     would otherwise resurrect a just-removed tag forever.
+const pendingWrites = new Set();
+const lastAppliedTitle = new Map();
 
 // ── Read ──
 
@@ -44,14 +61,31 @@ export async function setTags(sessionId, tags) {
     .map((t) => String(t || "").trim())
     .filter((t) => t.length > 0);
 
+  // Snapshot what the sidebar currently shows *before* touching the cache —
+  // that is still the title on the server, and it is what we compare against.
+  const previousTitle = getTitleFromSidebar(sessionId) || getTitleFromState(sessionId);
+
   if (cleaned.length === 0) {
     delete state.chatTags[sessionId];
   } else {
     state.chatTags[sessionId] = cleaned;
   }
 
-  await persistTags();
-  await syncTitleWithTags(sessionId);
+  pendingWrites.add(sessionId);
+  try {
+    // Rewrite the title cache synchronously, before any await. The page-wide
+    // scan reads `data-bds-full-title` on every pass; while the rename is in
+    // flight that cache still carries the removed tags, and `discoverTags`
+    // would write them straight back into state — and storage. See #213.
+    if (previousTitle) {
+      writeTitleCache(sessionId, buildFullTitle(extractBaseTitle(previousTitle), cleaned));
+    }
+
+    await persistTags();
+    await syncTitleWithTags(sessionId, previousTitle);
+  } finally {
+    pendingWrites.delete(sessionId);
+  }
 }
 
 export async function addTag(sessionId, tagName) {
@@ -108,14 +142,20 @@ export function buildFullTitle(baseTitle, tags) {
 // ── Title sync ──
 
 /**
- * Read the current title from the sidebar DOM, strip old tags,
- * append current tags, and push to DeepSeek's API.
+ * Read the current title from the sidebar DOM, strip old tags, append current
+ * tags, and mirror the result into DeepSeek's title via the native rename UI.
+ *
+ * @param {string} sessionId
+ * @param {string} [knownTitle] Title to treat as the server's current title.
+ *   Callers that already snapshotted it (see `setTags`) must pass it: by the
+ *   time we get here the DOM cache has been rewritten to the *target* title,
+ *   so re-reading it would make the rename look like a no-op.
  */
-export async function syncTitleWithTags(sessionId) {
+export async function syncTitleWithTags(sessionId, knownTitle) {
   const tags = getTags(sessionId);
 
   // Try to get the current title from sidebar DOM
-  const currentTitle = getTitleFromSidebar(sessionId) || getTitleFromState(sessionId);
+  const currentTitle = knownTitle || getTitleFromSidebar(sessionId) || getTitleFromState(sessionId);
   if (!currentTitle) {
     console.warn("[BDS Tags] Cannot find title for session", sessionId);
     return;
@@ -130,7 +170,7 @@ export async function syncTitleWithTags(sessionId) {
   try {
     await updateSessionTitle(sessionId, newTitle);
     // Update the sidebar DOM immediately
-    updateTitleInSidebar(sessionId, newTitle);
+    writeTitleCache(sessionId, newTitle);
   } catch (err) {
     console.error("[BDS Tags] Failed to sync title:", err);
   }
@@ -222,13 +262,12 @@ function getTitleFromSidebar(sessionId) {
   const item = findSidebarItem(sessionId);
   if (!item) return null;
 
-  // The title element uses class .c08e6e93
-  const titleEl = item.querySelector(".c08e6e93");
+  const titleEl = item.querySelector(TITLE_SELECTOR);
   if (!titleEl) return null;
 
   // Read the original title from data attribute if we've stored it,
   // otherwise read from textContent
-  return titleEl.getAttribute("data-bds-full-title") || titleEl.textContent;
+  return titleEl.getAttribute(FULL_TITLE_ATTR) || titleEl.textContent;
 }
 
 /**
@@ -240,17 +279,33 @@ function getTitleFromState(sessionId) {
 }
 
 /**
- * Update the title text in the sidebar DOM after an API sync.
+ * Write the authoritative title into the sidebar DOM: the tag-free text the
+ * user sees plus the full title in `data-bds-full-title` for later reads.
+ * Called both before a rename (to kill the stale cache) and after it lands.
+ *
+ * @returns {boolean} false when the sidebar item is not rendered.
  */
-function updateTitleInSidebar(sessionId, newTitle) {
+function writeTitleCache(sessionId, fullTitle) {
   const item = findSidebarItem(sessionId);
-  if (!item) return;
+  if (!item) return false;
 
-  const titleEl = item.querySelector(".c08e6e93");
-  if (!titleEl) return;
+  const titleEl = item.querySelector(TITLE_SELECTOR);
+  if (!titleEl) return false;
 
-  titleEl.setAttribute("data-bds-full-title", newTitle);
-  // The tag-hider will strip tags from display on next scan
+  const baseTitle = extractBaseTitle(fullTitle);
+  if (baseTitle === fullTitle) {
+    safeRemoveAttribute(titleEl, FULL_TITLE_ATTR);
+  } else {
+    safeSetAttribute(titleEl, FULL_TITLE_ATTR, fullTitle);
+  }
+
+  // The tag-hider would do this on its next pass; doing it now keeps the DOM
+  // consistent with the cache we just wrote.
+  if (titleEl.textContent !== baseTitle) {
+    safeSetTextContent(titleEl, baseTitle);
+  }
+
+  return true;
 }
 
 // ── Persistence ──
@@ -268,12 +323,23 @@ async function persistTags() {
  * the extension's local storage was populated.
  *
  * It does NOT call syncTitleWithTags to avoid redundant API calls.
+ *
+ * Discovery is deliberately edge-triggered and never overrides a local write
+ * in flight — otherwise the stale sidebar title undoes tag removal. See #213.
  */
 export async function discoverTags(sessionId, fullTitle) {
   if (!sessionId || !fullTitle) return;
 
+  // A local write owns this session until it settles.
+  if (pendingWrites.has(sessionId)) return;
+
   const tagsFromTitle = extractTagsFromTitle(fullTitle);
   if (tagsFromTitle.length === 0) return;
+
+  // Reconcile each distinct title only once. The scan re-reads the same title
+  // on every pass, and until the rename lands it still carries the old tags.
+  if (lastAppliedTitle.get(sessionId) === fullTitle) return;
+  lastAppliedTitle.set(sessionId, fullTitle);
 
   const currentTags = getTags(sessionId);
 
