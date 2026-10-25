@@ -11,6 +11,7 @@
 import state from "../state.js";
 import { STORAGE_KEYS } from "../../lib/constants.js";
 import { safeSetTextContent, safeSetAttribute, safeRemoveAttribute } from "../dom/dom-safety.js";
+import { remoteConfig } from "../../lib/remote-config.svelte.js";
 
 // ── Tag pattern in titles ──
 // Tags are appended as: "Base Title <tag1> <tag2>"
@@ -176,6 +177,88 @@ export async function syncTitleWithTags(sessionId, knownTitle) {
   }
 }
 
+// ── DeepSeek Context Menu Keyword Dictionary ──
+export const RENAME_KEYWORDS = [
+  "rename",
+  "yeniden adlandır",
+  "yeniden adlandir",
+  "adını dəyiş",
+  "adini deyis",
+  "重命名",
+  "重新命名",
+  "переименовать",
+  "renombrar",
+  "cambiar nombre",
+  "umbenennen",
+  "renommer",
+  "名前を変更",
+  "名前変更",
+  "이름 바꾸기",
+  "이름변경",
+  "renomear",
+  "rinomina",
+  "đổi tên",
+  "إعادة تسمية",
+  "تغییر نام",
+  "hernoemen",
+  "zmień nazwę",
+  "zmienic nazwe",
+  "қайта атау",
+  "qayta nomlash",
+];
+
+/**
+ * Locate the "Rename" option in DeepSeek's chat context menu (.ds-dropdown-menu).
+ * Supports multi-language keywords as well as positional/structural fallback
+ * driven by remote config so that button order changes can be updated remotely.
+ *
+ * @param {Element[]|NodeList} options
+ * @param {number} [overrideIndex]
+ * @returns {Element|null}
+ */
+export function findRenameOption(options, overrideIndex = undefined) {
+  const list = Array.from(options || []);
+  if (list.length === 0) return null;
+
+  // Filter out any BDS-injected options (e.g. Tags, Export)
+  const nativeOptions = list.filter((el) => {
+    const className = String(el.className || "");
+    return !className.includes("bds-");
+  });
+
+  if (nativeOptions.length === 0) return null;
+
+  // 1. Check for text matching known multi-language rename keywords
+  // (Also check for any extra keywords provided via remote config)
+  const remoteKeywords = remoteConfig?.getConfig?.("selectors.dropdownMenu.renameKeywords");
+  const keywords = Array.isArray(remoteKeywords)
+    ? [...remoteKeywords, ...RENAME_KEYWORDS]
+    : RENAME_KEYWORDS;
+
+  for (const opt of nativeOptions) {
+    const text = String(opt.textContent || "").toLowerCase().trim();
+    if (keywords.some((kw) => text.includes(kw))) {
+      return opt;
+    }
+  }
+
+  // 2. Structural/Positional fallback using remote config:
+  // If button order changes, it can be updated remotely without releasing an extension update.
+  let targetIndex = overrideIndex;
+  if (typeof targetIndex !== "number") {
+    const fromRemote =
+      remoteConfig?.getConfig?.("selectors.dropdownMenu.renameOptionIndex") ??
+      remoteConfig?.getConfig?.("features.tagManager.renameOptionIndex");
+    targetIndex = typeof fromRemote === "number" ? fromRemote : 0;
+  }
+
+  if (targetIndex >= 0 && targetIndex < nativeOptions.length) {
+    return nativeOptions[targetIndex];
+  }
+
+  return nativeOptions[0];
+}
+
 // ── DeepSeek API ──
 
 /**
@@ -187,40 +270,62 @@ async function updateSessionTitle(sessionId, newTitle) {
   if (!item) throw new Error("Sidebar item not found");
 
   // 1. Open the three-dot menu
-  const menuBtn = item.querySelector('._2090548');
+  const menuBtn =
+    item.querySelector('._2090548') ||
+    item.querySelector('[class*="_2090548"]') ||
+    item.querySelector('.ds-dropdown-trigger') ||
+    item.querySelector('[role="button"]');
   if (!menuBtn) throw new Error("Menu button not found");
   menuBtn.click();
 
-  // 2. Wait for dropdown and find "Rename"
-  await new Promise(r => setTimeout(r, 100));
-  const renameOption = Array.from(document.querySelectorAll('.ds-dropdown-menu-option'))
-    .find(el => el.textContent.toLowerCase().includes('rename'));
-  
+  // 2. Wait for dropdown and find "Rename" across languages
+  let renameOption = null;
+  const startWait = Date.now();
+  while (Date.now() - startWait < 500) {
+    const options = document.querySelectorAll('.ds-dropdown-menu-option');
+    if (options.length > 0) {
+      renameOption = findRenameOption(options);
+      if (renameOption) break;
+    }
+    await new Promise((r) => setTimeout(r, 40));
+  }
+
   if (!renameOption) {
-    // If not found, menu might not have opened. Try clicking body to close and retry?
-    // For now, just throw.
     throw new Error("Rename option not found in menu");
   }
   renameOption.click();
 
   // 3. Wait for input to appear
-  await new Promise(r => setTimeout(r, 150));
-  const input = document.querySelector('input.ds-input__input');
+  let input = null;
+  const startInputWait = Date.now();
+  while (Date.now() - startInputWait < 600) {
+    input =
+      item.querySelector('input') ||
+      document.querySelector('input.ds-input__input') ||
+      document.querySelector('.c08e6e93 input');
+    if (input) break;
+    await new Promise((r) => setTimeout(r, 40));
+  }
+
   if (!input) throw new Error("Rename input field not found");
 
   // 4. Set the value using React-safe method
   const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
   nativeInputValueSetter.call(input, newTitle);
   input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
 
   // 5. Submit with Enter key
-  input.dispatchEvent(new KeyboardEvent('keydown', { 
+  const enterInit = { 
     key: 'Enter', 
     code: 'Enter', 
     keyCode: 13, 
     which: 13, 
     bubbles: true 
-  }));
+  };
+  input.dispatchEvent(new KeyboardEvent('keydown', enterInit));
+  input.dispatchEvent(new KeyboardEvent('keypress', enterInit));
+  input.dispatchEvent(new KeyboardEvent('keyup', enterInit));
 
   return true;
 }

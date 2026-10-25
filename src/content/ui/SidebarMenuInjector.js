@@ -3,6 +3,7 @@ import { setPendingExport, checkPendingExport } from "../tools/pending-export.js
 import { openTagEditor } from "../tags/tag-editor.js";
 import { i18n } from "../../lib/i18n.svelte.js";
 import appState from "../state.js";
+import { remoteConfig } from "../../lib/remote-config.svelte.js";
 
 // Keep track of which chat item's menu was opened
 let lastClickedChatUrl = null;
@@ -132,15 +133,63 @@ async function handleExportAction(format) {
   }
 }
 
+export const DELETE_KEYWORDS = [
+  "delete",
+  "sil",
+  "删除",
+  "刪除",
+  "удалить",
+  "eliminar",
+  "supprimer",
+  "löschen",
+  "削除",
+  "삭제",
+  "excluir",
+  "elimina",
+  "xóa",
+  "حذف",
+];
+
+export function findDeleteOption(menu) {
+  const allOptions = Array.from(menu.querySelectorAll(".ds-dropdown-menu-option"));
+  const nativeOptions = allOptions.filter((opt) => !opt.className.includes("bds-"));
+
+  // 1. Text match against known delete keywords
+  const remoteKeywords = remoteConfig?.getConfig?.("selectors.dropdownMenu.deleteKeywords");
+  const keywords = Array.isArray(remoteKeywords)
+    ? [...remoteKeywords, ...DELETE_KEYWORDS]
+    : DELETE_KEYWORDS;
+
+  const matched = nativeOptions.find((opt) => {
+    const text = (
+      opt.querySelector(".ds-dropdown-menu-option__label")?.textContent ||
+      opt.textContent ||
+      ""
+    ).toLowerCase().trim();
+    return keywords.some((kw) => text.includes(kw));
+  });
+  if (matched) return matched;
+
+  // 2. Fallback: In DeepSeek, the delete option position can be configured via remote config (-1 for last)
+  const configuredIndex = remoteConfig?.getConfig?.("selectors.dropdownMenu.deleteOptionIndex");
+  if (typeof configuredIndex === "number") {
+    const resolvedIndex = configuredIndex < 0 ? nativeOptions.length + configuredIndex : configuredIndex;
+    if (resolvedIndex >= 0 && resolvedIndex < nativeOptions.length) {
+      return nativeOptions[resolvedIndex];
+    }
+  }
+
+  if (nativeOptions.length >= 2) {
+    return nativeOptions[nativeOptions.length - 1];
+  }
+
+  return null;
+}
+
 function injectOptions(menu) {
   if (menu.querySelector(".bds-export-option")) return;
 
-  const deleteOption = Array.from(
-    menu.querySelectorAll(".ds-dropdown-menu-option")
-  ).find((opt) =>
-    opt.querySelector(".ds-dropdown-menu-option__label")?.textContent.toLowerCase().includes("delete")
-  );
-
+  const deleteOption = findDeleteOption(menu);
   const insertBefore = deleteOption || null;
 
   // Tags option
@@ -173,13 +222,24 @@ function injectOptions(menu) {
 function injectSettingsDrawerOptions(menu) {
   if (menu.querySelector(".bds-whats-new-option")) return;
 
-  const targetLabels = ["Download mobile App", "Get App"];
+  const targetLabels = [
+    "Download mobile App",
+    "Get App",
+    "Mobil Uygulamayı İndir",
+    "Uygulamayı İndir",
+    "Uygulamayı al",
+    "下载手机 App",
+    "下载移动应用",
+    "获取 App",
+    "Скачать мобильное приложение",
+    "Установить приложение",
+  ];
   let targetOption = null;
   for (const label of targetLabels) {
     targetOption = Array.from(
       menu.querySelectorAll(".ds-dropdown-menu-option")
     ).find((opt) =>
-      opt.querySelector(".ds-dropdown-menu-option__label")?.textContent.trim().includes(label)
+      opt.querySelector(".ds-dropdown-menu-option__label")?.textContent.trim().toLowerCase().includes(label.toLowerCase())
     );
     if (targetOption) break;
   }

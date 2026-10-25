@@ -7,11 +7,13 @@ import { chromeMockState, resetChromeMock } from "../../../tests/mocks/chrome.js
 import {
   addTag,
   discoverTags,
+  findRenameOption,
   getTags,
   removeTag,
   setTags,
 } from "./tag-manager.js";
 import { hideTagsInSidebar } from "./tag-hider.js";
+import { remoteConfig } from "../../lib/remote-config.svelte.js";
 
 /**
  * Sidebar DOM shaped like DeepSeek's: link > title span, the three-dot menu
@@ -186,3 +188,92 @@ describe("adding tags", () => {
     expect(titleEl().textContent).toBe("My Chat");
   });
 });
+
+describe("multi-language rename support", () => {
+  it("finds rename option with Turkish label (Yeniden adlandır)", async () => {
+    const id = "d1b2c3d4-0001";
+    mountSidebar({ id, title: "Proje", renameLabel: "Yeniden adlandır" });
+    await addTag(id, "test");
+    expect(getTags(id)).toEqual(["test"]);
+    expect(storedFullTitle()).toBe("Proje <test>");
+  });
+
+  it("finds rename option with Azerbaijani label (Adını dəyiş)", async () => {
+    const id = "d1b2c3d4-0002";
+    mountSidebar({ id, title: "Video özeti", renameLabel: "Adını dəyiş" });
+    await addTag(id, "video");
+    expect(getTags(id)).toEqual(["video"]);
+    expect(storedFullTitle()).toBe("Video özeti <video>");
+  });
+
+  it("finds rename option with Chinese label (重命名)", async () => {
+    const id = "d1b2c3d4-0003";
+    mountSidebar({ id, title: "代码分析", renameLabel: "重命名" });
+    await addTag(id, "dev");
+    expect(getTags(id)).toEqual(["dev"]);
+    expect(storedFullTitle()).toBe("代码分析 <dev>");
+  });
+
+  it("falls back to the first native option when label is in an unlisted language", async () => {
+    const id = "d1b2c3d4-0004";
+    mountSidebar({ id, title: "Chat", renameLabel: "OmniRenameCustom" });
+    await addTag(id, "fallback");
+    expect(getTags(id)).toEqual(["fallback"]);
+    expect(storedFullTitle()).toBe("Chat <fallback>");
+  });
+
+  it("findRenameOption ignores BDS options and picks native rename", () => {
+    const bdsOption = document.createElement("div");
+    bdsOption.className = "ds-dropdown-menu-option bds-tags-option";
+    bdsOption.textContent = "Tags (BDS)";
+
+    const nativeRename = document.createElement("div");
+    nativeRename.className = "ds-dropdown-menu-option";
+    nativeRename.textContent = "Renombrar";
+
+    const nativeDelete = document.createElement("div");
+    nativeDelete.className = "ds-dropdown-menu-option";
+    nativeDelete.textContent = "Eliminar";
+
+    const result = findRenameOption([bdsOption, nativeRename, nativeDelete]);
+    expect(result).toBe(nativeRename);
+  });
+
+  it("picks the configured index from remote config when button order changes", async () => {
+    // Simulate remote config overriding renameOptionIndex to 1
+    await remoteConfig.applyRemote({
+      selectors: {
+        dropdownMenu: {
+          renameOptionIndex: 1,
+        },
+      },
+    });
+
+    const opt0 = document.createElement("div");
+    opt0.className = "ds-dropdown-menu-option";
+    opt0.textContent = "Other Action";
+
+    const opt1 = document.createElement("div");
+    opt1.className = "ds-dropdown-menu-option";
+    opt1.textContent = "Special Rename Custom";
+
+    const result = findRenameOption([opt0, opt1]);
+    expect(result).toBe(opt1);
+
+    await remoteConfig.resetToBuiltin();
+  });
+
+  it("supports explicit overrideIndex parameter", () => {
+    const opt0 = document.createElement("div");
+    opt0.className = "ds-dropdown-menu-option";
+    opt0.textContent = "Action 0";
+
+    const opt1 = document.createElement("div");
+    opt1.className = "ds-dropdown-menu-option";
+    opt1.textContent = "Action 1";
+
+    const result = findRenameOption([opt0, opt1], 1);
+    expect(result).toBe(opt1);
+  });
+});
+

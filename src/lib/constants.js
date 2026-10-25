@@ -1142,7 +1142,7 @@ export const DEFAULT_REMOTE_CONFIG = {
     expandToggle: { collapseLongMessages: true },
     questionPanel: { enabled: true },
     codeRunner: { enabled: true },
-    tagManager: { enabled: true, sidebarRename: true },
+    tagManager: { enabled: true, sidebarRename: true, renameOptionIndex: 0 },
     sideBarMenuInjector: { enabled: true },
     selectionMode: { enabled: true },
     whatsNewPopup: { enabled: true },
@@ -1181,6 +1181,8 @@ export const DEFAULT_REMOTE_CONFIG = {
       container: ".ds-dropdown-menu",
       option: ".ds-dropdown-menu-option",
       optionLabel: ".ds-dropdown-menu-option__label",
+      renameOptionIndex: 0,
+      deleteOptionIndex: -1,
     },
     priceInsertion: {
       userMessage: ["_11d6b3a .ds-flex", "ds-flex._78e0558", "[class*='_78e0558']"],
