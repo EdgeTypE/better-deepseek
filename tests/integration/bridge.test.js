@@ -62,7 +62,10 @@ describe("bridge integration", () => {
     expect(received).toMatchObject({
       systemPrompt: "You are a test assistant.",
       preferredLang: "English",
-      skills: [{ name: "Active", content: "Use me" }],
+      skills: [
+        { name: "Active", content: "Use me", active: true },
+        { name: "Disabled", content: "Skip me", active: false },
+      ],
       memories: [{ key: "user_name", value: "Alex", importance: "always" }],
       activeCharacter: { name: "Mage", content: "wise", usage: "rp", active: true, id: "1" },
       activeProject: {

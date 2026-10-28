@@ -982,6 +982,8 @@
       "add": "Ekle",
       "categorySnippet": "snippet",
       "autocompleteHint": "Sekme \u21b9 tamamla \u00b7 \u21b5 çalıştır",
+      "categorySkill": "beceri",
+      "mentionHint": "Sekme \u21b9 ekle \u00b7 yalnızca bu mesaj",
       "cmdSearchDesc": "Web'de ara ve sonuçları sohbete ekle",
       "cmdSearchUsage": "/search <sorgu>",
       "cmdNewDesc": "Yeni bir sohbet başlat",

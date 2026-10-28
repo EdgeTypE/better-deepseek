@@ -985,6 +985,8 @@
       "add": "Add",
       "categorySnippet": "snippet",
       "autocompleteHint": "Tab \u21b9 complete \u00b7 \u21b5 execute",
+      "categorySkill": "skill",
+      "mentionHint": "Tab \u21b9 insert \u00b7 this message only",
       "cmdSearchDesc": "Search the web and inject results into chat",
       "cmdSearchUsage": "/search <query>",
       "cmdNewDesc": "Start a new conversation",

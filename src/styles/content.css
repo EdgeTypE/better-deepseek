@@ -4452,6 +4452,15 @@ textarea.bds-input,
   color: var(--bds-accent, #4d6bfe);
   background: var(--bds-accent-glow, rgba(77, 107, 254, 0.1));
 }
+.bds-cmd-category--skill {
+  color: var(--bds-accent, #4d6bfe);
+  background: var(--bds-accent-glow, rgba(77, 107, 254, 0.1));
+}
+.bds-cmd-icon--mention {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bds-accent, #4d6bfe);
+}
 .bds-cmd-args {
   color: var(--bds-text-tertiary, #999);
   font-size: 11px;

@@ -400,9 +400,15 @@ export async function pushConfigToPage() {
               schedule: e.schedule || { type: "first", everyNTurns: 1 },
             }))
         : [],
-      skills: state.skills
-        .filter((skill) => skill.active)
-        .map((skill) => ({ name: skill.name, content: skill.content })),
+      // Every skill travels to the page world, not only the active ones: the
+      // payload mutator resolves `@name` mentions there, and a mentioned skill
+      // has to work while its checkbox is off. The mutator filters on `active`
+      // for the standing injection.
+      skills: state.skills.map((skill) => ({
+        name: skill.name,
+        content: skill.content,
+        active: Boolean(skill.active),
+      })),
       memories: Object.entries(state.memories).map(([key, item]) => ({
         key,
         value: item.value,

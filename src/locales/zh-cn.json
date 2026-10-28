@@ -981,6 +981,8 @@
       "add": "添加",
       "categorySnippet": "片段",
       "autocompleteHint": "Tab \u21b9 补全 \u00b7 \u21b5 执行",
+      "categorySkill": "技能",
+      "mentionHint": "Tab \u21b9 插入 \u00b7 仅当前消息",
       "cmdSearchDesc": "搜索网页并将结果注入聊天",
       "cmdSearchUsage": "/search <查询>",
       "cmdNewDesc": "开始新对话",

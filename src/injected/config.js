@@ -7,6 +7,9 @@ export function normalizeConfig(config) {
         .map((skill) => ({
           name: String(skill && skill.name ? skill.name : "skill"),
           content: String(skill && skill.content ? skill.content : ""),
+          // Inactive skills stay in the list so `@name` can reach them; the
+          // standing injection filters on this flag.
+          active: !(skill && skill.active === false),
         }))
         .filter((skill) => skill.content.trim().length > 0)
     : [];

@@ -982,6 +982,8 @@
       "add": "Добавить",
       "categorySnippet": "сниппет",
       "autocompleteHint": "Tab \u21b9 завершить \u00b7 \u21b5 выполнить",
+      "categorySkill": "навык",
+      "mentionHint": "Tab \u21b9 вставить \u00b7 только это сообщение",
       "cmdSearchDesc": "Искать в интернете и вставлять результаты в чат",
       "cmdSearchUsage": "/search <запрос>",
       "cmdNewDesc": "Начать новый разговор",

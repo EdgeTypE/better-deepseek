@@ -981,6 +981,8 @@
       "add": "افزودن",
       "categorySnippet": "قطعه",
       "autocompleteHint": "Tab تکمیل · ⏎ اجرا",
+      "categorySkill": "مهارت",
+      "mentionHint": "Tab درج · فقط همین پیام",
       "cmdSearchDesc": "جستجوی وب و تزریق نتایج به گفتگو",
       "cmdSearchUsage": "/search <query>",
       "cmdNewDesc": "شروع گفتگوی جدید",
