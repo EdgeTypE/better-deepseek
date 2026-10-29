@@ -199,7 +199,8 @@
       "searchProvider": {
         "ddgLite": "DuckDuckGo (Lite)",
         "ddgHtml": "DuckDuckGo (HTML)",
-        "bing": "Bing"
+        "bing": "Bing",
+        "deepseekOfficial": "DeepSeek Official Search"
       },
       "collapseLongUserMessages": "جمع‌کردن پیام‌های طولانی کاربر",
       "collapseLongUserMessagesHint": "پیام‌های بسیار طولانی کاربر را به‌صورت خودکار پشت دکمه «بیشتر بخوانید» پنهان می‌کند.",
@@ -262,7 +263,18 @@
       "advancedSearchPlaceholder": "جستجوی تنظیمات...",
       "advancedNoResults": "تنظیمات منطبقی یافت نشد.",
       "disableTipBox": "غیرفعال‌کردن جعبه نکته",
-      "disableTipBoxHint": "هر بار که کشو باز می‌شود یک نکته تصادفی نشان می‌دهد."
+      "disableTipBoxHint": "هر بار که کشو باز می‌شود یک نکته تصادفی نشان می‌دهد.",
+      "officialWeb": {
+        "title": "Official Search / Fetch",
+        "fetchProvider": "Page reader",
+        "browserFetch": "Browser reader (existing)",
+        "officialFetch": "DeepSeek Official Fetch",
+        "manageKey": "Manage official API key (opens extension page)",
+        "refreshStatus": "Refresh key status",
+        "keyConfigured": "Official API key configured",
+        "keyMissing": "Official API key not configured",
+        "hint": "Select DeepSeek Official Search in the list above. Search and Fetch are independent. Save the provider settings below. Official failures do not silently switch providers. API billing is separate from web chat; deep reads may issue multiple requests."
+      }
     },
     "skillList": {
       "title": "مجموعه مهارت",
@@ -1523,8 +1535,8 @@
       "columnOptions": "گزینه‌های ستون",
       "hideRow": "پنهان‌کردن ردیف",
       "manageColumnsRows": "مدیریت ستون‌ها و ردیف‌ها",
-      "sortAsc": "\u25B2 مرتب‌سازی الف تا ی",
-      "sortDesc": "\u25BC مرتب‌سازی ی تا الف",
+      "sortAsc": "▲ مرتب‌سازی الف تا ی",
+      "sortDesc": "▼ مرتب‌سازی ی تا الف",
       "hideColumn": "پنهان‌کردن ستون",
       "showColumn": "نمایش ستون",
       "columns": "ستون‌ها",
@@ -1549,7 +1561,7 @@
       "10": "می‌خواهیم پشتیبانی زبان بیشتری به Better DeepSeek اضافه کنیم. اگر می‌خواهید زبان خود را اضافه کنید، <a href=\"https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md\" target=\"_blank\" rel=\"noopener noreferrer\">اینجا</a> را ببینید. همچنین اگر خطای ترجمه‌ای دیدید، می‌توانید اصلاح کنید.",
       "11": "می‌توانید با کلیک روی دکمه ... در تاریخچه نشست به هر گفتگو برچسب اختصاص دهید. سپس از آن برچسب‌ها برای جستجو یا فیلتر سریع گفتگوها استفاده کنید.",
       "12": "فقط با درخواست از دیپ‌سیک می‌توانید مهارت یا شخصیت جدید بسازید. کافی است بگویید چه می‌خواهید.",
-      "title": "\uD83D\uDCA1 نکته",
+      "title": "💡 نکته",
       "disableInSettings": "می‌توانید این را از تنظیمات غیرفعال کنید."
     },
     "contextMenu": {

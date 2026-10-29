@@ -328,6 +328,7 @@ describe("resolveSearchProviders", () => {
       { id: "ddg-lite", name: "DuckDuckGo Lite", labelKey: "settings.searchProvider.ddgLite" },
       { id: "ddg-html", name: "DuckDuckGo HTML", labelKey: "settings.searchProvider.ddgHtml" },
       { id: "bing", name: "Bing", labelKey: "settings.searchProvider.bing" },
+      { id: "deepseek-official", name: "DeepSeek Official Search", labelKey: "settings.searchProvider.deepseekOfficial" },
     ]);
   });
 
@@ -928,7 +929,7 @@ describe("MCP search providers", () => {
 
   it("appends MCP servers to the settings catalog", () => {
     const catalog = buildSearchProviderCatalog([EXA_SERVER]);
-    expect(catalog.map((p) => p.id)).toEqual(["ddg-lite", "ddg-html", "bing", "mcp:srv1"]);
+    expect(catalog.map((p) => p.id)).toEqual(["ddg-lite", "ddg-html", "bing", "deepseek-official", "mcp:srv1"]);
     expect(catalog[0].kind).toBe("http");
     expect(catalog.at(-1)).toEqual({
       id: "mcp:srv1",

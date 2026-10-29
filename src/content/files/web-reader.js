@@ -62,6 +62,15 @@ function convertHtmlToMarkdown(html, url) {
 export async function fetchAndConvertWebPage(url, onStatus = () => {}) {
   try {
     const normalizedUrl = normalizeHttpUrl(url);
+    const stored = await chrome.storage.local.get('bds_settings');
+    if (stored?.bds_settings?.webFetchProvider === 'deepseek-official') {
+      onStatus("Reading with DeepSeek Official Fetch...");
+      const response = await chrome.runtime.sendMessage({ type: 'bds-official-web', operation: 'fetch', input: { url: normalizedUrl } });
+      if (!response?.ok) throw new Error(response?.error || 'Official Fetch failed. No fallback was used.');
+      const { title, content } = response.data;
+      const text = `Title: ${title}\nURL: ${normalizedUrl}\nSource: DeepSeek Official Fetch\n\n${content}`;
+      return new File([text], 'deepseek-page.md', { type: 'text/markdown' });
+    }
     onStatus("Fetching page content...");
     const response = await chrome.runtime.sendMessage({
       type: "bds-fetch-url",

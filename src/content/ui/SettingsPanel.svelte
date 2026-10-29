@@ -236,6 +236,19 @@
   // Declared before searchProviderRows: the row builder reads the MCP servers
   // to include MCP-backed search providers.
   let mcpServers = $state([...appState.mcpServers]);
+  let webFetchProvider = $state(appState.settings.webFetchProvider || 'browser');
+  let officialKeyConfigured = $state(false);
+  let officialKeyBusy = $state(false);
+  let officialKeyError = $state('');
+  async function officialKeyAction(action) {
+    officialKeyBusy = true; officialKeyError = '';
+    try {
+      const response = await chrome.runtime.sendMessage({ type: 'bds-official-web-settings', action,  });
+      if (!response?.ok) throw new Error(response?.error || 'Unable to access official web settings.');
+      officialKeyConfigured = response.data.configured;
+    } catch (error) { officialKeyError = error.message; }
+    finally { officialKeyBusy = false; }
+  }
   let searchProviderRows = $state(buildSearchProviderRows(appState.settings.searchProviders));
   let activeSearchProviderCount = $derived(searchProviderRows.filter((row) => row.enabled).length);
   let locale = $state(appState.settings.locale || availableLocaleCodes[0] || "en");
@@ -479,7 +492,7 @@
       disableMemory, htmlToMarkdownMaxDepth, maxChatSessions,
       tokenPriceDisplay, showTimestamps, projectRagEnabled, projectRagLimit,
       processGitignoreOnUpload, injectSystemDateTime, skipDeletionConfirmation,
-      deepResearchDeepFetch,
+      deepResearchDeepFetch, webFetchProvider,
       searchProviders: enabledSearchProviderIds(),
       mcpInlineMaxChars,
       locale, syncLocale, keepReasoningBlocksOpen,
@@ -1045,6 +1058,7 @@
     // include MCP-backed search providers.
     mcpServers = [...appState.mcpServers];
     searchProviderRows = buildSearchProviderRows(appState.settings.searchProviders);
+    webFetchProvider = appState.settings.webFetchProvider || "browser";
     processGitignoreOnUpload = Boolean(appState.settings.processGitignoreOnUpload);
     injectSystemDateTime = Boolean(appState.settings.injectSystemDateTime);
     skipDeletionConfirmation = Boolean(appState.settings.skipDeletionConfirmation);
@@ -1159,6 +1173,7 @@
   }
 
   onMount(() => {
+    void officialKeyAction("status");
     chrome.storage.local.get("bds_locale_update_last_checked", (data) => {
       lastCheckedDate = data.bds_locale_update_last_checked || "";
     });
@@ -1299,6 +1314,7 @@
     appState.settings.searchProviders = enabledProviders.length > 0
       ? enabledProviders
       : SEARCH_PROVIDER_CATALOG.map((provider) => provider.id);
+    appState.settings.webFetchProvider = webFetchProvider;
     appState.settings.deepResearchContextGuardEnabled = deepResearchContextGuardEnabled;
     appState.settings.deepResearchContextLimitTokens = Math.max(16000, Math.min(1000000, Math.round(Number(deepResearchContextLimitTokens) || 128000)));
     appState.settings.deepResearchContextStopPercent = Math.max(50, Math.min(95, Math.round(Number(deepResearchContextStopPercent) || 70)));
@@ -2340,6 +2356,19 @@
             {/each}
           </div>
           <p style="font-size: 10px; opacity: 0.5; margin: 0;">{t('settings.searchProvidersHint')}</p>
+        </div>
+        <div class="bds-toggle-row" data-testid="official-web-settings" style="flex-direction:column;align-items:stretch;gap:8px;">
+          <strong>{t('settings.officialWeb.title')}</strong>
+          <label for="bds-web-fetch-provider">{t('settings.officialWeb.fetchProvider')}</label>
+          <select id="bds-web-fetch-provider" class="bds-input" bind:value={webFetchProvider}>
+            <option value="browser">{t('settings.officialWeb.browserFetch')}</option>
+            <option value="deepseek-official">{t('settings.officialWeb.officialFetch')}</option>
+          </select>
+          <button class="bds-btn" id="bds-open-official-key" onclick={async () => { await chrome.runtime.sendMessage({ type: 'bds-official-web-open-settings' }); }}>{t('settings.officialWeb.manageKey')}</button>
+          <button class="bds-btn" onclick={() => officialKeyAction('status')}>{t('settings.officialWeb.refreshStatus')}</button>
+          <span role="status">{t(officialKeyConfigured ? 'settings.officialWeb.keyConfigured' : 'settings.officialWeb.keyMissing')}</span>
+          {#if officialKeyError}<span role="alert">{officialKeyError}</span>{/if}
+          <p style="font-size:11px;opacity:.7;margin:0;">{t('settings.officialWeb.hint')}</p>
         </div>
 
         <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
