@@ -38,6 +38,8 @@ const SEARCH_FETCH_OPTIONS = {
   timeoutMs: SEARCH_PROVIDER_TIMEOUT_MS,
 };
 
+const OFFICIAL_SEARCH_PROVIDER = { id: "deepseek-official", kind: "official", name: "DeepSeek Official Search" };
+
 const SEARCH_PROVIDERS = [
   {
     id: "ddg-lite",
@@ -67,10 +69,11 @@ const PROVIDER_LABEL_KEYS = {
   "ddg-lite": "settings.searchProvider.ddgLite",
   "ddg-html": "settings.searchProvider.ddgHtml",
   "bing": "settings.searchProvider.bing",
+  "deepseek-official": "settings.searchProvider.deepseekOfficial",
 };
 
 /** Canonical id+label list for settings UI rendering (built-in providers only). */
-export const SEARCH_PROVIDER_CATALOG = SEARCH_PROVIDERS.map(({ id, name }) => ({
+export const SEARCH_PROVIDER_CATALOG = [...SEARCH_PROVIDERS, OFFICIAL_SEARCH_PROVIDER].map(({ id, name }) => ({
   id,
   name,
   labelKey: PROVIDER_LABEL_KEYS[id],
@@ -176,7 +179,7 @@ export function buildSearchProviderCatalog(mcpServers = []) {
  * @param {Array<object>} [mcpServers] state.mcpServers, for MCP provider lookup.
  */
 export function resolveSearchProviders(preferred, mcpServers = []) {
-  const available = [...SEARCH_PROVIDERS, ...collectMcpSearchProviders(mcpServers)];
+  const available = [...SEARCH_PROVIDERS, OFFICIAL_SEARCH_PROVIDER, ...collectMcpSearchProviders(mcpServers)];
   if (!Array.isArray(preferred)) return [...SEARCH_PROVIDERS];
 
   const byId = new Map(available.map((provider) => [provider.id, provider]));
@@ -211,7 +214,7 @@ function isResolvedProvider(value) {
     && typeof value === "object"
     && typeof value.id === "string"
     && value.id !== ""
-    && (typeof value.parse === "function" || value.kind === "mcp");
+    && (typeof value.parse === "function" || value.kind === "mcp" || value.kind === "official");
 }
 
 function cleanSearchText(value) {
@@ -835,6 +838,15 @@ export async function searchWeb(query, deepFetch = 0, onStatus = () => {}, optio
     onStatus(`Searching ${provider.name}...`, { phase: "searching", provider: provider.name });
 
     let parsedResults;
+
+    if (provider.id === "deepseek-official") {
+      const response = await chrome.runtime.sendMessage({ type: "bds-official-web", operation: "search", input: { query: providerQuery } });
+      if (!response?.ok) throw new Error(response?.error || "Official Search failed. No fallback was used.");
+      results = response.data.results;
+      if (!results.length) throw new Error("Official Search returned no results. No fallback was used.");
+      providerName = provider.name; rawResultCount = results.length;
+      break;
+    }
 
     if (provider.kind === "mcp") {
       let text;

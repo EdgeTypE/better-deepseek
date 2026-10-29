@@ -199,7 +199,8 @@
       "searchProvider": {
         "ddgLite": "DuckDuckGo (Lite)",
         "ddgHtml": "DuckDuckGo (HTML)",
-        "bing": "Bing"
+        "bing": "Bing",
+        "deepseekOfficial": "DeepSeek 官方 Search"
       },
       "collapseLongUserMessages": "折叠过长的用户消息",
       "collapseLongUserMessagesHint": "自动折叠过长的用户消息，点击“查看更多”展开。",
@@ -262,7 +263,18 @@
       "advancedSearchPlaceholder": "搜索设置…",
       "advancedNoResults": "未找到匹配的设置。",
       "disableTipBox": "禁用提示框",
-      "disableTipBoxHint": "每次打开抽屉时显示随机提示。"
+      "disableTipBoxHint": "每次打开抽屉时显示随机提示。",
+      "officialWeb": {
+        "title": "官方 Search / Fetch",
+        "fetchProvider": "网页读取来源",
+        "browserFetch": "浏览器读取（原有）",
+        "officialFetch": "DeepSeek 官方 Fetch",
+        "manageKey": "管理官方 API 密钥（打开扩展页面）",
+        "refreshStatus": "刷新密钥状态",
+        "keyConfigured": "已配置官方 API 密钥",
+        "keyMissing": "尚未配置官方 API 密钥",
+        "hint": "搜索在上方勾选 DeepSeek 官方 Search；网页读取单独选择。来源选择需点击下方保存设置。官方接口出错不会悄悄切换来源，API 计费与网页版聊天独立；深度读取可能产生多次请求。"
+      }
     },
     "skillList": {
       "title": "技能集",
@@ -980,9 +992,9 @@
       "cmdHint": "/命令名（小写，无空格）",
       "add": "添加",
       "categorySnippet": "片段",
-      "autocompleteHint": "Tab \u21b9 补全 \u00b7 \u21b5 执行",
+      "autocompleteHint": "Tab ↹ 补全 · ↵ 执行",
       "categorySkill": "技能",
-      "mentionHint": "Tab \u21b9 插入 \u00b7 仅当前消息",
+      "mentionHint": "Tab ↹ 插入 · 仅当前消息",
       "cmdSearchDesc": "搜索网页并将结果注入聊天",
       "cmdSearchUsage": "/search <查询>",
       "cmdNewDesc": "开始新对话",
@@ -1148,19 +1160,19 @@
           }
         },
         "v0_1_11": {
-          "title": "MCP \u670D\u52A1\u5668\u3001\u52A8\u6001\u8868\u683C\u4E0E\u7A33\u5B9A\u6027\u6539\u8FDB",
+          "title": "MCP 服务器、动态表格与稳定性改进",
           "features": {
             "feat_0": {
-              "title": "MCP \u670D\u52A1\u5668\u652F\u6301",
-              "description": "\u5C06\u8FDC\u7A0B MCP \u670D\u52A1\u5668\u8FDE\u63A5\u5230 DeepSeek \u4EE5\u83B7\u53D6\u5916\u90E8\u5DE5\u5177\u8BBF\u95EE\u3002\u5728\u8BBE\u7F6E \u2192 \u9AD8\u7EA7\u8BBE\u7F6E \u2192 MCP \u670D\u52A1\u5668\u4E2D\u914D\u7F6E\u670D\u52A1\u5668\u3002"
+              "title": "MCP 服务器支持",
+              "description": "将远程 MCP 服务器连接到 DeepSeek 以获取外部工具访问。在设置 → 高级设置 → MCP 服务器中配置服务器。"
             },
             "feat_1": {
-              "title": "\u52A8\u6001\u8868\u683C",
-              "description": "\u76F4\u63A5\u5728 DeepSeek \u751F\u6210\u7684\u8868\u683C\u4E2D\u6392\u5E8F\u6570\u636E\u548C\u91CD\u65B0\u6392\u5217\u5217\u3002"
+              "title": "动态表格",
+              "description": "直接在 DeepSeek 生成的表格中排序数据和重新排列列。"
             },
             "feat_2": {
-              "title": "\u7A33\u5B9A\u6027\u4E0E\u7528\u6237\u4F53\u9A8C\u6539\u8FDB",
-              "description": "\u6269\u5C55\u4E2D\u6570\u5341\u4E2A\u9519\u8BEF\u4FEE\u590D\u548C UI/UX \u6539\u8FDB\u3002"
+              "title": "稳定性与用户体验改进",
+              "description": "扩展中数十个错误修复和 UI/UX 改进。"
             }
           }
         },
@@ -1520,37 +1532,37 @@
       "cancelledToast": "Deep Research 修订已取消。"
     },
     "tableInjector": {
-      "columnOptions": "\u5217\u9009\u9879",
-      "hideRow": "\u9690\u85CF\u884C",
-      "manageColumnsRows": "\u7BA1\u7406\u5217\u548C\u884C",
-      "sortAsc": "\u25B2 \u5347\u5E8F\u6392\u5E8F A\u2192Z",
-      "sortDesc": "\u25BC \u964D\u5E8F\u6392\u5E8F Z\u2192A",
-      "hideColumn": "\u9690\u85CF\u5217",
-      "showColumn": "\u663E\u793A\u5217",
-      "columns": "\u5217",
-      "hiddenRows": "\u9690\u85CF\u7684\u884C ({{count}})",
-      "showAll": "\u663E\u793A\u6240\u6709\u5217\u548C\u884C",
-      "columnLabel": "\u5217 {{n}}"
+      "columnOptions": "列选项",
+      "hideRow": "隐藏行",
+      "manageColumnsRows": "管理列和行",
+      "sortAsc": "▲ 升序排序 A→Z",
+      "sortDesc": "▼ 降序排序 Z→A",
+      "hideColumn": "隐藏列",
+      "showColumn": "显示列",
+      "columns": "列",
+      "hiddenRows": "隐藏的行 ({{count}})",
+      "showAll": "显示所有列和行",
+      "columnLabel": "列 {{n}}"
     },
     "shareModal": {
       "searchEngineWarning": "共享的对话可能会被搜索引擎发现并索引。"
     },
     "tips": {
-      "title": "\uD83D\uDCA1 \u63D0\u793A",
-      "disableInSettings": "\u60A8\u53EF\u4EE5\u5728\u8BBE\u7F6E\u4E2D\u5173\u95ED\u6B64\u529F\u80FD\u3002",
-      "0": "\u8981\u5BFC\u51FA\u804A\u5929\u8BB0\u5F55\uFF0C\u8BF7\u70B9\u51FB\u804A\u5929\u5386\u53F2\u4E2D\u4F1A\u8BDD\u65C1\u8FB9\u7684 ... \u6309\u94AE\u3002",
-      "1": "\u60A8\u53EF\u4EE5\u5728\u8BBE\u7F6E\u4E2D\u5173\u95ED\u6B64\u63D0\u793A\u6846\u3002",
-      "2": "\u60A8\u53EF\u4EE5\u5BFC\u51FA\u5F53\u524D\u8BBE\u7F6E\u548C\u6570\u636E\u3002\u8BF7\u8BBF\u95EE\u9AD8\u7EA7\u8BBE\u7F6E\u90E8\u5206\u3002",
-      "3": "\u5C06\u5E38\u7528\u63D0\u793A\u4FDD\u5B58\u4E3A\u7247\u6BB5\uFF0C\u4EE5\u540E\u53EF\u4EE5\u8F7B\u677E\u518D\u6B21\u53D1\u9001\u3002\u60A8\u751A\u81F3\u53EF\u4EE5\u5C06\u7247\u6BB5\u5206\u914D\u7ED9 \"/\" \u547D\u4EE4\u4EE5\u52A0\u5FEB\u64CD\u4F5C\u901F\u5EA6\u3002\u8BE6\u60C5\u8BF7\u8BBF\u95EE BDS \u62BD\u5C49\u4E2D\u7684\u7247\u6BB5\u9009\u9879\u5361\u3002",
-      "4": "\u60A8\u77E5\u9053\u5417\uFF1F\u60A8\u53EF\u4EE5\u6FC0\u6D3B\u591A\u7CFB\u7EDF\u63D0\u793A\u6A21\u5F0F\uFF0C\u540C\u65F6\u4F7F\u7528\u591A\u4E2A\u7CFB\u7EDF\u63D0\u793A\uFF0C\u914D\u5408\u5404\u79CD\u65F6\u95F4\u8868\u548C\u6761\u4EF6\uFF0C\u521B\u5EFA\u81EA\u5B9A\u4E49\u5DE5\u4F5C\u6D41\u7A0B\u3002",
-      "5": "\u60A8\u53EF\u4EE5\u4ECE\u5176\u4ED6 AI \u5C06\u8BB0\u5FC6\u5BFC\u5165 BDS\u3002\u70B9\u51FB\u8BB0\u5FC6\u90E8\u5206\u5E95\u90E8\u7684\u300C\u4ECE\u5176\u4ED6 AI \u5BFC\u5165\u8BB0\u5FC6\u300D\u3002",
-      "6": "\u60A8\u77E5\u9053\u5417\uFF1FBetter DeepSeek \u4E5F\u6709 <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">Android \u5E94\u7528</a>\uFF1F",
-      "7": "\u5982\u679C\u60A8\u559C\u6B22\u8FD9\u4E2A\u6269\u5C55\uFF0C\u8BF7\u4E0E\u670B\u53CB\u5206\u4EAB\uFF01\u8981\u8BF7\u6C42\u529F\u80FD\uFF0C\u8BF7\u5728 <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub \u9875\u9762</a>\u4E0A\u544A\u8BC9\u6211\u4EEC\u3002",
-      "8": "\u60A8\u77E5\u9053\u5417\uFF1F\u60A8\u53EF\u4EE5\u5C06 MCP \u670D\u52A1\u5668\u8FDE\u63A5\u5230 Better DeepSeek\u3002\u8BF7\u67E5\u770B\u9AD8\u7EA7\u8BBE\u7F6E\u3002",
-      "9": "\u60A8\u53EF\u4EE5\u4F7F\u7528\u81EA\u5B9A\u4E49 CSS \u968F\u610F\u5B9A\u5236\u754C\u9762\u3002",
-      "10": "\u6211\u4EEC\u5E0C\u671B\u4E3A Better DeepSeek \u6DFB\u52A0\u66F4\u591A\u8BED\u8A00\u652F\u6301\u3002\u5982\u679C\u60A8\u60F3\u6DFB\u52A0\u81EA\u5DF1\u7684\u8BED\u8A00\uFF0C\u8BF7<a href=\"https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md\" target=\"_blank\" rel=\"noopener noreferrer\">\u67E5\u770B\u8FD9\u91CC</a>\u3002\u53E6\u5916\uFF0C\u5982\u679C\u60A8\u53D1\u73B0\u4EFB\u4F55\u7FFB\u8BD1\u9519\u8BEF\uFF0C\u53EF\u4EE5\u4FEE\u590D\u5B83\u4EEC\u3002",
-      "11": "\u60A8\u53EF\u4EE5\u901A\u8FC7\u5355\u51FB\u4F1A\u8BDD\u5386\u53F2\u4E2D\u7684 ... \u6309\u94AE\u4E3A\u4EFB\u4F55\u804A\u5929\u4F1A\u8BDD\u5206\u914D\u6807\u7B7E\u3002\u7136\u540E\u4F7F\u7528\u8FD9\u4E9B\u6807\u7B7E\u5FEB\u901F\u641C\u7D22\u6216\u8FC7\u6EE4\u60A8\u7684\u5BF9\u8BDD\u3002",
-      "12": "\u4F60\u53EF\u4EE5\u76F4\u63A5\u8BA9 DeepSeek \u521B\u5EFA\u65B0\u6280\u80FD\u6216\u89D2\u8272\u3002\u53EA\u9700\u8BF4\u51FA\u4F60\u7684\u9700\u6C42\u5373\u53EF\u3002"
+      "title": "💡 提示",
+      "disableInSettings": "您可以在设置中关闭此功能。",
+      "0": "要导出聊天记录，请点击聊天历史中会话旁边的 ... 按钮。",
+      "1": "您可以在设置中关闭此提示框。",
+      "2": "您可以导出当前设置和数据。请访问高级设置部分。",
+      "3": "将常用提示保存为片段，以后可以轻松再次发送。您甚至可以将片段分配给 \"/\" 命令以加快操作速度。详情请访问 BDS 抽屉中的片段选项卡。",
+      "4": "您知道吗？您可以激活多系统提示模式，同时使用多个系统提示，配合各种时间表和条件，创建自定义工作流程。",
+      "5": "您可以从其他 AI 将记忆导入 BDS。点击记忆部分底部的「从其他 AI 导入记忆」。",
+      "6": "您知道吗？Better DeepSeek 也有 <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">Android 应用</a>？",
+      "7": "如果您喜欢这个扩展，请与朋友分享！要请求功能，请在 <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub 页面</a>上告诉我们。",
+      "8": "您知道吗？您可以将 MCP 服务器连接到 Better DeepSeek。请查看高级设置。",
+      "9": "您可以使用自定义 CSS 随意定制界面。",
+      "10": "我们希望为 Better DeepSeek 添加更多语言支持。如果您想添加自己的语言，请<a href=\"https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md\" target=\"_blank\" rel=\"noopener noreferrer\">查看这里</a>。另外，如果您发现任何翻译错误，可以修复它们。",
+      "11": "您可以通过单击会话历史中的 ... 按钮为任何聊天会话分配标签。然后使用这些标签快速搜索或过滤您的对话。",
+      "12": "你可以直接让 DeepSeek 创建新技能或角色。只需说出你的需求即可。"
     },
     "contextMenu": {
       "askDeepSeek": "询问 DeepSeek",

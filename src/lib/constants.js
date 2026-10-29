@@ -1031,6 +1031,7 @@ export const DEFAULT_SETTINGS = {
   mcpInlineMaxChars: 8000,
   // Ordered, enabled web-search providers (see resolveSearchProviders in search-reader.js)
   searchProviders: ["ddg-lite", "ddg-html", "bing"],
+  webFetchProvider: "browser",
   // Load all history — scroll to top on session open to trigger lazy-load
   loadAllHistoryOnSession: false,
   showTimestamps: false,

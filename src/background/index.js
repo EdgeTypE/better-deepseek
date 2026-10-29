@@ -1,3 +1,5 @@
+import { registerOfficialWeb } from "./official-web.js";
+registerOfficialWeb();
 import "./api-proxy.js";
 import { fetchTranscript } from "youtube-transcript";
 import {

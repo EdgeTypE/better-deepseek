@@ -199,7 +199,8 @@
       "searchProvider": {
         "ddgLite": "DuckDuckGo (Lite)",
         "ddgHtml": "DuckDuckGo (HTML)",
-        "bing": "Bing"
+        "bing": "Bing",
+        "deepseekOfficial": "DeepSeek Official Search"
       },
       "collapseLongUserMessages": "Collapse long user messages",
       "collapseLongUserMessagesHint": "Automatically hide very long user messages behind a read-more toggle.",
@@ -249,7 +250,6 @@
       "saveAsSnippet": "Save as Snippet",
       "manageSnippets": "Manage CSS Snippets",
       "restore": "Restore",
-      "delete": "Delete",
       "enterSnippetName": "Enter snippet name:",
       "snippetSaved": "Snippet saved!",
       "snippetDeleted": "Snippet deleted",
@@ -263,7 +263,18 @@
       "advancedSearchPlaceholder": "Search settings...",
       "advancedNoResults": "No matching settings found.",
       "disableTipBox": "Disable Tip Box",
-      "disableTipBoxHint": "Shows a random tip each time you open the drawer."
+      "disableTipBoxHint": "Shows a random tip each time you open the drawer.",
+      "officialWeb": {
+        "title": "Official Search / Fetch",
+        "fetchProvider": "Page reader",
+        "browserFetch": "Browser reader (existing)",
+        "officialFetch": "DeepSeek Official Fetch",
+        "manageKey": "Manage official API key (opens extension page)",
+        "refreshStatus": "Refresh key status",
+        "keyConfigured": "Official API key configured",
+        "keyMissing": "Official API key not configured",
+        "hint": "Select DeepSeek Official Search in the list above. Search and Fetch are independent. Save the provider settings below. Official failures do not silently switch providers. API billing is separate from web chat; deep reads may issue multiple requests."
+      }
     },
     "skillList": {
       "title": "Skill Set",
@@ -482,9 +493,6 @@
       "noProjectSelected": "No project selected",
       "webImportTitle": "Fetch Web Page",
       "webPlaceholder": "https://example.com/article",
-      "close": "Close",
-      "fetch": "Fetch",
-      "fetching": "Fetching...",
       "noSpeechRecognition": "Browser does not support Speech Recognition.",
       "voiceError": "Voice Error: {{msg}}",
       "noInputField": "Could not find input field.",
@@ -984,9 +992,9 @@
       "cmdHint": "/mycommand (lowercase, no spaces)",
       "add": "Add",
       "categorySnippet": "snippet",
-      "autocompleteHint": "Tab \u21b9 complete \u00b7 \u21b5 execute",
+      "autocompleteHint": "Tab ↹ complete · ↵ execute",
       "categorySkill": "skill",
-      "mentionHint": "Tab \u21b9 insert \u00b7 this message only",
+      "mentionHint": "Tab ↹ insert · this message only",
       "cmdSearchDesc": "Search the web and inject results into chat",
       "cmdSearchUsage": "/search <query>",
       "cmdNewDesc": "Start a new conversation",
@@ -1527,8 +1535,8 @@
       "columnOptions": "Column options",
       "hideRow": "Hide row",
       "manageColumnsRows": "Manage columns & rows",
-      "sortAsc": "\u25B2 Sort A \u2192 Z",
-      "sortDesc": "\u25BC Sort Z \u2192 A",
+      "sortAsc": "▲ Sort A → Z",
+      "sortDesc": "▼ Sort Z → A",
       "hideColumn": "Hide column",
       "showColumn": "Show column",
       "columns": "Columns",
@@ -1540,7 +1548,7 @@
       "searchEngineWarning": "Shared conversations may be discovered and indexed by search engines."
     },
     "tips": {
-      "title": "\uD83D\uDCA1 Tip",
+      "title": "💡 Tip",
       "disableInSettings": "You can disable this from Settings.",
       "0": "To export a chat, click the ... button next to the session in the chat history.",
       "1": "You can disable this tip box from Settings.",

@@ -193,7 +193,8 @@
       "searchProvider": {
         "ddgLite": "DuckDuckGo (Lite)",
         "ddgHtml": "DuckDuckGo (HTML)",
-        "bing": "Bing"
+        "bing": "Bing",
+        "deepseekOfficial": "DeepSeek Official Search"
       },
       "enabled": "Etkin",
       "githubTokenHelp": "GitHub Ayarları -> Tokens altından repo yetkili klasik bir token oluşturun.",
@@ -249,7 +250,6 @@
       "saveAsSnippet": "Snippet Olarak Kaydet",
       "manageSnippets": "CSS Snippet'lerini Yönet",
       "restore": "Geri Yükle",
-      "delete": "Sil",
       "enterSnippetName": "Snippet ismini girin:",
       "snippetSaved": "Snippet kaydedildi!",
       "snippetDeleted": "Snippet silindi",
@@ -263,7 +263,18 @@
       "advancedSearchPlaceholder": "Ayarlarda ara...",
       "advancedNoResults": "Eşleşen ayar bulunamadı.",
       "disableTipBox": "İpucu Kutusunu Devre Dışı Bırak",
-      "disableTipBoxHint": "Drawer her açıldığında rastgele bir ipucu gösterir."
+      "disableTipBoxHint": "Drawer her açıldığında rastgele bir ipucu gösterir.",
+      "officialWeb": {
+        "title": "Official Search / Fetch",
+        "fetchProvider": "Page reader",
+        "browserFetch": "Browser reader (existing)",
+        "officialFetch": "DeepSeek Official Fetch",
+        "manageKey": "Manage official API key (opens extension page)",
+        "refreshStatus": "Refresh key status",
+        "keyConfigured": "Official API key configured",
+        "keyMissing": "Official API key not configured",
+        "hint": "Select DeepSeek Official Search in the list above. Search and Fetch are independent. Save the provider settings below. Official failures do not silently switch providers. API billing is separate from web chat; deep reads may issue multiple requests."
+      }
     },
     "skillList": {
       "title": "Yetenek Seti",
@@ -981,9 +992,9 @@
       "cmdHint": "/komutadı (küçük harf, boşluksuz)",
       "add": "Ekle",
       "categorySnippet": "snippet",
-      "autocompleteHint": "Sekme \u21b9 tamamla \u00b7 \u21b5 çalıştır",
+      "autocompleteHint": "Sekme ↹ tamamla · ↵ çalıştır",
       "categorySkill": "beceri",
-      "mentionHint": "Sekme \u21b9 ekle \u00b7 yalnızca bu mesaj",
+      "mentionHint": "Sekme ↹ ekle · yalnızca bu mesaj",
       "cmdSearchDesc": "Web'de ara ve sonuçları sohbete ekle",
       "cmdSearchUsage": "/search <sorgu>",
       "cmdNewDesc": "Yeni bir sohbet başlat",
@@ -1149,19 +1160,19 @@
           }
         },
         "v0_1_11": {
-          "title": "MCP Sunucular\u0131, Dinamik Tablolar ve Kararl\u0131l\u0131k",
+          "title": "MCP Sunucuları, Dinamik Tablolar ve Kararlılık",
           "features": {
             "feat_0": {
-              "title": "MCP Sunucu Deste\u011Fi",
-              "description": "Harici ara\u00E7 eri\u015Fimi i\u00E7in DeepSeek'e uzaktan MCP sunucular\u0131 ba\u011Flay\u0131n. Sunucular\u0131 Ayarlar \u2192 Geli\u015Fmi\u015F Ayarlar \u2192 MCP Sunucular\u0131 b\u00F6l\u00FCm\u00FCnden yap\u0131land\u0131r\u0131n."
+              "title": "MCP Sunucu Desteği",
+              "description": "Harici araç erişimi için DeepSeek'e uzaktan MCP sunucuları bağlayın. Sunucuları Ayarlar → Gelişmiş Ayarlar → MCP Sunucuları bölümünden yapılandırın."
             },
             "feat_1": {
               "title": "Dinamik Tablolar",
-              "description": "DeepSeek taraf\u0131ndan olu\u015Fturulan tablolarda verileri do\u011Frudan s\u0131ralay\u0131n ve s\u00FCtunlar\u0131 yeniden d\u00FCzenleyin."
+              "description": "DeepSeek tarafından oluşturulan tablolarda verileri doğrudan sıralayın ve sütunları yeniden düzenleyin."
             },
             "feat_2": {
-              "title": "Kararl\u0131l\u0131k ve UX \u0130yile\u015Ftirmeleri",
-              "description": "Eklenti genelinde d\u00FCzinlerce hata d\u00FCzeltmesi ve UI/UX iyile\u015Ftirmesi."
+              "title": "Kararlılık ve UX İyileştirmeleri",
+              "description": "Eklenti genelinde düzinlerce hata düzeltmesi ve UI/UX iyileştirmesi."
             }
           }
         },
@@ -1521,37 +1532,37 @@
       "cancelledToast": "Deep Research revizyonu iptal edildi."
     },
     "tableInjector": {
-      "columnOptions": "S\u00FCtun se\u00E7enekleri",
-      "hideRow": "Sat\u0131r\u0131 gizle",
-      "manageColumnsRows": "S\u00FCtunlar\u0131 ve sat\u0131rlar\u0131 y\u00F6net",
-      "sortAsc": "\u25B2 A'dan Z'ye s\u0131rala",
-      "sortDesc": "\u25BC Z'den A'ya s\u0131rala",
-      "hideColumn": "S\u00FCtunu gizle",
-      "showColumn": "S\u00FCtunu g\u00F6ster",
-      "columns": "S\u00FCtunlar",
-      "hiddenRows": "Gizli sat\u0131rlar ({{count}})",
-      "showAll": "T\u00FCm s\u00FCtunlar\u0131 ve sat\u0131rlar\u0131 g\u00F6ster",
-      "columnLabel": "S\u00FCtun {{n}}"
+      "columnOptions": "Sütun seçenekleri",
+      "hideRow": "Satırı gizle",
+      "manageColumnsRows": "Sütunları ve satırları yönet",
+      "sortAsc": "▲ A'dan Z'ye sırala",
+      "sortDesc": "▼ Z'den A'ya sırala",
+      "hideColumn": "Sütunu gizle",
+      "showColumn": "Sütunu göster",
+      "columns": "Sütunlar",
+      "hiddenRows": "Gizli satırlar ({{count}})",
+      "showAll": "Tüm sütunları ve satırları göster",
+      "columnLabel": "Sütun {{n}}"
     },
     "shareModal": {
       "searchEngineWarning": "Paylaşılan sohbetler, arama motorları tarafından bulunup indekslenebilir."
     },
     "tips": {
-      "title": "\uD83D\uDCA1 \u0130pucu",
+      "title": "💡 İpucu",
       "disableInSettings": "Bu ipucunu Ayarlar'dan kapatabilirsin.",
-      "0": "Bir sohbeti d\u0131\u015Far\u0131 aktarmak i\u00E7in sohbet ge\u00E7mi\u015Finde session'\u0131n yan\u0131ndaki ... butonuna t\u0131klayabilirsin.",
-      "1": "Ayarlar'dan bu ipucu kutusunu devre d\u0131\u015F\u0131 b\u0131rakabilirsin.",
-      "2": "Dilersen, mevcut ayarlar\u0131n\u0131 ve verilerini d\u0131\u015Far\u0131 aktarabilirsin. Geli\u015Fmi\u015F ayarlar\u0131 ziyaret etmen yeterli.",
-      "3": "S\u0131k kulland\u0131\u011F\u0131n prompt'lar\u0131 snippet olarak atay\u0131p daha sonra kolayca tekrardan g\u00F6nderebilirsin. Dilersen snippet'lar\u0131 bir \"/\" komutuna atayarak i\u015Fleri h\u0131zland\u0131rabilirsin. Detayl\u0131 bilgi i\u00E7in BDS drawer'\u0131ndaki snippet sekmesini ziyaret et.",
-      "4": "Multi system prompt'u aktif ederek ayn\u0131 anda birden fazla system prompt kullanabilece\u011Fini, ve dilersen bunlar\u0131 \u00E7e\u015Fitli s\u0131ralar ve ko\u015Fullarla kullanarak kendine \u00F6zel bir workflow olu\u015Fturabilece\u011Fini biliyor muydun?",
-      "5": "Ba\u015Fka bir AI'daki memory'ni BDS'e aktarabilirsin. Bunun i\u00E7in haf\u0131za men\u00FCs\u00FCn\u00FCn en alt\u0131ndaki \"Import memory from Another AI\" yaz\u0131s\u0131na t\u0131klaman yeterli.",
-      "6": "Better DeepSeek'in bir <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">Android uygulamas\u0131</a> da oldu\u011Funu biliyor muydun?",
-      "7": "Eklentiden memnunsan arkada\u015Flar\u0131nla payla\u015F\u0131rsan \u00E7ok seviniriz. Ayr\u0131ca eklentide olmas\u0131n\u0131 istedi\u011Fin bir \u00F6zellik var ise <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub</a> sayfam\u0131zdan bildirebilirsin.",
-      "8": "Better DeepSeek'e MCP serverlar\u0131 ba\u011Flayabilece\u011Finizi biliyor muydunuz? Geli\u015Fmi\u015F ayarlar\u0131 ziyaret edin.",
-      "9": "Custom CSS'ler ile aray\u00FCz\u00FC diledi\u011Fin gibi \u00F6zelle\u015Ftirebilirsin.",
-      "10": "Better DeepSeek'e daha fazla dil deste\u011Fi eklemek istiyoruz. Sen de kendi dilini eklemek istersen <a href=\"https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md\" target=\"_blank\" rel=\"noopener noreferrer\">buraya</a> g\u00F6z atabilirsin. Ayr\u0131ca \u00E7eviri hatalar\u0131n\u0131n oldu\u011Funu d\u00FC\u015F\u00FCn\u00FCyorsan d\u00FCzeltebilirsin.",
-      "11": "Sohbet ge\u00E7mi\u015Finde ... butonuna t\u0131klayarak herhangi bir sohbet oturumuna etiket atayabilirsin. Ard\u0131ndan bu etiketleri kullanarak konu\u015Fmalar\u0131n\u0131 h\u0131zl\u0131ca arayabilir veya filtreleyebilirsin.",
-      "12": "Yeni bir skill ya da karakter olu\u015Furmak i\u00E7in DeepSeek'i kullanabilirsin. \u0130stemen/sorman yeter."
+      "0": "Bir sohbeti dışarı aktarmak için sohbet geçmişinde session'ın yanındaki ... butonuna tıklayabilirsin.",
+      "1": "Ayarlar'dan bu ipucu kutusunu devre dışı bırakabilirsin.",
+      "2": "Dilersen, mevcut ayarlarını ve verilerini dışarı aktarabilirsin. Gelişmiş ayarları ziyaret etmen yeterli.",
+      "3": "Sık kullandığın prompt'ları snippet olarak atayıp daha sonra kolayca tekrardan gönderebilirsin. Dilersen snippet'ları bir \"/\" komutuna atayarak işleri hızlandırabilirsin. Detaylı bilgi için BDS drawer'ındaki snippet sekmesini ziyaret et.",
+      "4": "Multi system prompt'u aktif ederek aynı anda birden fazla system prompt kullanabileceğini, ve dilersen bunları çeşitli sıralar ve koşullarla kullanarak kendine özel bir workflow oluşturabileceğini biliyor muydun?",
+      "5": "Başka bir AI'daki memory'ni BDS'e aktarabilirsin. Bunun için hafıza menüsünün en altındaki \"Import memory from Another AI\" yazısına tıklaman yeterli.",
+      "6": "Better DeepSeek'in bir <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">Android uygulaması</a> da olduğunu biliyor muydun?",
+      "7": "Eklentiden memnunsan arkadaşlarınla paylaşırsan çok seviniriz. Ayrıca eklentide olmasını istediğin bir özellik var ise <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub</a> sayfamızdan bildirebilirsin.",
+      "8": "Better DeepSeek'e MCP serverları bağlayabileceğinizi biliyor muydunuz? Gelişmiş ayarları ziyaret edin.",
+      "9": "Custom CSS'ler ile arayüzü dilediğin gibi özelleştirebilirsin.",
+      "10": "Better DeepSeek'e daha fazla dil desteği eklemek istiyoruz. Sen de kendi dilini eklemek istersen <a href=\"https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md\" target=\"_blank\" rel=\"noopener noreferrer\">buraya</a> göz atabilirsin. Ayrıca çeviri hatalarının olduğunu düşünüyorsan düzeltebilirsin.",
+      "11": "Sohbet geçmişinde ... butonuna tıklayarak herhangi bir sohbet oturumuna etiket atayabilirsin. Ardından bu etiketleri kullanarak konuşmalarını hızlıca arayabilir veya filtreleyebilirsin.",
+      "12": "Yeni bir skill ya da karakter oluşurmak için DeepSeek'i kullanabilirsin. İstemen/sorman yeter."
     },
     "contextMenu": {
       "askDeepSeek": "DeepSeek'e Sor",
