@@ -53,6 +53,7 @@ export function normalizeConfig(config) {
     memories,
     activeCharacter: config.activeCharacter || null,
     preferredLang: String(config.preferredLang || ""),
+    voiceLanguage: String(config.voiceLanguage || ""),
     disableSystemPrompt: Boolean(config.disableSystemPrompt),
     disableMemory: Boolean(config.disableMemory),
     systemPromptInjectionFrequency: String(config.systemPromptInjectionFrequency || "first"),
