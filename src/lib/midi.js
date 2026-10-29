@@ -748,6 +748,21 @@ const PAN_SPREAD = 0.5;
 /** Notes shorter than this after a seek clip are not worth scheduling. */
 const MIN_AUDIBLE_SECONDS = 0.02;
 
+/**
+ * How far ahead of the playhead notes are scheduled, in seconds.
+ *
+ * Every note owns a small node chain (filter, envelope, oscillators, noise), so
+ * this window — not the length of the score — decides how large the live audio
+ * graph gets. Scheduling a whole three-minute piece up front put thousands of
+ * nodes in the graph at once (~8.6k for a three-track test score), which starved
+ * the audio thread: the tail of a long score dropped out and eventually went
+ * silent (issue #217).
+ */
+const SCHEDULE_WINDOW_SECONDS = 3;
+
+/** How often the scheduler tops the window up. Well inside the window above. */
+const SCHEDULE_TICK_MS = 500;
+
 const MIDDLE_C = 261.63;
 
 const clampNumber = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -869,19 +884,28 @@ export function createMidiSynth(ctx) {
     const total = Math.max(0, Number(score?.durationSeconds) || 0);
     const startAt = ctx.currentTime + delay;
 
-    const nodes = [];
-    const sources = [];
-    const keep = (node) => {
-      nodes.push(node);
+    // Two lifetimes: nodes that live as long as the session (buses, reverb,
+    // LFOs) and nodes that belong to one scheduling window (note chains).
+    const baseNodes = [];
+    const baseSources = [];
+    const keepBase = (node) => {
+      baseNodes.push(node);
       return node;
     };
 
+    /**
+     * Note chains scheduled together, in playback order. A chunk is dropped as
+     * soon as its last note has finished releasing, which is what keeps the
+     * live graph the size of the window instead of the size of the score.
+     */
+    const chunks = [];
+
     // Master chain: master gain -> compressor -> speakers.
-    const master = keep(ctx.createGain());
+    const master = keepBase(ctx.createGain());
     master.gain.value = MAX_MASTER_GAIN * clampNumber(volume, 0, 1);
 
     if (typeof ctx.createDynamicsCompressor === "function") {
-      const compressor = keep(ctx.createDynamicsCompressor());
+      const compressor = keepBase(ctx.createDynamicsCompressor());
       compressor.threshold.value = -14;
       compressor.knee.value = 18;
       compressor.ratio.value = 4;
@@ -893,22 +917,22 @@ export function createMidiSynth(ctx) {
       master.connect(ctx.destination);
     }
 
-    const dry = keep(ctx.createGain());
+    const dry = keepBase(ctx.createGain());
     dry.gain.value = 1;
     dry.connect(master);
 
     // Shared reverb bus. High-passed so low notes do not turn to mud.
     let reverbIn = null;
     if (typeof ctx.createConvolver === "function" && typeof ctx.createBuffer === "function") {
-      const convolver = keep(ctx.createConvolver());
+      const convolver = keepBase(ctx.createConvolver());
       convolver.normalize = true;
       convolver.buffer = getImpulse();
 
-      const highpass = keep(ctx.createBiquadFilter());
+      const highpass = keepBase(ctx.createBiquadFilter());
       highpass.type = "highpass";
       highpass.frequency.value = 180;
 
-      const wet = keep(ctx.createGain());
+      const wet = keepBase(ctx.createGain());
       wet.gain.value = WET_LEVEL;
 
       convolver.connect(highpass);
@@ -922,18 +946,21 @@ export function createMidiSynth(ctx) {
     const pans = trackPans(tracks);
     const lfoStop = startAt + Math.max(0, total - from) + 4;
 
-    tracks.forEach((track, trackIndex) => {
-      if (!track.notes.length) return;
-
+    /**
+     * Nodes and constants that belong to a track rather than a note: its bus,
+     * panner, reverb send and the shared vibrato LFO. Built once, by the first
+     * window that reaches the track, and reused by every later window.
+     */
+    function createTrackState(track, trackIndex) {
       const timbre = voiceForProgram(track.program);
       const useWave = canShapeWaves && timbre.partials && timbre.partials.length > 0;
 
-      const bus = keep(ctx.createGain());
+      const bus = keepBase(ctx.createGain());
       bus.gain.value = trackLevel * timbre.gain;
 
       let tail = bus;
       if (typeof ctx.createStereoPanner === "function") {
-        const panner = keep(ctx.createStereoPanner());
+        const panner = keepBase(ctx.createStereoPanner());
         panner.pan.value = pans[trackIndex];
         bus.connect(panner);
         tail = panner;
@@ -941,7 +968,7 @@ export function createMidiSynth(ctx) {
       tail.connect(dry);
 
       if (reverbIn && timbre.reverb > 0) {
-        const send = keep(ctx.createGain());
+        const send = keepBase(ctx.createGain());
         send.gain.value = timbre.reverb;
         tail.connect(send);
         send.connect(reverbIn);
@@ -952,20 +979,56 @@ export function createMidiSynth(ctx) {
       if (timbre.vibrato > 0) {
         const lfo = ctx.createOscillator();
         lfo.frequency.value = timbre.vibratoRate;
-        const depth = keep(ctx.createGain());
+        const depth = keepBase(ctx.createGain());
         depth.gain.value = timbre.vibrato;
         lfo.connect(depth);
         lfo.start(startAt);
         lfo.stop(lfoStop);
-        sources.push(lfo);
+        baseSources.push(lfo);
         vibrato = depth;
       }
 
       const cents = timbre.detune ? [-timbre.detune, timbre.detune] : [0];
-      const stackScale = cents.length > 1 ? 0.62 : 1;
 
-      for (const note of track.notes) {
+      return {
+        timbre,
+        useWave,
+        bus,
+        vibrato,
+        cents,
+        stackScale: cents.length > 1 ? 0.62 : 1,
+        /** Index of the first note this track has not scheduled yet. */
+        cursor: 0,
+      };
+    }
+
+    const trackStates = [];
+
+    /**
+     * Schedule one track's notes that start before `windowEnd` into `chunk`.
+     *
+     * Windows are contiguous and each note is scheduled exactly once — in the
+     * window whose end first passes its start — so the resulting sound is the
+     * same as scheduling the whole score at once; only the moment the nodes are
+     * built moves.
+     */
+    function scheduleTrack(track, trackIndex, windowEnd, chunk) {
+      if (!track.notes.length) return;
+
+      const state =
+        trackStates[trackIndex] || (trackStates[trackIndex] = createTrackState(track, trackIndex));
+      const { timbre, useWave, bus, cents, stackScale, vibrato } = state;
+      const keep = (node) => {
+        chunk.nodes.push(node);
+        return node;
+      };
+
+      for (let index = state.cursor; index < track.notes.length; index++) {
+        const note = track.notes[index];
         const noteStart = note.start * secondsPerBeat;
+        if (noteStart >= windowEnd) break;
+        state.cursor = index + 1;
+
         const noteEnd = noteStart + Math.max(0.06, note.duration * secondsPerBeat);
         // Notes behind the seek point are dropped; one straddling it is clipped
         // so it still sounds, just shorter.
@@ -1004,6 +1067,9 @@ export function createMidiSynth(ctx) {
         const sustainRatio = Math.max(0.0005, timbre.sustain);
         const decaySpan = clampNumber(noteOff - attackEnd, 0, decayTime);
         const endAt = noteOff + timbre.release;
+        // The oscillators stop 50 ms after the release, so the whole chain is
+        // silent from there on: that is the earliest a chunk may be dropped.
+        chunk.retireAt = Math.max(chunk.retireAt, endAt + 0.05);
 
         const envelope = keep(ctx.createGain());
         let level = peak;
@@ -1038,7 +1104,7 @@ export function createMidiSynth(ctx) {
           oscillator.connect(filter);
           oscillator.start(at);
           oscillator.stop(endAt + 0.05);
-          sources.push(oscillator);
+          chunk.sources.push(oscillator);
         }
 
         // Sub oscillator, unfiltered, riding the same envelope.
@@ -1052,7 +1118,7 @@ export function createMidiSynth(ctx) {
           subGain.connect(envelope);
           sub.start(at);
           sub.stop(endAt + 0.05);
-          sources.push(sub);
+          chunk.sources.push(sub);
         }
 
         // Noise layer: hammer thump, pluck snap or sustained breath.
@@ -1086,18 +1152,77 @@ export function createMidiSynth(ctx) {
           noiseGain.connect(bus);
           source.start(at, Math.random() * 1.5);
           source.stop(noiseEnd + 0.05);
-          sources.push(source);
+          chunk.sources.push(source);
         }
       }
-    });
+    }
+
+    /**
+     * Schedule everything that starts before `windowEnd` as one retireable
+     * chunk. Every track is visited, so a chunk always covers the same slice of
+     * score for all of them.
+     */
+    function scheduleWindow(windowEnd) {
+      const chunk = { nodes: [], sources: [], retireAt: 0 };
+      for (const [trackIndex, track] of tracks.entries()) {
+        scheduleTrack(track, trackIndex, windowEnd, chunk);
+      }
+      if (chunk.nodes.length) chunks.push(chunk);
+    }
 
     let stopped = false;
+    /** Score position the schedule already covers. */
+    let windowStart = from;
+    let timer = 0;
+
+    /**
+     * Keep the schedule `SCHEDULE_WINDOW_SECONDS` ahead of the playhead, then
+     * let go of the chunks that have finished.
+     *
+     * The window is far more slack than a timer needs: a late tick costs
+     * nothing until it falls behind the window, and a background tab's
+     * throttled timer still lands well inside it.
+     */
+    function pump() {
+      timer = 0;
+      if (stopped) return;
+
+      const audible = from + Math.max(0, ctx.currentTime - startAt);
+      const horizon = Math.min(total, audible + SCHEDULE_WINDOW_SECONDS);
+
+      while (windowStart < horizon) {
+        const until = Math.min(horizon, windowStart + SCHEDULE_WINDOW_SECONDS);
+        scheduleWindow(until);
+        windowStart = until;
+      }
+
+      // A chunk is silent once its last note has finished releasing, so its
+      // nodes can be disconnected and collected. Without this the graph would
+      // still grow with the score, just more slowly.
+      while (chunks.length && chunks[0].retireAt <= ctx.currentTime) {
+        for (const node of chunks.shift().nodes) {
+          try {
+            node.disconnect();
+          } catch {
+            // Ignore: some engines throw when disconnecting a finished node.
+          }
+        }
+      }
+
+      if (windowStart < total || chunks.length) timer = setTimeout(pump, SCHEDULE_TICK_MS);
+    }
+
+    // First window synchronously, so the first note is never late.
+    pump();
 
     return {
       startTime: startAt,
       stop() {
         if (stopped) return;
         stopped = true;
+
+        clearTimeout(timer);
+        timer = 0;
 
         // Fade the master first and let the voices die underneath it. Stopping
         // oscillators outright, or disconnecting a convolver mid-tail, steps the
@@ -1111,7 +1236,14 @@ export function createMidiSynth(ctx) {
           // Ignore: a closing context rejects automation.
         }
 
-        for (const source of sources) {
+        const liveSources = baseSources.slice();
+        const liveNodes = baseNodes.slice();
+        for (const chunk of chunks) {
+          liveSources.push(...chunk.sources);
+          liveNodes.push(...chunk.nodes);
+        }
+
+        for (const source of liveSources) {
           try {
             source.stop(now + FADE_STOP_SECONDS);
           } catch {
@@ -1120,7 +1252,7 @@ export function createMidiSynth(ctx) {
         }
 
         setTimeout(() => {
-          for (const node of nodes) {
+          for (const node of liveNodes) {
             try {
               node.disconnect();
             } catch {
