@@ -4,6 +4,33 @@
  */
 
 /**
+ * Resolve the Speech-to-Text (input) language.
+ * @param {object} settings
+ * @returns {string} BCP-47 tag
+ */
+export function resolveInputLanguage(settings) {
+  return (
+    settings?.voiceLanguage ||
+    (typeof navigator !== "undefined" ? navigator.language : "en-US") ||
+    "en-US"
+  );
+}
+
+/**
+ * Resolve the Text-to-Speech (output) language. Falls back to the input language
+ * when no separate output language is configured (historical single-language
+ * behaviour), then to the browser locale.
+ * @param {object} settings
+ * @returns {string} BCP-47 tag
+ */
+export function resolveOutputLanguage(settings) {
+  return (
+    settings?.voiceOutputLanguage ||
+    resolveInputLanguage(settings)
+  );
+}
+
+/**
  * Clean text for smooth, natural Text-to-Speech playback.
  * Strips code fences, markdown symbols, BDS tags, URLs, HTML, emojis, list bullets,
  * and normalizes punctuation for fluid, human-like voice delivery.

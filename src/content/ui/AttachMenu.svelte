@@ -39,6 +39,7 @@
   import { resolveComposerVisibility } from "../../lib/composer-visibility.js";
   import { needsCarousel } from "../../lib/composer-layout.js";
   import { VADProcessor } from "../vad-processor.js";
+  import { resolveInputLanguage } from "../live/tts-utils.js";
   import { findActiveFileInput } from "../scanner.js";
   import { sendFileWithMessage } from "../auto.js";
 
@@ -479,8 +480,8 @@
     restartAttempts = 0;
 
     recognition = new SpeechRecognition();
-    recognition.lang =
-      appState.settings.voiceLanguage || navigator.language || "en-US";
+    // STT language is the INPUT language.
+    recognition.lang = resolveInputLanguage(appState.settings);
     recognition.interimResults = true;
     recognition.continuous = false;
 

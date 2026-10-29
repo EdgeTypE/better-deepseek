@@ -47,12 +47,18 @@
   let autoZip = $state(Boolean(appState.settings.autoDownloadLongWorkZip));
   let voiceMode = $state(Boolean(appState.settings.voiceMode));
   let nativeVoice = $state(appState.settings.nativeVoice !== false);
-  let voiceLanguage = $state(
+  // INPUT language (Speech-to-Text).
+  let voiceInputLanguage = $state(
     appState.settings.voiceLanguage ||
       (typeof navigator !== "undefined" ? navigator.language : "en-US"),
   );
+  // OUTPUT language (Text-to-Speech). Empty string = "same as input".
+  let voiceOutputLanguage = $state(appState.settings.voiceOutputLanguage || "");
   let autoSubmitVoice = $state(Boolean(appState.settings.autoSubmitVoice));
   let voiceURI = $state(appState.settings.voiceURI || "");
+  /** The output language actually used for TTS: explicit pick, else the input
+   *  language. The voice list and saved-voice reset key off THIS, not the input. */
+  const effectiveOutputLanguage = $derived(voiceOutputLanguage || voiceInputLanguage);
   /** Installed speech-synthesis voices. Populated async — see loadVoices(). */
   let availableVoices = $state([]);
 
@@ -82,10 +88,10 @@
   /** When the speech language changes, drop any specific voice pick — the saved
    *  voice was for the previous language and would otherwise linger at the top
    *  of the list. Skips the initial mount so a saved voice survives reload. */
-  let lastVoiceLang = voiceLanguage;
+  let lastVoiceLang = effectiveOutputLanguage;
   $effect(() => {
-    if (voiceLanguage !== lastVoiceLang) {
-      lastVoiceLang = voiceLanguage;
+    if (effectiveOutputLanguage !== lastVoiceLang) {
+      lastVoiceLang = effectiveOutputLanguage;
       if (playingURI) {
         if (typeof window !== "undefined" && window.speechSynthesis) window.speechSynthesis.cancel();
         playingURI = "";
@@ -97,7 +103,7 @@
   /** Voices for the chosen speech language, sorted by language then name. */
   const voiceList = $derived.by(() => {
     const all = availableVoices;
-    const prefix = (voiceLanguage || "").split("-")[0].toLowerCase();
+    const prefix = (effectiveOutputLanguage || "").split("-")[0].toLowerCase();
     const matches = all.filter(
       (v) => (v.lang || "").toLowerCase().replace("_", "-").split("-")[0] === prefix,
     );
@@ -118,10 +124,14 @@
 
   /** Supported speech languages, dynamically prepending current pick if custom/unlisted. */
   const speechLanguages = $derived.by(() => {
-    if (voiceLanguage && !SPEECH_LANGUAGES.some((l) => l.value === voiceLanguage)) {
-      return [{ value: voiceLanguage, label: voiceLanguage }, ...SPEECH_LANGUAGES];
+    // Prepend any custom/unlisted pick so it never silently disappears.
+    const extras = [];
+    for (const v of [voiceInputLanguage, voiceOutputLanguage]) {
+      if (v && !SPEECH_LANGUAGES.some((l) => l.value === v) && !extras.some((e) => e.value === v)) {
+        extras.push({ value: v, label: v });
+      }
     }
-    return SPEECH_LANGUAGES;
+    return [...extras, ...SPEECH_LANGUAGES];
   });
 
   /** Label of the currently selected voice (Auto when none is picked). */
@@ -471,7 +481,8 @@
 
   function captureFormSnapshot() {
     return JSON.stringify({
-      autoFiles, autoZip, voiceMode, nativeVoice, voiceLanguage, autoSubmitVoice,
+      autoFiles, autoZip, voiceMode, nativeVoice, voiceInputLanguage,
+      voiceOutputLanguage, autoSubmitVoice,
       vadSilenceTimeout, liveModeShowText, voiceURI,
       preferredLang, githubToken, disableSystemPrompt,
       systemPromptMultiMode, systemPromptEntries,
@@ -865,7 +876,7 @@
     ]},
     { key: 'subVoice', labelKey: 'settings.subVoice', settingKeys: [
       'settings.voiceMode', 'settings.nativeVoice', 'settings.autoSubmitVoice',
-      'settings.speechLanguage', 'settings.voiceURI',
+      'settings.speechInputLanguage', 'settings.speechOutputLanguage', 'settings.voiceURI',
       'settings.vadSilenceTimeout', 'settings.liveModeShowText',
     ]},
     { key: 'subIntegrations', labelKey: 'settings.subIntegrations', settingKeys: [
@@ -1015,9 +1026,10 @@
     autoZip = Boolean(appState.settings.autoDownloadLongWorkZip);
     voiceMode = Boolean(appState.settings.voiceMode);
     nativeVoice = appState.settings.nativeVoice !== false;
-    voiceLanguage =
+    voiceInputLanguage =
       appState.settings.voiceLanguage ||
       (typeof navigator !== "undefined" ? navigator.language : "en-US");
+    voiceOutputLanguage = appState.settings.voiceOutputLanguage || "";
     autoSubmitVoice = Boolean(appState.settings.autoSubmitVoice);
     vadSilenceTimeout = Number(appState.settings.vadSilenceTimeout) || 1100;
     liveModeShowText = Boolean(appState.settings.liveModeShowText);
@@ -1260,7 +1272,8 @@
     appState.settings.autoDownloadLongWorkZip = autoZip;
     appState.settings.voiceMode = voiceMode;
     appState.settings.nativeVoice = nativeVoice;
-    appState.settings.voiceLanguage = voiceLanguage;
+    appState.settings.voiceLanguage = voiceInputLanguage;
+    appState.settings.voiceOutputLanguage = voiceOutputLanguage || "";
     // Saving from Settings counts as having chosen a language — no first-run prompt.
     appState.settings.voiceLanguageChosen = true;
     appState.settings.autoSubmitVoice = autoSubmitVoice;
@@ -2418,8 +2431,18 @@
         </div>
 
         <div class="bds-toggle-row">
-          <span class="bds-toggle-label">{t('settings.speechLanguage')}</span>
-          <select class="bds-select" bind:value={voiceLanguage}>
+          <span class="bds-toggle-label">{t('settings.speechInputLanguage')}</span>
+          <select class="bds-select" bind:value={voiceInputLanguage}>
+            {#each speechLanguages as lang (lang.value)}
+              <option value={lang.value}>{lang.label}</option>
+            {/each}
+          </select>
+        </div>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.speechOutputLanguage')}</span>
+          <select class="bds-select" bind:value={voiceOutputLanguage}>
+            <option value="">{t('settings.speechOutputSameAsInput')}</option>
             {#each speechLanguages as lang (lang.value)}
               <option value={lang.value}>{lang.label}</option>
             {/each}
