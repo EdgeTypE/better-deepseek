@@ -2,12 +2,45 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="#3B82F6"
-        android:pathData="M54,18 L84,36 L84,72 L54,90 L24,72 L24,36 Z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M44,46 L44,62 L52,62 L60,54 L52,46 Z" />
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group
+        android:scaleX="0.68"
+        android:scaleY="0.68"
+        android:translateX="62.2"
+        android:translateY="74.78">
+        <!-- Whale tail -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M388,276 L464,206 Q474,198 478,210 L458,276 L478,342 Q474,354 464,346 L388,276 Z" />
+        <!-- Whale body -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M92,302 C92,238 162,194 244,194 C322,194 382,230 392,276 C382,322 322,356 244,356 C162,356 92,350 92,302 Z" />
+        <!-- Whale fin -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M244,350 C258,370 252,390 232,394 C226,378 232,362 244,350 Z" />
+        <!-- Water drops -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillAlpha="0.95"
+            android:pathData="M246,159 a9,9 0 1,0 0,18 a9,9 0 1,0 0,-18 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillAlpha="0.8"
+            android:pathData="M214,144 a6,6 0 1,0 0,12 a6,6 0 1,0 0,-12 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillAlpha="0.85"
+            android:pathData="M274,139 a7,7 0 1,0 0,14 a7,7 0 1,0 0,-14 Z" />
+        <!-- Whale eye (pupil) -->
+        <path
+            android:fillColor="#4D6BFE"
+            android:pathData="M176,249 a13,13 0 1,0 0,26 a13,13 0 1,0 0,-26 Z" />
+        <!-- Whale eye (highlight) -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M171,253 a4,4 0 1,0 0,8 a4,4 0 1,0 0,-8 Z" />
+    </group>
 </vector>
