@@ -116,6 +116,28 @@ export function setupBridgeEvents() {
   };
   window.addEventListener("bds:assistant-message-id", handlers["bds:assistant-message-id"]);
 
+  // The completion stream hands over the reply text before the renderer touches
+  // it. Keep the freshest copy per session so tag attributes can be parsed from
+  // the bytes the model actually wrote, not from the lossy DOM.
+  handlers["bds:raw-reply"] = (event) => {
+    let detail = event.detail;
+    if (typeof detail === "string") {
+      try { detail = JSON.parse(detail); } catch (e) { return; }
+    }
+    const rawText = detail?.rawText;
+    const sessionId = detail?.sessionId;
+    if (typeof rawText !== "string" || !rawText || !sessionId) return;
+
+    state.rawRepliesBySession.set(String(sessionId), rawText);
+    // Only the session on screen is ever consulted; keep the map from growing.
+    while (state.rawRepliesBySession.size > 5) {
+      const oldest = state.rawRepliesBySession.keys().next().value;
+      state.rawRepliesBySession.delete(oldest);
+    }
+    devLog("Parser", `stream supplied verbatim reply text for ${sessionId}`);
+  };
+  window.addEventListener("bds:raw-reply", handlers["bds:raw-reply"]);
+
   // The MAIN world could not fetch the history at all (no token, http error,
   // network failure). Surface it where the voice diagnostics can see it.
   handlers["bds:history-msgs-error"] = (event) => {
