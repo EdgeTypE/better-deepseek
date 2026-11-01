@@ -761,7 +761,27 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
   stateData.hash = signature;
   stateData.forceClosedTags = shouldForceCloseTags;
 
-  const parsed = parseBdsMessage(richText, shouldForceCloseTags);
+  // Parse twice, by intent:
+  //
+  // - TAGS AND ATTRIBUTES come from rawText. Attribute values are
+  //   opaque payloads, but richText represents any `$tex$ $ span as the
+  //   page's KaTeX DOM subtree, so a `$s='hi'; $s` payload arrives as HTML
+  //   and corrupts the arguments. rawText collapses KaTeX back to
+  //   `$tex$` (see katexToMarkdown), restoring the delimiters.
+  //
+  // - VISIBLE TEXT comes from richText. The overlay renders it with
+  //   `marked.parse()`, which has no KaTeX plugin — it only passes the
+  //   renderer's own `<span class="katex">` markup through. Feeding the
+  //   overlay rawText would show literal `$tex$` instead of the formula.
+  //
+  // This fixes the `$...$` deletion bug. It does NOT fix `\/` -> `/`, bare
+  // URL-> autolink, or `&` -> `&amp;`: those are rewritten by the Markdown
+  // renderer before the DOM exists, and nothing DOM-derived can undo them.
+  const parsed = parseBdsMessage(rawText, shouldForceCloseTags);
+  if (parsed.visibleText !== undefined) {
+    // Keep the rendered KaTeX markup for the overlay only.
+    parsed.visibleText = parseBdsMessage(richText, shouldForceCloseTags).visibleText;
+  }
   const preGateBlocks = parsed.renderableBlocks;
 
   // --- BIDI DIRECTION (issue #181) ---

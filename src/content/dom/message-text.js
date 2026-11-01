@@ -80,10 +80,16 @@ function katexToMarkdown(el) {
     return el.classList.contains("katex-display") ? `\n$$${tex}$$\n` : `$${tex}$`;
   }
 
-  // No LaTeX source to recover: emit the MathML token text as plain text rather
-  // than wrapping a garbled formula in math delimiters.
+  // No LaTeX source to recover. Emitting "" here deleted the whole subtree from
+  // the extracted text, so a BDS tag attribute that merely *contained* two `$`
+  // characters lost everything between them with no error anywhere (the KaTeX
+  // rendering of an unparseable formula is a red error span, not a formula, and
+  // the payload was never meant to be math). Never return empty: fall back to
+  // the MathML token text, then to the element text, so the payload at least
+  // survives as text instead of vanishing.
   const math = el.querySelector("math");
-  return math ? String(math.textContent || "").trim() : "";
+  if (math) return String(math.textContent || "").trim();
+  return String(el.textContent || "").trim();
 }
 
 /** Marker kept so a diagram-only message is not dropped as empty content. */
