@@ -1,6 +1,15 @@
 export const PPTX_SKILL = `
 ## PptxGenJS Library Reference (PowerPoint)
 
+WHEN TO USE:
+✓ When the user asks for a PowerPoint, presentation, or slides.
+✓ When you need to present structured data or a pitch deck.
+✓ Prefer over plain markdown for formal presentations.
+
+DO NOT USE for:
+✗ Simple documents (use create_file instead).
+✗ When only raw data is needed.
+
 ### GLOBAL AVAILABILITY
 - PptxGenJS is ALREADY globally available as \`window.PptxGenJS\` and \`window.pptxgen\` in the sandbox.
 - Do NOT use \`import\`, \`require\`, or \`const PptxGenJS = ...\`.
@@ -76,6 +85,10 @@ slide3.addChart(pptx.charts.PIE, [
 ], { x: 1.5, y: 1.5, w: 7, h: 4 });
 
 await pptx.writeFile({ fileName: "ProjectPlan.pptx" });
+
+### STRING QUOTES:
+- If you must use straight quotes, escape inner quotes with a backslash:
+  \`slide.addText("He said \\"hello\\"", { x:1, y:1 });\`
 
 ### COMMON MISTAKES TO AVOID:
 - ✗ \`const PptxGenJS = require('pptxgenjs')\`: NOT available

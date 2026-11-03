@@ -8,9 +8,9 @@
  */
 
 import { MIDI_PROMPT } from "./midi.js";
-import { DOCX_SKILL } from "../office-skills/docx.js";
-import { XLSX_SKILL } from "../office-skills/xlsx.js";
-import { PPTX_SKILL } from "../office-skills/pptx.js";
+import { DOCX_SKILL } from "./docx.js";
+import { XLSX_SKILL } from "./xlsx.js";
+import { PPTX_SKILL } from "./pptx.js";
 
 /**
  * Rules shared by every office library. Kept out of the individual skill files
@@ -20,7 +20,7 @@ const OFFICE_SHARED = [
   "## Office document rules (shared)",
   "- The code runs in a browser sandbox and the library is already global.",
   "  Never use `import`, `require`, or redeclare it.",
-  "- ALWAYS end with the library's save/write call — without it no file is produced.",
+  "- ALWAYS end with the library's save/write call. Without it no file is produced.",
   "- Use template literals (backticks) for strings that contain quotes.",
   "- CRITICAL: only valid JavaScript inside the tag. No explanations, no chatter.",
 ].join("\n");

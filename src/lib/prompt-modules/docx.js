@@ -1,6 +1,14 @@
 export const DOCX_SKILL = `
 ## docx Library Reference (Word Documents)
 
+WHEN TO USE:
+✓ When the user asks for a Word document, .docx file, or letter.
+✓ When complex text formatting, tables, or professional document structures are needed.
+✓ Prefer over plain markdown for users who need to edit the document in Word.
+
+DO NOT USE for:
+✗ Simple text snippets (use markdown).
+
 ### GLOBAL AVAILABILITY
 - The \`docx\` library is ALREADY globally available as \`window.docx\`, \`window.DOCX\`, and \`window.Packer\`.
 - All library exports are also available as globals: \`Document\`, \`Paragraph\`, \`TextRun\`, \`Table\`, etc.

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_SYSTEM_PROMPT } from "./constants.js";
 import {
   PROMPT_MODULES,
   PROMPT_MODULE_IDS,
@@ -24,6 +25,26 @@ describe("prompt module registry", () => {
     expect(PROMPT_MODULES.docx.content).toContain("DOCX.save");
     expect(PROMPT_MODULES.xlsx.content).toContain("XLSX.writeFile");
     expect(PROMPT_MODULES.pptx.content).toContain("pptx.writeFile");
+  });
+
+  it("keeps the when-to-use guidance the main prompt used to carry", () => {
+    for (const id of ["docx", "xlsx", "pptx"]) {
+      expect(PROMPT_MODULES[id].content).toContain("WHEN TO USE:");
+      expect(PROMPT_MODULES[id].content).toContain("DO NOT USE for:");
+    }
+  });
+
+  it("keeps the quote-escaping rule for PptxGenJS", () => {
+    expect(PROMPT_MODULES.pptx.content).toContain("escape inner quotes with a backslash");
+  });
+
+  it("carries the office when-to-use guidance in the main prompt too", () => {
+    for (const heading of ["<BDS:pptx>:", "<BDS:excel>:", "<BDS:docx>:"]) {
+      expect(DEFAULT_SYSTEM_PROMPT).toContain(heading);
+    }
+    expect(DEFAULT_SYSTEM_PROMPT).toContain("DO NOT USE for:");
+    expect(DEFAULT_SYSTEM_PROMPT).toContain("✗ Plain text tables (use markdown).");
+    expect(DEFAULT_SYSTEM_PROMPT).toContain("✗ Simple text snippets (use markdown).");
   });
 
   it("office carries all three references in one module", () => {

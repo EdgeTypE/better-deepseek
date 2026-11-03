@@ -12,9 +12,9 @@ import { fetchYouTubeData } from "./files/youtube-reader.js";
 import appState from "./state.js";
 import { getDeepCodeFiles } from "./deep-code.js";
 import { searchActiveProjectRAG } from "../lib/rag-engine.js";
-import { XLSX_SKILL } from "../lib/office-skills/xlsx.js";
-import { PPTX_SKILL } from "../lib/office-skills/pptx.js";
-import { DOCX_SKILL } from "../lib/office-skills/docx.js";
+import { XLSX_SKILL } from "../lib/prompt-modules/xlsx.js";
+import { PPTX_SKILL } from "../lib/prompt-modules/pptx.js";
+import { DOCX_SKILL } from "../lib/prompt-modules/docx.js";
 import { extractHttpUrl, normalizeHttpUrl } from "../lib/utils/url-normalizer.js";
 import { extractMcpResultText } from "../lib/mcp-result.js";
 import {

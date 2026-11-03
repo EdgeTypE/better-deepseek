@@ -1,6 +1,15 @@
 export const XLSX_SKILL = `
 ## SheetJS (XLSX) Library Reference
 
+WHEN TO USE:
+✓ When the user asks for an Excel file, spreadsheet, or .xlsx download.
+✓ When you need to provide structured tabular data that the user wants to open in Excel.
+✓ Prefer over plain CSV for multi-sheet or formatted data requests.
+
+DO NOT USE for:
+✗ Plain text tables (use markdown).
+✗ Simple small data (use markdown).
+
 ### GLOBAL AVAILABILITY
 - XLSX is ALREADY globally available as \`window.XLSX\` in the sandbox.
 - Do NOT use \`import\`, \`require\`, or \`const XLSX = ...\`.
