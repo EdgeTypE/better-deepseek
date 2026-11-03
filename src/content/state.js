@@ -55,6 +55,8 @@ const state = {
   chatMessagesBySession: new Map(),
   /** @type {Map<string, string>} id of the reply the completion stream just produced, keyed by session ID — the same id DeepSeek's own read-aloud button uses */
   assistantMessageIds: new Map(),
+  /** @type {Map<string, string>} verbatim reply text from the completion stream, keyed by session ID. The rendered DOM has already lost escapes like `\\/`, so BDS tag attributes must be parsed from this copy when it is available. */
+  rawRepliesBySession: new Map(),
   /** Token price tracking — session-level totals */
   pricing: {
     /** @type {string|null} current model being used */

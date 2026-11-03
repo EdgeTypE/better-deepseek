@@ -1,10 +1,12 @@
 import { mutatePayload } from "./payload-mutator.js";
 import {
+  currentSessionIdFromUrl,
   emitAssistantMessageId,
   findMessageId,
   findMessageIdInSse,
   isReplyStreamUrl,
 } from "./message-id.js";
+import { extractReplyTextFromSse } from "./reply-text.js";
 
 /**
  * Patch window.fetch to intercept chat completion requests.
@@ -285,6 +287,24 @@ async function parseSSEUsage(response, modelName, captureMessageId) {
   if (!captureMessageId) return;
   const messageId = findMessageIdInSse(buffer);
   if (messageId) emitAssistantMessageId(messageId);
+
+  // Hand the untouched reply text to the content script. The DOM this reply
+  // becomes is lossy — CommonMark has already eaten escapes like `\\/` by the
+  // time it renders — so tag attributes must be parsed from this copy.
+  const { content } = extractReplyTextFromSse(buffer);
+  if (content) emitRawReply(content, messageId);
+}
+
+/** Tell the content script which reply text this stream produced, verbatim. */
+function emitRawReply(rawText, messageId) {
+  window.dispatchEvent(new CustomEvent("bds:raw-reply", {
+    detail: JSON.stringify({
+      messageId: messageId || null,
+      sessionId: currentSessionIdFromUrl(),
+      rawText,
+      timestamp: Date.now(),
+    }),
+  }));
 }
 
 function emitTokenUsage(inputTokens, outputTokens, modelName) {

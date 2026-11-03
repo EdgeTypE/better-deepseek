@@ -747,8 +747,20 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
     }, Math.max(0, SETTLE_STALL_MS - timeSinceUpdate) + SETTLE_RECHECK_MARGIN_MS);
   }
 
+  // The completion stream can hand over the reply text verbatim, which is the
+  // only copy that still contains escapes the Markdown renderer ate (`\/` ->
+  // `/`). It arrives after the stream ends, so it must take part in the hash or
+  // the settled message would never be re-parsed with the better source.
+  const sessionId = getCurrentConversationIdInline();
+  const streamedRawText = isLatestAssistant && sessionId
+    ? state.rawRepliesBySession?.get(sessionId) || null
+    : null;
+  const parseSource = streamedRawText || rawText;
+
   // Include settlement state in hash so transition to 'finished' triggers a final re-parse
-  const signature = simpleHash(rawText + (isSettled ? ":settled" : ":streaming"));
+  const signature = simpleHash(
+    parseSource + (isSettled ? ":settled" : ":streaming") + (streamedRawText ? ":verbatim" : ""),
+  );
   const shouldForceCloseTags = isSettled && isStalled;
 
   if (stateData.hash === signature && stateData.forceClosedTags === shouldForceCloseTags) {
@@ -761,7 +773,29 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
   stateData.hash = signature;
   stateData.forceClosedTags = shouldForceCloseTags;
 
-  const parsed = parseBdsMessage(richText, shouldForceCloseTags);
+  // Parse twice, by intent:
+  //
+  // - TAGS AND ATTRIBUTES come from rawText. Attribute values are
+  //   opaque payloads, but richText represents any `$tex$ $ span as the
+  //   page's KaTeX DOM subtree, so a `$s='hi'; $s` payload arrives as HTML
+  //   and corrupts the arguments. rawText collapses KaTeX back to
+  //   `$tex$` (see katexToMarkdown), restoring the delimiters.
+  //
+  // - VISIBLE TEXT comes from richText. The overlay renders it with
+  //   `marked.parse()`, which has no KaTeX plugin — it only passes the
+  //   renderer's own `<span class="katex">` markup through. Feeding the
+  //   overlay rawText would show literal `$tex$` instead of the formula.
+  //
+  // This fixes the `$...$` deletion bug on its own, and — when the completion
+  // stream handed over a verbatim copy — `\/` -> `/` as well. Bare URL ->
+  // autolink and `&` -> `&amp;` are still rewritten by the Markdown renderer
+  // before the DOM exists; they are covered by link-artifacts and HTML entity
+  // decoding respectively.
+  const parsed = parseBdsMessage(parseSource, shouldForceCloseTags);
+  if (parsed.visibleText !== undefined) {
+    // Keep the rendered KaTeX markup for the overlay only.
+    parsed.visibleText = parseBdsMessage(richText, shouldForceCloseTags).visibleText;
+  }
   const preGateBlocks = parsed.renderableBlocks;
 
   // --- BIDI DIRECTION (issue #181) ---
