@@ -1,5 +1,6 @@
 <script>
   import { onMount } from "svelte";
+  import { t } from "../../lib/i18n.svelte.js";
   import { buildHeadlessRunnerDocument } from "../../lib/utils/html-utils.js";
   import { handleAutoCodeRunnerResult } from "../auto.js";
 
@@ -10,9 +11,9 @@
   let status = $state("pending"); // pending, running, success, error, rejected
   let output = $state([]);
   let showCode = $state(false);
+  let copyFeedback = $state(false);
   let iframe = $state();
 
-  const sandboxUrl = chrome.runtime.getURL("sandbox.html");
   let headlessSrcDoc = $derived(buildHeadlessRunnerDocument(language));
 
   let isPython = $derived(language === "python" || language === "py");
@@ -48,17 +49,31 @@
   function runCode() {
     status = "running";
     output = [];
-    iframe.contentWindow.postMessage({
-      type: "RUN_CODE",
-      code: content,
-      id: instanceId
-    }, "*");
+    if (iframe?.contentWindow) {
+      iframe.contentWindow.postMessage({
+        type: "RUN_CODE",
+        code: content,
+        id: instanceId
+      }, "*");
+    }
   }
 
   function rejectCode() {
     status = "rejected";
     output = [{ method: "warn", text: "User rejected code execution." }];
     handleAutoCodeRunnerResult(language, "rejected", output);
+  }
+
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(content);
+      copyFeedback = true;
+      setTimeout(() => {
+        copyFeedback = false;
+      }, 2000);
+    } catch {
+      // fallback
+    }
   }
 
   function toggleCode() {
@@ -90,42 +105,62 @@
         {/if}
       </div>
       <div class="bds-auto-runner-details">
-        <h4>AI wants to run {langLabel} code</h4>
-        <p>This will execute in a safe sandbox.</p>
+        <h4>{t('autoCodeRunner.aiWantsToRun', { lang: langLabel }) || `AI wants to run ${langLabel} code`}</h4>
+        <p>{t('autoCodeRunner.safeSandbox') || 'This will execute in a safe sandbox.'}</p>
       </div>
     </div>
 
     <div class="bds-auto-runner-actions">
       {#if status === 'pending'}
-        <button type="button" class="bds-btn run" onclick={runCode}>▶ Run Code</button>
-        <button type="button" class="bds-btn reject" onclick={rejectCode}>✕ Reject</button>
-      {:else if status === 'running'}
-        <span class="bds-status-bubble">Running...</span>
-      {:else if status === 'success'}
-        <span class="bds-status-bubble success">Finished</span>
-        <button type="button" class="bds-btn-text" onclick={runCode}>Run Again</button>
-      {:else if status === 'error'}
-        <span class="bds-status-bubble error">Error</span>
-        <button type="button" class="bds-btn-text" onclick={runCode}>Retry</button>
-      {:else if status === 'rejected'}
-        <span class="bds-status-bubble">Rejected</span>
-        <button type="button" class="bds-btn-text" onclick={runCode}>Actually, Run</button>
+        <button type="button" class="bds-btn run" onclick={runCode}>{t('autoCodeRunner.runCode') || '▶ Run Code'}</button>
+        <button type="button" class="bds-btn reject" onclick={rejectCode}>{t('autoCodeRunner.reject') || '✕ Reject'}</button>
+      {:else}
+        {#if status === 'running'}
+          <span class="bds-status-bubble">{t('autoCodeRunner.running') || 'Running...'}</span>
+        {:else if status === 'success'}
+          <span class="bds-status-bubble success">{t('autoCodeRunner.finished') || 'Finished'}</span>
+          <button type="button" class="bds-btn-text" onclick={runCode}>{t('autoCodeRunner.runAgain') || 'Run Again'}</button>
+        {:else if status === 'error'}
+          <span class="bds-status-bubble error">{t('autoCodeRunner.error') || 'Error'}</span>
+          <button type="button" class="bds-btn-text" onclick={runCode}>{t('autoCodeRunner.retry') || 'Retry'}</button>
+        {:else if status === 'rejected'}
+          <span class="bds-status-bubble">{t('autoCodeRunner.rejected') || 'Rejected'}</span>
+          <button type="button" class="bds-btn-text" onclick={runCode}>{t('autoCodeRunner.actuallyRun') || 'Actually, Run'}</button>
+        {/if}
       {/if}
       <button type="button" class="bds-btn-text toggle" onclick={toggleCode}>
-        {showCode ? 'Hide Code ▴' : 'Show Code ▾'}
+        {showCode ? (t('autoCodeRunner.hideCode') || 'Hide Code ▴') : (t('autoCodeRunner.showCode') || 'Show Code ▾')}
       </button>
     </div>
   </div>
 
   {#if showCode}
     <div class="bds-auto-runner-source">
+      <button 
+        type="button" 
+        class="bds-source-copy-btn bds-btn-copy" 
+        onclick={copyCode}
+        title={copyFeedback ? (t('autoCodeRunner.copied') || 'Copied!') : (t('autoCodeRunner.copyCode') || 'Copy')}
+        aria-label={copyFeedback ? (t('autoCodeRunner.copied') || 'Copied!') : (t('autoCodeRunner.copyCode') || 'Copy')}
+      >
+        {#if copyFeedback}
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        {:else}
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        {/if}
+      </button>
       <pre>{content}</pre>
     </div>
   {/if}
 
   {#if output.length > 0}
     <div class="bds-auto-runner-output">
-      <div class="bds-output-label">Console Output</div>
+      <div class="bds-output-label">{t('autoCodeRunner.consoleOutput') || 'Console Output'}</div>
       <div class="bds-output-logs">
         {#each output as log}
           <div class="bds-log-line" class:error={log.method === 'error'} class:warn={log.method === 'warn'}>
@@ -258,9 +293,41 @@
   .bds-status-bubble.error { color: #ef4444; }
 
   .bds-auto-runner-source {
+    position: relative;
     padding: 0 16px 12px;
     border-top: 1px solid var(--bds-border);
     padding-top: 10px;
+  }
+
+  .bds-source-copy-btn {
+    position: absolute;
+    top: 16px;
+    right: 24px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    background: var(--bds-bg-panel);
+    border: 1px solid var(--bds-border);
+    border-radius: 6px;
+    color: var(--bds-text-secondary);
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    user-select: none;
+    transition: all 0.15s ease;
+  }
+
+  .bds-source-copy-btn:hover {
+    background: var(--bds-bg-hover);
+    color: var(--bds-text-primary);
+    border-color: var(--bds-border-hover);
+  }
+
+  .bds-source-copy-btn:active {
+    transform: scale(0.92);
   }
 
   .bds-auto-runner-source pre {
@@ -270,6 +337,7 @@
     background: var(--bds-bg-elevated);
     border-radius: 8px;
     padding: 10px;
+    padding-right: 42px;
     font-size: 11px;
     border: 1px solid var(--bds-border);
     font-family: monospace;

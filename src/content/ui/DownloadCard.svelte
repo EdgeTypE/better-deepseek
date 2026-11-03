@@ -7,6 +7,7 @@
   let { title, description, fileName, blob, files = [] } = $props();
 
   let expanded = $state(false);
+  let copyFeedback = $state(false);
 
   let isMultiFile = $derived(files.length > 1);
   let hasBrowse = $derived(files.length > 0);
@@ -16,6 +17,18 @@
   let singleContent = $derived(
     !isMultiFile && files.length === 1 ? String(files[0].content || "") : "",
   );
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(singleContent);
+      copyFeedback = true;
+      setTimeout(() => {
+        copyFeedback = false;
+      }, 2000);
+    } catch {
+      // fallback
+    }
+  }
 
   function handleDownload() {
     triggerBlobDownload(blob, fileName);
@@ -79,7 +92,27 @@
           {/each}
         </div>
       {:else}
-        <pre class="bds-download-card-code">{singleContent}</pre>
+        <div class="bds-download-card-code-wrapper">
+          <button
+            type="button"
+            class="bds-download-code-copy-btn bds-btn-copy"
+            onclick={handleCopy}
+            title={copyFeedback ? (t('downloadCard.copied') || 'Copied!') : (t('downloadCard.copyCode') || 'Copy')}
+            aria-label={copyFeedback ? (t('downloadCard.copied') || 'Copied!') : (t('downloadCard.copyCode') || 'Copy')}
+          >
+            {#if copyFeedback}
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            {:else}
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            {/if}
+          </button>
+          <pre class="bds-download-card-code">{singleContent}</pre>
+        </div>
       {/if}
     </div>
   {/if}
@@ -245,9 +278,45 @@
     white-space: nowrap;
   }
 
+  .bds-download-card-code-wrapper {
+    position: relative;
+  }
+
+  .bds-download-code-copy-btn {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    background: var(--bg-color);
+    border: 1px solid var(--btn-border);
+    border-radius: 6px;
+    color: var(--icon-color);
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    user-select: none;
+    transition: all 0.15s ease;
+  }
+
+  .bds-download-code-copy-btn:hover {
+    background: var(--btn-hover-bg);
+    color: var(--title-color);
+    border-color: var(--btn-border);
+  }
+
+  .bds-download-code-copy-btn:active {
+    transform: scale(0.92);
+  }
+
   .bds-download-card-code {
     margin: 0;
     padding: 12px 16px;
+    padding-right: 48px;
     max-height: 320px;
     overflow: auto;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

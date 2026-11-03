@@ -11,6 +11,7 @@
   let code = $state(content);
   let output = $state([]);
   let status = $state("READY"); // READY, LOADING_PYODIDE, RUNNING, FINISHED, ERROR
+  let copyFeedback = $state(false);
   let iframe = $state();
   
   let isPython = $derived(language === "python" || language === "py");
@@ -43,6 +44,18 @@
       code: code,
       id: instanceId
     }, "*");
+  }
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(code);
+      copyFeedback = true;
+      setTimeout(() => {
+        copyFeedback = false;
+      }, 2000);
+    } catch {
+      // ignore
+    }
   }
 
   function handleDownload() {
@@ -91,6 +104,20 @@
     </div>
 
     <div class="bds-runner-actions">
+      <button type="button" class="bds-btn-copy" onclick={handleCopy}>
+        {#if copyFeedback}
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span style="color: #10b981;">{t('codeRunner.copied') || 'Copied!'}</span>
+        {:else}
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span>{t('codeRunner.copyCode') || 'Copy Code'}</span>
+        {/if}
+      </button>
       <button type="button" class="bds-btn-small" onclick={handleDownload}>
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
         {t('codeRunner.download')}
@@ -213,7 +240,14 @@
     letter-spacing: 0.5px;
   }
 
-  .bds-btn-small {
+  .bds-runner-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .bds-btn-small,
+  .bds-btn-copy {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -228,7 +262,8 @@
     transition: all var(--bds-transition);
   }
 
-  .bds-btn-small:hover {
+  .bds-btn-small:hover,
+  .bds-btn-copy:hover {
     background: var(--bds-bg-hover);
     color: var(--bds-text-primary);
     border-color: var(--bds-border-hover);

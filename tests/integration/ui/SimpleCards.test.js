@@ -84,6 +84,42 @@ describe("simple ui cards", () => {
     cleanup();
   });
 
+  it("copies code to clipboard from single-file card", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    });
+
+    const blob = new Blob(["const answer = 42;"], { type: "text/plain" });
+    const { target, cleanup } = renderSvelte(DownloadCard, {
+      title: "Generated file",
+      description: "solution.js",
+      fileName: "solution.js",
+      blob,
+      files: [{ path: "solution.js", content: "const answer = 42;" }],
+    });
+
+    // Expand
+    const showCodeBtn = target.querySelector("button");
+    showCodeBtn.click();
+    await flushUi();
+
+    const copyBtn = target.querySelector(".bds-download-code-copy-btn");
+    expect(copyBtn).toBeTruthy();
+    expect(copyBtn.getAttribute("aria-label")).toBe("Copy");
+
+    copyBtn.click();
+    await flushUi();
+
+    expect(writeTextMock).toHaveBeenCalledWith("const answer = 42;");
+    expect(copyBtn.getAttribute("aria-label")).toBe("Copied!");
+
+    vi.unstubAllGlobals();
+    cleanup();
+  });
+
   it("shows a file tree for a multi-file card and toggles it", async () => {
     const blob = new Blob(["zip"], { type: "application/zip" });
     const { target, cleanup } = renderSvelte(DownloadCard, {

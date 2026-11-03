@@ -80,4 +80,59 @@ describe("CodeRunner integration", () => {
     );
     cleanup();
   });
+
+  it("copies the current script to clipboard", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    });
+
+    const { target, cleanup } = renderSvelte(CodeRunner, {
+      content: "print('copy me')",
+      language: "python",
+    });
+    await flushUi();
+
+    const copyBtn = target.querySelector(".bds-btn-copy");
+    expect(copyBtn).toBeTruthy();
+    expect(copyBtn.textContent).toContain("Copy Code");
+
+    copyBtn.click();
+    await flushUi();
+
+    expect(writeTextMock).toHaveBeenCalledWith("print('copy me')");
+    expect(copyBtn.textContent).toContain("Copied!");
+
+    vi.unstubAllGlobals();
+    cleanup();
+  });
+
+  it("copies modified script from editor", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    });
+
+    const { target, cleanup } = renderSvelte(CodeRunner, {
+      content: "initial code",
+      language: "javascript",
+    });
+    await flushUi();
+
+    target.querySelector(".bds-code-editor").value = "modified code";
+    target.querySelector(".bds-code-editor").dispatchEvent(new Event("input", { bubbles: true }));
+    await flushUi();
+
+    target.querySelector(".bds-btn-copy").click();
+    await flushUi();
+
+    expect(writeTextMock).toHaveBeenCalledWith("modified code");
+
+    vi.unstubAllGlobals();
+    cleanup();
+  });
 });
