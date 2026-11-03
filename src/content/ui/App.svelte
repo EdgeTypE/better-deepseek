@@ -214,6 +214,15 @@
   window.addEventListener("bds:open-live-mode", () => {
     openLiveMode();
   });
+
+  window.addEventListener("bds:open-drawer", (e) => {
+    drawerOpen = true;
+    if (e.detail?.section === "skills") {
+      setTimeout(() => {
+        document.querySelector("#bds-skill-list")?.scrollIntoView({ behavior: "smooth" });
+      }, 150);
+    }
+  });
 </script>
 
 <button id="bds-toggle" type="button" onclick={toggleDrawer} aria-label="Better DeepSeek">

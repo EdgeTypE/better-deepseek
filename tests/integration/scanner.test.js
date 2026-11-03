@@ -7,6 +7,7 @@ const mountMock = vi.hoisted(() => vi.fn(() => ({})));
 const unmountMock = vi.hoisted(() => vi.fn());
 const deepResearchToggleMock = vi.hoisted(() => ({ name: "DeepResearchToggle" }));
 const deepCodeToggleMock = vi.hoisted(() => ({ name: "DeepCodeToggle" }));
+const activeSkillsChipMock = vi.hoisted(() => ({ name: "ActiveSkillsChip" }));
 const attachMenuMock = vi.hoisted(() => ({ name: "AttachMenu" }));
 const expandToggleMock = vi.hoisted(() => ({ name: "ExpandToggle" }));
 const ragPreviewMock = vi.hoisted(() => ({ name: "RagPreview" }));
@@ -48,6 +49,10 @@ vi.mock("../../src/content/ui/DeepResearchToggle.svelte", () => ({
 
 vi.mock("../../src/content/ui/DeepCodeToggle.svelte", () => ({
   default: deepCodeToggleMock,
+}));
+
+vi.mock("../../src/content/ui/ActiveSkillsChip.svelte", () => ({
+  default: activeSkillsChipMock,
 }));
 
 vi.mock("../../src/content/ui/SidebarSearch.js", () => ({

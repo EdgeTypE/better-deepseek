@@ -10,6 +10,9 @@
 
   let skills = $state([...appState.skills]);
   let uploadInput = $state(null);
+  let settingsOpen = $state(false);
+  let resetSkillsOnNewChat = $state(Boolean(appState.settings?.resetSkillsOnNewChat));
+  let showSelectedSkillsOnComposer = $state(appState.settings?.showSelectedSkillsOnComposer ?? true);
 
   // Editing state
   let editingId = $state(null);
@@ -19,6 +22,25 @@
 
   export function refresh() {
     skills = [...appState.skills];
+    resetSkillsOnNewChat = Boolean(appState.settings?.resetSkillsOnNewChat);
+    showSelectedSkillsOnComposer = appState.settings?.showSelectedSkillsOnComposer ?? true;
+  }
+
+  async function toggleResetOnNewChat() {
+    appState.settings.resetSkillsOnNewChat = resetSkillsOnNewChat;
+    await chrome.storage?.local?.set?.({
+      [STORAGE_KEYS.settings]: JSON.parse(JSON.stringify(appState.settings)),
+    });
+    window.dispatchEvent(new CustomEvent("bds:settingsChanged"));
+  }
+
+  async function toggleShowSelectedSkillsOnComposer() {
+    appState.settings.showSelectedSkillsOnComposer = showSelectedSkillsOnComposer;
+    await chrome.storage?.local?.set?.({
+      [STORAGE_KEYS.settings]: JSON.parse(JSON.stringify(appState.settings)),
+    });
+    window.dispatchEvent(new CustomEvent("bds:settingsChanged"));
+    window.dispatchEvent(new CustomEvent("bds:skillsChanged"));
   }
 
   function exportSkills() {
@@ -240,4 +262,46 @@
       {/if}
     {/each}
   {/if}
+</div>
+
+<button
+  type="button"
+  class="bds-sub-toggle"
+  class:open={settingsOpen}
+  onclick={() => (settingsOpen = !settingsOpen)}
+  aria-expanded={settingsOpen}
+  style="margin-top: 10px;"
+  data-testid="bds-skill-settings-toggle"
+>
+  {t('skillList.settingsTitle')}
+  <span class="bds-chevron">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </span>
+</button>
+<div class="bds-sub-content" class:open={settingsOpen}>
+  <div class="bds-sub-inner">
+    <div class="bds-toggle-row">
+      <div>
+        <span class="bds-toggle-label">{t('settings.resetSkillsOnNewChat')}</span>
+        <p style="font-size: 10px; opacity: 0.5; margin: 2px 0 0;">{t('settings.resetSkillsOnNewChatHint')}</p>
+      </div>
+      <label class="bds-switch">
+        <input type="checkbox" bind:checked={resetSkillsOnNewChat} onchange={toggleResetOnNewChat} />
+        <span class="bds-switch-track"></span>
+      </label>
+    </div>
+
+    <div class="bds-toggle-row">
+      <div>
+        <span class="bds-toggle-label">{t('settings.showSelectedSkillsOnComposer')}</span>
+        <p style="font-size: 10px; opacity: 0.5; margin: 2px 0 0;">{t('settings.showSelectedSkillsOnComposerHint')}</p>
+      </div>
+      <label class="bds-switch">
+        <input type="checkbox" bind:checked={showSelectedSkillsOnComposer} onchange={toggleShowSelectedSkillsOnComposer} />
+        <span class="bds-switch-track"></span>
+      </label>
+    </div>
+  </div>
 </div>

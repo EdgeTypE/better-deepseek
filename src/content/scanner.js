@@ -18,6 +18,7 @@ import ExpandToggle from "./ui/ExpandToggle.svelte";
 import RagPreview from "./ui/RagPreview.svelte";
 import DeepResearchToggle from "./ui/DeepResearchToggle.svelte";
 import DeepCodeToggle from "./ui/DeepCodeToggle.svelte";
+import ActiveSkillsChip from "./ui/ActiveSkillsChip.svelte";
 import { injectSearchInput } from "./ui/SidebarSearch.js";
 import { checkPendingExport } from "./tools/pending-export.js";
 import { hideTagsInSidebar, hideTagsInHeader, hideBdsTagsInPopovers } from "./tags/tag-hider.js";
@@ -620,6 +621,19 @@ export function scanInputArea() {
     unmountComposerMount("bds-deep-code-mount");
   }
 
+  const skillChipMountPoint = ensureComposerMount(
+    deepResearchWrapper,
+    "bds-skill-chip-mount",
+    ".bds-skill-chip",
+    insertBeforeNode,
+  );
+  if (!skillChipMountPoint.dataset.bdsMounted) {
+    skillChipMountPoint.__bdsInstance = mount(ActiveSkillsChip, {
+      target: skillChipMountPoint,
+    });
+    skillChipMountPoint.dataset.bdsMounted = "1";
+  }
+
   if (!fileInput || !wrapper) {
     markComposerControlsMounted(deepResearchWrapper, wrapper);
     return;
@@ -955,6 +969,7 @@ function findComposerInsertAnchor(wrapper) {
   return Array.from(wrapper.children).find((child) =>
     !child.classList?.contains("bds-deep-research-mount") &&
     !child.classList?.contains("bds-deep-code-mount") &&
+    !child.classList?.contains("bds-skill-chip-mount") &&
     !child.closest?.("#bds-root")
   ) || null;
 }
@@ -968,6 +983,7 @@ function findNativeFileInputTrigger(fileInput) {
   if (
     candidate.classList?.contains("bds-deep-research-mount") ||
     candidate.classList?.contains("bds-deep-code-mount") ||
+    candidate.classList?.contains("bds-skill-chip-mount") ||
     candidate.classList?.contains("bds-attach-menu-mount") ||
     candidate.classList?.contains("bds-expand-toggle-mount") ||
     candidate.classList?.contains("bds-rag-preview-mount")
@@ -1051,7 +1067,7 @@ function ensureComposerMount(wrapper, className, descendantSelector, beforeNode)
     child.classList && child.classList.contains(className)
   );
 
-  if (!mountPoint && (className === "bds-deep-research-mount" || className === "bds-deep-code-mount")) {
+  if (!mountPoint && (className === "bds-deep-research-mount" || className === "bds-deep-code-mount" || className === "bds-skill-chip-mount")) {
     mountPoint = document.querySelector(`.${className}`);
   }
 

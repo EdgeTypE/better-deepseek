@@ -738,6 +738,7 @@ textarea.bds-input,
    whenever the feature is on rather than while the chip is being hovered. */
 .bds-deep-research-toggle:hover .bds-chip-label,
 .bds-deep-code-toggle:hover .bds-chip-label,
+.bds-skill-chip:hover .bds-chip-label,
 .ds-toggle-button--selected .bds-chip-label {
   max-width: 40ch;
   margin-left: 6px;
@@ -752,7 +753,8 @@ textarea.bds-input,
    is exactly what made the icon look off-centre. Taking the overlay out of flow
    equalises the two paddings and reclaims 6px of width. */
 .bds-deep-research-toggle > .ds-focus-ring,
-.bds-deep-code-toggle > .ds-focus-ring {
+.bds-deep-code-toggle > .ds-focus-ring,
+.bds-skill-chip > .ds-focus-ring {
   position: absolute;
   pointer-events: none;
 }

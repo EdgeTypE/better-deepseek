@@ -284,6 +284,21 @@ async function init() {
     if ((state.settings.loadAllHistoryOnSession || state.settings.showTimestamps) && location.href.includes("/chat/s/")) {
       loadAllHistory();
     }
+
+    if (!newId && state.settings.resetSkillsOnNewChat && Array.isArray(state.skills)) {
+      let changed = false;
+      for (const skill of state.skills) {
+        if (skill.active) {
+          skill.active = false;
+          changed = true;
+        }
+      }
+      if (changed) {
+        chrome.storage?.local?.set?.({ [STORAGE_KEYS.skills]: state.skills });
+        pushConfigToPage();
+        window.dispatchEvent(new CustomEvent("bds:skillsChanged"));
+      }
+    }
   });
 }
 

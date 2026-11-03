@@ -556,6 +556,9 @@ export function bindStorageChangeListener() {
       if (state.ui) {
         state.ui.refreshSkills();
       }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent("bds:skillsChanged"));
+      }
       pageConfigChanged = true;
     }
 
