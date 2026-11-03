@@ -505,15 +505,18 @@ describe("buildMidiFile", () => {
 describe("MIDI prompt module <BDS:midi> contract", () => {
   const prompt = String(MIDI_PROMPT);
 
-  const exampleStart = prompt.indexOf("EXAMPLE (structure only");
-  const exampleOpen = prompt.indexOf("<BDS:midi>", exampleStart);
-  const exampleClose = prompt.indexOf("</BDS:midi>", exampleOpen);
-  const example = prompt.slice(exampleOpen + "<BDS:midi>".length, exampleClose).trim();
+  const exampleMatches = [...prompt.matchAll(/EXAMPLE(?:\s+\d+)?[^<]*<BDS:midi>([\s\S]*?)<\/BDS:midi>/gi)];
+  const exampleBlocks = exampleMatches.map((m) => m[1].trim());
 
-  /** Group the example's note lines by track, splitting on bar lines. */
-  function exampleBars() {
+  const exampleStart = exampleMatches.length ? exampleMatches[0].index : -1;
+  const exampleOpen = exampleStart > -1 ? prompt.indexOf("<BDS:midi>", exampleStart) : -1;
+  const exampleClose = exampleOpen > -1 ? prompt.indexOf("</BDS:midi>", exampleOpen) : -1;
+  const example = exampleBlocks[0] ?? "";
+
+  /** Group an example's note lines by track, splitting on bar lines. */
+  function exampleBars(scoreText = example) {
     const bars = new Map();
-    for (const line of example.split("\n")) {
+    for (const line of scoreText.split("\n")) {
       const trimmed = line.trim();
       if (!trimmed || trimmed.startsWith("#") || /^(title|tempo)\s*[:=]/i.test(trimmed)) continue;
 
@@ -535,28 +538,35 @@ describe("MIDI prompt module <BDS:midi> contract", () => {
     expect(exampleStart).toBeGreaterThan(-1);
     expect(exampleOpen).toBeGreaterThan(exampleStart);
     expect(exampleClose).toBeGreaterThan(exampleOpen);
+    expect(exampleBlocks.length).toBeGreaterThan(0);
 
-    const score = parseMidiScore(example);
-    expect(score.errors).toEqual([]);
-    expect(score.ok).toBe(true);
-    expect(score.noteCount).toBeGreaterThan(0);
-    expect(score.title).not.toBe("");
+    for (const block of exampleBlocks) {
+      const score = parseMidiScore(block);
+      expect(score.errors).toEqual([]);
+      expect(score.ok).toBe(true);
+      expect(score.noteCount).toBeGreaterThan(0);
+      expect(score.title).not.toBe("");
+    }
   });
 
   it("keeps the example inside the rules the prompt states", () => {
-    const bars = exampleBars();
-    expect(bars.size).toBeGreaterThan(1);
+    expect(exampleBlocks.length).toBeGreaterThan(0);
 
-    const barCounts = new Set();
-    for (const list of bars.values()) {
-      barCounts.add(list.length);
-      for (const bar of list) {
-        const parsed = parseMidiScore(`track X\n${bar}`);
-        expect(parsed.errors).toEqual([]);
-        expect(parsed.durationBeats).toBe(4); // 4/4, every bar full
+    for (const block of exampleBlocks) {
+      const bars = exampleBars(block);
+      expect(bars.size).toBeGreaterThan(1);
+
+      const barCounts = new Set();
+      for (const list of bars.values()) {
+        barCounts.add(list.length);
+        for (const bar of list) {
+          const parsed = parseMidiScore(`track X\n${bar}`);
+          expect(parsed.errors).toEqual([]);
+          expect(parsed.durationBeats).toBe(4); // 4/4, every bar full
+        }
       }
+      expect(barCounts.size).toBe(1); // all tracks the same length
     }
-    expect(barCounts.size).toBe(1); // all tracks the same length
   });
 
   it("parses every form the prompt documents", () => {

@@ -30,7 +30,7 @@ describe("prompt module request handler", () => {
     const message = autoMocks.injectPureTextAndSend.mock.calls[0][0];
 
     expect(message).toContain("[BDS:PROMPT_MODULE] midi");
-    expect(message).toContain("HARD CONSTRAINTS");
+    expect(message).toContain("STRICT SYNTAX");
     expect(message.startsWith("<BetterDeepSeek>")).toBe(true);
     expect(message.trimEnd().endsWith("</BetterDeepSeek>")).toBe(true);
   });

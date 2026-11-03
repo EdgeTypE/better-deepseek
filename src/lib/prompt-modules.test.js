@@ -18,7 +18,7 @@ describe("prompt module registry", () => {
 
     expect(midi).toContain("tempo:");
     expect(midi).toContain("<BDS:midi>");
-    expect(midi).toContain("HARD CONSTRAINTS");
+    expect(midi).toContain("STRICT SYNTAX");
   });
 
   it("bundles the library API of each office format", () => {
