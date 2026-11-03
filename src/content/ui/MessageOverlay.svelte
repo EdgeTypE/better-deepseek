@@ -292,6 +292,18 @@
         <ChartCard content={block.content} attrs={block.attrs} />
       {:else if block.name === 'midi'}
         <MidiCard content={block.content} attrs={block.attrs} />
+      {:else if block.name === 'get'}
+        <div class="bds-question-info-card bds-prompt-module-card">
+          <div class="bds-question-icon bds-prompt-module-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+          </div>
+          <div class="bds-question-content">
+            <div class="bds-question-title">{t('messageOverlay.promptModuleLoading', { name: block.content })}</div>
+          </div>
+        </div>
       {:else if block.name === 'harness_task' || block.name === 'auto:harness_task'}
         <HarnessTaskCard attrs={block.attrs} content={block.content} />
       {:else if block.name === 'long_work'}
@@ -673,6 +685,15 @@
 
   .bds-skill-card {
     border-left: 3px solid #8b5cf6;
+  }
+
+  .bds-prompt-module-icon {
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+  }
+
+  .bds-prompt-module-card {
+    border-left: 3px solid #f59e0b;
   }
 
   .bds-web-fetch-icon {

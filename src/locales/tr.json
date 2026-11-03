@@ -918,6 +918,7 @@
       "skillCreated": "Yetenek oluşturuldu.",
       "skillActive": "Aktif yetenek: <strong>{{name}}</strong>",
       "webFetchRequested": "Web sayfası getiriliyor",
+      "promptModuleLoading": "Başvuru kaynağı yükleniyor: {{name}}...",
       "githubFetchRequested": "GitHub deposu getiriliyor",
       "searchRequested": "{{provider}} aranıyor...",
       "fileReadRequested": "Kod dosyası okunuyor...",

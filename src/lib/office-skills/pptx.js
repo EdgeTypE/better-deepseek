@@ -47,7 +47,7 @@ export const PPTX_SKILL = `
    // Shape:
    slide.addShape(pptx.shapes.RECTANGLE, { x: 1, y: 1, w: 4, h: 3, fill: { color: "4472C4" } });
 
-5. SAVE — ALWAYS end with:
+5. SAVE: ALWAYS end with:
    await pptx.writeFile({ fileName: "Presentation.pptx" });
    // CRITICAL: Without this call, no file is generated. Must be awaited.
 
@@ -78,14 +78,14 @@ slide3.addChart(pptx.charts.PIE, [
 await pptx.writeFile({ fileName: "ProjectPlan.pptx" });
 
 ### COMMON MISTAKES TO AVOID:
-- ✗ \`const PptxGenJS = require('pptxgenjs')\` — NOT available
-- ✗ \`const PptxGenJS = ...\` — PptxGenJS is already defined globally
-- ✗ Forgetting \`await\` before \`pptx.writeFile()\` — it's async, must be awaited
-- ✗ \`pptx.save()\` — wrong method, use \`pptx.writeFile({ fileName: ... })\`
-- ✗ \`slide.addText("text", x, y, w, h)\` — wrong! Second arg is an options object
-- ✗ Using \`document.createElement\`, \`fetch\`, \`Blob\` — these are NOT available in sandbox
-- ✗ \`pptx.write()\` without options — use \`writeFile\` for file download
-- ✗ Not calling \`pptx.writeFile\` at all — the most common reason for "no output"
+- ✗ \`const PptxGenJS = require('pptxgenjs')\`: NOT available
+- ✗ \`const PptxGenJS = ...\`: PptxGenJS is already defined globally
+- ✗ Forgetting \`await\` before \`pptx.writeFile()\`: it's async, must be awaited
+- ✗ \`pptx.save()\`: wrong method, use \`pptx.writeFile({ fileName: ... })\`
+- ✗ \`slide.addText("text", x, y, w, h)\`: wrong! Second arg is an options object
+- ✗ Using \`document.createElement\`, \`fetch\`, \`Blob\`: these are NOT available in sandbox
+- ✗ \`pptx.write()\` without options: use \`writeFile\` for file download
+- ✗ Not calling \`pptx.writeFile\` at all: the most common reason for "no output"
 
 ### POSITIONING HELP:
 - Slide dimensions: LAYOUT_WIDE = 10" x 5.625", LAYOUT_STANDARD = 10" x 7.5"

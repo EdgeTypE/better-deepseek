@@ -35,6 +35,7 @@ import {
 } from "./dom/host.js";
 import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun, handleAutoMcpCall, handleAutoFileRead, handleAutoSearchInDirectory, handleAutoListDir, findChatEditor } from "./auto.js";
 import { handleManagedAutoContinuation, isManagedRunActive, trySynthesizeReport } from "./deep-research.js";
+import { handlePromptModuleRequest } from "./prompt-modules.js";
 import { cleanTextForSpeech, getBestVoice, softenPunctuationForSpeech } from "./live/tts-utils.js";
 import {
   isNativeVoiceSupported,
@@ -780,7 +781,8 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
     parsed.autoRequests.mcpCalls.length > 0 ||
     (parsed.autoRequests.fileRead && parsed.autoRequests.fileRead.length > 0) ||
     (parsed.autoRequests.searchInDirectory && parsed.autoRequests.searchInDirectory.length > 0) ||
-    (parsed.autoRequests.dirList && parsed.autoRequests.dirList.length > 0);
+    (parsed.autoRequests.dirList && parsed.autoRequests.dirList.length > 0) ||
+    (parsed.autoRequests.promptModules && parsed.autoRequests.promptModules.length > 0);
   const currentConversationId = getCurrentConversationIdInline();
   const managedAutoSuppressionRun = getManagedAutoSuppressionRun(parsed, currentConversationId);
   const suppressManagedAuto = Boolean(managedAutoSuppressionRun);
@@ -878,6 +880,12 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
           stateData.autoDirListsHandled.add(dirPath);
           handleAutoListDir(dirPath);
         }
+      }
+
+      // Prompt modules are conversation-scoped, not managed-research scoped —
+      // a research run can still ask for the MIDI reference.
+      for (const moduleName of (parsed.autoRequests.promptModules || [])) {
+        handlePromptModuleRequest(moduleName, currentConversationId);
       }
 
       if (

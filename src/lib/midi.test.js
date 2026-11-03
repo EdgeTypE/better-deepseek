@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SYSTEM_PROMPT } from "./constants.js";
+import { MIDI_PROMPT } from "./prompt-modules/midi.js";
 import {
   BEATS_PER_BAR,
   buildMidiFile,
@@ -499,12 +499,11 @@ describe("buildMidiFile", () => {
 });
 
 /**
- * The system prompt is the contract the model writes against, so its own
+ * The prompt module is the contract the model writes against, so its own
  * example has to survive the parser and obey the rules the prompt states.
  */
-describe("system prompt <BDS:midi> contract", () => {
-  // The prompt is assembled by joining its source array, so it arrives as a string.
-  const prompt = String(DEFAULT_SYSTEM_PROMPT);
+describe("MIDI prompt module <BDS:midi> contract", () => {
+  const prompt = String(MIDI_PROMPT);
 
   const exampleStart = prompt.indexOf("EXAMPLE (structure only");
   const exampleOpen = prompt.indexOf("<BDS:midi>", exampleStart);

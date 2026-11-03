@@ -202,6 +202,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
       fileRead: [],
       searchInDirectory: [],
       dirList: [],
+      promptModules: [],
     },
     visibleText: stripAutoLinkArtifacts(text),
   };
@@ -504,6 +505,25 @@ export function parseBdsMessage(rawText, isSettled = false) {
       });
       renderableTagMatches.push({ original: tag.raw, index: tag.index, blockIdx });
     }
+  }
+
+  // On-demand prompt modules. Both `<BDS:GET>midi</BDS:GET>` and the
+  // self-closing `<BDS:GET name="midi"/>` form are accepted: models reach for
+  // the second one on their own even when the prompt shows the first.
+  for (const tag of scanBdsTagPairs(text, "get", { includeSelfClosing: true })) {
+    if (isInsideCodeBlock(tag.index)) continue;
+    const attrs = parseTagAttributes(tag.attrsRaw);
+    const moduleName = String(tag.body || attrs.name || attrs.module || "").trim();
+    if (!moduleName) continue;
+
+    result.autoRequests.promptModules.push(moduleName);
+    const blockIdx = result.renderableBlocks.length;
+    result.renderableBlocks.push({
+      name: "get",
+      attrs: { module: moduleName },
+      content: moduleName,
+    });
+    renderableTagMatches.push({ original: tag.raw, index: tag.index, blockIdx });
   }
 
   const fileReadResultRegex = /\[BDS:AUTO_FILE_READ_RESULT\]\s*([\s\S]*?)\s*\[\/BDS:AUTO_FILE_READ_RESULT\]/gi;

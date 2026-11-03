@@ -45,6 +45,7 @@ Better DeepSeek introduces a set of special tags that DeepSeek can use to produc
 - `<BDS:pptx>...</BDS:pptx>` – Generate a PowerPoint presentation using the PptxGenJS library.
 - `<BDS:excel>...</BDS:excel>` – Generate an Excel spreadsheet using SheetJS.
 - `<BDS:docx>...</BDS:docx>` – Generate a Word document using the docx library.
+- `<BDS:GET>module</BDS:GET>` – Load a tool's full reference on demand (`midi`, `docx`, `xlsx`, `pptx`, `office`) before using it.
 - `<BDS:chart>...</BDS:chart>` – Generate interactive charts and data visualizations using the declarative Vega-Lite specification.
 - `<BDS:AUTO:REQUEST_WEB_FETCH>url</BDS:AUTO:REQUEST_WEB_FETCH>` – Automatically fetch and convert a web page to markdown, then inject it into the chat context.
 - `<BDS:AUTO:REQUEST_GITHUB_FETCH>url</BDS:AUTO:REQUEST_GITHUB_FETCH>` – Automatically fetch a GitHub repository and inject its codebase into the chat context.

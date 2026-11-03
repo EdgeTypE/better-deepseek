@@ -918,6 +918,7 @@
       "skillCreated": "Навык создан.",
       "skillActive": "Активный навык: <strong>{{name}}</strong>",
       "webFetchRequested": "Веб-страница загружается",
+      "promptModuleLoading": "Загрузка справки: {{name}}...",
       "githubFetchRequested": "GitHub репозиторий загружается",
       "searchRequested": "Идёт поиск через {{provider}}...",
       "fileReadRequested": "Чтение файла кодовой базы...",

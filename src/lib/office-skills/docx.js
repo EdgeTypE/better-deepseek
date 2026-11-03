@@ -67,7 +67,7 @@ export const DOCX_SKILL = `
    // Page break:
    new Paragraph({ pageBreakBefore: true })
 
-4. SAVE — ALWAYS end with:
+4. SAVE: ALWAYS end with:
    await DOCX.save(doc, "filename.docx");
    // Alternatively: const blob = await DOCX.Packer.toBlob(doc);
    // CRITICAL: Without DOCX.save(), no file is generated.
@@ -127,16 +127,16 @@ const doc = new Document({
 await DOCX.save(doc, "AnnualReport.docx");
 
 ### COMMON MISTAKES TO AVOID:
-- ✗ \`import { Document } from "docx"\` — NOT available, don't use import
-- ✗ \`const docx = require("docx")\` — NOT available
-- ✗ \`const DOCX = ...\` or \`const docx = ...\` — DOCX/docx is already globally defined
-- ✗ \`new Docx()\` — wrong! Use \`new Document()\` from the library
-- ✗ \`doc.save("filename.docx")\` — use \`DOCX.save(doc, "filename.docx")\`
-- ✗ Forgetting \`await\` before \`DOCX.save()\` — it's async
-- ✗ \`new TextRun("text", { bold: true })\` — wrong! TextRun takes text as first arg OR options object: \`new TextRun({ text: "text", bold: true })\`
-- ✗ Missing \`sections: [{ children: [...] }]\` — Document requires at least one section
-- ✗ Using \`document.createElement\`, \`fetch\`, \`Blob\` — NOT available in sandbox
-- ✗ Forgetting \`new\` keyword before Paragraph, TextRun, etc. — these are constructors
+- ✗ \`import { Document } from "docx"\`: NOT available, don't use import
+- ✗ \`const docx = require("docx")\`: NOT available
+- ✗ \`const DOCX = ...\` or \`const docx = ...\`: DOCX/docx is already globally defined
+- ✗ \`new Docx()\`: wrong! Use \`new Document()\` from the library
+- ✗ \`doc.save("filename.docx")\`: use \`DOCX.save(doc, "filename.docx")\`
+- ✗ Forgetting \`await\` before \`DOCX.save()\`: it's async
+- ✗ \`new TextRun("text", { bold: true })\`: wrong! TextRun takes text as first arg OR options object: \`new TextRun({ text: "text", bold: true })\`
+- ✗ Missing \`sections: [{ children: [...] }]\`: Document requires at least one section
+- ✗ Using \`document.createElement\`, \`fetch\`, \`Blob\`: NOT available in sandbox
+- ✗ Forgetting \`new\` keyword before Paragraph, TextRun, etc.: these are constructors
 
 ### COMMONLY USED CLASSES AND THEIR IMPORTS (all available as globals):
 - Document, Paragraph, TextRun, Table, TableRow, TableCell

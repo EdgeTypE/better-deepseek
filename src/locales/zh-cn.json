@@ -918,6 +918,7 @@
       "skillCreated": "技能已创建。",
       "skillActive": "当前技能：<strong>{{name}}</strong>",
       "webFetchRequested": "正在抓取网页",
+      "promptModuleLoading": "正在加载参考文档：{{name}}...",
       "githubFetchRequested": "正在抓取 GitHub 仓库",
       "searchRequested": "正在使用 {{provider}} 搜索…",
       "fileReadRequested": "正在读取代码库文件…",

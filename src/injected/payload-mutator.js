@@ -2,10 +2,11 @@
  * All payload mutation logic for intercepted API requests.
  *
  * This is the CORE of the injection system — it injects the system prompt,
- * skills, memory context, and office document library references into DeepSeek's API payload.
+ * skills and memory context into DeepSeek's API payload. Tool documentation is
+ * no longer injected from prompt keywords: the model loads it on demand with
+ * `<BDS:GET>`, and that reference arrives as its own follow-up message.
  */
 
-import { buildOfficeSkillsBlock } from "../lib/office-skills/index.js";
 import { searchActiveProjectRAG, formatRagInjections } from "../lib/rag-engine.js";
 import { buildQuoteContextBlock } from "../lib/quote-context.js";
 import { parseSkillMentions } from "../lib/skill-mentions.js";
@@ -480,11 +481,6 @@ export function buildHiddenPrefix(
   const memoryBlock = buildMemoryCallsBlock(userPrompt, state, messages);
   if (memoryBlock) {
     blocks.push(memoryBlock);
-  }
-
-  const officeBlock = buildOfficeSkillsBlock(userPrompt);
-  if (officeBlock) {
-    blocks.push(officeBlock);
   }
 
   const activeChar = state.config.activeCharacter;
@@ -1080,6 +1076,7 @@ export function stripInjectedBlocks(text) {
       if (
         content.includes("[BDS:AUTO]") ||
         content.includes("[BDS:DEEP_RESEARCH]") ||
+        content.includes("[BDS:PROMPT_MODULE]") ||
         /<BDS:memory_calls[\s>]/i.test(content)
       ) {
         return match;

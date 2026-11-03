@@ -30,7 +30,7 @@ export const XLSX_SKILL = `
 4. COLUMN WIDTHS (optional but recommended):
    ws["!cols"] = [{ wch: 20 }, { wch: 10 }];
 
-5. SAVE — ALWAYS end with:
+5. SAVE: ALWAYS end with:
    XLSX.writeFile(wb, "filename.xlsx");
    // CRITICAL: This triggers the download. Without it, nothing happens.
 
@@ -45,13 +45,13 @@ XLSX.utils.book_append_sheet(wb, ws, "Products");
 XLSX.writeFile(wb, "products.xlsx");
 
 ### COMMON MISTAKES TO AVOID:
-- ✗ \`const XLSX = require('xlsx')\` — NOT available, don't use require
-- ✗ \`const XLSX = ...\` — XLSX is already defined, redeclaring causes error
-- ✗ \`XLSX.write(wb, ...)\` without type — use \`XLSX.writeFile(wb, name)\` for download
-- ✗ \`for each row manually\` — use json_to_sheet or aoa_to_sheet
-- ✗ Forgetting \`XLSX.utils.book_append_sheet()\` — the sheet must be added to workbook
-- ✗ \`await XLSX.writeFile()\` — writeFile is synchronous, no await needed
-- ✗ Browser APIs like \`document.getElementById\`, \`fetch\`, \`Blob\` — NOT available in sandbox
+- ✗ \`const XLSX = require('xlsx')\`: NOT available, don't use require
+- ✗ \`const XLSX = ...\`: XLSX is already defined, redeclaring causes error
+- ✗ \`XLSX.write(wb, ...)\` without type: use \`XLSX.writeFile(wb, name)\` for download
+- ✗ \`for each row manually\`: use json_to_sheet or aoa_to_sheet
+- ✗ Forgetting \`XLSX.utils.book_append_sheet()\`: the sheet must be added to workbook
+- ✗ \`await XLSX.writeFile()\`: writeFile is synchronous, no await needed
+- ✗ Browser APIs like \`document.getElementById\`, \`fetch\`, \`Blob\`: NOT available in sandbox
 
 ### CELL STYLING (limited support):
 // Cell object in sheet:

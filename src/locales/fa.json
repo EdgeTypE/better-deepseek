@@ -918,6 +918,7 @@
       "skillCreated": "مهارت ایجاد شد.",
       "skillActive": "مهارت فعال: <strong>{{name}}</strong>",
       "webFetchRequested": "صفحه وب در حال دریافت است",
+      "promptModuleLoading": "در حال بارگذاری مرجع: {{name}}...",
       "githubFetchRequested": "مخزن گیت‌هاب در حال دریافت است",
       "searchRequested": "در حال جستجو در {{provider}}...",
       "fileReadRequested": "در حال خواندن فایل پایگاه کد...",

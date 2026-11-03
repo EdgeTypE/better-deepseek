@@ -918,6 +918,7 @@
       "skillCreated": "Skill created.",
       "skillActive": "Active skill: <strong>{{name}}</strong>",
       "webFetchRequested": "Web page is being fetched",
+      "promptModuleLoading": "Loading reference: {{name}}...",
       "githubFetchRequested": "GitHub repository is being fetched",
       "searchRequested": "Searching {{provider}}...",
       "fileReadRequested": "Reading codebase file...",
