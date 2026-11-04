@@ -2,6 +2,7 @@
   import { t } from "../../lib/i18n.svelte.js";
   import appState from "../state.js";
   import { STORAGE_KEYS } from "../../lib/constants.js";
+  import { parseAnnouncementMessage } from "../../lib/announcement-parser.js";
 
   let announcements = $state(appState.remoteAnnouncements || []);
   let dismissedAnnouncements = $state(appState.dismissedAnnouncements || []);
@@ -63,7 +64,25 @@
       {/if}
     </div>
     <div class="bds-announcement-content">
-      {ann.message}
+      {#each parseAnnouncementMessage(ann.message) as token}
+        {#if token.type === 'link'}
+          <a
+            href={token.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="bds-announcement-link"
+            onclick={(e) => e.stopPropagation()}
+          >{token.text}</a>
+        {:else if token.type === 'bold'}
+          <strong>{token.text}</strong>
+        {:else if token.type === 'italic'}
+          <em>{token.text}</em>
+        {:else if token.type === 'code'}
+          <code class="bds-announcement-code">{token.text}</code>
+        {:else}
+          {token.text}
+        {/if}
+      {/each}
     </div>
     <button 
       class="bds-announcement-close" 
@@ -140,6 +159,31 @@
     font-size: 13px;
     font-weight: 500;
     line-height: 1.4;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .bds-announcement-content a,
+  .bds-announcement-link {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .bds-announcement-content a:hover,
+  .bds-announcement-link:hover {
+    opacity: 0.8;
+  }
+
+  .bds-announcement-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.9em;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: color-mix(in srgb, currentColor 12%, transparent);
   }
 
   .bds-announcement-close {

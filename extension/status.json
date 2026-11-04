@@ -47,10 +47,10 @@
     "message": "Due to a recent update to the DeepSeek interface, some extension features may currently not be working properly. We are aware of the issue and actively working on a fix. For more details or if you would like to help resolve it, please check our GitHub repository. -BDS",
     "type": "warning"
   },
-    {
+  {
     "id": "bds-512-star",
     "show": true,
-    "message": "Better DeepSeek just passed 512 stars on GitHub and unlocked the Silver Starstruck achievement. Back when it hit 128 stars, I thought 512 was impossible. Genuinely didn't think we'd get here. Thank you to everyone who starred, tested, reported, and contributed.",
+    "message": "Better DeepSeek just passed 512 stars on [GitHub](https://github.com/EdgeTypE/better-deepseek) and unlocked the Silver Starstruck achievement. Back when it hit 128 stars, I thought 512 was impossible. Genuinely didn't think we'd get here. Thank you to everyone who starred, tested, reported, and contributed.",
     "type": "info"
   }
 ]
