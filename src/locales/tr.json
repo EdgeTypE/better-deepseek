@@ -289,6 +289,26 @@
       "importFailed": "Yetenekler içe aktarılamadı. Geçersiz dosya biçimi.",
       "settingsTitle": "Yetenek Ayarları"
     },
+    "findSkill": {
+      "button": "Skill Bul",
+      "title": "Skill Bul",
+      "subtitle": "skills.sh üzerinde ara ve bir skill'in SKILL.md dosyasını yetenek setine kaydet.",
+      "placeholder": "Skill ara (örn. react, pdf)",
+      "search": "Ara",
+      "searching": "Aranıyor…",
+      "hint": "skills.sh'te aramak için en az 2 karakter yaz.",
+      "minChars": "Aramak için en az 2 karakter gir.",
+      "noResults": "Skill bulunamadı.",
+      "searchFailed": "Arama başarısız.",
+      "save": "Kaydet",
+      "saving": "Kaydediliyor…",
+      "saved": "Kaydedildi",
+      "saveFailed": "Skill kaydedilemedi.",
+      "savedNotice": "{{name}} yetenek setine kaydedildi.",
+      "installs": "{{count}} yükleme",
+      "closeAria": "Skill Bul penceresini kapat",
+      "footnote": "Yalnızca SKILL.md içe aktarılır; destek dosyaları alınmaz. İndirip kaydetmek için bir sonuca tıkla."
+    },
     "characterList": {
       "title": "Rol Yapma Karakterleri",
       "export": "Dışa Aktar",

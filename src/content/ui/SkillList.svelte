@@ -4,6 +4,7 @@
   import { STORAGE_KEYS } from "../../lib/constants.js";
   import { makeId } from "../../lib/utils/helpers.js";
   import { triggerBlobDownload } from "../../lib/utils/download.js";
+  import FindSkillModal from "./FindSkillModal.svelte";
   import { openNativeFilePicker } from "../files/native-file-input.js";
   import { IMPORT_FORMAT, detectImportFormat, parseJsonDocument } from "../files/import-format.js";
   import { t } from "../../lib/i18n.svelte.js";
@@ -19,6 +20,7 @@
   let editingName = $state("");
   let editingUsage = $state("");
   let editingContent = $state("");
+  let findSkillOpen = $state(false);
 
   export function refresh() {
     skills = [...appState.skills];
@@ -186,12 +188,15 @@
       {t('skillList.title')}
     </div>
 
-    <div style="display: flex; gap: 6px;">
-      <button type="button" class="bds-btn-outlined" onclick={exportSkills}>
+    <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end;">
+      <button type="button" class="bds-btn-outlined" style="white-space: nowrap;" onclick={exportSkills}>
         {t('skillList.export')}
       </button>
-      <button type="button" class="bds-btn-outlined" onclick={triggerImport}>
+      <button type="button" class="bds-btn-outlined" style="white-space: nowrap;" onclick={triggerImport}>
         {t('skillList.import')}
+      </button>
+      <button type="button" class="bds-btn-outlined" style="white-space: nowrap;" onclick={() => (findSkillOpen = true)}>
+        {t('findSkill.button')}
       </button>
     </div>
   </div>
@@ -305,3 +310,10 @@
     </div>
   </div>
 </div>
+
+{#if findSkillOpen}
+  <FindSkillModal
+    onclose={() => (findSkillOpen = false)}
+    onsaved={refresh}
+  />
+{/if}

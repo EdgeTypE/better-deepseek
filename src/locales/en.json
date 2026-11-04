@@ -289,6 +289,26 @@
       "importFailed": "Failed to import skills. Invalid file format.",
       "settingsTitle": "Skill Settings"
     },
+    "findSkill": {
+      "button": "Find Skill",
+      "title": "Find Skill",
+      "subtitle": "Search skills.sh and save a skill's SKILL.md to your skill set.",
+      "placeholder": "Search skills (e.g. react, pdf)",
+      "search": "Search",
+      "searching": "Searching…",
+      "hint": "Type at least 2 characters to search skills.sh.",
+      "minChars": "Enter at least 2 characters to search.",
+      "noResults": "No skills found.",
+      "searchFailed": "Search failed.",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Saved",
+      "saveFailed": "Could not save the skill.",
+      "savedNotice": "Saved {{name}} to your skill set.",
+      "installs": "{{count}} installs",
+      "closeAria": "Close Find Skill",
+      "footnote": "Only SKILL.md is imported; supporting files are not. Click a result to download and save it."
+    },
     "characterList": {
       "title": "RP Characters",
       "export": "Export",

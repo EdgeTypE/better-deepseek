@@ -289,6 +289,26 @@
       "importFailed": "导入技能失败，文件格式无效。",
       "settingsTitle": "技能设置"
     },
+    "findSkill": {
+      "button": "查找技能",
+      "title": "查找技能",
+      "subtitle": "在 skills.sh 中搜索，并将技能的 SKILL.md 保存到技能集。",
+      "placeholder": "搜索技能（如 react、pdf）",
+      "search": "搜索",
+      "searching": "搜索中…",
+      "hint": "输入至少 2 个字符以搜索 skills.sh。",
+      "minChars": "请至少输入 2 个字符再搜索。",
+      "noResults": "未找到技能。",
+      "searchFailed": "搜索失败。",
+      "save": "保存",
+      "saving": "保存中…",
+      "saved": "已保存",
+      "saveFailed": "技能保存失败。",
+      "savedNotice": "已将 {{name}} 保存到技能集。",
+      "installs": "{{count}} 次安装",
+      "closeAria": "关闭查找技能窗口",
+      "footnote": "仅导入 SKILL.md，不会导入辅助文件。点击结果即可下载并保存。"
+    },
     "characterList": {
       "title": "角色",
       "export": "导出",
