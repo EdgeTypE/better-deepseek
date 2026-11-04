@@ -26,11 +26,14 @@ const LOW_CONFIDENCE_NOTICE =
 
 const SEARCH_FETCH_OPTIONS = {
   method: "GET",
+  // CORS-safelisted headers only. Cache-Control and Pragma are NOT safelisted
+  // and force an OPTIONS preflight that Bing/DDG never answer, which breaks
+  // search on browsers that enforce preflight for extension fetches (Brave).
+  // Freshness is preserved by cache: "no-store" below (a fetch mode, not a
+  // header, so it never triggers a preflight).
   headers: {
     Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
-    "Cache-Control": "no-cache, no-store",
-    Pragma: "no-cache",
   },
   cache: "no-store",
   credentials: "omit",
@@ -865,7 +868,9 @@ export async function searchWeb(query, deepFetch = 0, onStatus = () => {}, optio
       }
 
       if (!response || !response.ok) {
-        errors.push(`${provider.name}: ${response?.error || "Search request failed."}`);
+        const detail = response?.error || "Search request failed.";
+        const status = response?.status ? ` (HTTP ${response.status})` : "";
+        errors.push(`${provider.name}: ${detail}${status}`);
         continue;
       }
 

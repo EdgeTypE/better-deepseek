@@ -569,6 +569,16 @@ describe("searchWeb", () => {
     await expect(searchWeb("test")).rejects.toThrow("Search failed: connection failed");
   });
 
+  it("includes the HTTP status in the failure message when providers fail", async () => {
+    chromeSendMessageMock.mockResolvedValue({
+      ok: false,
+      status: 503,
+      error: "Server returned 503 for https://www.bing.com/search?q=test",
+    });
+    await expect(searchWeb("test")).rejects.toThrow("Search failed");
+    await expect(searchWeb("test")).rejects.toThrow("HTTP 503");
+  });
+
   it("throws on no search results", async () => {
     const html = "<html><body>no results</body></html>";
     chromeSendMessageMock.mockResolvedValue({ ok: true, html });
@@ -753,6 +763,16 @@ describe("searchWeb", () => {
     expect(sentMessage.options.headers).toBeDefined();
     expect(sentMessage.options.headers.Accept).toContain("text/html");
     expect(sentMessage.options.headers).not.toHaveProperty("User-Agent");
+    // Brave enforces CORS preflight on extension fetches while Chrome exempts
+    // them: Cache-Control and Pragma are NOT CORS-safelisted and force an
+    // OPTIONS preflight that Bing/DDG never answer, so they must stay out of
+    // the request. Freshness is covered by cache: "no-store" instead.
+    expect(sentMessage.options.headers).toEqual({
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.9",
+    });
+    expect(sentMessage.options.headers).not.toHaveProperty("Cache-Control");
+    expect(sentMessage.options.headers).not.toHaveProperty("Pragma");
     expect(sentMessage.options.cache).toBe("no-store");
     expect(sentMessage.options.credentials).toBe("omit");
     expect(sentMessage.options.redirect).toBe("follow");
