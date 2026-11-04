@@ -10,6 +10,7 @@
 import state from "../state.js";
 import { DEFAULT_SYSTEM_PROMPT, STORAGE_KEYS } from "../../lib/constants.js";
 import { CONFIG_SECTIONS } from "../../lib/config-sync.js";
+import { syncBuiltinSystemPromptEntries } from "../../lib/system-prompt-entries.js";
 
 /** Section key → the state field it replaces. */
 const SECTION_STATE_KEYS = {
@@ -122,6 +123,12 @@ export async function applyConfigPayload(payload, sections = CONFIG_SECTIONS) {
         ? { activeSystemPromptId: "default", systemPrompt: DEFAULT_SYSTEM_PROMPT }
         : {}),
     };
+    // Imported entries were written by another build: resolve the built-in
+    // slot against this build's core prompt (#235).
+    state.settings.systemPromptEntries = syncBuiltinSystemPromptEntries(
+      state.settings.systemPromptEntries,
+      { storedPrompt: incoming.systemPrompt },
+    );
     await chrome.storage.local.set({ [STORAGE_KEYS.settings]: plain(state.settings) });
     applied.push("settings");
   }

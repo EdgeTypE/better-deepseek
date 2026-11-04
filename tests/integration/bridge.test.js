@@ -21,7 +21,7 @@ import {
   setupBridgeEvents,
 } from "../../src/content/bridge.js";
 import state from "../../src/content/state.js";
-import { BRIDGE_EVENTS } from "../../src/lib/constants.js";
+import { BRIDGE_EVENTS, DEFAULT_SYSTEM_PROMPT } from "../../src/lib/constants.js";
 import { resetAppState } from "../helpers/app-state.js";
 
 describe("bridge integration", () => {
@@ -74,6 +74,47 @@ describe("bridge integration", () => {
         files: [{ name: "README.md", content: "# Demo" }],
       },
     });
+  });
+
+  it("sends the shipped core prompt for the built-in multi-prompt entry (#235)", async () => {
+    state.settings.systemPromptMultiMode = true;
+    state.settings.systemPromptEntries = [
+      {
+        id: "sp_default",
+        name: "Default",
+        content: "You are Better DeepSeek. Stale copy without MIDI.",
+        builtin: true,
+        enabled: true,
+        schedule: { type: "first", everyNTurns: 1 },
+      },
+      {
+        id: "sp_mine",
+        name: "Mine",
+        content: "be terse",
+        enabled: true,
+        schedule: { type: "always", everyNTurns: 1 },
+      },
+    ];
+
+    let received = null;
+    window.addEventListener(BRIDGE_EVENTS.configUpdate, (event) => {
+      received = JSON.parse(event.detail);
+    }, { once: true });
+
+    await pushConfigToPage();
+
+    expect(received.systemPromptEntries).toEqual([
+      {
+        id: "sp_default",
+        content: DEFAULT_SYSTEM_PROMPT,
+        schedule: { type: "first", everyNTurns: 1 },
+      },
+      {
+        id: "sp_mine",
+        content: "be terse",
+        schedule: { type: "always", everyNTurns: 1 },
+      },
+    ]);
   });
 
   it("keeps long work alive while requests are active", () => {

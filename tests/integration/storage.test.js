@@ -116,6 +116,71 @@ describe("storage integration", () => {
     expect(chrome.storage.local.set).toHaveBeenCalled();
   });
 
+  it("refreshes a frozen built-in multi-prompt entry on load (#235)", async () => {
+    const stalePrompt = "You are Better DeepSeek. Old core prompt without MIDI.";
+    setChromeStorage({
+      [STORAGE_KEYS.settings]: {
+        systemPrompt: stalePrompt,
+        systemPromptBackupDone: true,
+        systemPromptTemplateVersion: SYSTEM_PROMPT_TEMPLATE_VERSION,
+        downloadBehaviorVersion: DOWNLOAD_BEHAVIOR_VERSION,
+        systemPromptMultiMode: true,
+        systemPromptEntries: [
+          {
+            id: "sp_default",
+            name: "Default",
+            content: stalePrompt,
+            enabled: true,
+            schedule: { type: "first", everyNTurns: 1 },
+          },
+          {
+            id: "sp_mine",
+            name: "Mine",
+            content: "be terse",
+            enabled: true,
+            schedule: { type: "always", everyNTurns: 1 },
+          },
+        ],
+      },
+    });
+
+    await loadStateFromStorage();
+
+    expect(state.settings.systemPromptEntries[0].builtin).toBe(true);
+    expect(state.settings.systemPromptEntries[0].content).toBe(DEFAULT_SYSTEM_PROMPT);
+    expect(state.settings.systemPromptEntries[0].schedule).toEqual({ type: "first", everyNTurns: 1 });
+    expect(state.settings.systemPromptEntries[1].content).toBe("be terse");
+
+    const stored = (await chrome.storage.local.get(STORAGE_KEYS.settings))[STORAGE_KEYS.settings];
+    expect(stored.systemPromptEntries[0].content).toBe(DEFAULT_SYSTEM_PROMPT);
+  });
+
+  it("keeps a user-edited built-in multi-prompt entry on load", async () => {
+    setChromeStorage({
+      [STORAGE_KEYS.settings]: {
+        systemPromptBackupDone: true,
+        systemPromptTemplateVersion: SYSTEM_PROMPT_TEMPLATE_VERSION,
+        downloadBehaviorVersion: DOWNLOAD_BEHAVIOR_VERSION,
+        systemPromptMultiMode: true,
+        systemPromptEntries: [
+          {
+            id: "sp_default",
+            name: "My core",
+            content: "My own rules",
+            builtin: false,
+            enabled: true,
+            schedule: { type: "first", everyNTurns: 1 },
+          },
+        ],
+      },
+    });
+
+    await loadStateFromStorage();
+
+    expect(state.settings.systemPromptEntries[0].content).toBe("My own rules");
+    expect(state.settings.systemPromptEntries[0].builtin).toBe(false);
+  });
+
   it("binds storage change listeners and refreshes ui slices", () => {
     state.ui = {
       refreshSettings: vi.fn(),

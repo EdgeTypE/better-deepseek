@@ -14,6 +14,7 @@ import {
   CSS_PRESETS,
 } from "../lib/constants.js";
 import { makeId } from "../lib/utils/helpers.js";
+import { syncBuiltinSystemPromptEntries } from "../lib/system-prompt-entries.js";
 import { setHtmlToMarkdownMaxDepth } from "./dom/message-text.js";
 import { i18n } from "../lib/i18n.svelte.js";
 import { remoteConfig } from "../lib/remote-config.svelte.js";
@@ -110,6 +111,21 @@ export async function loadStateFromStorage() {
   // built-in prompt selected — no custom prompt overrides this at rest.
   if (state.settings.activeSystemPromptId === "default") {
     state.settings.systemPrompt = DEFAULT_SYSTEM_PROMPT;
+  }
+
+  // Multi-prompt mode used to freeze a copy of the built-in prompt inside
+  // `systemPromptEntries`, so upstream changes never reached the model (#235).
+  // Resolve that slot against the shipped prompt on every load and persist the
+  // repair so exports and the settings UI see the current text too.
+  const syncedEntries = syncBuiltinSystemPromptEntries(
+    state.settings.systemPromptEntries,
+    { storedPrompt: storedSettings.systemPrompt },
+  );
+  if (JSON.stringify(syncedEntries) !== JSON.stringify(state.settings.systemPromptEntries)) {
+    state.settings.systemPromptEntries = syncedEntries;
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.settings]: state.settings,
+    });
   }
 
   const behaviorVersion = Number(
@@ -232,13 +248,19 @@ export function normalizeCustomSystemPrompts(raw) {
 export function normalizeSystemPromptEntries(raw) {
   if (!Array.isArray(raw)) return [];
   return raw
-    .map((e) => ({
-      id: String(e && e.id ? e.id : ""),
-      name: String(e && e.name ? e.name : ""),
-      content: String(e && e.content ? e.content : ""),
-      enabled: e && typeof e.enabled === "boolean" ? e.enabled : true,
-      schedule: normalizeSystemPromptSchedule(e && e.schedule),
-    }))
+    .map((e) => {
+      const entry = {
+        id: String(e && e.id ? e.id : ""),
+        name: String(e && e.name ? e.name : ""),
+        content: String(e && e.content ? e.content : ""),
+        enabled: e && typeof e.enabled === "boolean" ? e.enabled : true,
+        schedule: normalizeSystemPromptSchedule(e && e.schedule),
+      };
+      // Leave the flag absent on legacy entries: syncBuiltinSystemPromptEntries
+      // uses its absence to tell an untouched core copy from a user edit.
+      if (e && typeof e.builtin === "boolean") entry.builtin = e.builtin;
+      return entry;
+    })
     .filter((e) => e.id && e.content.trim().length > 0);
 }
 
@@ -532,7 +554,10 @@ export function bindStorageChangeListener() {
         ...(changes[STORAGE_KEYS.settings].newValue || {}),
       };
       state.settings.customSystemPrompts = normalizeCustomSystemPrompts(state.settings.customSystemPrompts);
-      state.settings.systemPromptEntries = normalizeSystemPromptEntries(state.settings.systemPromptEntries);
+      state.settings.systemPromptEntries = syncBuiltinSystemPromptEntries(
+        normalizeSystemPromptEntries(state.settings.systemPromptEntries),
+        { storedPrompt: changes[STORAGE_KEYS.settings].newValue?.systemPrompt },
+      );
       state.settings.composerVisibility = normalizeComposerVisibility(
         state.settings.composerVisibility,
       );

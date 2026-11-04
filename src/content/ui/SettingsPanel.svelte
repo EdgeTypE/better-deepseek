@@ -13,6 +13,10 @@
   import { t, i18n, availableLocaleCodes } from "../../lib/i18n.svelte.js";
   import { SEARCH_PROVIDER_CATALOG, buildSearchProviderCatalog } from "../files/search-reader.js";
   import { CSS_PRESETS } from "../../lib/constants.js";
+  import {
+    BUILTIN_SYSTEM_PROMPT_ENTRY_ID,
+    syncBuiltinSystemPromptEntries,
+  } from "../../lib/system-prompt-entries.js";
   import { openNativeFilePicker } from "../files/native-file-input.js";
   import { encryptData, decryptData } from "../../lib/utils/crypto.js";
   import { makeId } from "../../lib/utils/helpers.js";
@@ -1245,7 +1249,7 @@
       entriesSnapshot = JSON.parse(JSON.stringify(systemPromptEntries));
     }
     if (!Array.isArray(entriesSnapshot)) entriesSnapshot = [];
-    appState.settings.systemPromptEntries = entriesSnapshot;
+    appState.settings.systemPromptEntries = syncBuiltinSystemPromptEntries(entriesSnapshot);
 
     // When "default" is active, ensure the stored prompt always reflects the
     // latest built-in default so subsequent page loads see the current version.
@@ -1595,7 +1599,8 @@
     if (entry) {
       editingPrompt = entry;
       promptEditorName = entry.name;
-      promptEditorContent = entry.content;
+      // Show the current core prompt, not the persisted copy.
+      promptEditorContent = entry.builtin === true ? DEFAULT_SYSTEM_PROMPT : entry.content;
       promptEditorIsNew = false;
       multiEntryScheduleType = entry.schedule?.type || "first";
       multiEntryScheduleInterval = entry.schedule?.everyNTurns || 3;
@@ -1633,20 +1638,25 @@
       systemPromptEntries = [...current, newEntry];
     } else if (editingPrompt) {
       const current = Array.isArray(systemPromptEntries) ? systemPromptEntries : [];
-      systemPromptEntries = current.map(e =>
-        e.id === editingPrompt.id
-          ? {
-              ...e,
-              name: promptEditorName.trim(),
-              content: promptEditorContent.trim(),
-              enabled: multiEntryEnabled,
-              schedule: {
-                type: multiEntryScheduleType,
-                everyNTurns: multiEntryScheduleType === "interval" ? Math.max(1, Math.floor(Number(multiEntryScheduleInterval) || 3)) : 1,
-              },
-            }
-          : e
-      );
+      systemPromptEntries = current.map(e => {
+        if (e.id !== editingPrompt.id) return e;
+        const content = promptEditorContent.trim();
+        return {
+          ...e,
+          name: promptEditorName.trim(),
+          content,
+          // Editing the core prompt turns it into a custom entry so upstream
+          // updates never overwrite the user's own text.
+          ...(e.builtin === true
+            ? { builtin: content === DEFAULT_SYSTEM_PROMPT.trim() }
+            : {}),
+          enabled: multiEntryEnabled,
+          schedule: {
+            type: multiEntryScheduleType,
+            everyNTurns: multiEntryScheduleType === "interval" ? Math.max(1, Math.floor(Number(multiEntryScheduleInterval) || 3)) : 1,
+          },
+        };
+      });
     }
 
     closePromptEditor();
@@ -1669,9 +1679,10 @@
       if (entries.length === 0) {
         const newEntries = [];
         newEntries.push({
-          id: "sp_default",
+          id: BUILTIN_SYSTEM_PROMPT_ENTRY_ID,
           name: t('settings.defaultPromptName'),
-          content: appState.settings.systemPrompt || DEFAULT_SYSTEM_PROMPT,
+          content: DEFAULT_SYSTEM_PROMPT,
+          builtin: true,
           enabled: !disableSystemPrompt,
           schedule: {
             type: systemPromptInjectionFrequency === "every_x" ? "interval" : systemPromptInjectionFrequency,

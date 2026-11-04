@@ -4,6 +4,7 @@
 
 import state from "./state.js";
 import { BRIDGE_EVENTS, DEFAULT_SYSTEM_PROMPT } from "../lib/constants.js";
+import { isBuiltinSystemPromptEntry } from "../lib/system-prompt-entries.js";
 import { findLatestAssistantMessageNode, collectMessageNodes, scheduleScan } from "./scanner.js";
 import { finalizeLongWork } from "./files/long-work.js";
 import { getActiveProject, getActiveFiles, getFilesForProject } from "./project-manager.js";
@@ -396,7 +397,9 @@ export async function pushConfigToPage() {
             .filter(e => e.enabled && e.content && e.content.trim())
             .map(e => ({
               id: e.id,
-              content: e.content,
+              // The built-in slot is a live reference to this build's core
+              // prompt; never send a stale frozen copy to the page (#235).
+              content: isBuiltinSystemPromptEntry(e) ? DEFAULT_SYSTEM_PROMPT : e.content,
               schedule: e.schedule || { type: "first", everyNTurns: 1 },
             }))
         : [],

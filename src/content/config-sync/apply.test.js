@@ -68,6 +68,28 @@ describe("applyConfigPayload", () => {
     expect(state.settings.systemPrompt).toBe(DEFAULT_SYSTEM_PROMPT);
   });
 
+  it("resolves an imported built-in multi-prompt entry to this build's core prompt", async () => {
+    await applyConfigPayload(
+      payload({
+        settings: {
+          systemPromptEntries: [
+            {
+              id: "sp_default",
+              name: "Default",
+              content: "You are Better DeepSeek. Old core prompt without MIDI.",
+              enabled: true,
+              schedule: { type: "first", everyNTurns: 1 },
+            },
+          ],
+        },
+      }),
+      ["settings"],
+    );
+
+    expect(state.settings.systemPromptEntries[0].builtin).toBe(true);
+    expect(state.settings.systemPromptEntries[0].content).toBe(DEFAULT_SYSTEM_PROMPT);
+  });
+
   it("keeps a custom prompt that travelled as text", async () => {
     await applyConfigPayload(
       payload({
