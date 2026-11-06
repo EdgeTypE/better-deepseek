@@ -49,8 +49,14 @@
   },
   {
     "id": "bds-512-star",
-    "show": true,
+    "show": false,
     "message": "Better DeepSeek just passed 512 stars on [GitHub](https://github.com/EdgeTypE/better-deepseek) and unlocked the Silver Starstruck achievement. Back when it hit 128 stars, I thought 512 was impossible. Genuinely didn't think we'd get here. Thank you to everyone who starred, tested, reported, and contributed.",
     "type": "info"
+  },
+  {
+    "id": "deepseek-fair-use-ban-wave-v1",
+    "show": true,
+    "message": "DeepSeek appears to have started banning accounts recently. While exact criteria are unknown, they seem to be cracking down on automated abuse and treating the free web chat like an autonomous AI agent or harness, though false-positive bans are also occurring. Please use Better DeepSeek responsibly and do not abuse the free service; doing so will only lead to stricter limitations for everyone. For automation or agentic workflows, please use the official DeepSeek API. -BDS",
+    "type": "warning"
   }
 ]
