@@ -1134,6 +1134,27 @@
       "seeAllChanges": "See all changes in v{{version}} on GitHub",
       "seeDetailed": "See detailed release notes on GitHub",
       "features": {
+        "v0_1_16": {
+          "title": "Stability & Reliability Update",
+          "features": {
+            "feat_0": {
+              "title": "Skills in Chat (@ Mentions)",
+              "description": "Type @ in the composer to add a skill to your conversation. The chosen skill applies to that message only."
+            },
+            "feat_1": {
+              "title": "Skill Discovery",
+              "description": "Discover and install new skills from the Skill menu."
+            },
+            "feat_2": {
+              "title": "Bug Fixes & UI/UX Improvements",
+              "description": "Numerous bug fixes and UI/UX improvements across the extension."
+            },
+            "feat_3": {
+              "title": "A Note on Fair Use",
+              "description": "I see that some users are trying to abuse the free DeepSeek service using the Better DeepSeek extension. Please stop. This will only lead to the free service being limited for everyone."
+            }
+          }
+        },
         "v0_1_14": {
           "title": "Advanced Charts, Persian Language & Improvements",
           "features": {

@@ -1,5 +1,32 @@
 export const VERSION_HISTORY = [
   {
+    version: "0.1.16",
+    date: "2026-11-06",
+    title: "Stability & Reliability Update",
+    features: [
+      {
+        type: "feature",
+        title: "Skills in Chat (@ Mentions)",
+        description: "Type @ in the composer to add a skill to your conversation. The chosen skill applies to that message only."
+      },
+      {
+        type: "feature",
+        title: "Skill Discovery",
+        description: "Discover and install new skills from the Skill menu."
+      },
+      {
+        type: "bugfix",
+        title: "Bug Fixes & UI/UX Improvements",
+        description: "Numerous bug fixes and UI/UX improvements across the extension."
+      },
+      {
+        type: "interactive",
+        title: "A Note on Fair Use",
+        description: "I see that some users are trying to abuse the free DeepSeek service using the Better DeepSeek extension. Please stop. This will only lead to the free service being limited for everyone."
+      }
+    ]
+  },
+  {
     version: "0.1.15",
     date: "2026-10-09",
     title: "BDS Live, Context Menu & Music",

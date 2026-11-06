@@ -1134,6 +1134,27 @@
       "seeAllChanges": "在 GitHub 上查看 v{{version}} 的全部变更",
       "seeDetailed": "在 GitHub 上查看详细发布说明",
       "features": {
+        "v0_1_16": {
+          "title": "稳定性与可靠性更新",
+          "features": {
+            "feat_0": {
+              "title": "在对话中添加技能（@ 提及）",
+              "description": "在输入框中输入 @ 即可把技能加入当前对话；所选技能仅对该条消息生效。"
+            },
+            "feat_1": {
+              "title": "技能发现",
+              "description": "通过技能菜单浏览并安装新技能。"
+            },
+            "feat_2": {
+              "title": "错误修复与 UI/UX 改进",
+              "description": "修复了大量问题，并对扩展各处的界面与交互体验进行了改进。"
+            },
+            "feat_3": {
+              "title": "关于合理使用的说明",
+              "description": "我看到有部分用户试图利用 Better DeepSeek 扩展滥用 DeepSeek 的免费服务。请停止这样做，这只会让免费服务对所有人都受到限制。"
+            }
+          }
+        },
         "v0_1_14": {
           "title": "高级图表、波斯语支持与多项改进",
           "features": {

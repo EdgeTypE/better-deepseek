@@ -187,6 +187,13 @@ For private repositories, add a classic GitHub personal access token with `repo`
 
 ## Changelog
 
+### v0.1.16 (2026-11-06)
+- **Full-Session Export**: "Select All" now reads DeepSeek's local history cache, so long conversations export completely (Markdown, PDF, HTML, images) instead of stopping at the messages loaded on the page.
+- **Remote Config on Android**: the app now fetches the published config through the native bridge, keeping feature flags and composer buttons in sync with the browser builds.
+- **@ Skill Mentions**: type `@` in the composer to add a skill to a single message without changing your active skill set. An active-skills chip lets you see and manage them.
+- **Skill Discovery**: the Skill menu can search skills.sh and install new skills without overwriting your own.
+- **Bug Fixes & UI/UX Improvements**: Firefox PDF export, Brave web search, MCP URL validation, Android downloads/attachments, tag and RAG handling, plus many smaller fixes and interface refinements.
+
 ### v0.1.15 (2026-10-09)
 - **New Feature**: BDS Live (Experimental). Talk to DeepSeek out loud instead of typing — a hands-free voice mode with live transcription and spoken replies. Headphones are strongly recommended (otherwise the microphone picks up your speakers). BDS Live relies on browser APIs that Firefox does not implement, so it is currently unavailable there; for the best experience use a Chromium-based browser (Chrome, Edge, Brave, Opera, ...).
 - **New Feature**: Context Menu Actions. Right-click anywhere and use **Ask DeepSeek** on selected text, or **Summarize with DeepSeek** on a page. Both open DeepSeek in a new tab with your selection — or a summary request for the page URL — ready to send.

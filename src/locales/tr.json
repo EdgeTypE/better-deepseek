@@ -920,7 +920,9 @@
       "fetchTools": "Araçları çek",
       "fetchToolsFailed": "Araçlar alınamadı: {{message}}",
       "queryArgLabel": "Sorgu argümanı adı",
-      "countArgLabel": "Sonuç sayısı argümanı (isteğe bağlı)"
+      "countArgLabel": "Sonuç sayısı argümanı (isteğe bağlı)",
+      "invalidUrl": "Yalnızca genel HTTPS adreslerine izin verilir. Localhost, düz HTTP ve yerel ağ adresleri engellenmiştir.",
+      "httpsNotice": "Yalnızca güvenli genel HTTPS uç noktaları desteklenir (localhost veya özel IP'ler kullanılamaz)."
     },
     "expandToggle": {
       "expand": "Genişlet",
@@ -1132,6 +1134,27 @@
       "seeAllChanges": "v{{version}} sürümündeki tüm değişiklikleri GitHub'da gör",
       "seeDetailed": "Detaylı sürüm notlarını GitHub'da gör",
       "features": {
+        "v0_1_16": {
+          "title": "Kararlılık ve Güvenilirlik Güncellemesi",
+          "features": {
+            "feat_0": {
+              "title": "Sohbette Yetenekler (@ Bahsetmeleri)",
+              "description": "Sohbetinize bir yetenek eklemek için giriş alanına @ yazın. Seçilen yetenek yalnızca o mesaj için geçerli olur."
+            },
+            "feat_1": {
+              "title": "Yetenek Keşfi",
+              "description": "Yetenek menüsünden yeni yetenekler keşfedin ve yükleyin."
+            },
+            "feat_2": {
+              "title": "Hata Düzeltmeleri ve Arayüz/Deneyim İyileştirmeleri",
+              "description": "Eklenti genelinde çok sayıda hata düzeltmesi ve arayüz/deneyim iyileştirmesi yapıldı."
+            },
+            "feat_3": {
+              "title": "Adil Kullanım Hakkında Bir Not",
+              "description": "Bazı kullanıcıların Better DeepSeek eklentisi kullanarak ücretsiz DeepSeek servisini kötüye kullanmaya çalıştığını görüyorum. Lütfen bunu bırakın. Bu, ancak ücretsiz hizmetin herkes için limitlenmesine yol açar."
+            }
+          }
+        },
         "v0_1_14": {
           "title": "Gelişmiş Grafikler, Farsça Dil Desteği ve İyileştirmeler",
           "features": {
