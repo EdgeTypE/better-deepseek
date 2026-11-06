@@ -920,7 +920,9 @@
       "save": "Сохранить",
       "deleteConfirm": "Удалить MCP сервер «{{name}}»?",
       "testFailed": "Ошибка MCP теста: {{message}}",
-      "toolsCount": "{{count}} инструментов"
+      "toolsCount": "{{count}} инструментов",
+      "invalidUrl": "Разрешены только публичные HTTPS-адреса. Localhost, обычный HTTP и локальные сети заблокированы.",
+      "httpsNotice": "Поддерживаются только безопасные публичные HTTPS-адреса (без localhost и приватных IP)."
     },
     "expandToggle": {
       "expand": "Развернуть",

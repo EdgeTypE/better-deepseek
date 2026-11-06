@@ -920,7 +920,9 @@
       "fetchTools": "Fetch tools",
       "fetchToolsFailed": "Failed to fetch tools: {{message}}",
       "queryArgLabel": "Query argument name",
-      "countArgLabel": "Result-count argument (optional)"
+      "countArgLabel": "Result-count argument (optional)",
+      "invalidUrl": "Only public HTTPS URLs are allowed. Localhost, plain HTTP, and private network addresses are blocked.",
+      "httpsNotice": "Only secure public HTTPS endpoints are allowed (no localhost or private IPs)."
     },
     "expandToggle": {
       "expand": "Expand",

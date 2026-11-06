@@ -17,6 +17,7 @@ import { PPTX_SKILL } from "../lib/prompt-modules/pptx.js";
 import { DOCX_SKILL } from "../lib/prompt-modules/docx.js";
 import { extractHttpUrl, normalizeHttpUrl } from "../lib/utils/url-normalizer.js";
 import { extractMcpResultText } from "../lib/mcp-result.js";
+import { validateMcpUrl } from "../lib/mcp-url.js";
 import {
   isBdsInjectedControl,
   isNativeComposerModeToggle,
@@ -673,13 +674,19 @@ export async function handleAutoMcpCall(serverUrl, toolName, args = {}) {
 
   devLog("Auto", `Starting MCP call: ${toolName} @ ${serverUrl}`);
 
-  const server = appState.mcpServers.find(s =>
+  const server = appState.mcpServers?.find(s =>
     s.serverUrl === serverUrl ||
     s.name === serverUrl ||
     stripQuery(s.serverUrl) === stripQuery(serverUrl)
   );
   const apiKey = server?.apiKey || "";
   const actualUrl = server?.serverUrl || serverUrl;
+
+  const validation = validateMcpUrl(actualUrl);
+  if (!validation.valid) {
+    devLog("Auto", `MCP call blocked: unsafe server URL (${actualUrl}): ${validation.error}`);
+    return;
+  }
 
   try {
     const result = await new Promise((resolve, reject) => {

@@ -920,7 +920,9 @@
       "save": "保存",
       "deleteConfirm": "删除 MCP 服务器“{{name}}”？",
       "testFailed": "MCP 测试失败：{{message}}",
-      "toolsCount": "{{count}} 个工具"
+      "toolsCount": "{{count}} 个工具",
+      "invalidUrl": "仅允许公共 HTTPS 地址。禁止使用 localhost、普通 HTTP 和局域网地址。",
+      "httpsNotice": "仅支持安全的公共 HTTPS 端点（不支持 localhost 或私有 IP）。"
     },
     "expandToggle": {
       "expand": "展开",

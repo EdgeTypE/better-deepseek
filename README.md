@@ -69,7 +69,7 @@ Better DeepSeek supports the [Model Context Protocol](https://spec.modelcontextp
 - **Test the connection**: Click "Test" to verify the server responds and list its available tools.
 - **How it works**: Tool schemas are injected into the system prompt. When the AI outputs `<BDS:AUTO:MCP url="..." tool="..." args='...'>`, the extension calls the tool and injects the result back into the conversation as an attached file.
 
-*Note: Only HTTP/Streamable HTTP transport is supported. Stdio-based MCP servers are not supported.*
+*Note: Only secure HTTPS Streamable HTTP transport is supported. Plain HTTP, localhost, private network addresses, and stdio-based MCP servers are not supported.*
 
 ### LONG_WORK Project Mode
 When building multi-file projects, DeepSeek can use the `<BDS:LONG_WORK>` tag. All files created inside this block are collected, zipped, and presented as a single download after the block closes. During generation, the user sees only a "Working..." indicator, keeping the chat clean.

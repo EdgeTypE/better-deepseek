@@ -31,6 +31,7 @@
     readComposerDefaults,
   } from "../../lib/composer-visibility.js";
   import { REMOTE_CONFIG_EVENT } from "../../lib/remote-config.svelte.js";
+  import { validateMcpUrl } from "../../lib/mcp-url.js";
 
   let { onapiplayground, onimportdata, onsave } = $props();
 
@@ -1466,6 +1467,12 @@
     const serverUrl = mcpEditorUrl.trim();
     if (!serverUrl) return;
 
+    const validation = validateMcpUrl(serverUrl);
+    if (!validation.valid) {
+      if (appState.ui) appState.ui.showToast(t('mcp.invalidUrl'));
+      return;
+    }
+
     mcpEditorFetching = true;
     try {
       const response = await new Promise((resolve, reject) => {
@@ -1499,7 +1506,14 @@
   }
 
   async function saveMcpServer() {
-    if (!mcpEditorName.trim() || !mcpEditorUrl.trim()) return;
+    const serverUrl = mcpEditorUrl.trim();
+    if (!mcpEditorName.trim() || !serverUrl) return;
+
+    const validation = validateMcpUrl(serverUrl);
+    if (!validation.valid) {
+      if (appState.ui) appState.ui.showToast(t('mcp.invalidUrl'));
+      return;
+    }
     // Drop a selected tool that the current tool list no longer contains — e.g.
     // after the server URL was changed, or after a re-fetch returned a
     // different tool set. Keeping it would leave a search provider pointing at
@@ -1553,6 +1567,13 @@
     mcpTestingIndex = index;
     const server = mcpServers[index];
     if (!server) { mcpTestingIndex = -1; return; }
+
+    const validation = validateMcpUrl(server.serverUrl);
+    if (!validation.valid) {
+      if (appState.ui) appState.ui.showToast(t('mcp.invalidUrl'));
+      mcpTestingIndex = -1;
+      return;
+    }
     try {
       const response = await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage(
@@ -2921,6 +2942,7 @@
         <div class="bds-field">
           <label class="bds-label">{t('mcp.serverUrlLabel')}</label>
           <input type="url" class="bds-input" bind:value={mcpEditorUrl} placeholder={t('mcp.serverUrlPlaceholder')} />
+          <p style="font-size: 11px; opacity: 0.6; margin: 4px 0 0;">{t('mcp.httpsNotice')}</p>
         </div>
         <div class="bds-field">
           <label class="bds-label">{t('mcp.apiKeyLabel')}</label>

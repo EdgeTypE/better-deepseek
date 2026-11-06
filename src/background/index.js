@@ -13,6 +13,7 @@ import {
   isRepoMetadataUrl,
   isRepoTextUrl,
 } from "../lib/repo-hosts.js";
+import { assertSafeMcpUrl } from "../lib/mcp-url.js";
 
 import { setupContextMenus } from "./context-menu.js";
 
@@ -216,6 +217,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "bds-mcp-list-tools") {
+    try {
+      assertSafeMcpUrl(message.serverUrl);
+    } catch (error) {
+      sendResponse({
+        ok: false,
+        error: String(error && error.message ? error.message : error),
+      });
+      return true;
+    }
     listMcpTools(message.serverUrl, message.apiKey)
       .then((tools) => sendResponse({ ok: true, tools }))
       .catch((error) => sendResponse({
@@ -226,6 +236,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "bds-mcp-call") {
+    try {
+      assertSafeMcpUrl(message.serverUrl);
+    } catch (error) {
+      sendResponse({
+        ok: false,
+        error: String(error && error.message ? error.message : error),
+      });
+      return true;
+    }
     mcpCallTool(message.serverUrl, message.toolName, message.args, message.apiKey)
       .then((result) => sendResponse({ ok: true, result }))
       .catch((error) => sendResponse({
@@ -820,15 +839,16 @@ function mcpHeaders(apiKey, sessionId, authMethod = "bearer") {
  * all other errors.
  */
 async function mcpFetch(serverUrl, bodyObj, apiKey, { sessionId, signal, authMethod } = {}) {
+  const safeUrl = assertSafeMcpUrl(serverUrl);
   const startedAt = Date.now();
   const methodName = bodyObj?.method || "?";
-  devLog("MCP", `>> ${methodName} @ ${serverUrl} [auth=${authMethod}, sessionId=${sessionId}]`);
+  devLog("MCP", `>> ${methodName} @ ${safeUrl} [auth=${authMethod}, sessionId=${sessionId}]`);
 
   const ac = !signal ? new AbortController() : null;
   const resolvedSignal = signal || ac.signal;
   const timer = ac ? setTimeout(() => ac.abort(new DOMException("MCP server did not respond within 30s", "TimeoutError")), MCP_REQUEST_TIMEOUT_MS) : null;
   try {
-    const resp = await fetch(serverUrl, {
+    const resp = await fetch(safeUrl, {
       method: "POST",
       headers: mcpHeaders(apiKey, sessionId, authMethod),
       body: JSON.stringify(bodyObj),
@@ -983,6 +1003,7 @@ async function mcpJsonRpcRequest(serverUrl, method, params = {}, apiKey = "", si
 }
 
 async function listMcpTools(serverUrl, apiKey = "") {
+  assertSafeMcpUrl(serverUrl);
   try {
     return await mcpJsonRpcRequest(serverUrl, "tools/list", {}, apiKey);
   } catch (err) {
@@ -995,6 +1016,7 @@ async function listMcpTools(serverUrl, apiKey = "") {
 }
 
 async function mcpCallTool(serverUrl, toolName, args = {}, apiKey = "") {
+  assertSafeMcpUrl(serverUrl);
   try {
     return await mcpJsonRpcRequest(serverUrl, "tools/call", { name: toolName, arguments: args }, apiKey);
   } catch (err) {
