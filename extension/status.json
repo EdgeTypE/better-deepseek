@@ -55,8 +55,14 @@
   },
   {
     "id": "deepseek-fair-use-ban-wave-v1",
-    "show": true,
+    "show": false,
     "message": "DeepSeek appears to have started banning accounts recently. While exact criteria are unknown, they seem to be cracking down on automated abuse and treating the free web chat like an autonomous AI agent or harness, though false-positive bans are also occurring. Please use Better DeepSeek responsibly and do not abuse the free service; doing so will only lead to stricter limitations for everyone. For automation or agentic workflows, please use the official DeepSeek API. -BDS",
     "type": "warning"
+  },
+  {
+    "id": "deepseek-online-harness-v1",
+    "show": true,
+    "message": "DeepSeek has officially released an advanced web UI/online harness. Note that it runs on your own API key rather than the free tier. You can check it out [here.](https://cdn.deepseek.com/chat-demo) -BDS",
+    "type": "info"
   }
 ]
