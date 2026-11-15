@@ -61,8 +61,14 @@
   },
   {
     "id": "deepseek-online-harness-v1",
-    "show": true,
+    "show": false,
     "message": "DeepSeek has officially released an advanced web UI/online harness. Note that it runs on your own API key rather than the free tier. You can check it out [here.](https://cdn.deepseek.com/chat-demo) -BDS",
+    "type": "info"
+  },
+  {
+    "id": "deepseek-quotas-v1",
+    "show": true,
+    "message": "Looks like quotas are coming to DeepSeek. Once the system rolls out, the aggressive bans aimed at stopping free tier abuse will probably stop. [More info.](https://github.com/EdgeTypE/better-deepseek/discussions/231#discussioncomment-19600849) -BDS",
     "type": "info"
   }
 ]
