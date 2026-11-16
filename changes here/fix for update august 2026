@@ -1,0 +1,98 @@
+[BDS dock] pad=0 open=false target=DIV#.cb86951c targetRect=0,0 1486x703 hist=DIV#._189b4a0 histRect=1436,202 34x300 histInsideDock=true histTranslate=true content.js:2684:53289
+This site appears to use a scroll-linked positioning effect. This may not work well with asynchronous panning; see https://firefox-source-docs.mozilla.org/performance/scroll-linked_effects.html for further details and to join the discussion on related tools and features! 8cd8882f-d138-4e53-8021-44490bbd05c2
+DOMException: Node.removeChild: The node to be removed is not a child of this node
+    sp https://fe-static.deepseek.com/chat/static/default-vendors.b9e9755780.js:1
+    sm https://fe-static.deepseek.com/chat/static/default-vendors.b9e9755780.js:1
+
+
+
+above is error from devconsole from firefox
+
+
+
+
+the error indicates the Firefox extension is manipulating the DOM in a way that conflicts with DeepSeek's React rendering.
+
+## The Problem
+
+The extension is trying to remove DOM nodes that are no longer children of their parent. This happens because:
+
+- DeepSeek uses React with virtual DOM diffing
+- React re-renders and replaces nodes frequently
+- The extension holds stale references to old DOM nodes
+- When it tries to remove them, they no longer exist in the current DOM tree
+
+The console shows `Node.removeChild: The node to be removed is not a child of this node` - this is the core issue.
+
+## Likely Cause
+
+Your extension probably stores references to DOM elements, then later tries to clean them up after DeepSeek has already replaced those elements.
+
+## Fix Suggestions
+
+**Option 1: Use MutationObserver instead of direct DOM references**
+- Watch for node changes rather than storing references
+- Only operate on nodes that are currently in the DOM
+
+**Option 2: Check parentNode before removal**
+```javascript
+if (node.parentNode) {
+    node.parentNode.removeChild(node);
+}
+```
+
+**Option 3: Use WeakRef to avoid holding stale references**
+```javascript
+const ref = new WeakRef(element);
+// Later:
+const el = ref.deref();
+if (el && el.parentNode) {
+    el.parentNode.removeChild(el);
+}
+```
+
+## Quick Fix for Testing
+
+Wrap removal calls in a try-catch:
+
+```javascript
+try {
+    parent.removeChild(node);
+} catch (e) {
+    // Node already removed, ignore
+}
+```
+
+the extension is interfering with DeepSeek's React rendering. When the extension is off, DeepSeek works normally because no external script is modifying the DOM.
+
+## The Mechanism
+
+DeepSeek's chat interface is built with React, which maintains a virtual DOM. When the extension runs:
+
+1. The extension adds/modifies DOM elements or stores references
+2. React re-renders the chat (new messages, UI updates)
+3. React replaces DOM nodes that have changed
+4. The extension still holds old references to nodes that no longer exist
+5. When the extension tries to remove or modify those nodes, React throws errors
+6. DeepSeek detects the error state and shows "reload page"
+
+## Why This Happens Specifically
+
+Your extension likely does one of these:
+
+- **Stores DOM references** - then tries to use them after React replaces them
+- **Adds extra DOM nodes** - React doesn't know about them, causes mismatch
+- **Modifies React-managed attributes** - breaks React's reconciliation
+
+## What to Check in Your Extension
+
+Look for code that:
+
+- Captures DOM elements with `document.querySelector` or `getElementById`
+- Uses `removeChild`, `appendChild`, `insertBefore` on DeepSeek's DOM tree
+- Adds event listeners to DeepSeek's elements
+- Clones or stores references to DeepSeek's DOM nodes
+
+## Quick Fix
+
+Make the extension only run on specific DeepSeek subdomains or pages, or run it after React has finished rendering with a delay.

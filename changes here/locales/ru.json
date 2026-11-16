@@ -1,0 +1,1195 @@
+{
+  "updatedAt": "2026-07-27T00:00:00Z",
+  "messages": {
+    "common": {
+      "save": "Сохранить",
+      "cancel": "Отмена",
+      "delete": "Удалить",
+      "edit": "Редактировать",
+      "close": "Закрыть",
+      "back": "Назад",
+      "export": "Экспорт",
+      "import": "Импорт",
+      "refresh": "Обновить",
+      "download": "Скачать",
+      "name": "Имя",
+      "content": "Содержание",
+      "description": "Описание",
+      "none": "Нет",
+      "working": "Работаю..."
+    },
+    "drawer": {
+      "title": "Better DeepSeek",
+      "close": "Закрыть",
+      "github": "GitHub",
+      "version": "v{{version}}",
+      "exportAll": "Экспорт всех данных",
+      "importAll": "Импорт всех данных",
+      "exportEncrypt": "Защитить паролем (рекомендуется)",
+      "enterPassword": "Введите пароль",
+      "confirmPassword": "Подтвердите пароль",
+      "passwordTooShort": "Пароль должен содержать не менее 4 символов.",
+      "passwordMismatch": "Пароли не совпадают.",
+      "passwordRequired": "Требуется пароль.",
+      "passwordWrong": "Неверный пароль.",
+      "exportDone": "Данные успешно экспортированы.",
+      "exportFailed": "Не удалось экспортировать данные.",
+      "exporting": "Экспорт...",
+      "importing": "Импорт...",
+      "download": "Скачать",
+      "decrypt": "Расшифровать",
+      "selectSections": "Выберите разделы для импорта:",
+      "importBtn": "Импортировать",
+      "importParseError": "Неверный формат файла.",
+      "importDone": "Данные успешно импортированы.",
+      "importFailed": "Не удалось импортировать данные.",
+      "importContextError": "Расширение было обновлено. Пожалуйста, перезагрузите страницу и повторите попытку.",
+      "importPasswordPlaceholder": "Введите пароль экспорта",
+      "sectionSettings": "Настройки",
+      "sectionPrompts": "Пользовательские промпты",
+      "sectionSkills": "Набор навыков",
+      "sectionCharacters": "RP Персонажи",
+      "sectionMemories": "Сохранённая память",
+      "sectionProjects": "Проекты",
+      "sectionProjectFiles": "Файлы проектов",
+      "sectionChatTags": "Теги чатов",
+      "sectionSavedItems": "Сохранённые элементы",
+      "sectionCssSnippets": "CSS фрагменты",
+      "sectionMcpServers": "MCP серверы"
+    },
+    "settings": {
+      "generalSettings": "Основные настройки",
+      "systemPrompts": "Системные промпты",
+      "defaultPromptName": "По умолчанию (скрытый)",
+      "defaultPromptStatus": "Базовые инструкции (только чтение)",
+      "customPromptStatus": "Сохранённый пользовательский промпт",
+      "view": "Просмотр",
+      "edit": "Редактировать",
+      "delete": "Удалить",
+      "addNewPrompt": "Добавить новый системный промпт",
+      "addNewTitle": "Добавить новый промпт",
+      "viewTitle": "Просмотр промпта",
+      "editTitle": "Редактировать промпт",
+      "nameLabel": "Название",
+      "namePlaceholder": "Например, Мои правила",
+      "contentLabel": "Содержание",
+      "contentPlaceholder": "Инструкции системы здесь...",
+      "baseOnDefault": "На основе стандартного",
+      "cancel": "Отмена",
+      "savePrompt": "Сохранить промпт",
+      "nameRequired": "Имя и содержание обязательны.",
+      "settingsSaved": "Настройки сохранены.",
+      "advancedSettings": "Расширенные настройки",
+      "subLanguage": "Язык и регион",
+      "subChat": "Чат и сообщения",
+      "subProjects": "Проекты и файлы",
+      "subInjection": "Инструкции и память",
+      "subResearch": "Глубокое исследование",
+      "subVoice": "Голос",
+      "subIntegrations": "Интеграции",
+      "subUtilities": "Инструменты",
+      "subCSS": "Свой CSS",
+      "projectAutoContext": "Авто-контекст проекта (локальный RAG)",
+      "processGitignore": "Обрабатывать .gitignore при загрузке",
+      "autoDownloadFiles": "Автоскачивание create_file",
+      "disableSystemPrompt": "Отключить скрытый системный промпт",
+      "disableMemory": "Отключить инъекцию сохранённой памяти",
+      "injectSystemDateTime": "Вставлять системные дату и время в сообщения",
+      "skipDeletionConfirmation": "Пропустить подтверждение удаления",
+      "injectionFrequency": "Частота инъекции системного промпта",
+      "firstMessage": "Только в первом сообщении",
+      "everyMessage": "Всегда (в каждом сообщении)",
+      "everyNMessages": "Каждые N сообщений",
+      "injectionInterval": "Интервал инъекции (N)",
+      "injectEveryN": "Внедрять промпт каждые {{n}} сообщений.",
+      "voiceMode": "Голосовой режим (авто-чтение ответов)",
+      "autoSubmitVoice": "Автоотправка после речи",
+      "speechLanguage": "Язык речи",
+      "vadSilenceTimeout": "Тайм-аут тишины",
+      "autoDownloadZip": "Автоскачивание LONG_WORK архива",
+      "preferredLang": "Предпочтительный язык ответа",
+      "preferredLangPlaceholder": "Например, Русский, Английский",
+      "preferredLangHint": "Оставьте пустым, чтобы модель решала сама.",
+      "markdownMaxDepth": "Макс. глубина обхода Markdown",
+      "markdownMaxDepthHint": "Предел глубины рекурсии DOM при реконструкции markdown из сообщения. Меньше = безопаснее от переполнения стека; больше = сохраняет структуру глубоко вложенного контента. По умолчанию 200.",
+      "chatSessionCap": "Лимит списка сессий чата",
+      "chatSessionCapHint": "Максимальное количество сессий чата, хранящихся в памяти для боковой панели. Старые сессии за этим лимитом удаляются (FIFO). Меньшие значения снижают использование памяти на долгоживущих вкладках. По умолчанию 500.",
+      "githubToken": "GitHub Personal Access Token",
+      "githubTokenPlaceholder": "ghp_...",
+      "deepResearchContextGuard": "Защита контекста Deep Research",
+      "contextGuardEnabled": "Включить защиту контекста",
+      "contextGuardEnabledHint": "Останавливает управляемый Deep Research до исчерпания контекстного окна чата. Учитывает скрытые промпты расширения, дайджесты доказательств и использование, сообщаемое сервером.",
+      "contextGuardLimit": "Лимит контекста (токены)",
+      "contextGuardLimitHint": "Размер контекстного окна веб-чата DeepSeek. По умолчанию 128 000 токенов.",
+      "contextGuardStopPercent": "Порог остановки (%)",
+      "contextGuardStopPercentHint": "Останавливает Deep Research, когда оценка контекста достигает {{threshold}} токенов. Ограничено диапазоном 50-95%.",
+      "enabled": "Включено",
+      "githubTokenHelp": "Создайте классический токен с областью repo в GitHub Settings -> Tokens.",
+      "githubTokenShow": "Показать",
+      "githubTokenHide": "Скрыть",
+      "githubTokenClear": "Очистить",
+      "tokenPriceEstimation": "Оценка стоимости токенов (экспериментально)",
+      "tokenPriceHint": "Показывает примерную стоимость API DeepSeek за сообщение и общую сумму сессии. Используются цены на входные/выходные токены. Данные о ценах загружаются динамически.",
+      "collapseLongUserMessages": "Сворачивать длинные сообщения",
+      "collapseLongUserMessagesHint": "Автоматически скрывать очень длинные сообщения пользователя за кнопкой «читать далее».",
+      "loadAllHistoryOnSession": "Загружать всю историю при открытии сессии",
+      "loadAllHistoryHint": "Прокручивает вверх, чтобы вызвать ленивую загрузку DeepSeek, обеспечивая доступность всех сообщений для экспорта и расчёта стоимости. Может быть медленно для длинных бесед. По умолчанию отключено.",
+      "showTimestamps": "Показывать временные метки сообщений",
+      "showTimestampsHint": "Отображать точное время отправки или получения каждого сообщения в чате.",
+      "save": "Сохранить настройки",
+      "ragChunks": "Макс. фрагментов RAG для инъекции",
+      "ragChunks3": "3 фрагмента (~600 слов)",
+      "ragChunks5": "5 фрагментов (~1000 слов)",
+      "ragChunks8": "8 фрагментов (~1600 слов)",
+      "ragChunks10": "10 фрагментов (~2000 слов)",
+      "ragHint": "Автоматически извлекает релевантные части из файлов вашего проекта.",
+      "projectInstructions": "Инструкции проекта",
+      "projectInstructionsPlaceholder": "Пользовательские инструкции, добавляемые к глобальному системному промпту для этого проекта...",
+      "autoSaved": "Автосохранено",
+      "languageSettings": "Языковые настройки",
+      "syncLocale": "Синхронизировать язык расширения с браузером",
+      "selectLanguage": "Язык",
+      "checkUpdates": "Проверить обновления языков",
+      "resetFactory": "Сбросить на заводские языки",
+      "lastChecked": "Последняя проверка: {{date}}",
+      "updateAvailable": "Доступно обновление языка!",
+      "updatedSuccess": "Языковые файлы успешно обновлены.",
+      "resetSuccess": "Языковые файлы сброшены до заводских настроек.",
+      "updateFailed": "Не удалось проверить обновления языков.",
+      "unsavedTitle": "Несохранённые изменения",
+      "unsavedMessage": "У вас есть несохранённые изменения настроек. Вы уверены, что хотите отменить их?",
+      "discard": "Отменить",
+      "keepEditing": "Продолжить редактирование",
+      "customCSS": "Пользовательский CSS",
+      "customCSSPlaceholder": "/* Вставьте ваш CSS или выберите пресет выше */",
+      "multiPromptMode": "Режим нескольких системных промптов (расширенный)",
+      "scheduleType": "Расписание инъекций",
+      "cssPresets": "Пресеты",
+      "presetNone": "Нет",
+      "presetReducePadding": "Уменьшить отступы",
+      "presetWiderMessages": "Широкие сообщения",
+      "presetCompact": "Компактный интерфейс",
+      "presetBetterCodeFont": "Лучший шрифт для кода",
+      "saveAsSnippet": "Сохранить как сниппет",
+      "manageSnippets": "Управление CSS-сниппетами",
+      "restore": "Сбросить",
+      "delete": "Удалить",
+      "enterSnippetName": "Введите название сниппета:",
+      "snippetSaved": "Сниппет сохранён!",
+      "snippetDeleted": "Сниппет удалён",
+      "presetRestored": "Пресет сброшен по умолчанию",
+      "duplicateNameError": "Сниппет с таким именем уже существует.",
+      "updateSnippet": "Обновить сниппет",
+      "snippetUpdated": "Сниппет обновлен!",
+      "editingSnippet": "Редактирование сниппета: {{name}}",
+      "exitEditMode": "Выйти из режима редактирования",
+      "noSnippets": "CSS-сниппетов пока нет.",
+      "advancedSearchPlaceholder": "Поиск настроек...",
+      "advancedNoResults": "Совпадений не найдено.",
+      "disableTipBox": "Отключить окно подсказок",
+      "disableTipBoxHint": "Показывает случайную подсказку при каждом открытии панели."
+    },
+    "skillList": {
+      "title": "Набор навыков",
+      "export": "Экспорт",
+      "import": "Импорт",
+      "uploadLabel": "Загрузить навык (.md)",
+      "empty": "Нет загруженных навыков.",
+      "namePlaceholder": "Название навыка",
+      "usagePlaceholder": "Использование (например, typescript, react)",
+      "contentPlaceholder": "Инструкции/описание навыка...",
+      "cancel": "Отмена",
+      "save": "Сохранить",
+      "edit": "Редактировать",
+      "delete": "Удалить",
+      "onlyMdOrJson": "Поддерживаются только файлы .md и .json.",
+      "onlyMd": "Для навыков поддерживаются только файлы .md.",
+      "loaded": "Навык загружен: {{name}}",
+      "removed": "Навык удалён.",
+      "saved": "Навык сохранён.",
+      "importedCount": "Импортировано навыков: {{count}}.",
+      "importFailed": "Не удалось импортировать навыки. Неверный формат файла."
+    },
+    "characterList": {
+      "title": "RP Персонажи",
+      "export": "Экспорт",
+      "import": "Импорт",
+      "uploadLabel": "Загрузить персонажа (.md)",
+      "defaultOption": "Нет (Ассистент)",
+      "empty": "Нет сохранённых персонажей.",
+      "namePlaceholder": "Имя персонажа",
+      "usagePlaceholder": "Использование (напр., развлечение, философия)",
+      "contentPlaceholder": "Инструкции/предыстория персонажа...",
+      "cancel": "Отмена",
+      "save": "Сохранить",
+      "edit": "Редактировать",
+      "delete": "Удалить",
+      "onlyMdOrJson": "Поддерживаются только файлы .md и .json.",
+      "onlyMd": "Для загрузки персонажей поддерживаются только файлы .md.",
+      "loaded": "Персонаж загружен: {{name}}",
+      "removed": "Персонаж удалён.",
+      "saved": "Персонаж сохранён.",
+      "importedCount": "Импортировано персонажей: {{count}}.",
+      "importFailed": "Не удалось импортировать персонажей. Неверный формат файла."
+    },
+    "memoryList": {
+      "title": "Сохранённая память",
+      "export": "Экспорт",
+      "import": "Импорт",
+      "empty": "Нет записей в памяти.",
+      "delete": "Удалить",
+      "edit": "Редактировать",
+      "editTitle": "Редактировать память",
+      "saved": "Сохранено: {{key}}",
+      "importSuccess": "Память успешно импортирована.",
+      "importFailed": "Ошибка импорта: неверный формат JSON.",
+      "deleted": "Удалена запись памяти: {{key}}",
+      "more": "+{{count}} ещё"
+    },
+    "memoryImport": {
+      "title": "Импорт памяти из ИИ",
+      "step1Title": "1. Скопируйте промпт и вставьте в другой ИИ",
+      "copyPrompt": "Копировать",
+      "copied": "Скопировано!",
+      "step2Title": "2. Вставьте ответ ИИ ниже",
+      "placeholder": "Вставьте ответ ИИ сюда...",
+      "importButton": "Импорт и запуск Expert сессии",
+      "importError": "Пожалуйста, сначала вставьте ответ ИИ."
+    },
+    "projectsManager": {
+      "noFilesPicked": "Ничего не прикреплено - выбранные файл(ы) не поддерживаются, слишком большие (более 2 МБ) или бинарные.",
+      "someFilesSkipped": "{{skipped}} из {{total}} выбранных файл(ов) не удалось прикрепить (не поддерживаются, слишком большие или бинарные).",
+      "folderNoTextFiles": "В выбранной папке не найдено поддерживаемых текстовых файлов.",
+      "pickTimeout": "Средство выбора файлов не вернуло результат. Попробуйте еще раз.",
+      "back": "Назад",
+      "title": "Проекты",
+      "manage": "Управление проектами",
+      "newProject": "+ Новый проект",
+      "nameRequired": "Название проекта (обязательно)",
+      "descriptionOptional": "Описание (необязательно)",
+      "cancel": "Отмена",
+      "create": "Создать",
+      "empty": "Пока нет проектов.",
+      "nameLabel": "Название",
+      "descriptionLabel": "Описание",
+      "optional": "Необязательно",
+      "customInstructions": "Пользовательские инструкции",
+      "instructionsPlaceholder": "Инструкции, добавляемые к глобальному системному промпту, когда этот проект активен...",
+      "autoSaved": "Автосохранено",
+      "files": "Файлы",
+      "exportAll": "Экспортировать всё",
+      "noFiles": "Файлы ещё не добавлены.",
+      "export": "Экспорт",
+      "delete": "Удалить",
+      "uploadFile": "+ Загрузить файл",
+      "uploadFolder": "+ Загрузить папку",
+      "fileHint": "Только текстовые файлы. Макс. 500 КБ на файл.",
+      "localDirectory": "Локальная директория",
+      "permissionLost": "(разрешение потеряно — перепривязать)",
+      "refresh": "Обновить",
+      "unlink": "Отвязать",
+      "linkDirectory": "+ Привязать локальную директорию",
+      "selectingDir": "Выбор директории...",
+      "dirHint": "Файлы читаются напрямую с вашей файловой системы (не копируются). Только браузеры на Chromium.",
+      "deleteProject": "Удалить проект",
+      "nameIsRequired": "Название обязательно.",
+      "filePickFailed": "Ошибка выбора файла.",
+      "fileTooLarge": "«{{name}}» слишком большой ({{size}} КБ)",
+      "fileUnreadable": "Не удалось прочитать «{{name}}»",
+      "fileEmpty": "«{{name}}» пуст",
+      "storageError": "Ошибка хранилища: {{msg}}",
+      "folderPickFailed": "Ошибка выбора папки.",
+      "folderRequiresNewer": "Загрузка папки требует более новой версии приложения.",
+      "folderUploadFailed": "Ошибка загрузки папки: {{msg}}",
+      "filesUploaded": "Загружено: {{count}} файл(а/ов), пропущено: {{skipped}} (слишком большие, нечитаемые или не текстовые).",
+      "linkFailed": "Не удалось привязать директорию.",
+      "refreshFailed": "Не удалось обновить директорию.",
+      "downloadAll": "Скачать все файлы одним объединённым текстовым файлом",
+      "downloadFile": "Скачать {{name}}",
+      "removeFile": "Удалить {{name}} из этого проекта",
+      "deleteConfirm": "Удалить «{{name}}»? Это также удалит его {{count}} файл(а/ов).",
+      "filesUploadedShort": "{{count}} файл(а/ов) загружено, {{skipped}} пропущено (слишком большие или пустые)."
+    },
+    "projectsCard": {
+      "title": "Проекты",
+      "manage": "Управление",
+      "description": "Выбор проекта и файлов доступен под полем ввода чата."
+    },
+    "selectionOverlay": {
+      "selected": "выбрано",
+      "deselectAll": "Снять выделение",
+      "selectAll": "Выделить всё",
+      "markdown": "Markdown (.md)",
+      "pdf": "PDF Документ",
+      "html": "Интерактивный HTML",
+      "image": "Длинный скриншот",
+      "cancel": "Отмена",
+      "exportHint": "Пожалуйста, сначала выберите сообщения для экспорта."
+    },
+    "questionPanel": {
+      "of": "{{current}} из {{total}}",
+      "dismiss": "Закрыть",
+      "somethingElse": "Что-то ещё...",
+      "typeAnswer": "Введите ваш ответ здесь...",
+      "keyboardNav": "↑↓ для навигации",
+      "keyboardSelect": "Enter для выбора",
+      "keyboardClose": "Esc для закрытия",
+      "sendAnswers": "Отправить ответы",
+      "skip": "Пропустить",
+      "next": "Далее",
+      "other": "Другое",
+      "noOptionSkipped": "*(Вариант не выбран / Пропущено)*",
+      "noAnswerSkipped": "*(Ответ не предоставлен / Пропущено)*",
+      "answersHeader": "Вот ответы на ваши уточняющие вопросы:\n\n",
+      "noInputField": "Не удалось найти поле ввода DeepSeek."
+    },
+    "statusBanner": {
+      "title": "DeepSeek — обнаружена проблема {{indicator}} | {{description}}",
+      "message": "Проблема не на вашей стороне, а на стороне серверов DeepSeek. Возможны неполадки из-за высокой нагрузки или обслуживания."
+    },
+    "announcementBanner": {
+      "dismiss": "Закрыть"
+    },
+    "attachMenu": {
+      "noFilesPicked": "Ничего не прикреплено - выбранные файл(ы) не поддерживаются, слишком большие (более 2 МБ) или бинарные.",
+      "someFilesSkipped": "{{skipped}} из {{total}} выбранных файл(ов) не удалось прикрепить (не поддерживаются, слишком большие или бинарные).",
+      "folderNoTextFiles": "В выбранной папке не найдено поддерживаемых текстовых файлов.",
+      "pickTimeout": "Средство выбора файлов не вернуло результат. Попробуйте еще раз.",
+      "imagesRequireVision": "Изображения можно прикреплять только в режиме Vision.",
+      "expertModeWarning": "Из-за ограничений платформы DeepSeek эти инструменты могут работать некорректно в режиме Expert.",
+      "buttonTitle": "Расширенная загрузка",
+      "attachProject": "Прикрепить проект",
+      "voicePrompt": "Голосовой ввод",
+      "stopRecording": "Остановить запись",
+      "uploadFile": "Загрузить файл",
+      "uploadFolder": "Загрузить папку",
+      "githubRepo": "GitHub Репозиторий",
+      "githubAuthLabel": "Авторизованный доступ GitHub",
+      "fetchWebPage": "Загрузить веб-страницу",
+      "githubImportTitle": "Импорт GitHub репозитория",
+      "authenticated": "Авторизован",
+      "githubPlaceholder": "https://github.com/владелец/репозиторий или владелец/репозиторий",
+      "includeCommits": "Включить историю коммитов",
+      "commitsLabel": "Количество коммитов:",
+      "close": "Закрыть",
+      "fetch": "Загрузить",
+      "fetching": "Загрузка...",
+      "projectLabel": "Проект",
+      "noProject": "Нет",
+      "projectHint": "Инструкции из выбранного проекта применяются только к первому сообщению.",
+      "deselectAll": "Снять все",
+      "selectAll": "Выбрать все",
+      "file": "файл",
+      "files": "файлы",
+      "attach": "Прикрепить ({{count}})",
+      "noFiles": "Нет файлов — добавьте через Управление проектами",
+      "noProjectSelected": "Проект не выбран",
+      "webImportTitle": "Загрузить веб-страницу",
+      "webPlaceholder": "https://example.com/статья",
+      "noSpeechRecognition": "Браузер не поддерживает распознавание речи.",
+      "noInputField": "Не удалось найти поле ввода.",
+      "voiceError": "Ошибка голоса: {{msg}}",
+      "filePickFailed": "Ошибка выбора файла.",
+      "folderPickFailed": "Ошибка выбора папки.",
+      "folderRequiresNewer": "Загрузка папки требует более новой версии приложения.",
+      "folderUploadFailed": "Ошибка загрузки папки: {{msg}}",
+      "invalidGithubUrl": "Неверный URL. Используйте: https://github.com/владелец/репозиторий или владелец/репозиторий",
+      "commitsFailed": "Не удалось получить историю коммитов: {{msg}}",
+      "repoFailed": "Не удалось получить репозиторий: {{msg}}",
+      "invalidWebUrl": "Пожалуйста, введите корректный URL (с http/https).",
+      "webFetchFailed": "Не удалось загрузить содержимое страницы: {{msg}}"
+    },
+    "codeRunner": {
+      "pythonRunner": "Запуск Python",
+      "tsRunner": "Запуск TypeScript",
+      "jsRunner": "Запуск JavaScript",
+      "luaRunner": "Запуск Lua",
+      "rubyRunner": "Запуск Ruby",
+      "download": "Скачать",
+      "placeholder": "Введите ваш код здесь...",
+      "running": "Выполнение...",
+      "runPython": "▶ Запустить Python",
+      "runTs": "▶ Запустить TS",
+      "runJs": "▶ Запустить JS",
+      "runLua": "▶ Запустить Lua",
+      "runRuby": "▶ Запустить Ruby",
+      "consoleOutput": "Вывод консоли",
+      "clear": "Очистить",
+      "noOutput": "(Выполнение завершено без вывода)",
+      "loadingPyodide": "Загрузка Pyodide...",
+      "finished": "Готово.",
+      "executionError": "Ошибка выполнения.",
+      "pythonStatus": "Python 3.x (WASM)",
+      "tsStatus": "TypeScript (Babel)",
+      "jsStatus": "JavaScript (V8)",
+      "luaStatus": "Lua (Fengari)",
+      "rubyStatus": "Ruby (Opal)"
+    },
+    "autoCodeResult": {
+      "success": "Выполнение успешно",
+      "rejected": "Запрос отклонён",
+      "failed": "Ошибка выполнения",
+      "completed": "Выполнение кода {{lang}} успешно завершено",
+      "wasRejected": "Выполнение кода {{lang}} было отклонено",
+      "execFailed": "Выполнение кода {{lang}} завершилось ошибкой",
+      "hideOutput": "Скрыть вывод ▴",
+      "showOutput": "Показать вывод ▾"
+    },
+    "searchResult": {
+      "searching": "Поиск DuckDuckGo...",
+      "resultsFor": "Результаты поиска: {{query}}",
+      "resultCount": "Найдено {{count}} результатов"
+    },
+    "autoCodeRunner": {
+      "aiWantsToRun": "ИИ хочет выполнить код {{lang}}",
+      "safeSandbox": "Код будет выполнен в безопасной изолированной среде.",
+      "runCode": "▶ Выполнить код",
+      "reject": "✕ Отклонить",
+      "running": "Выполнение...",
+      "finished": "Завершено",
+      "runAgain": "Выполнить снова",
+      "error": "Ошибка",
+      "retry": "Повторить",
+      "rejected": "Отклонено",
+      "actuallyRun": "Всё равно выполнить",
+      "hideCode": "Скрыть код ▴",
+      "showCode": "Показать код ▾",
+      "consoleOutput": "Вывод консоли"
+    },
+    "toolCard": {
+      "pythonRunner": "Запуск Python"
+    },
+    "imageCard": {
+      "searching": "Поиск Wikimedia...",
+      "close": "Закрыть",
+      "notFound": "Изображение не найдено"
+    },
+    "todoCard": {
+      "title": "Список задач",
+      "copy": "Копировать Markdown",
+      "copied": "Скопировано!",
+      "download": "Скачать"
+    },
+    "downloadCard": {
+      "download": "Скачать"
+    },
+    "pptxCard": {
+      "title": "Презентация PowerPoint",
+      "download": "Скачать",
+      "working": "Работаю...",
+      "showScript": "Показать сгенерированный скрипт",
+      "hideScript": "Скрыть сгенерированный скрипт",
+      "preparing": "Подготовка песочницы...",
+      "downloading": "Скачивание...",
+      "success": "Готово!",
+      "error": "Ошибка: {{msg}}",
+      "generating": "Генерация PPTX...",
+      "bridgeError": "Ошибка моста",
+      "browserUnsupported": "Ваш браузер не поддерживается",
+      "browserUnsupportedDesc": "Мы работаем над поддержкой вашего браузера. Если хотите помочь, посетите нашу страницу на GitHub."
+    },
+    "excelCard": {
+      "title": "Таблица Excel",
+      "download": "Скачать",
+      "working": "Работаю...",
+      "showScript": "Показать сгенерированный скрипт",
+      "hideScript": "Скрыть сгенерированный скрипт",
+      "preparing": "Подготовка песочницы...",
+      "downloading": "Скачивание...",
+      "success": "Готово!",
+      "error": "Ошибка: {{msg}}",
+      "generating": "Генерация Excel...",
+      "bridgeError": "Ошибка моста",
+      "browserUnsupported": "Ваш браузер не поддерживается",
+      "browserUnsupportedDesc": "Мы работаем над поддержкой вашего браузера. Если хотите помочь, посетите нашу страницу на GitHub."
+    },
+    "docxCard": {
+      "title": "Документ Word",
+      "download": "Скачать",
+      "working": "Работаю...",
+      "showScript": "Показать сгенерированный скрипт",
+      "hideScript": "Скрыть сгенерированный скрипт",
+      "preparing": "Подготовка песочницы...",
+      "downloading": "Скачивание...",
+      "success": "Готово!",
+      "error": "Ошибка: {{msg}}",
+      "generating": "Генерация Word...",
+      "bridgeError": "Ошибка моста",
+      "browserUnsupported": "Ваш браузер не поддерживается",
+      "browserUnsupportedDesc": "Мы работаем над поддержкой вашего браузера. Если хотите помочь, посетите нашу страницу на GitHub."
+    },
+    "visualizerCard": {
+      "title": "Визуализатор",
+      "subtitle": "Интерактивная симуляция",
+      "openInPanel": "Открыть в панели",
+      "reportIssue": "Сообщить о проблеме",
+      "runtimeError": "Ошибка выполнения",
+      "reportErrorTooltip": "Обнаружена ошибка выполнения. Нажмите, чтобы отправить ошибку ИИ.",
+      "reportWarningTooltip": "Сообщить о проблеме с визуализацией",
+      "runtimeErrorTitle": "Ошибка выполнения визуализатора",
+      "feedbackTitle": "Отзыв о визуализаторе",
+      "sentToAi": "Отправлено ИИ для перегенерации",
+      "optionBuggy": "Выглядит некорректно / Сбой",
+      "optionBlank": "Ничего не отображается / Пусто",
+      "optionOther": "Другое (Опишите сами)",
+      "otherPlaceholder": "Опишите, что именно работает не так...",
+      "otherEmptyFallback": "Не указано",
+      "sendAndRegenerate": "Сообщить и сгенерировать заново",
+      "sendFailed": "Ошибка отправки. Попробуйте снова.",
+      "cancel": "Отмена"
+    },
+    "previewPanel": {
+      "close": "Закрыть",
+      "download": "Скачать .html"
+    },
+    "htmlPreview": {
+      "title": "Предпросмотр HTML",
+      "subtitle": "Интерактивный вывод",
+      "downloadHtml": "Скачать .html"
+    },
+    "pptxGenerator": {
+      "title": "Генератор PowerPoint",
+      "subtitle": "Движок PptxGenJS",
+      "heading": "Презентация PowerPoint",
+      "download": "Скачать",
+      "showScript": "Показать сгенерированный скрипт",
+      "hideScript": "Скрыть скрипт",
+      "processing": "Обработка...",
+      "done": "Готово!",
+      "error": "Ошибка"
+    },
+    "loadingIndicator": {
+      "working": "Работаю..."
+    },
+    "ragPreview": {
+      "title": "RAG — сопоставленные файлы",
+      "moreFiles": "ещё +{{count}} файл(а/ов)",
+      "lines": "Строки {{start}}–{{end}}"
+    },
+    "mcp": {
+      "detailShow": "▸ Показать детали",
+      "detailHide": "▾ Скрыть детали",
+      "inlineMaxChars": "Макс. символов в строке",
+      "inlineMaxCharsHint": "Макс. символов для списка инструментов MCP и результатов. Если список превышает лимит, лишние инструменты опускаются с предупреждением. При отклонении результата используются сокращённые варианты.",
+      "transportNote": "Примечание: Поддерживается только HTTP/Streamable HTTP транспорт.",
+      "connected": "Подключено: {{count}} инструментов найдено",
+      "sectionTitle": "MCP Серверы",
+      "description": "Добавляйте удалённые MCP (Model Context Protocol) серверы. ИИ сможет находить и вызывать инструменты с этих серверов.",
+      "test": "Тест",
+      "testLoading": "Тестирование...",
+      "edit": "Редактировать",
+      "addServer": "Добавить MCP сервер",
+      "addModalTitle": "Добавить MCP сервер",
+      "editModalTitle": "Редактировать MCP сервер",
+      "nameLabel": "Название",
+      "namePlaceholder": "Мой MCP сервер",
+      "serverUrlLabel": "URL сервера",
+      "serverUrlPlaceholder": "https://example.com/mcp",
+      "apiKeyLabel": "API ключ (необязательно)",
+      "apiKeyPlaceholder": "sk-...",
+      "enabledLabel": "Включён",
+      "cancel": "Отмена",
+      "save": "Сохранить",
+      "deleteConfirm": "Удалить MCP сервер «{{name}}»?",
+      "testFailed": "Ошибка MCP теста: {{message}}",
+      "toolsCount": "{{count}} инструментов"
+    },
+    "expandToggle": {
+      "expand": "Развернуть",
+      "collapse": "Свернуть",
+      "expandTitle": "Развернуть поле ввода",
+      "collapseTitle": "Свернуть поле ввода",
+      "showMore": "Показать ещё",
+      "showLess": "Скрыть"
+    },
+    "messageOverlay": {
+      "questionsAsked": "Заданы уточняющие вопросы.",
+      "questionsSubtitle": "Пожалуйста, дайте ответы в панели взаимодействия ниже.",
+      "characterCreated": "Персонаж создан.",
+      "characterActive": "Активный персонаж: <strong>{{name}}</strong>",
+      "skillCreated": "Навык создан.",
+      "skillActive": "Активный навык: <strong>{{name}}</strong>",
+      "webFetchRequested": "Веб-страница загружается",
+      "githubFetchRequested": "GitHub репозиторий загружается",
+      "searchRequested": "Поиск DuckDuckGo...",
+      "memoryStored": "Память сохранена ({{count}}).",
+      "downloadMd": "Скачать как .md"
+    },
+    "savedItems": {
+      "title": "Сохранённое",
+      "bookmarks": "Закладки",
+      "snippets": "Сниппеты",
+      "newSnippet": "Новый сниппет",
+      "editSnippet": "Редактировать сниппет",
+      "search": "Поиск в сохранённом...",
+      "emptyBookmarks": "Закладок пока нет. Нажмите на иконку закладки на любом сообщении, чтобы сохранить его.",
+      "emptySnippets": "Сниппетов пока нет. Создайте один, чтобы повторно использовать свои любимые промпты.",
+      "delete": "Удалить",
+      "edit": "Редактировать",
+      "send": "Отправить в чат",
+      "removeBookmark": "Удалить закладку",
+      "bookmarkThis": "Добавить сообщение в закладки",
+      "bookmarked": "Сообщение добавлено в закладки",
+      "bookmarkRemoved": "Закладка удалена",
+      "deleted": "Удалено",
+      "snippetSent": "Сниппет отправлен",
+      "importSuccess": "Импортировано {{count}} элемент(ов)",
+      "importFailed": "Ошибка импорта: {{msg}}",
+      "namePlaceholder": "Название сниппета",
+      "contentPlaceholder": "Вставьте ваш промпт или сообщение...",
+      "contentRequired": "Содержание обязательно.",
+      "save": "Сохранить",
+      "cancel": "Отмена",
+      "titleRequired": "Название обязательно.",
+      "export": "Экспорт",
+      "import": "Импорт",
+      "openConversation": "Открыть разговор",
+      "dateJustNow": "только что",
+      "dateMinAgo": "{{count}} мин. назад",
+      "dateHourAgo": "{{count}} ч. назад"
+    },
+    "sidebarMenu": {
+      "tags": "Теги (BDS)",
+      "exportChat": "Экспорт чата (BDS)",
+      "getBdsApp": "Получить BDS App",
+      "whatsNew": "Что нового?"
+    },
+    "commands": {
+      "title": "Команды",
+      "manage": "Управление",
+      "helpTitle": "Команды",
+      "search": "Поиск команд...",
+      "all": "Все",
+      "noCommands": "Команды не найдены",
+      "addCommand": "Добавить команду",
+      "remove": "Удалить",
+      "noCustomCommands": "Пользовательских команд пока нет. Сопоставьте сниппет выше.",
+      "builtinCommands": "Встроенные команды",
+      "unknownCommand": "Неизвестная команда: /{{cmd}}. Введите /help для списка команд.",
+      "cmdRequired": "Команда обязательна",
+      "cmdInvalidChars": "Только строчные буквы, цифры и подчёркивания",
+      "cmdConflictBuiltin": "Конфликт со встроенной командой",
+      "cmdConflictSnippet": "Команда уже используется другим сниппетом",
+      "cmdPlaceholder": "команда (необязательно)",
+      "cmdOk": "OK",
+      "selectSnippet": "Выберите сниппет...",
+      "compress": "Суммируйте разговор и начните новый сеанс с полным контекстом",
+      "summarize": "Создайте передаточную сводку разговора",
+      "done": "Готово",
+      "commandShortcuts": "Командные сокращения",
+      "cmdHint": "/команда (строчные, без пробелов)",
+      "add": "Добавить",
+      "categorySnippet": "сниппет",
+      "autocompleteHint": "Tab \u21b9 завершить \u00b7 \u21b5 выполнить",
+      "cmdSearchDesc": "Искать в интернете и вставлять результаты в чат",
+      "cmdSearchUsage": "/search <запрос>",
+      "cmdNewDesc": "Начать новый разговор",
+      "cmdNewUsage": "/new",
+      "cmdExportDesc": "Экспорт разговора (markdown, pdf, html, image)",
+      "cmdExportUsage": "/export <формат>",
+      "cmdCompressDesc": "Суммируйте разговор и начните новый сеанс с полным контекстом",
+      "cmdCompressUsage": "/compress",
+      "cmdSummarizeDesc": "Создайте передаточную сводку текущего разговора",
+      "cmdSummarizeUsage": "/summarize",
+      "cmdHelpDesc": "Показать все доступные команды",
+      "cmdHelpUsage": "/help [команда]",
+      "cattools": "инструменты",
+      "catnavigation": "навигация",
+      "catbuiltin": "встроенные"
+    },
+    "sidebarSearch": {
+      "placeholder": "Поиск в истории... (#тег)"
+    },
+    "files": {
+      "standalone": {
+        "packageTitle": "Сгенерированный пакет файлов",
+        "folderPath": "{{path}} (структура папок сохранена)",
+        "singleTitle": "Сгенерированный файл"
+      },
+      "longWork": {
+        "noFiles": "LONG_WORK завершён. Файлы не созданы.",
+        "complete": "LONG_WORK завершён: {{count}} файл(а/ов) упаковано в архив.",
+        "projectTitle": "LONG_WORK проект",
+        "filesPackaged": "Упаковано файлов: {{count}}"
+      },
+      "webReader": {
+        "fetching": "Загрузка содержимого страницы...",
+        "processing": "Обработка содержимого...",
+        "converting": "Конвертация в Markdown...",
+        "creating": "Создание файла...",
+        "fetchFailed": "Не удалось загрузить страницу.",
+        "parseFailed": "Не удалось извлечь основной контент со страницы.",
+        "unknown": "Неизвестно"
+      },
+      "githubReader": {
+        "downloading": "Скачивание {{owner}}/{{repo}} ({{branch}})...",
+        "extracting": "Распаковка ZIP...",
+        "processing": "Обработка файлов...",
+        "creating": "Создание файла...",
+        "invalidUrl": "Неверный URL GitHub. Используйте: https://github.com/владелец/репозиторий",
+        "tokenRejected": "GitHub отклонил ваш токен. Проверьте, что у него есть область repo и он не истёк.",
+        "notFound": "Репозиторий не найден. Возможно, вам нужен GitHub токен для приватных репозиториев. Добавьте его в Расширенных настройках.",
+        "downloadFailed": "Не удалось скачать {{owner}}/{{repo}}/{{branch}}. Проверьте URL и убедитесь, что репозиторий публичный.",
+        "extractFailed": "Не удалось распаковать ZIP: {{msg}}",
+        "directoryTree": "Дерево директорий:"
+      },
+      "youtubeReader": {
+        "invalidUrl": "Неверный URL YouTube.",
+        "fallbackTitle": "YouTube Видео",
+        "noTranscript": "[Субтитры недоступны. Возможно, для этого видео нет субтитров.]",
+        "transcriptError": "[Ошибка получения субтитров: {{msg}}]",
+        "bgScriptError": "[Не удалось получить данные субтитров из фонового скрипта.]"
+      },
+      "twitterReader": {
+        "fetchFailed": "Не удалось получить информацию о твите из Twitter OEmbed.",
+        "noExtract": "Не удалось извлечь текст твита."
+      }
+    },
+    "exporter": {
+      "branding": "Better DeepSeek",
+      "archiveReport": "Архивный отчёт",
+      "userQuery": "Запрос пользователя",
+      "aiResponse": "Ответ ИИ",
+      "pdfFooter": "Документ создан через Better DeepSeek Browser Extension",
+      "imageHeader": "Длинный снимок",
+      "imageDate": "Снято {{date}}",
+      "userLabel": "Пользователь",
+      "assistantLabel": "Ассистент",
+      "imageFooter": "Создано через Better DeepSeek",
+      "htmlLogo": "Экспорт Better DeepSeek",
+      "htmlToggleTheme": "Переключить тему",
+      "htmlFooter": "Экспортировано через Better DeepSeek Browser Extension",
+      "copy": "Копировать",
+      "copied": "Скопировано!",
+      "powerpoint": "PowerPoint",
+      "presentation": "Презентация",
+      "bdsTool": "BDS Инструмент",
+      "imageTooLong": "Сессия слишком длинная ({{height}}k px при {{scale}}x). Изображение может быть обрезано на {{limit}}k px. Используйте PDF или HTML.",
+      "imageFailed": "Экспорт изображения достиг предела размера холста браузера. Попробуйте экспортировать меньше сообщений или используйте PDF/HTML/MD."
+    },
+    "auto": {
+      "fetchFailed": "Не удалось загрузить {{url}}:\n\n{{msg}}",
+      "githubFailed": "Не удалось загрузить GitHub репозиторий {{url}}:\n\n{{msg}}",
+      "tweetFailed": "Не удалось загрузить твит {{url}}:\n\n{{msg}}",
+      "youtubeFailed": "Не удалось загрузить YouTube видео {{url}}:\n\n{{msg}}",
+      "statusSuccess": "УСПЕШНО",
+      "statusError": "ОШИБКА",
+      "statusRejected": "ОТКЛОНЕНО",
+      "noOutput": "(Нет вывода)",
+      "generationError": "ОШИБКА при генерации {{toolName}}.",
+      "errorMessage": "Сообщение об ошибке: {{msg}}",
+      "correctionPrompt": "Пожалуйста, проанализируйте ошибку выше, изучите API-справочник библиотеки, затем исправьте код и предоставьте исправленную версию внутри соответствующего тега <BDS:{{tagName}}>. Обратите внимание на: правильные имена API-методов, правильные аргументы и обязательный вызов сохранения/вывода в конце."
+    },
+    "messageProcessor": {
+      "minCost": "<$0.0001",
+      "contextTemplate": "{{used}} / {{total}} ({{percent}}%)",
+      "contextTooltip": "Контекст: {{text}}",
+      "longWorkClosed": "LONG_WORK закрыт, так как ответ API завершился.",
+      "userPrice": "API: ~{{price}}",
+      "tokenCount": "{{count}} ток"
+    },
+    "whatsnew": {
+      "title": "Что нового",
+      "versionHistory": "История версий",
+      "dismiss": "Понятно, спасибо!",
+      "reportBug": "Сообщить об ошибке",
+      "requestFeature": "Предложить функцию",
+      "brandingNote": "Better DeepSeek — это проект сообщества с открытым исходным кодом.",
+      "seeAllChanges": "Посмотреть все изменения в v{{version}} на GitHub",
+      "seeDetailed": "Посмотреть подробные примечания к выпуску на GitHub",
+      "features": {
+        "v0_1_11": {
+          "title": "MCP Серверы, динамические таблицы и стабильность",
+          "features": {
+            "feat_0": {
+              "title": "Поддержка MCP серверов",
+              "description": "Подключайте удалённые MCP серверы к DeepSeek для доступа к внешним инструментам. Настройте серверы в Настройки → Расширенные настройки → MCP Серверы."
+            },
+            "feat_1": {
+              "title": "Динамические таблицы",
+              "description": "Сортируйте данные и изменяйте порядок столбцов прямо в таблицах, сгенерированных DeepSeek."
+            },
+            "feat_2": {
+              "title": "Улучшения стабильности и UX",
+              "description": "Десятки исправлений ошибок и улучшений UI/UX по всему расширению."
+            }
+          }
+        },
+        "v0_1_10": {
+          "title": "Стабильность и улучшения",
+          "features": {
+            "feat_0": {
+              "title": "Поддержка изображений",
+              "description": "DeepSeek теперь может искать и отображать изображения из Wikimedia Commons прямо в диалоге с помощью нового тега BDS:IMAGE."
+            },
+            "feat_1": {
+              "title": "Система слэш-команд",
+              "description": "Полноценная подсистема слэш-команд с автодополнением, передачей контекста, встроенными командами и возможностью создавать пользовательские команды из сохранённых сниппетов."
+            },
+            "feat_2": {
+              "title": "Исправления ошибок и улучшения UX",
+              "description": "Многочисленные исправления ошибок и улучшения пользовательского опыта."
+            }
+          }
+        },
+        "v0_1_9": {
+          "title": "Мульти-системные промпты, обновление Visualizer и глубокое исследование",
+          "features": {
+            "feat_0": {
+              "title": "Режим нескольких системных промптов и расширенное планирование",
+              "description": "Используйте несколько системных промптов с индивидуальными настройками расписания - первое сообщение, каждый N-й Turn или всегда."
+            },
+            "feat_1": {
+              "title": "Обновление Visualizer",
+              "description": "Виджеты Visualizer теперь можно изменять в размере и скачивать. Весь интерфейс был переработан для более чистого опыта."
+            },
+            "feat_2": {
+              "title": "Глубокое исследование",
+              "description": "Сообщите DeepSeek тему, просмотрите сгенерированный план и после одобрения он автоматически проведёт многоэтапное глубокое исследование."
+            },
+            "feat_3": {
+              "title": "Улучшенный экспорт/импорт",
+              "description": "Все данные расширения (настройки, навыки, воспоминания, персонажи, проекты) теперь можно экспортировать и импортировать с опциональным шифрованием."
+            }
+          }
+        },
+        "v0_1_8": {
+          "title": "Переработка памяти, сохранённые элементы и API Playground",
+          "features": {
+            "feat_0": {
+              "title": "Переработка памяти",
+              "description": "Система called-памяти переработана. Внедрён подход на основе пересечения токенов для более точного сопоставления контекста."
+            },
+            "feat_1": {
+              "title": "Сохранённые элементы (Закладки и Сниппеты)",
+              "description": "Сохраняйте сообщения для быстрого доступа. Создавайте сниппеты и отправляйте их одним кликом."
+            },
+            "feat_2": {
+              "title": "Инструмент создания навыков",
+              "description": "Попросите ИИ создать навык прямо из чата."
+            },
+            "feat_3": {
+              "title": "Импорт памяти из другого ИИ",
+              "description": "Импортируйте вашу память из других ИИ-платформ в DeepSeek."
+            },
+            "feat_4": {
+              "title": "API Playground",
+              "description": "Встроенная площадка для удобного тестирования DeepSeek API."
+            },
+            "feat_5": {
+              "title": "Автоматический поиск",
+              "description": "Заменили удалённые в Expert режиме функции чтения ссылок и поиска на собственный интегрированный инструмент поиска."
+            },
+            "feat_6": {
+              "title": "Исправления ошибок и улучшения UX",
+              "description": "Многочисленные исправления ошибок и улучшения пользовательского опыта."
+            }
+          }
+        },
+        "v0_1_7": {
+          "title": "Локализация, кастомные промпты и RAG",
+          "features": {
+            "feat_0": {
+              "title": "Система локализации",
+              "description": "Better DeepSeek теперь поддерживает несколько языков. Помогите нам улучшить переводы или добавить свой язык на <a href='https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md' target='_blank' style='color: #4d6bfe; text-decoration: underline;'>GitHub</a>."
+            },
+            "feat_1": {
+              "title": "Кастомные промпты",
+              "description": "Создавайте, сохраняйте и легко переключайтесь между несколькими системными промптами."
+            },
+            "feat_2": {
+              "title": "RAG-поиск по проекту",
+              "description": "Добавлена примитивная RAG-система. Подключите проект или выберите локальную папку для поиска по файлам. Мы будем улучшать это в будущих релизах."
+            },
+            "feat_3": {
+              "title": "Улучшения интерфейса",
+              "description": "Сворачивание/разворачивание длинных сообщений, иконка расширения открывает сайт DeepSeek, карточки для операций загрузки, баннеры состояния сервера и объявлений."
+            },
+            "feat_4": {
+              "title": "Исправления ошибок и производительность",
+              "description": "Улучшения парсера BDS инструментов и Office инструментов. Исправлены проблемы со шрифтами в интерфейсе DeepSeek. Различные оптимизации стабильности и производительности."
+            }
+          }
+        },
+        "v0_1_6": {
+          "title": "Android и организация",
+          "features": {
+            "feat_0": {
+              "title": "Версия для Android",
+              "description": "Better DeepSeek теперь доступен на <a href='https://github.com/EdgeTypE/better-deepseek/releases' target='_blank' style='color: #4d6bfe; text-decoration: underline;'>Android</a>."
+            },
+            "feat_1": {
+              "title": "Фильтрация чатов и теги",
+              "description": "Организуйте сессии с помощью тегов. Легко фильтруйте и группируйте чаты из бокового меню."
+            },
+            "feat_2": {
+              "title": "Обновлённый интерфейс экспорта",
+              "description": "Новый дизайн экспорта в Markdown, PDF, HTML и изображения. Экспортируйте полные сессии или отдельные части."
+            }
+          }
+        },
+        "v0_1_5": {
+          "title": "Улучшения и видимость",
+          "features": {
+            "feat_0": {
+              "title": "Окно «Что нового»",
+              "description": "Вы смотрите на него! Теперь мы будем держать вас в курсе последних изменений прямо здесь."
+            },
+            "feat_1": {
+              "title": "Расширенный контроль инъекций",
+              "description": "Выберите «Всегда», «Только первое сообщение» или «Каждые X сообщений» с настраиваемыми интервалами для системных промптов."
+            },
+            "feat_2": {
+              "title": "Поддержка приватных репозиториев",
+              "description": "Импортируйте приватные репозитории через GitHub Personal Access Tokens безопасно."
+            },
+            "feat_3": {
+              "title": "Оценка токенов и цен",
+              "description": "Оценка использования токенов и отображение окна контекста в реальном времени для эквивалентного использования API."
+            },
+            "feat_4": {
+              "title": "Отключение памяти",
+              "description": "Новый переключатель в Настройках для предотвращения сохранения контекста разговора расширением."
+            },
+            "feat_5": {
+              "title": "Улучшения стабильности",
+              "description": "Решены проблемы с обработкой сообщений и улучшено общее состояние пользовательского интерфейса."
+            }
+          }
+        },
+        "v0_1_4": {
+          "title": "Проекты и расширенные настройки",
+          "features": {
+            "feat_0": {
+              "title": "Меню проектов",
+              "description": "Лучший организационный контроль для сессий и файлов."
+            },
+            "feat_1": {
+              "title": "Поиск в истории",
+              "description": "Добавлена функция поиска в боковую панель истории сессий."
+            },
+            "feat_2": {
+              "title": "Расширенные настройки",
+              "description": "Обновлённое меню настроек с макетом-аккордеоном для экономии места и улучшения фокуса."
+            },
+            "feat_3": {
+              "title": "Отключение системного промпта",
+              "description": "Новая опция для полного отключения Скрытого системного промпта, когда он не нужен."
+            },
+            "feat_4": {
+              "title": "Принудительный язык",
+              "description": "Убедитесь, что DeepSeek всегда отвечает на предпочитаемом вами языке, независимо от ввода."
+            }
+          }
+        },
+        "v0_1_3": {
+          "title": "Вопросы и экспорт",
+          "features": {
+            "feat_0": {
+              "title": "Инструмент «Задать вопрос»",
+              "description": "DeepSeek теперь может запрашивать уточнения, когда не уверен в контексте или инструкциях."
+            },
+            "feat_1": {
+              "title": "Экспорт в Markdown и PDF",
+              "description": "Экспортируйте полные сессии чата в файлы Markdown и PDF."
+            },
+            "feat_2": {
+              "title": "Сброс промпта",
+              "description": "Легко сбросьте системный промпт до состояния по умолчанию."
+            },
+            "feat_3": {
+              "title": "Исправления навигации",
+              "description": "Решены проблемы с полной перезагрузкой страницы при клике на логотип или «Новый чат»."
+            }
+          }
+        },
+        "v0_1_2": {
+          "title": "Кроссплатформенность и выполнение кода",
+          "features": {
+            "feat_0": {
+              "title": "Поддержка Firefox",
+              "description": "Добавлена экспериментальная поддержка браузера Firefox."
+            },
+            "feat_1": {
+              "title": "Улучшенные раннеры кода",
+              "description": "Обновлён раннер Python и добавлены новые среды выполнения JS и TS."
+            },
+            "feat_2": {
+              "title": "GitHub авто-загрузка",
+              "description": "Внедряйте GitHub репозитории прямо в чат через команду BDS:AUTO."
+            }
+          }
+        },
+        "v0_1_1": {
+          "title": "Голосовая поддержка и надёжность",
+          "features": {
+            "feat_0": {
+              "title": "Полная голосовая поддержка",
+              "description": "Интеграция распознавания речи (Speech-to-Text) и синтеза речи (Text-to-Speech)."
+            },
+            "feat_1": {
+              "title": "Настройка голоса",
+              "description": "Настраиваемые языки голоса и распознавания в Настройках."
+            },
+            "feat_2": {
+              "title": "Улучшенная навигация",
+              "description": "Логотип и «Новый чат» теперь являются реальными тегами &lt;a&gt; с поддержкой «Открыть в новой вкладке»."
+            },
+            "feat_3": {
+              "title": "Надёжность потоковой передачи",
+              "description": "Улучшенная обработка зависших потоков и автоматическое закрытие тегов."
+            }
+          }
+        }
+      }
+    },
+    "language": {
+      "en": "English",
+      "tr": "Türkçe",
+      "ru": "Русский",
+      "zh-cn": "简体中文"
+    },
+    "apiPlayground": {
+      "title": "API Playground",
+      "builder": "Конструктор",
+      "response": "Ответ",
+      "history": "История",
+      "presets": "Шаблоны",
+      "endpoint": "Endpoint",
+      "model": "Модель",
+      "messages": "Сообщения",
+      "stream": "Stream",
+      "temperature": "Temperature",
+      "maxTokens": "Max Tokens",
+      "topP": "Top P",
+      "frequencyPenalty": "Frequency Penalty",
+      "presencePenalty": "Presence Penalty",
+      "thinking": "Thinking",
+      "disabled": "Отключено",
+      "enabled": "Включено",
+      "budgetToken": "Budget Token",
+      "reasoningEffort": "Reasoning Effort",
+      "low": "Низкий",
+      "medium": "Средний",
+      "high": "Высокий",
+      "responseFormat": "Response Format",
+      "text": "Текст",
+      "jsonObject": "JSON Object",
+      "jsonSchema": "JSON Schema",
+      "schema": "Schema",
+      "tools": "Инструменты",
+      "toolChoice": "Tool Choice",
+      "auto": "Авто",
+      "required": "Обязательно",
+      "none": "Нет",
+      "toolName": "Имя инструмента",
+      "addTool": "Добавить инструмент",
+      "addMessage": "Добавить сообщение",
+      "role": "Роль",
+      "content": "Содержание",
+      "name": "Имя",
+      "prefix": "Префикс",
+      "toolCallId": "Tool Call ID",
+      "remove": "Удалить",
+      "moveUp": "Вверх",
+      "moveDown": "Вниз",
+      "beta": "Бета",
+      "prefixCompletion": "Prefix Completion",
+      "store": "Store",
+      "reasoning": "Reasoning",
+      "metadata": "Metadata",
+      "userId": "User ID",
+      "labels": "Метки",
+      "logprobs": "Logprobs",
+      "topLogprobs": "Top Logprobs",
+      "copy": "Копировать",
+      "noResponse": "Отправьте запрос, чтобы увидеть ответ.",
+      "noKey": "Нет ключа",
+      "messagePlaceholder": "Введите текст сообщения...",
+      "sending": "Отправка...",
+      "send": "Отправить",
+      "reset": "Сбросить",
+      "saveRequest": "Сохранить запрос",
+      "saveName": "Имя сохранения",
+      "manageKeys": "Управление API ключами",
+      "addKey": "Добавить ключ",
+      "noKeysHint": "Нет сохраненных API ключей. Добавьте ключ для отправки запросов.",
+      "exportHistory": "Экспорт",
+      "clearHistory": "Очистить",
+      "noHistory": "История пуста.",
+      "delete": "Удалить",
+      "historyLimit": "История ограничена 500 записями. Экспортируйте перед очисткой.",
+      "builtinPresets": "Встроенные шаблоны",
+      "savedRequests": "Сохраненные запросы",
+      "viewCurl": "cURL",
+      "copyCode": "Копировать",
+      "clear": "Очистить",
+      "latency": "Задержка",
+      "finishReason": "Причина завершения",
+      "tokens": "Токены",
+      "input": "Вход",
+      "output": "Выход",
+      "cacheHit": "Cache Hit",
+      "cacheMiss": "Cache Miss",
+      "cacheSavings": "Экономия кэша",
+      "cost": "Стоимость",
+      "estimatedCost": "Оценочная стоимость",
+      "responseTime": "Время ответа",
+      "rawResponse": "Сырой ответ",
+      "streamChunks": "Stream Chunks",
+      "toolsCalled": "Вызванные инструменты",
+      "searchHistory": "Поиск...",
+      "allModels": "Все модели",
+      "saveNamePlaceholder": "Назовите запрос...",
+      "betaFeatureDescription": "Бета-функции (используйте с осторожностью).",
+      "codeGen": "Code Gen",
+      "promptSuffix": "Prompt Suffix",
+      "enterJsonSchema": "Введите JSON схему...",
+      "useActiveKey": "Используется ключ: {{name}}",
+      "noActiveKey": "Нет активного API ключа"
+    },
+    "queue": {
+      "title": "Сообщения в очереди",
+      "waitingForAI": "Ожидание ИИ...",
+      "sendingNext": "Отправка следующего...",
+      "clearAll": "Очистить все",
+      "addToQueue": "Добавить в очередь",
+      "enterToQueueTip": "ИИ генерирует ответ. Нажмите Enter, чтобы добавить в очередь.",
+      "moveUp": "Переместить вверх",
+      "moveDown": "Переместить вниз"
+    },
+    "tableInjector": {
+      "columnOptions": "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u0442\u043E\u043B\u0431\u0446\u0430",
+      "hideRow": "\u0421\u043A\u0440\u044B\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443",
+      "manageColumnsRows": "\u0423\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0441\u0442\u043E\u043B\u0431\u0446\u0430\u043C\u0438 \u0438 \u0441\u0442\u0440\u043E\u043A\u0430\u043C\u0438",
+      "sortAsc": "\u25B2 \u0421\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0410\u2192\u042F",
+      "sortDesc": "\u25BC \u0421\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u042F\u2192\u0410",
+      "hideColumn": "\u0421\u043A\u0440\u044B\u0442\u044C \u0441\u0442\u043E\u043B\u0431\u0435\u0446",
+      "showColumn": "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u0442\u043E\u043B\u0431\u0435\u0446",
+      "columns": "\u0421\u0442\u043E\u043B\u0431\u0446\u044B",
+      "hiddenRows": "\u0421\u043A\u0440\u044B\u0442\u044B\u0435 \u0441\u0442\u0440\u043E\u043A\u0438 ({{count}})",
+      "showAll": "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0432\u0441\u0435 \u0441\u0442\u043E\u043B\u0431\u0446\u044B \u0438 \u0441\u0442\u0440\u043E\u043A\u0438",
+      "columnLabel": "\u0421\u0442\u043E\u043B\u0431\u0435\u0446 {{n}}"
+    },
+    "shareModal": {
+      "searchEngineWarning": "Общие беседы могут быть найдены и проиндексированы поисковыми системами."
+    },
+    "tips": {
+      "title": "\uD83D\uDCA1 \u0421\u043E\u0432\u0435\u0442",
+      "disableInSettings": "\u0412\u044B \u043C\u043E\u0436\u0435\u0442\u0435 \u043E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u044D\u0442\u043E \u0432 \u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445.",
+      "0": "\u0427\u0442\u043E\u0431\u044B \u044D\u043A\u0441\u043F\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0447\u0430\u0442, \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \u043D\u0430 \u043A\u043D\u043E\u043F\u043A\u0443 ... \u0440\u044F\u0434\u043E\u043C \u0441 \u0441\u0435\u0441\u0441\u0438\u0435\u0439 \u0432 \u0438\u0441\u0442\u043E\u0440\u0438\u0438 \u0447\u0430\u0442\u043E\u0432.",
+      "1": "\u0412\u044B \u043C\u043E\u0436\u0435\u0442\u0435 \u043E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u044D\u0442\u043E \u043E\u043A\u043D\u043E \u043F\u043E\u0434\u0441\u043A\u0430\u0437\u043E\u043A \u0432 \u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445.",
+      "2": "\u0412\u044B \u043C\u043E\u0436\u0435\u0442\u0435 \u044D\u043A\u0441\u043F\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0432\u043E\u0438 \u0442\u0435\u043A\u0443\u0449\u0438\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0438 \u0434\u0430\u043D\u043D\u044B\u0435. \u0412\u043E\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435\u0441\u044C \u0440\u0430\u0437\u0434\u0435\u043B\u043E\u043C \u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u043D\u044B\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438.",
+      "3": "\u0421\u043E\u0445\u0440\u0430\u043D\u044F\u0439\u0442\u0435 \u0447\u0430\u0441\u0442\u043E \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u043C\u044B\u0435 \u043F\u0440\u043E\u043C\u043F\u0442\u044B \u043A\u0430\u043A \u0441\u043D\u0438\u043F\u043F\u0435\u0442\u044B \u0438 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u044F\u0439\u0442\u0435 \u0438\u0445 \u0441\u043D\u043E\u0432\u0430 \u043E\u0434\u043D\u0438\u043C \u043A\u043B\u0438\u043A\u043E\u043C. \u0412\u044B \u0434\u0430\u0436\u0435 \u043C\u043E\u0436\u0435\u0442\u0435 \u043D\u0430\u0437\u043D\u0430\u0447\u0438\u0442\u044C \u0441\u043D\u0438\u043F\u043F\u0435\u0442\u0443 \u043A\u043E\u043C\u0430\u043D\u0434\u0443 \"/\" \u0434\u043B\u044F \u0431\u044B\u0441\u0442\u0440\u043E\u0433\u043E \u0434\u043E\u0441\u0442\u0443\u043F\u0430. \u041F\u043E\u0434\u0440\u043E\u0431\u043D\u0435\u0435 \u0432 \u0440\u0430\u0437\u0434\u0435\u043B\u0435 \u0421\u043D\u0438\u043F\u043F\u0435\u0442\u044B \u0432 \u043F\u0430\u043D\u0435\u043B\u0438 BDS.",
+      "4": "\u0417\u043D\u0430\u0435\u0442\u0435 \u043B\u0438 \u0432\u044B, \u0447\u0442\u043E \u043C\u043E\u0436\u043D\u043E \u0432\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0440\u0435\u0436\u0438\u043C \u043D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u0438\u0445 \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0445 \u043F\u0440\u043E\u043C\u043F\u0442\u043E\u0432, \u0447\u0442\u043E\u0431\u044B \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C \u043D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u044B\u0445 \u043F\u0440\u043E\u043C\u043F\u0442\u043E\u0432 \u043E\u0434\u043D\u043E\u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E \u0441 \u0440\u0430\u0437\u043B\u0438\u0447\u043D\u044B\u043C\u0438 \u0440\u0430\u0441\u043F\u0438\u0441\u0430\u043D\u0438\u044F\u043C\u0438 \u0438 \u0443\u0441\u043B\u043E\u0432\u0438\u044F\u043C\u0438 \u0434\u043B\u044F \u0441\u043E\u0437\u0434\u0430\u043D\u0438\u044F \u0441\u043E\u0431\u0441\u0442\u0432\u0435\u043D\u043D\u043E\u0433\u043E \u0440\u0430\u0431\u043E\u0447\u0435\u0433\u043E \u043F\u0440\u043E\u0446\u0435\u0441\u0441\u0430?",
+      "5": "\u0412\u044B \u043C\u043E\u0436\u0435\u0442\u0435 \u0438\u043C\u043F\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0432\u043E\u0438 \u0432\u043E\u0441\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u044F \u0438\u0437 \u0434\u0440\u0443\u0433\u043E\u0433\u043E \u0418\u0418 \u0432 BDS. \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u00AB\u0418\u043C\u043F\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0432\u043E\u0441\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u044F \u0438\u0437 \u0434\u0440\u0443\u0433\u043E\u0433\u043E \u0418\u0418\u00BB \u0432\u043D\u0438\u0437\u0443 \u0440\u0430\u0437\u0434\u0435\u043B\u0430 \u041F\u0430\u043C\u044F\u0442\u044C.",
+      "6": "\u0417\u043D\u0430\u0435\u0442\u0435 \u043B\u0438 \u0432\u044B, \u0447\u0442\u043E \u0443 Better DeepSeek \u0442\u0430\u043A\u0436\u0435 \u0435\u0441\u0442\u044C <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">Android \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435</a>?",
+      "7": "\u0415\u0441\u043B\u0438 \u0432\u0430\u043C \u043D\u0440\u0430\u0432\u0438\u0442\u0441\u044F \u0440\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u0438\u0435, \u043F\u043E\u0434\u0435\u043B\u0438\u0442\u0435\u0441\u044C \u0438\u043C \u0441 \u0434\u0440\u0443\u0437\u044C\u044F\u043C\u0438! \u0427\u0442\u043E\u0431\u044B \u043F\u0440\u0435\u0434\u043B\u043E\u0436\u0438\u0442\u044C \u0444\u0443\u043D\u043A\u0446\u0438\u044E, \u0441\u043E\u043E\u0431\u0449\u0438\u0442\u0435 \u043D\u0430\u043C \u043D\u0430 \u043D\u0430\u0448\u0435\u0439 <a href=\"https://github.com/EdgeTypE/better-deepseek\" target=\"_blank\" rel=\"noopener noreferrer\">\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435 GitHub</a>.",
+      "8": "\u0417\u043D\u0430\u0435\u0442\u0435 \u043B\u0438 \u0432\u044B, \u0447\u0442\u043E \u043C\u043E\u0436\u043D\u043E \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0430\u0442\u044C MCP \u0441\u0435\u0440\u0432\u0435\u0440\u044B \u043A Better DeepSeek? \u0417\u0430\u0433\u043B\u044F\u043D\u0438\u0442\u0435 \u0432 \u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u043D\u044B\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438.",
+      "9": "\u0412\u044B \u043C\u043E\u0436\u0435\u0442\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0438\u0442\u044C \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441 \u043F\u043E \u0441\u0432\u043E\u0435\u043C\u0443 \u0432\u043A\u0443\u0441\u0443 \u0441 \u043F\u043E\u043C\u043E\u0449\u044C\u044E Custom CSS.",
+      "10": "\u041C\u044B \u0445\u043E\u0442\u0438\u043C \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0431\u043E\u043B\u044C\u0448\u0435 \u044F\u0437\u044B\u043A\u043E\u0432 \u0432 Better DeepSeek. \u0415\u0441\u043B\u0438 \u0432\u044B \u0445\u043E\u0442\u0438\u0442\u0435 \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0441\u0432\u043E\u0439 \u044F\u0437\u044B\u043A, \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0439\u0442\u0435 <a href=\"https://github.com/EdgeTypE/better-deepseek/blob/main/LOCALIZATION.md\" target=\"_blank\" rel=\"noopener noreferrer\">\u0437\u0434\u0435\u0441\u044C</a>. \u0422\u0430\u043A\u0436\u0435, \u0435\u0441\u043B\u0438 \u0432\u044B \u0437\u0430\u043C\u0435\u0442\u0438\u043B\u0438 \u043E\u0448\u0438\u0431\u043A\u0438 \u043F\u0435\u0440\u0435\u0432\u043E\u0434\u0430, \u0432\u044B \u043C\u043E\u0436\u0435\u0442\u0435 \u0438\u0445 \u0438\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C.",
+"11": "Вы можете назначать теги любой сессии чата, нажав на кнопку ... в истории сессий. Затем используйте эти теги для быстрого поиска или фильтрации разговоров.",
+      "12": "Вы можете создавать новые навыки или персонажей, просто попросив DeepSeek. Просто скажите, что вам нужно."
+    }
+  }
+}

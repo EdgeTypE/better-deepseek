@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Better DeepSeek</string>
+    <string name="bds_target_url">https://chat.deepseek.com/</string>
+    <string name="bds_asset_authority">bds-asset.local</string>
+</resources>
