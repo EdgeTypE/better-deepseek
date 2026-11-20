@@ -134,6 +134,8 @@ export class LiveEngine {
 
   async start() {
     this.destroyed = false;
+    this.sttFatal = false;
+    this.recogFails = 0;
     this.speechLang = state.settings.voiceLanguage || navigator.language || "en-US";
     state.liveMode.active = true;
     state.liveMode.status = "listening";
@@ -189,6 +191,8 @@ export class LiveEngine {
       : null;
 
     if (!SpeechRecognition) {
+      state.liveMode.active = false;
+      state.liveMode.status = "idle";
       return { supported: false, error: "SpeechRecognition unsupported" };
     }
 
@@ -212,6 +216,20 @@ export class LiveEngine {
       await this.vadProcessor.start();
     } catch (err) {
       console.warn("[BDS:Live] VAD / Mic initialization failed:", err);
+    }
+
+    // The panel may have been closed while `vadProcessor.start()` was still
+    // awaiting getUserMedia: `stop()` then runs before recognition exists and
+    // marks the engine destroyed. Starting mic + recognition from here would
+    // leak a live session (hot mic, running VAD loop) with no UI and no way
+    // to stop it.
+    if (this.destroyed) {
+      if (this.vadProcessor) {
+        this.vadProcessor.stop();
+        this.vadProcessor = null;
+      }
+      devLog("Live", "Start aborted: panel closed during init");
+      return { supported: false, error: "stopped" };
     }
 
     // 5. Initialize Continuous Speech Recognition
@@ -258,6 +276,9 @@ export class LiveEngine {
       };
 
       this.recognition.onresult = (event) => {
+        // Any successful result is proof the recognition backend works, so
+        // whatever consecutive failures came before it were transient.
+        this.recogFails = 0;
         if (this.isMuted || this.destroyed) return;
 
         let sessionText = "";
@@ -308,22 +329,48 @@ export class LiveEngine {
 
       this.recognition.onerror = (event) => {
         if (this.destroyed) return;
-        if (event.error === "no-speech") return;
-        console.warn("[BDS:Live] SpeechRecognition error:", event.error);
+        const error = event.error;
+        // Fatal categories: no restart can ever succeed here (denied mic
+        // permission, unsupported language).
         if (
-          event.error === "network" ||
-          event.error === "audio-capture" ||
-          event.error === "aborted"
+          error === "not-allowed" ||
+          error === "service-not-allowed" ||
+          error === "language-not-supported"
         ) {
-          clearTimeout(this.restartRecognitionTimer);
-          this.restartRecognitionTimer = setTimeout(() => {
-            this.restartRecognition();
-          }, 300);
+          this.sttFatal = true;
+        }
+        if (error === "no-speech") return;
+        console.warn("[BDS:Live] SpeechRecognition error:", error);
+        if (
+          error === "network" ||
+          error === "audio-capture" ||
+          error === "aborted"
+        ) {
+          // Distinguish transient hiccups (Chrome network blips) from a
+          // browser whose speech backend is permanently unavailable
+          // (Brave and other Chromium forks strip Google's speech-API keys,
+          // so every attempt fails with "network"). Back off first; calling
+          // `stop()` cleanly tears down mic, recognition and UI state.
+          this.recogFails += 1;
+          if (this.recogFails >= 4) {
+            console.warn("[BDS:Live] SpeechRecognition unavailable; giving up after repeated failures");
+            if (state.ui?.showToast) {
+              state.ui.showToast(
+                "Speech recognition is unavailable in this browser (Brave and other Chromium forks block Google's speech engine). Live Voice Mode needs Chrome or Edge."
+              );
+            }
+            this.stop();
+          } else {
+            clearTimeout(this.restartRecognitionTimer);
+            this.restartRecognitionTimer = setTimeout(() => {
+              this.restartRecognition();
+            }, Math.min(5000, 300 * 2 ** this.recogFails));
+          }
         }
       };
 
       this.recognition.onend = () => {
-        if (this.destroyed || !state.liveMode?.active) return;
+        if (this.destroyed || this.sttFatal || !state.liveMode?.active) return;
         clearTimeout(this.restartRecognitionTimer);
         this.restartRecognitionTimer = setTimeout(() => {
           this.restartRecognition();
@@ -337,7 +384,7 @@ export class LiveEngine {
   }
 
   restartRecognition() {
-    if (this.destroyed || !state.liveMode?.active) return;
+    if (this.destroyed || this.sttFatal || !state.liveMode?.active) return;
     try {
       if (this.recognition) {
         this.recognition.onend = null;
@@ -988,7 +1035,23 @@ export class LiveEngine {
     // Shorten punctuation pauses: sentence/clause marks become commas (the engine's
     // shortest pause) instead of long full-stop silences, so clauses still breathe.
     const spokenText = softenPunctuationForSpeech(text);
-    if (!spokenText) return;
+    if (!spokenText) {
+      // Sanitization can reduce a chunk to nothing (pure symbols/dashes/etc.).
+      // The state flags were already set above, so a plain return deadlocks
+      // the queue: no onend ever fires and live mode freezes in "speaking".
+      // Drain the queue or resume listening instead.
+      this.isSpeakingUtterance = false;
+      devLog("Live", "TTS chunk sanitized to empty; skipping");
+      if (this.ttsQueue.length > 0) {
+        this.processTTSQueue();
+      } else if (!this.isWaitingForResponse && this.activeUtterances === 0) {
+        this.stopTtsKeepAlive();
+        if (this.status === "speaking") {
+          this.setStatus("listening");
+        }
+      }
+      return;
+    }
 
     const utterance = new SpeechSynthesisUtterance(spokenText);
     utterance.lang = this.speechLang;
@@ -1057,6 +1120,39 @@ export class LiveEngine {
     } catch {}
 
     window.speechSynthesis.speak(utterance);
+    this.setTtsWatchdog(utterance, spokenText);
+  }
+
+  /**
+   * Recovery for utterances whose `onend`/`onerror` never fire.
+   *
+   * Chrome occasionally never terminates a synthesis request (remote-voice
+   * quirks, background throttling). The playback counters never drain then,
+   * `processTTSQueue` stays blocked and the mode freezes in "speaking"
+   * forever. The watchdog is estimated speech length plus a generous margin.
+   * Cancelling an utterance removes it from the set first, so late ticks are
+   * no-ops.
+   */
+  setTtsWatchdog(utterance, text) {
+    const estimatedMs = Math.max(15000, Math.min(120000, (text || "").length * 120));
+    utterance.__bdsWatchdog = setTimeout(() => {
+      if (!this.activeUtteranceSet.has(utterance)) return;
+      devLog("Live", "TTS watchdog: no onend/onerror fired; recovering");
+      this.activeUtteranceSet.delete(utterance);
+      this.activeUtterances = Math.max(0, this.activeUtterances - 1);
+      this.isSpeakingUtterance = false;
+      this.closeEchoWindowIfSettled();
+      if (this.ttsQueue.length > 0) {
+        this.processTTSQueue();
+      } else if (!this.isWaitingForResponse && this.activeUtterances === 0) {
+        this.stopTtsKeepAlive();
+        if (this.status === "speaking") {
+          this.accumulatedTranscript = "";
+          this.currentTranscript = "";
+          this.setStatus("listening");
+        }
+      }
+    }, estimatedMs);
   }
 
   ensureTtsKeepAlive() {
