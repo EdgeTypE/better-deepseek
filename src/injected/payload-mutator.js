@@ -61,29 +61,38 @@ function stripConfigSyncFromMessages(messages) {
 /**
  * @param {object} payload - The parsed JSON request body
  * @param {object} state - The injected script state
+ * @param {{ preview?: boolean, now?: Date }} [options]
  * @returns {{ changed: boolean, payload: object }}
  */
-export function mutatePayload(payload, state) {
+export function mutatePayload(payload, state, options = {}) {
+  const preview = Boolean(options?.preview);
+  const now = options?.now instanceof Date ? options.now : undefined;
   if (!state.sessionUserMsgCounts) state.sessionUserMsgCounts = {};
 
   const messages = resolveMessageArray(payload);
   const conversationId = resolveConversationId(payload);
 
   let userMsgCount = 1;
+  let isFirstTurn = true;
   if (messages && messages.length > 0) {
     userMsgCount = messages.filter(m => {
       const role = String(m.role || m.author || "").toLowerCase();
       return role === "user" || role === "human";
     }).length;
-    state.sessionUserMsgCounts[conversationId] = userMsgCount;
+    isFirstTurn = userMsgCount <= 1 && messages.length <= 1;
+    if (!preview) state.sessionUserMsgCounts[conversationId] = userMsgCount;
   } else if (typeof payload.prompt === "string") {
     const isFirstMessageEdit = payload.message_id === 1 || payload.parent_message_id == null;
+    isFirstTurn = isFirstMessageEdit;
     if (isFirstMessageEdit) {
       userMsgCount = 1;
+    } else if (state.sessionUserMsgCounts[conversationId] > 0) {
+      userMsgCount = state.sessionUserMsgCounts[conversationId] + 1;
     } else {
-      userMsgCount = (state.sessionUserMsgCounts[conversationId] || 0) + 1;
+      // Estimate prior turns after a page reload so interval schedules remain consistent.
+      userMsgCount = estimatePriorUserTurns(payload) + 1;
     }
-    state.sessionUserMsgCounts[conversationId] = userMsgCount;
+    if (!preview) state.sessionUserMsgCounts[conversationId] = userMsgCount;
   }
 
   let changed = false;
@@ -140,12 +149,15 @@ export function mutatePayload(payload, state) {
         state,
         forceSystemPrompt,
         messages,
-        target
+        target,
+        { preview, now, userMsgCount, isFirstMessage: isFirstTurn }
       );
 
-      window.dispatchEvent(new CustomEvent("bds:mutation-applied", {
-        detail: JSON.stringify({ conversationId, injectedText: prefix || "", userPrompt: cleanText })
-      }));
+      if (!preview) {
+        window.dispatchEvent(new CustomEvent("bds:mutation-applied", {
+          detail: JSON.stringify({ conversationId, injectedText: prefix || "", userPrompt: cleanText })
+        }));
+      }
 
       if (prefix) {
         setMessageText(target, `${prefix}\n\n${cleanText}`);
@@ -176,10 +188,20 @@ export function mutatePayload(payload, state) {
       forceSystemPrompt = isFirstMessageEdit;
     }
 
-    const prefix = buildHiddenPrefix(cleanText, conversationId, state, forceSystemPrompt, null, null);
-    window.dispatchEvent(new CustomEvent("bds:mutation-applied", {
-      detail: JSON.stringify({ conversationId, injectedText: prefix || "", userPrompt: cleanText })
-    }));
+    const prefix = buildHiddenPrefix(
+      cleanText,
+      conversationId,
+      state,
+      forceSystemPrompt,
+      null,
+      null,
+      { preview, now, userMsgCount, isFirstMessage: isFirstTurn }
+    );
+    if (!preview) {
+      window.dispatchEvent(new CustomEvent("bds:mutation-applied", {
+        detail: JSON.stringify({ conversationId, injectedText: prefix || "", userPrompt: cleanText })
+      }));
+    }
 
     if (prefix) {
       payload.prompt = `${prefix}\n\n${cleanText}`;
@@ -232,22 +254,30 @@ export function mutatePayload(payload, state) {
     const lastUserMsg = findLastUserMessage(messages);
     if (lastUserMsg) {
       const text = extractMessageText(lastUserMsg);
-      console.warn(`[BDS] Guard check: model="${model}" payload.model=${payload.model} source=${modelSource} type=${modelType} limit=${limit} msgLen=${text.length} limits=${JSON.stringify(limits)}`);
+      if (!preview) {
+        console.warn(`[BDS] Guard check: model="${model}" payload.model=${payload.model} source=${modelSource} type=${modelType} limit=${limit} msgLen=${text.length} limits=${JSON.stringify(limits)}`);
+      }
       if (text.length > limit) {
         const suffix = "\n\n...[truncated by Better DeepSeek]...";
         const truncated = text.slice(0, limit - suffix.length) + suffix;
         setMessageText(lastUserMsg, truncated);
         changed = true;
-        console.warn(`[BDS] TRUNCATED user message from ${text.length} to ${limit} chars`);
+        if (!preview) {
+          console.warn(`[BDS] TRUNCATED user message from ${text.length} to ${limit} chars`);
+        }
       }
     }
   } else if (typeof payload.prompt === 'string') {
-    console.warn(`[BDS] Guard check (prompt): model="${model}" payload.model=${payload.model} source=${modelSource} type=${modelType} limit=${limit} msgLen=${payload.prompt.length} limits=${JSON.stringify(limits)}`);
+    if (!preview) {
+      console.warn(`[BDS] Guard check (prompt): model="${model}" payload.model=${payload.model} source=${modelSource} type=${modelType} limit=${limit} msgLen=${payload.prompt.length} limits=${JSON.stringify(limits)}`);
+    }
     if (payload.prompt.length > limit) {
       const suffix = "\n\n...[truncated by Better DeepSeek]...";
       payload.prompt = payload.prompt.slice(0, limit - suffix.length) + suffix;
       changed = true;
-      console.warn(`[BDS] TRUNCATED prompt from ${payload.prompt.length} to ${limit} chars`);
+      if (!preview) {
+        console.warn(`[BDS] TRUNCATED prompt from ${payload.prompt.length} to ${limit} chars`);
+      }
     }
   }
 
@@ -391,8 +421,11 @@ export function buildHiddenPrefix(
   state,
   forceSystemPrompt = false,
   messages = null,
-  excludeTarget = null
+  excludeTarget = null,
+  options = {}
 ) {
+  const preview = Boolean(options?.preview);
+  const now = options?.now instanceof Date ? options.now : undefined;
   const blocks = [];
 
   if (state.config?.isLiveMode) {
@@ -402,7 +435,8 @@ export function buildHiddenPrefix(
   const deepResearchBlock = buildDeepResearchPlanningBlock(
     userPrompt,
     conversationId,
-    state
+    state,
+    preview
   );
   if (deepResearchBlock) {
     blocks.push(deepResearchBlock);
@@ -416,12 +450,14 @@ export function buildHiddenPrefix(
   const harnessReportBlock = buildHarnessReportBlock(state);
   if (harnessReportBlock) {
     blocks.push(harnessReportBlock);
-    // Clear pending report once consumed
-    if (state.config?.deepCode) {
-      state.config.deepCode.pendingReport = null;
-    }
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("bds:clear-harness-report"));
+    if (!preview) {
+      // Clear pending report once consumed
+      if (state.config?.deepCode) {
+        state.config.deepCode.pendingReport = null;
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("bds:clear-harness-report"));
+      }
     }
   }
 
@@ -429,12 +465,17 @@ export function buildHiddenPrefix(
   if (!state.config?.isLiveMode) {
     const entries = state.config.systemPromptEntries || [];
     if (entries.length > 0) {
-      const userMsgCount = state.sessionUserMsgCounts[conversationId] || 1;
+      const userMsgCount =
+        options?.userMsgCount ?? state.sessionUserMsgCounts[conversationId] ?? 1;
+      const isFirstMessage =
+        typeof options?.isFirstMessage === "boolean"
+          ? options.isFirstMessage
+          : userMsgCount <= 1;
       for (const entry of entries) {
         if (!entry.content.trim()) continue;
-        if (evaluateEntrySchedule(entry, userMsgCount, conversationId, state)) {
+        if (evaluateEntrySchedule(entry, userMsgCount, conversationId, state, isFirstMessage)) {
           blocks.push(`<BetterDeepSeek>\n${entry.content.trim()}\n</BetterDeepSeek>`);
-          if (state.markEntryInjected) {
+          if (!preview && state.markEntryInjected) {
             state.markEntryInjected(conversationId, entry.id);
           }
         }
@@ -449,7 +490,7 @@ export function buildHiddenPrefix(
         blocks.push(
           `<BetterDeepSeek>\n${state.config.systemPrompt.trim()}\n</BetterDeepSeek>`
         );
-        if (state.markInjected) {
+        if (!preview && state.markInjected) {
           state.markInjected(conversationId);
         }
       }
@@ -502,17 +543,19 @@ export function buildHiddenPrefix(
       const characterBlock = buildCharacterBlock(state);
       if (characterBlock) {
         blocks.push(characterBlock);
-        if (state.setLastChar) {
-          state.setLastChar(conversationId, activeChar.name);
+        if (!preview) {
+          if (state.setLastChar) {
+            state.setLastChar(conversationId, activeChar.name);
+          }
+          state.currentSessionChar = activeChar.name;
         }
-        state.currentSessionChar = activeChar.name;
       }
     }
   }
 
   if (state.isNextVoiceMessage) {
     blocks.push(`<BetterDeepSeek>User send this message using voice recorder tool.</BetterDeepSeek>`);
-    state.isNextVoiceMessage = false;
+    if (!preview) state.isNextVoiceMessage = false;
   }
 
   // Excerpt the user picked from an earlier answer. Consumed here so it can
@@ -521,8 +564,10 @@ export function buildHiddenPrefix(
   const quoteBlock = buildQuoteContextBlock(state.pendingQuoteContext);
   if (quoteBlock) {
     blocks.push(quoteBlock);
-    state.pendingQuoteContext = null;
-    notifyQuoteContextConsumed();
+    if (!preview) {
+      state.pendingQuoteContext = null;
+      notifyQuoteContextConsumed();
+    }
   }
 
   // Inject project context if first turn OR if project changed
@@ -554,7 +599,7 @@ export function buildHiddenPrefix(
   }
 
   if (forceSystemPrompt) {
-    const userDataBlock = buildUserDataBlock(state);
+    const userDataBlock = buildUserDataBlock(state, now);
     if (userDataBlock) {
       blocks.push(userDataBlock);
     }
@@ -581,8 +626,10 @@ export function buildHiddenPrefix(
   if (configSyncBlock) {
     blocks.push(CONFIG_SYNC_NOTE);
     blocks.push(configSyncBlock);
-    state.pendingConfigSync = null;
-    notifyConfigSyncConsumed();
+    if (!preview) {
+      state.pendingConfigSync = null;
+      notifyConfigSyncConsumed();
+    }
   }
 
   return blocks.join("\n\n");
@@ -610,14 +657,16 @@ function notifyQuoteContextConsumed() {
   window.dispatchEvent(new CustomEvent(BRIDGE_EVENTS.quoteContextConsumed));
 }
 
-function buildDeepResearchPlanningBlock(userPrompt, conversationId, state) {
+function buildDeepResearchPlanningBlock(userPrompt, conversationId, state, preview = false) {
   const config = state.config?.deepResearch;
   if (!config?.enabled || !config.runId) {
     return "";
   }
 
-  config.enabled = false;
-  emitDeepResearchStarted(config.runId, conversationId, userPrompt);
+  if (!preview) {
+    config.enabled = false;
+    emitDeepResearchStarted(config.runId, conversationId, userPrompt);
+  }
 
   return [
     `<BetterDeepSeek>`,
@@ -870,11 +919,10 @@ export function buildCharacterBlock(state) {
 /**
  * Build the user-specific data block (time, language preference, etc).
  */
-export function buildUserDataBlock(state) {
+export function buildUserDataBlock(state, now = new Date()) {
   const blocks = [];
 
   if (state.config.injectSystemDateTime !== false) {
-    const now = new Date();
     blocks.push(`User's System Date & Time: ${now.toLocaleString()}`);
   }
 
@@ -964,21 +1012,57 @@ export function buildMcpBlock(state, fingerprint) {
 }
 
 /**
- * Evaluate whether a specific system prompt entry should be injected
- * based on its schedule and injection history.
+ * Count completed assistant replies currently rendered in the chat DOM.
+ *
+ * @param {Document|null|undefined} doc
+ * @returns {number}
  */
-export function evaluateEntrySchedule(entry, userMsgCount, conversationId, state) {
+export function countCompletedAssistantTurns(doc = typeof document !== "undefined" ? document : null) {
+  if (!doc || !doc.querySelectorAll) return 0;
+  let count = 0;
+  for (const node of doc.querySelectorAll("div.ds-message")) {
+    if (node.closest?.("#bds-root")) continue;
+    const md = node.querySelector?.(".ds-markdown, [class*='ds-markdown']");
+    if (md && String(md.textContent || "").trim().length > 0) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function estimatePriorUserTurns(payload, doc = typeof document !== "undefined" ? document : null) {
+  const domTurns = countCompletedAssistantTurns(doc);
+  if (domTurns > 0) return domTurns;
+
+  const parentId = Number(payload?.parent_message_id);
+  if (Number.isFinite(parentId) && parentId > 0) {
+    return Math.max(1, Math.ceil(parentId / 2));
+  }
+  return 1;
+}
+
+/**
+ * Evaluate whether a specific system prompt entry should be injected
+ * based on its schedule, turn position, and injection history.
+ */
+export function evaluateEntrySchedule(
+  entry,
+  userMsgCount,
+  conversationId,
+  state,
+  isFirstMessage = userMsgCount <= 1
+) {
   const injectedIds = state.getInjectedEntries ? state.getInjectedEntries(conversationId) : [];
   const alreadyInjected = injectedIds.includes(entry.id);
 
   switch (entry.schedule.type) {
     case "first":
-      return !alreadyInjected;
+      return isFirstMessage && !alreadyInjected;
     case "always":
       return true;
     case "interval": {
       const interval = entry.schedule.everyNTurns || 3;
-      if (!alreadyInjected) return true;
+      if (isFirstMessage && !alreadyInjected) return true;
       return (userMsgCount - 1) % interval === 0;
     }
     default:

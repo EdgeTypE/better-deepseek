@@ -1,5 +1,10 @@
 import { mutatePayload } from "./payload-mutator.js";
 import {
+  consumePreparedTimestamp,
+  recordActualPromptLength,
+  rewriteGatorBatchBody,
+} from "./telemetry-sync.js";
+import {
   emitAssistantMessageId,
   findMessageIdInSse,
   isReplyStreamUrl,
@@ -22,113 +27,142 @@ export function patchXmlHttpRequest(
   const originalOpen = XMLHttpRequest.prototype.open;
   const originalSend = XMLHttpRequest.prototype.send;
   const originalSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
+  const xhrMetaMap = new WeakMap();
 
-  XMLHttpRequest.prototype.open = function patchedOpen(method, url) {
-    this.__bdsRequestMeta = {
-      method: String(method || "GET").toUpperCase(),
-      url: String(url || ""),
-    };
-    return originalOpen.apply(this, arguments);
-  };
-
-  XMLHttpRequest.prototype.setRequestHeader = function patchedSetRequestHeader(header, value) {
-    if (header && String(header).toLowerCase() === "authorization" && typeof state?.setAuthToken === "function") {
-      state.setAuthToken(String(value || ""));
-    }
-    return originalSetRequestHeader.apply(this, arguments);
-  };
-
-  XMLHttpRequest.prototype.send = function patchedSend(body) {
-    try {
-      const meta = this.__bdsRequestMeta || {};
-      if (!isChatCompletionUrl(meta.url)) {
-        return originalSend.call(this, body);
-      }
-
-      if (meta.url.includes("/api/v0/chat_session/fetch_page")) {
-        this.addEventListener("load", () => {
-          try {
-            const data = JSON.parse(this.responseText);
-            window.dispatchEvent(new CustomEvent("bds:session-data", { detail: JSON.stringify(data) }));
-          } catch (e) {}
+  XMLHttpRequest.prototype.open = new Proxy(originalOpen, {
+    apply(target, thisArg, argArray) {
+      const [method, url] = argArray;
+      if (thisArg && typeof thisArg === "object") {
+        xhrMetaMap.set(thisArg, {
+          method: String(method || "GET").toUpperCase(),
+          url: String(url || ""),
         });
-        return originalSend.call(this, body);
       }
+      return Reflect.apply(target, thisArg, argArray);
+    },
+  });
 
-      if (meta.url.includes("/api/v0/chat/history_messages")) {
-        this.addEventListener("load", () => {
-          try {
-            const data = JSON.parse(this.responseText);
-            window.dispatchEvent(new CustomEvent("bds:history-msgs", { detail: JSON.stringify(data) }));
-          } catch (e) {}
-        });
-        return originalSend.call(this, body);
-      }
-
-      markStart(meta.url);
-      let requestFinalized = false;
-      const finalizeRequest = () => {
-        if (requestFinalized) {
-          return;
+  XMLHttpRequest.prototype.setRequestHeader = new Proxy(originalSetRequestHeader, {
+    apply(target, thisArg, argArray) {
+      const [header, value] = argArray;
+      if (header) {
+        const lower = String(header).toLowerCase();
+        if (lower === "authorization" && typeof state?.setAuthToken === "function") {
+          state.setAuthToken(String(value || ""));
+        } else if (typeof state?.captureClientHeader === "function") {
+          state.captureClientHeader(lower, value);
         }
-        requestFinalized = true;
-
-        // Detect server errors or network failure
-        if (this.status >= 500 || this.status === 0) {
-          window.dispatchEvent(new CustomEvent("bds:network-error", {
-            detail: JSON.stringify({
-              url: meta.url,
-              status: this.status,
-              type: 'xhr'
-            })
-          }));
-        }
-
-        markEnd(meta.url);
-      };
-
-      this.addEventListener("loadend", finalizeRequest, { once: true });
-
-      const bodyText = getXhrBodyText(body);
-      if (!bodyText) {
-        return originalSend.call(this, body);
       }
+      return Reflect.apply(target, thisArg, argArray);
+    },
+  });
 
-      const payload = JSON.parse(bodyText);
-      const requestModelName = payload.model || null;
-
-      const mutation = mutatePayload(payload, state);
-      if (!mutation.changed) {
-        return originalSend.call(this, body);
-      }
-
-      const nextBody = JSON.stringify(mutation.payload);
-
-      const xhrRef = this;
-      // Intercept response for token usage
-      this.addEventListener("load", () => {
-        try {
-          const responseText = xhrRef.responseText;
-          if (responseText) {
-            extractXhrUsageContent(responseText, xhrRef, requestModelName, meta.url);
-          }
-        } catch (e) {}
-      }, { once: true });
-
-      return originalSend.call(this, nextBody);
-    } catch (error) {
-      const meta = this.__bdsRequestMeta || {};
-      console.warn("[BetterDeepSeek] XHR patch failed:", error);
+  XMLHttpRequest.prototype.send = new Proxy(originalSend, {
+    apply(target, thisArg, argArray) {
+      const [body] = argArray;
+      const meta = (thisArg && xhrMetaMap.get(thisArg)) || {};
       try {
-        return originalSend.call(this, body);
-      } catch (sendError) {
-        if (isChatCompletionUrl(meta.url)) {
-          markEnd(meta.url);
+        if (meta.url.includes("gator.volces.com") && typeof body === "string") {
+          const rewritten = rewriteGatorBatchBody(body, state);
+          if (rewritten !== body) {
+            return Reflect.apply(target, thisArg, [rewritten]);
+          }
+          return Reflect.apply(target, thisArg, argArray);
         }
-        throw sendError;
+
+        if (!isChatCompletionUrl(meta.url)) {
+          return Reflect.apply(target, thisArg, argArray);
+        }
+
+        if (meta.url.includes("/api/v0/chat_session/fetch_page")) {
+          thisArg.addEventListener("load", () => {
+            try {
+              const data = JSON.parse(thisArg.responseText);
+              window.dispatchEvent(new CustomEvent("bds:session-data", { detail: JSON.stringify(data) }));
+            } catch (e) {}
+          });
+          return Reflect.apply(target, thisArg, argArray);
+        }
+
+        if (meta.url.includes("/api/v0/chat/history_messages")) {
+          thisArg.addEventListener("load", () => {
+            try {
+              const data = JSON.parse(thisArg.responseText);
+              window.dispatchEvent(new CustomEvent("bds:history-msgs", { detail: JSON.stringify(data) }));
+            } catch (e) {}
+          });
+          return Reflect.apply(target, thisArg, argArray);
+        }
+
+        markStart(meta.url);
+        let requestFinalized = false;
+        const finalizeRequest = () => {
+          if (requestFinalized) {
+            return;
+          }
+          requestFinalized = true;
+
+          // Detect server errors or network failure
+          if (thisArg.status >= 500 || thisArg.status === 0) {
+            window.dispatchEvent(new CustomEvent("bds:network-error", {
+              detail: JSON.stringify({
+                url: meta.url,
+                status: thisArg.status,
+                type: 'xhr'
+              })
+            }));
+          }
+
+          markEnd(meta.url);
+        };
+
+        thisArg.addEventListener("loadend", finalizeRequest, { once: true });
+
+        const bodyText = getXhrBodyText(body);
+        if (!bodyText) {
+          return Reflect.apply(target, thisArg, argArray);
+        }
+
+        const payload = JSON.parse(bodyText);
+        const requestModelName = payload.model || null;
+        const rawPromptLen = typeof payload.prompt === "string" ? payload.prompt.length : null;
+        const stagedNow = consumePreparedTimestamp(payload, state);
+
+        const mutation = mutatePayload(payload, state, stagedNow ? { now: stagedNow } : {});
+        if (!mutation.changed) {
+          return Reflect.apply(target, thisArg, argArray);
+        }
+
+        if (typeof rawPromptLen === "number" && typeof mutation.payload?.prompt === "string") {
+          recordActualPromptLength(state, mutation.payload, rawPromptLen, mutation.payload.prompt.length);
+        }
+
+        const nextBody = JSON.stringify(mutation.payload);
+
+        // Intercept response for token usage
+        thisArg.addEventListener("load", () => {
+          try {
+            const responseText = thisArg.responseText;
+            if (responseText) {
+              extractXhrUsageContent(responseText, thisArg, requestModelName, meta.url);
+            }
+          } catch (e) {}
+        }, { once: true });
+
+        return Reflect.apply(target, thisArg, [nextBody]);
+      } catch (error) {
+        console.warn("[BetterDeepSeek] XHR patch failed:", error);
+        try {
+          return Reflect.apply(target, thisArg, argArray);
+        } catch (sendError) {
+          if (isChatCompletionUrl(meta.url)) {
+            markEnd(meta.url);
+          }
+          throw sendError;
+        }
       }
-    }
-  };
+    },
+  });
 }
 
 /**

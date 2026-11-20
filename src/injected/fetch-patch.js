@@ -1,4 +1,5 @@
 import { mutatePayload } from "./payload-mutator.js";
+import { captureMetadataFromHeaders } from "./client-headers.js";
 import {
   emitAssistantMessageId,
   findMessageId,
@@ -17,89 +18,92 @@ import {
 export function patchFetch(state, isChatCompletionUrl, markStart, markEnd) {
   const originalFetch = window.fetch;
 
-  window.fetch = async function patchedFetch(input, init) {
-    try {
-      const url = extractUrl(input);
-      if (!isChatCompletionUrl(url)) {
-        return originalFetch.apply(this, arguments);
-      }
-
-      // Capture auth token from any intercepted request for later use
-      captureAuthToken(input, init, state);
-
-      // If it's a session fetch, we don't mutate request, we capture response
-      if (url.includes("/api/v0/chat_session/fetch_page")) {
-        const response = await originalFetch.apply(this, arguments);
-        const cloned = response.clone();
-        cloned.json().then(data => {
-          window.dispatchEvent(new CustomEvent("bds:session-data", { detail: JSON.stringify(data) }));
-        }).catch(() => {});
-        return response;
-      }
-
-      // If it's a history messages fetch, capture response and dispatch
-      if (url.includes("/api/v0/chat/history_messages")) {
-        const response = await originalFetch.apply(this, arguments);
-        const cloned = response.clone();
-        cloned.json().then(data => {
-          window.dispatchEvent(new CustomEvent("bds:history-msgs", { detail: JSON.stringify(data) }));
-        }).catch(() => {});
-        return response;
-      }
-
-      markStart(url);
-
+  window.fetch = new Proxy(originalFetch, {
+    async apply(target, thisArg, argArray) {
+      const boundThis = thisArg === undefined || thisArg === null ? window : thisArg;
+      const [input, init] = argArray;
       try {
-        const requestInfo = await buildMutatedFetchRequest(
-          input,
-          init,
-          state
-        );
+        const url = extractUrl(input);
+        if (url.includes("/api/")) {
+          captureRequestMetadata(input, init, state);
+        }
+        if (!isChatCompletionUrl(url)) {
+          return Reflect.apply(target, boundThis, argArray);
+        }
 
-        if (!requestInfo) {
-          const response = await originalFetch.apply(this, arguments);
-          tryCaptureTokenUsage(response, url, requestInfo?.modelName);
+        // If it's a session fetch, we don't mutate request, we capture response
+        if (url.includes("/api/v0/chat_session/fetch_page")) {
+          const response = await Reflect.apply(target, boundThis, argArray);
+          const cloned = response.clone();
+          cloned.json().then(data => {
+            window.dispatchEvent(new CustomEvent("bds:session-data", { detail: JSON.stringify(data) }));
+          }).catch(() => {});
           return response;
         }
 
-        const response = await originalFetch.call(
-          this,
-          requestInfo.input,
-          requestInfo.init
-        );
+        // If it's a history messages fetch, capture response and dispatch
+        if (url.includes("/api/v0/chat/history_messages")) {
+          const response = await Reflect.apply(target, boundThis, argArray);
+          const cloned = response.clone();
+          cloned.json().then(data => {
+            window.dispatchEvent(new CustomEvent("bds:history-msgs", { detail: JSON.stringify(data) }));
+          }).catch(() => {});
+          return response;
+        }
 
-        // Detect server errors
-        if (response && response.status >= 500) {
+        markStart(url);
+
+        try {
+          const requestInfo = await buildMutatedFetchRequest(
+            input,
+            init,
+            state
+          );
+
+          if (!requestInfo) {
+            const response = await Reflect.apply(target, boundThis, argArray);
+            tryCaptureTokenUsage(response, url, requestInfo?.modelName);
+            return response;
+          }
+
+          const response = await Reflect.apply(target, boundThis, [
+            requestInfo.input,
+            requestInfo.init,
+          ]);
+
+          // Detect server errors
+          if (response && response.status >= 500) {
+            window.dispatchEvent(new CustomEvent("bds:network-error", {
+              detail: JSON.stringify({
+                url,
+                status: response.status,
+                type: 'fetch'
+              })
+            }));
+          }
+
+          tryCaptureTokenUsage(response, url, requestInfo.modelName);
+          return response;
+        } catch (innerError) {
+          // Detect network failures
           window.dispatchEvent(new CustomEvent("bds:network-error", {
             detail: JSON.stringify({
               url,
-              status: response.status,
-              type: 'fetch'
+              status: 0,
+              type: 'fetch',
+              error: String(innerError)
             })
           }));
+          throw innerError;
+        } finally {
+          markEnd(url);
         }
-
-        tryCaptureTokenUsage(response, url, requestInfo.modelName);
-        return response;
-      } catch (innerError) {
-        // Detect network failures
-        window.dispatchEvent(new CustomEvent("bds:network-error", {
-          detail: JSON.stringify({
-            url,
-            status: 0,
-            type: 'fetch',
-            error: String(innerError)
-          })
-        }));
-        throw innerError;
-      } finally {
-        markEnd(url);
+      } catch (error) {
+        console.warn("[BetterDeepSeek] Request patch failed:", error);
+        return Reflect.apply(target, boundThis, argArray);
       }
-    } catch (error) {
-      console.warn("[BetterDeepSeek] Request patch failed:", error);
-      return originalFetch.apply(this, arguments);
-    }
-  };
+    },
+  });
 }
 
 /**
@@ -320,28 +324,15 @@ async function extractBodyText(input, init) {
 }
 
 /**
- * Extract and store the Authorization Bearer token from a fetch request.
+ * Extract and store Authorization and DeepSeek client/device headers from a fetch request.
  */
-function captureAuthToken(input, init, state) {
+function captureRequestMetadata(input, init, state) {
   try {
-    let authHeader;
+    if (input instanceof Request) {
+      captureMetadataFromHeaders(input.headers, state);
+    }
     if (init && init.headers) {
-      const h = init.headers;
-      if (h instanceof Headers) {
-        authHeader = h.get("authorization");
-      } else if (Array.isArray(h)) {
-        for (const [k, v] of h) {
-          if (k.toLowerCase() === "authorization") { authHeader = v; break; }
-        }
-      } else if (typeof h === "object") {
-        authHeader = h["Authorization"] || h["authorization"];
-      }
-    }
-    if (!authHeader && input instanceof Request) {
-      authHeader = input.headers.get("authorization");
-    }
-    if (authHeader && typeof state?.setAuthToken === "function") {
-      state.setAuthToken(authHeader);
+      captureMetadataFromHeaders(init.headers, state);
     }
   } catch (e) { /* ignore */ }
 }

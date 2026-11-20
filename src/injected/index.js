@@ -10,6 +10,16 @@
 import { normalizeConfig, normalizeDeepResearch } from "./config.js";
 import { patchFetch } from "./fetch-patch.js";
 import { patchXmlHttpRequest } from "./xhr-patch.js";
+import {
+  buildDeepSeekApiHeaders,
+  captureClientHeader,
+  normalizeBearerToken,
+} from "./client-headers.js";
+import {
+  installInputTracker,
+  patchSendBeacon,
+  patchTelemetryStringify,
+} from "./telemetry-sync.js";
 
 (function () {
   "use strict";
@@ -86,18 +96,19 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
           if (val.trim().startsWith("{")) {
             try {
               const parsed = JSON.parse(val);
-              const token = parsed.token || parsed.accessToken || parsed.access_token || parsed.user_token || parsed.user?.token;
-              if (token && typeof token === "string") return token;
+              const rawToken =
+                parsed.token ||
+                parsed.accessToken ||
+                parsed.access_token ||
+                parsed.user_token ||
+                parsed.user?.token ||
+                (key === "userToken" ? parsed.value : null);
+              const normalized = normalizeBearerToken(rawToken);
+              if (normalized) return normalized;
             } catch {}
           } else if (typeof val === "string" && val.length > 20) {
-            let tokenStr = val;
-            if (tokenStr.startsWith("Bearer ")) {
-              tokenStr = tokenStr.substring(7);
-            }
-            if (tokenStr.startsWith('"') && tokenStr.endsWith('"')) {
-              tokenStr = tokenStr.slice(1, -1);
-            }
-            return tokenStr;
+            const normalized = normalizeBearerToken(val);
+            if (normalized) return normalized;
           }
         }
       }
@@ -144,12 +155,19 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
      * @type {string|null}
      */
     pendingConfigSync: null,
-    /** @type {string|null} Bearer token captured from API requests */
+    /** @type {string|null} Bearer token captured from API requests (raw, without "Bearer ") */
     authToken: findAuthTokenInStorage(),
-    /** @type {function(string): void} Store the Authorization header value */
+    /** @type {Record<string, string>} Client/device headers mirrored from DeepSeek's own requests */
+    clientHeaders: {},
+    /** @type {function(string, unknown): void} */
+    captureClientHeader: function(name, value) {
+      captureClientHeader(name, value, this.clientHeaders);
+    },
+    /** @type {function(string): void} Store the raw Authorization token */
     setAuthToken: function(token) {
-      if (token && token !== this.authToken) {
-        this.authToken = token;
+      const normalized = normalizeBearerToken(token);
+      if (normalized && normalized !== this.authToken) {
+        this.authToken = normalized;
       }
     },
   };
@@ -268,10 +286,11 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
     if (!sessionId) return;
 
     const url = `${HISTORY_MSGS_URL}?chat_session_id=${encodeURIComponent(sessionId)}`;
-    const headers = { "Content-Type": "application/json" };
-    if (state.authToken) {
-      headers["Authorization"] = `Bearer ${state.authToken}`;
-    }
+    const headers = buildDeepSeekApiHeaders({
+      authToken: state.authToken,
+      capturedHeaders: state.clientHeaders,
+      includeContentType: false,
+    });
 
     try {
       const response = await _originalFetch(url, { method: "GET", headers, credentials: "include" });
@@ -306,10 +325,11 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
     const id = detail?.id;
     if (!id) return;
 
-    const headers = { "Content-Type": "application/json" };
-    if (state.authToken) {
-      headers["Authorization"] = `Bearer ${state.authToken}`;
-    }
+    const headers = buildDeepSeekApiHeaders({
+      authToken: state.authToken,
+      capturedHeaders: state.clientHeaders,
+      includeContentType: true,
+    });
 
     let result = { ok: false, error: "request failed" };
     try {
@@ -344,6 +364,9 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
   const _originalFetch = window.fetch.bind(window);
 
   // ── Patch network APIs ──
+  installInputTracker(state);
+  patchTelemetryStringify(state);
+  patchSendBeacon(state);
   patchFetch(state, isChatCompletionUrl, markCompletionRequestStart, markCompletionRequestEnd);
   patchXmlHttpRequest(state, isChatCompletionUrl, markCompletionRequestStart, markCompletionRequestEnd);
 

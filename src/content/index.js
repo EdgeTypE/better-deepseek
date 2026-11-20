@@ -281,7 +281,12 @@ async function init() {
       stopVoicePlayback();
     }
 
-    if ((state.settings.loadAllHistoryOnSession || state.settings.showTimestamps) && location.href.includes("/chat/s/")) {
+    // Wait until an active completion finishes before loading history on session transition.
+    if (
+      (state.settings.loadAllHistoryOnSession || state.settings.showTimestamps) &&
+      location.href.includes("/chat/s/") &&
+      state.network.activeCompletionRequests === 0
+    ) {
       loadAllHistory();
     }
 
