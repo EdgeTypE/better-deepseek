@@ -53,4 +53,21 @@ describe("fetch and XHR patch behavior", () => {
     expect(state.captureClientHeader).toHaveBeenCalledWith("x-client-version", "2.8.0");
     expect(baseSend).toHaveBeenCalledTimes(1);
   });
+
+  it("passes non-chat fetch calls through synchronously without wrapping the Promise", () => {
+    const nativePromise = Promise.resolve(new Response("{}"));
+    const baseFetch = vi.fn(() => nativePromise);
+    window.fetch = baseFetch;
+
+    const state = {
+      config: { systemPrompt: "", systemPromptEntries: [], skills: [], memories: [] },
+      setAuthToken: vi.fn(),
+      captureClientHeader: vi.fn(),
+    };
+
+    patchFetch(state, (u) => u.includes("/api/v0/chat/completion"), vi.fn(), vi.fn());
+
+    const result = window.fetch("https://chat.deepseek.com/api/v0/telemetry", { method: "POST" });
+    expect(result).toBe(nativePromise);
+  });
 });

@@ -176,7 +176,12 @@ import {
   if (window.__bdsNetworkPatched) {
     return;
   }
-  window.__bdsNetworkPatched = true;
+  Object.defineProperty(window, "__bdsNetworkPatched", {
+    value: true,
+    enumerable: false,
+    configurable: true,
+    writable: true,
+  });
 
   // ── Debug API: inspect/override remote config from DevTools ──
   (function() {
@@ -204,16 +209,21 @@ import {
       };
     }
 
-    window.__BDS_CONFIG__ = {
-      raw: call("getRaw"),
-      getFlag: call("getFlag"),
-      getConfig: call("getConfig"),
-      applyRemote: call("applyRemote"),
-      replaceRemote: call("replaceRemote"),
-      resetToBuiltin: call("resetToBuiltin"),
-      detectModel: call("detectModel"),
-      toggleDebugPanel: call("toggleDebugPanel"),
-    };
+    Object.defineProperty(window, "__BDS_CONFIG__", {
+      value: {
+        raw: call("getRaw"),
+        getFlag: call("getFlag"),
+        getConfig: call("getConfig"),
+        applyRemote: call("applyRemote"),
+        replaceRemote: call("replaceRemote"),
+        resetToBuiltin: call("resetToBuiltin"),
+        detectModel: call("detectModel"),
+        toggleDebugPanel: call("toggleDebugPanel"),
+      },
+      enumerable: false,
+      configurable: true,
+      writable: true,
+    });
   })();
 
   // ── Listen for config updates from the content script ──
@@ -285,7 +295,7 @@ import {
     const sessionId = detail?.sessionId;
     if (!sessionId) return;
 
-    const url = `${HISTORY_MSGS_URL}?chat_session_id=${encodeURIComponent(sessionId)}`;
+    const url = `${HISTORY_MSGS_URL}?chat_session_id=${encodeURIComponent(sessionId)}&cache_version=6&cache_reset_at=1`;
     const headers = buildDeepSeekApiHeaders({
       authToken: state.authToken,
       capturedHeaders: state.clientHeaders,

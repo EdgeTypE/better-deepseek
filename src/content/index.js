@@ -36,7 +36,7 @@ import { i18n } from "../lib/i18n.svelte.js";
 import { remoteConfig, REMOTE_CONFIG_EVENT, detectModelType } from "../lib/remote-config.svelte.js";
 import { refreshRemoteConfigIfDue, DEFAULT_FETCH_INTERVAL_MS } from "../lib/remote-config-refresh.js";
 import { STORAGE_KEYS, CSS_PRESETS, EMBEDDED_PRICING } from "../lib/constants.js";
-import { loadAllHistory, retainOnlyHistorySession } from "./load-all-history.js";
+import { retainOnlyHistorySession } from "./load-all-history.js";
 import { stopVoicePlayback } from "./message-processor.svelte.js";
 // keep-awake only depends on message-processor, so importing it here leaves the
 // module evaluation order of everything above untouched.
@@ -257,12 +257,6 @@ async function init() {
     }
   }).catch(() => {});
 
-  // Auto-trigger loadAllHistory when navigating to a session page
-  if ((state.settings.loadAllHistoryOnSession || state.settings.showTimestamps) && location.href.includes("/chat/s/")) {
-    // Delay slightly so the DOM has a chance to render the first batch of messages
-    setTimeout(() => loadAllHistory(), 500);
-  }
-
   // The conversation the current read-aloud belongs to. Comparing session ids
   // (rather than the raw href) keeps a query-string change from cutting a read
   // short while still catching every real switch between chats.
@@ -279,15 +273,6 @@ async function init() {
     if (newId !== voiceSessionId) {
       voiceSessionId = newId;
       stopVoicePlayback();
-    }
-
-    // Wait until an active completion finishes before loading history on session transition.
-    if (
-      (state.settings.loadAllHistoryOnSession || state.settings.showTimestamps) &&
-      location.href.includes("/chat/s/") &&
-      state.network.activeCompletionRequests === 0
-    ) {
-      loadAllHistory();
     }
 
     if (!newId && state.settings.resetSkillsOnNewChat && Array.isArray(state.skills)) {

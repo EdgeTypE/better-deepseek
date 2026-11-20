@@ -228,7 +228,6 @@
   let tokenPriceDisplay = $state(Boolean(appState.settings.tokenPriceDisplay));
   let showTimestamps = $state(Boolean(appState.settings.showTimestamps));
   let keepReasoningBlocksOpen = $state(appState.settings.keepReasoningBlocksOpen ?? true);
-  let loadAllHistoryOnSession = $state(Boolean(appState.settings.loadAllHistoryOnSession));
   let projectRagEnabled = $state(Boolean(appState.settings.projectRagEnabled));
   let projectRagLimit = $state(Number(appState.settings.projectRagLimit) || 5);
   let processGitignoreOnUpload = $state(Boolean(appState.settings.processGitignoreOnUpload));
@@ -489,7 +488,7 @@
       searchProviders: enabledSearchProviderIds(),
       mcpInlineMaxChars,
       locale, syncLocale, keepReasoningBlocksOpen,
-      loadAllHistoryOnSession, customCSS, disableTipBox, contextMenuEnabled,
+      customCSS, disableTipBox, contextMenuEnabled,
       composerVisibility: normalizeComposerVisibility(composerVisibility)
     });
   }
@@ -846,7 +845,7 @@
       'settings.resetFactory', 'settings.preferredLang',
     ]},
     { key: 'subChat', labelKey: 'settings.subChat', settingKeys: [
-      'settings.keepReasoningBlocksOpen', 'settings.loadAllHistoryOnSession', 'settings.chatSessionCap',
+      'settings.keepReasoningBlocksOpen', 'settings.chatSessionCap',
     ]},
     { key: 'subComposer', labelKey: 'settings.subComposer', settingKeys: [
       'settings.composerHint', 'settings.composerAttachMenu',
@@ -1043,7 +1042,6 @@
     tokenPriceDisplay = Boolean(appState.settings.tokenPriceDisplay);
     showTimestamps = Boolean(appState.settings.showTimestamps);
     keepReasoningBlocksOpen = appState.settings.keepReasoningBlocksOpen ?? true;
-    loadAllHistoryOnSession = Boolean(appState.settings.loadAllHistoryOnSession);
     projectRagEnabled = Boolean(appState.settings.projectRagEnabled);
     projectRagLimit = Number(appState.settings.projectRagLimit) || 5;
     deepResearchDeepFetch = Number(appState.settings.deepResearchDeepFetch) ?? 1;
@@ -1294,7 +1292,6 @@
     appState.settings.tokenPriceDisplay = tokenPriceDisplay;
     appState.settings.showTimestamps = showTimestamps;
     appState.settings.keepReasoningBlocksOpen = keepReasoningBlocksOpen;
-    appState.settings.loadAllHistoryOnSession = loadAllHistoryOnSession;
     appState.settings.projectRagEnabled = projectRagEnabled;
     appState.settings.projectRagLimit = Number(projectRagLimit) || 5;
     appState.settings.processGitignoreOnUpload = processGitignoreOnUpload;
@@ -2106,19 +2103,6 @@
             <input id="bds-keep-reasoning-blocks-open" type="checkbox" bind:checked={keepReasoningBlocksOpen} />
             <span class="bds-switch-track"></span>
           </label>
-        </div>
-
-        <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 12px;">
-            <span class="bds-toggle-label">{t('settings.loadAllHistoryOnSession')}</span>
-            <label class="bds-switch">
-              <input id="bds-load-all-history" type="checkbox" bind:checked={loadAllHistoryOnSession} />
-              <span class="bds-switch-track"></span>
-            </label>
-          </div>
-          <p style="font-size: 10px; opacity: 0.5; margin: 0;">
-            {t('settings.loadAllHistoryHint')}
-          </p>
         </div>
 
         <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">

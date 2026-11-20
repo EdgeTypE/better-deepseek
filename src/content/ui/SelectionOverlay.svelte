@@ -2,8 +2,10 @@
   import appState from "../state.js";
   import { exportSession, collectMessages } from "../tools/exporter.js";
   import { scheduleScan } from "../scanner.js";
-  import { loadAllHistory } from "../load-all-history.js";
-  import { readCachedMessages, getSessionIdFromUrl } from "../tools/history-cache.js";
+  import {
+    readCachedMessages,
+    getSessionIdFromUrl,
+  } from "../tools/history-cache.js";
   import { t } from "../../lib/i18n.svelte.js";
 
   /** How long Select All waits for the session's cache record to appear. */
@@ -14,7 +16,8 @@
   let allSelected = $state(false);
 
   // Bridge presence is fixed at page load — not reactive.
-  const isAndroid = typeof window !== "undefined" &&
+  const isAndroid =
+    typeof window !== "undefined" &&
     typeof window.AndroidBridge?.downloadBlob === "function";
 
   $effect(() => {
@@ -38,13 +41,13 @@
       if (selectionMode !== appState.selectionMode) {
         selectionMode = appState.selectionMode;
         if (selectionMode) {
-           document.body.classList.add("bds-selection-mode-active");
-           // Sync count when opening
-           syncSelectionState();
-           // Ensure checkboxes are injected
-           scheduleScan();
+          document.body.classList.add("bds-selection-mode-active");
+          // Sync count when opening
+          syncSelectionState();
+          // Ensure checkboxes are injected
+          scheduleScan();
         } else {
-           document.body.classList.remove("bds-selection-mode-active");
+          document.body.classList.remove("bds-selection-mode-active");
         }
       }
     }, 200);
@@ -65,7 +68,7 @@
     document.body.classList.remove("bds-selection-mode-active");
 
     // Uncheck all checkboxes
-    document.querySelectorAll(".bds-selection-checkbox").forEach(cb => {
+    document.querySelectorAll(".bds-selection-checkbox").forEach((cb) => {
       if (cb instanceof HTMLInputElement) cb.checked = false;
     });
 
@@ -83,12 +86,13 @@
    */
   function isSessionSelection() {
     const ids = Array.from(appState.selectedMessageIds);
-    return ids.length > 0 && ids.every(id => !String(id).startsWith("msg-"));
+    return ids.length > 0 && ids.every((id) => !String(id).startsWith("msg-"));
   }
 
   function syncSelectionState() {
     selectedCount = appState.selectedMessageIds.size;
-    allSelected = selectedCount > 0 &&
+    allSelected =
+      selectedCount > 0 &&
       (isSessionSelection() || selectedCount === selectionCheckboxes().length);
   }
 
@@ -100,7 +104,7 @@
     if (!isSessionSelection()) return;
 
     const checkboxes = selectionCheckboxes();
-    if (!checkboxes.length || checkboxes.every(cb => cb.checked)) return;
+    if (!checkboxes.length || checkboxes.every((cb) => cb.checked)) return;
 
     appState.selectedMessageIds.clear();
     for (const cb of checkboxes) {
@@ -119,21 +123,26 @@
   async function sessionMessageIds() {
     const sessionId = getSessionIdFromUrl();
     if (sessionId) {
-      const cached = await readCachedMessages(sessionId, { waitMs: SELECT_ALL_CACHE_WAIT_MS });
+      const cached = await readCachedMessages(sessionId, {
+        waitMs: SELECT_ALL_CACHE_WAIT_MS,
+      });
       if (cached.status === "hit" && cached.chatMessages.length) {
         return cached.chatMessages
-          .map(msg => msg.message_id)
-          .filter(id => id != null)
+          .map((msg) => msg.message_id)
+          .filter((id) => id != null)
+          .map(String);
+      }
+
+      const apiMessages = appState.chatMessagesBySession?.get(sessionId);
+      if (apiMessages?.length) {
+        return apiMessages
+          .map((msg) => msg.message_id)
+          .filter((id) => id != null)
           .map(String);
       }
     }
 
-    if (!appState.settings.loadAllHistoryOnSession) return [];
-
-    const apiMessages = await loadAllHistory();
-    return apiMessages?.length
-      ? apiMessages.map(msg => msg.message_id).filter(id => id != null).map(String)
-      : [];
+    return [];
   }
 
   async function selectAll() {
@@ -141,7 +150,9 @@
     const deselecting = allSelected;
 
     appState.selectedMessageIds.clear();
-    checkboxes.forEach(cb => { cb.checked = !deselecting; });
+    checkboxes.forEach((cb) => {
+      cb.checked = !deselecting;
+    });
 
     if (!deselecting) {
       for (const id of await sessionMessageIds()) {
@@ -163,13 +174,15 @@
 
   async function handleExport(format) {
     if (selectedCount === 0) {
-      alert(t('selectionOverlay.exportHint'));
+      alert(t("selectionOverlay.exportHint"));
       return;
     }
 
     // Whole-session selection exports everything the history cache holds;
     // a per-message selection keeps the id filter.
-    const ids = isSessionSelection() ? null : Array.from(appState.selectedMessageIds);
+    const ids = isSessionSelection()
+      ? null
+      : Array.from(appState.selectedMessageIds);
     await exportSession(format, ids);
     cancelSelection();
   }
@@ -178,33 +191,52 @@
 {#if selectionMode}
   <div class="bds-selection-overlay">
     <div class="bds-selection-bar">
-
       <!-- Layer 1: count + select-all -->
       <div class="bds-row bds-row-info">
         <div class="bds-selection-info">
           <span class="bds-selection-count">{selectedCount}</span>
-          <span class="bds-selection-label">{t('selectionOverlay.selected')}</span>
+          <span class="bds-selection-label"
+            >{t("selectionOverlay.selected")}</span
+          >
         </div>
         <button class="bds-btn-ghost" onclick={selectAll}>
-          {allSelected ? t('selectionOverlay.deselectAll') : t('selectionOverlay.selectAll')}
+          {allSelected
+            ? t("selectionOverlay.deselectAll")
+            : t("selectionOverlay.selectAll")}
         </button>
       </div>
 
       <!-- Layer 2: format buttons -->
       <div class="bds-row bds-row-formats">
         <div class="bds-export-group">
-          <button class="bds-export-btn" onclick={() => handleExport('markdown')} title={t('selectionOverlay.markdown')}>
+          <button
+            class="bds-export-btn"
+            onclick={() => handleExport("markdown")}
+            title={t("selectionOverlay.markdown")}
+          >
             MD
           </button>
           {#if !isAndroid}
-            <button class="bds-export-btn" onclick={() => handleExport('pdf')} title={t('selectionOverlay.pdf')}>
+            <button
+              class="bds-export-btn"
+              onclick={() => handleExport("pdf")}
+              title={t("selectionOverlay.pdf")}
+            >
               PDF
             </button>
           {/if}
-          <button class="bds-export-btn" onclick={() => handleExport('html')} title={t('selectionOverlay.html')}>
+          <button
+            class="bds-export-btn"
+            onclick={() => handleExport("html")}
+            title={t("selectionOverlay.html")}
+          >
             HTML
           </button>
-          <button class="bds-export-btn" onclick={() => handleExport('image')} title={t('selectionOverlay.image')}>
+          <button
+            class="bds-export-btn"
+            onclick={() => handleExport("image")}
+            title={t("selectionOverlay.image")}
+          >
             IMG
           </button>
         </div>
@@ -212,9 +244,10 @@
 
       <!-- Layer 3: cancel (last, avoids accidental press) -->
       <div class="bds-row bds-row-cancel">
-        <button class="bds-btn-cancel" onclick={cancelSelection}>{t('selectionOverlay.cancel')}</button>
+        <button class="bds-btn-cancel" onclick={cancelSelection}
+          >{t("selectionOverlay.cancel")}</button
+        >
       </div>
-
     </div>
   </div>
 {/if}
@@ -234,8 +267,12 @@
   }
 
   @keyframes slideUp {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
   }
 
   /* Mobile-first: vertical card layout */
@@ -381,7 +418,9 @@
     cursor: pointer;
     padding: 8px 0;
     border-radius: 10px;
-    transition: background 0.2s, border-color 0.2s;
+    transition:
+      background 0.2s,
+      border-color 0.2s;
     width: 100%;
     text-align: center;
   }

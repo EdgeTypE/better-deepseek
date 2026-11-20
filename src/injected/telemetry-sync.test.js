@@ -263,4 +263,150 @@ describe("telemetry-sync", () => {
     expect(parsed.event_params.promptLength).toBe(realPayload.prompt.length);
     restore();
   });
+
+  it("keeps send_button_click and chatCompletionApi aligned across JSON.stringify, XHR, and gator batches", () => {
+    const state = makeState();
+    const restore = patchTelemetryStringify(state, JSON, document);
+
+    const rawPrompt = 'Merhaba, sadece tek kelimeyle "Tamam" yaz.';
+    recordComposerText(state, rawPrompt);
+
+    const sendClickJson = JSON.stringify({
+      event_name: "send_button_click",
+      event_params: {
+        chat_session_id: "sess-align",
+        model_type: "default",
+        is_edit_mode: 0,
+        prompt_length: rawPrompt.length,
+      },
+    });
+    const completionJson = JSON.stringify({
+      event_name: "chatCompletionApi",
+      event_params: {
+        scene: "completion",
+        chatSessionId: "sess-align",
+        modelType: "default",
+        promptLength: rawPrompt.length,
+      },
+    });
+
+    const sendClickParsed = JSON.parse(sendClickJson);
+    const completionParsed = JSON.parse(completionJson);
+
+    expect(state.pendingQuoteContext).toEqual({ text: "quoted snippet" });
+    expect(state.markInjected).not.toHaveBeenCalled();
+
+    const realPayload = {
+      chat_session_id: "sess-align",
+      parent_message_id: null,
+      model_type: "default",
+      prompt: rawPrompt,
+    };
+    const now = consumePreparedTimestamp(realPayload, state);
+    mutatePayload(realPayload, state, { now });
+    recordActualPromptLength(state, realPayload, rawPrompt.length, realPayload.prompt.length);
+
+    expect(sendClickParsed.event_params.prompt_length).toBe(realPayload.prompt.length);
+    expect(completionParsed.event_params.promptLength).toBe(realPayload.prompt.length);
+
+    const gatorBody = JSON.stringify([
+      {
+        events: [
+          {
+            event: "chatCompletionApi",
+            params: JSON.stringify({
+              ds_chatSessionId: "sess-align",
+              ds_promptLength: rawPrompt.length,
+            }),
+          },
+          {
+            event: "send_button_click",
+            params: JSON.stringify({
+              ds_chat_session_id: "sess-align",
+              ds_prompt_length: rawPrompt.length,
+            }),
+          },
+        ],
+      },
+    ]);
+
+    const rewritten = JSON.parse(rewriteGatorBatchBody(gatorBody, state));
+    const compParams = JSON.parse(rewritten[0].events[0].params);
+    const clickParams = JSON.parse(rewritten[0].events[1].params);
+    expect(compParams.ds_promptLength).toBe(realPayload.prompt.length);
+    expect(clickParams.ds_prompt_length).toBe(realPayload.prompt.length);
+
+    restore();
+  });
+
+  it("aligns send_button_click on a brand-new chat before chat_session_id is assigned", () => {
+    const state = makeState();
+    const restore = patchTelemetryStringify(state, JSON, document);
+
+    const rawPrompt = "First message";
+    recordComposerText(state, rawPrompt);
+
+    const sendClickParsed = JSON.parse(
+      JSON.stringify({
+        event_name: "send_button_click",
+        event_params: {
+          chat_session_id: "",
+          model_type: "default",
+          is_edit_mode: 0,
+          prompt_length: rawPrompt.length,
+        },
+      })
+    );
+    const completionParsed = JSON.parse(
+      JSON.stringify({
+        event_name: "chatCompletionApi",
+        event_params: {
+          scene: "completion",
+          chatSessionId: "created-uuid-123",
+          modelType: "default",
+          promptLength: rawPrompt.length,
+        },
+      })
+    );
+
+    const realPayload = {
+      chat_session_id: "created-uuid-123",
+      parent_message_id: null,
+      model_type: "default",
+      prompt: rawPrompt,
+    };
+    const now = consumePreparedTimestamp(realPayload, state);
+    mutatePayload(realPayload, state, { now });
+    recordActualPromptLength(state, realPayload, rawPrompt.length, realPayload.prompt.length);
+
+    expect(sendClickParsed.event_params.prompt_length).toBe(realPayload.prompt.length);
+    expect(completionParsed.event_params.promptLength).toBe(realPayload.prompt.length);
+
+    const gatorBody = JSON.stringify([
+      {
+        events: [
+          {
+            event: "chatCompletionApi",
+            params: JSON.stringify({
+              ds_chatSessionId: "created-uuid-123",
+              ds_promptLength: rawPrompt.length,
+            }),
+          },
+          {
+            event: "send_button_click",
+            params: JSON.stringify({
+              ds_chat_session_id: "",
+              ds_prompt_length: rawPrompt.length,
+            }),
+          },
+        ],
+      },
+    ]);
+
+    const rewritten = JSON.parse(rewriteGatorBatchBody(gatorBody, state));
+    const clickParams = JSON.parse(rewritten[0].events[1].params);
+    expect(clickParams.ds_prompt_length).toBe(realPayload.prompt.length);
+
+    restore();
+  });
 });

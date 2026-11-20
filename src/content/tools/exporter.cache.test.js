@@ -17,11 +17,6 @@ vi.mock("../dom/message-text.js", () => ({
   extractMessageRawText: vi.fn(),
 }));
 
-vi.mock("../load-all-history.js", () => ({
-  loadAllHistory: vi.fn(),
-  isLoadInProgress: vi.fn(),
-}));
-
 vi.mock("../../lib/utils/download.js", () => ({
   triggerTextDownload: vi.fn(),
   triggerBlobDownload: vi.fn(),
@@ -35,7 +30,6 @@ import { readCachedMessages } from "./history-cache.js";
 import { collectMessageNodes, detectMessageRole } from "../scanner.js";
 import { extractMessageMarkdown } from "../dom/message-text.js";
 import { triggerTextDownload } from "../../lib/utils/download.js";
-import { loadAllHistory } from "../load-all-history.js";
 
 function cachedMessage(id, role, content) {
   return {
@@ -53,7 +47,7 @@ describe("exportSession — IndexedDB cache source", () => {
   beforeEach(() => {
     document.title = "Cache Chat - DeepSeek";
     window.history.replaceState(null, "", "/chat/s/test-session");
-    state.settings.loadAllHistoryOnSession = false;
+    state.chatMessagesBySession.clear();
   });
 
   it("uses the cache when it holds the full session", async () => {
@@ -74,28 +68,24 @@ describe("exportSession — IndexedDB cache source", () => {
     expect(extractMessageMarkdown).not.toHaveBeenCalled();
   });
 
-  it("prefers the cache over the API when both are available", async () => {
-    state.settings.loadAllHistoryOnSession = true;
+  it("prefers the IndexedDB cache over passive session messages when both are available", async () => {
     readCachedMessages.mockResolvedValue(hit([cachedMessage(1, "user", "cached user")]));
     collectMessageNodes.mockReturnValue([document.createElement("div")]);
-    loadAllHistory.mockResolvedValue([cachedMessage(1, "user", "api user")]);
+    state.chatMessagesBySession.set("test-session", [cachedMessage(1, "user", "api user")]);
 
     await exportSession("markdown");
 
-    expect(loadAllHistory).not.toHaveBeenCalled();
     const [markdown] = triggerTextDownload.mock.calls[0];
     expect(markdown).toContain("cached user");
     expect(markdown).not.toContain("api user");
   });
 
-  it("falls back to the API when the cache misses", async () => {
-    state.settings.loadAllHistoryOnSession = true;
+  it("falls back to passively-captured session messages when the cache misses", async () => {
     readCachedMessages.mockResolvedValue({ status: "unavailable" });
-    loadAllHistory.mockResolvedValue([cachedMessage(1, "user", "api user")]);
+    state.chatMessagesBySession.set("test-session", [cachedMessage(1, "user", "api user")]);
 
     await exportSession("markdown");
 
-    expect(loadAllHistory).toHaveBeenCalled();
     const [markdown] = triggerTextDownload.mock.calls[0];
     expect(markdown).toContain("api user");
   });

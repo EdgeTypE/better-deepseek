@@ -19,91 +19,122 @@ export function patchFetch(state, isChatCompletionUrl, markStart, markEnd) {
   const originalFetch = window.fetch;
 
   window.fetch = new Proxy(originalFetch, {
-    async apply(target, thisArg, argArray) {
+    apply(target, thisArg, argArray) {
       const boundThis = thisArg === undefined || thisArg === null ? window : thisArg;
       const [input, init] = argArray;
+      let url = "";
       try {
-        const url = extractUrl(input);
+        url = extractUrl(input);
         if (url.includes("/api/")) {
           captureRequestMetadata(input, init, state);
-        }
-        if (!isChatCompletionUrl(url)) {
-          return Reflect.apply(target, boundThis, argArray);
-        }
-
-        // If it's a session fetch, we don't mutate request, we capture response
-        if (url.includes("/api/v0/chat_session/fetch_page")) {
-          const response = await Reflect.apply(target, boundThis, argArray);
-          const cloned = response.clone();
-          cloned.json().then(data => {
-            window.dispatchEvent(new CustomEvent("bds:session-data", { detail: JSON.stringify(data) }));
-          }).catch(() => {});
-          return response;
-        }
-
-        // If it's a history messages fetch, capture response and dispatch
-        if (url.includes("/api/v0/chat/history_messages")) {
-          const response = await Reflect.apply(target, boundThis, argArray);
-          const cloned = response.clone();
-          cloned.json().then(data => {
-            window.dispatchEvent(new CustomEvent("bds:history-msgs", { detail: JSON.stringify(data) }));
-          }).catch(() => {});
-          return response;
-        }
-
-        markStart(url);
-
-        try {
-          const requestInfo = await buildMutatedFetchRequest(
-            input,
-            init,
-            state
-          );
-
-          if (!requestInfo) {
-            const response = await Reflect.apply(target, boundThis, argArray);
-            tryCaptureTokenUsage(response, url, requestInfo?.modelName);
-            return response;
-          }
-
-          const response = await Reflect.apply(target, boundThis, [
-            requestInfo.input,
-            requestInfo.init,
-          ]);
-
-          // Detect server errors
-          if (response && response.status >= 500) {
-            window.dispatchEvent(new CustomEvent("bds:network-error", {
-              detail: JSON.stringify({
-                url,
-                status: response.status,
-                type: 'fetch'
-              })
-            }));
-          }
-
-          tryCaptureTokenUsage(response, url, requestInfo.modelName);
-          return response;
-        } catch (innerError) {
-          // Detect network failures
-          window.dispatchEvent(new CustomEvent("bds:network-error", {
-            detail: JSON.stringify({
-              url,
-              status: 0,
-              type: 'fetch',
-              error: String(innerError)
-            })
-          }));
-          throw innerError;
-        } finally {
-          markEnd(url);
         }
       } catch (error) {
         console.warn("[BetterDeepSeek] Request patch failed:", error);
         return Reflect.apply(target, boundThis, argArray);
       }
+
+      if (!isChatCompletionUrl(url)) {
+        return Reflect.apply(target, boundThis, argArray);
+      }
+
+      return handleChatFetch(
+        target,
+        boundThis,
+        argArray,
+        input,
+        init,
+        url,
+        state,
+        markStart,
+        markEnd
+      );
     },
   });
+}
+
+async function handleChatFetch(
+  target,
+  boundThis,
+  argArray,
+  input,
+  init,
+  url,
+  state,
+  markStart,
+  markEnd
+) {
+  try {
+    // If it's a session fetch, we don't mutate request, we capture response
+    if (url.includes("/api/v0/chat_session/fetch_page")) {
+      const response = await Reflect.apply(target, boundThis, argArray);
+      const cloned = response.clone();
+      cloned.json().then(data => {
+        window.dispatchEvent(new CustomEvent("bds:session-data", { detail: JSON.stringify(data) }));
+      }).catch(() => {});
+      return response;
+    }
+
+    // If it's a history messages fetch, capture response and dispatch
+    if (url.includes("/api/v0/chat/history_messages")) {
+      const response = await Reflect.apply(target, boundThis, argArray);
+      const cloned = response.clone();
+      cloned.json().then(data => {
+        window.dispatchEvent(new CustomEvent("bds:history-msgs", { detail: JSON.stringify(data) }));
+      }).catch(() => {});
+      return response;
+    }
+
+    markStart(url);
+
+    try {
+      const requestInfo = await buildMutatedFetchRequest(
+        input,
+        init,
+        state
+      );
+
+      if (!requestInfo) {
+        const response = await Reflect.apply(target, boundThis, argArray);
+        tryCaptureTokenUsage(response, url, requestInfo?.modelName);
+        return response;
+      }
+
+      const response = await Reflect.apply(target, boundThis, [
+        requestInfo.input,
+        requestInfo.init,
+      ]);
+
+      // Detect server errors
+      if (response && response.status >= 500) {
+        window.dispatchEvent(new CustomEvent("bds:network-error", {
+          detail: JSON.stringify({
+            url,
+            status: response.status,
+            type: 'fetch'
+          })
+        }));
+      }
+
+      tryCaptureTokenUsage(response, url, requestInfo.modelName);
+      return response;
+    } catch (innerError) {
+      // Detect network failures
+      window.dispatchEvent(new CustomEvent("bds:network-error", {
+        detail: JSON.stringify({
+          url,
+          status: 0,
+          type: 'fetch',
+          error: String(innerError)
+        })
+      }));
+      throw innerError;
+    } finally {
+      markEnd(url);
+    }
+  } catch (error) {
+    console.warn("[BetterDeepSeek] Request patch failed:", error);
+    return Reflect.apply(target, boundThis, argArray);
+  }
 }
 
 /**

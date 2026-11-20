@@ -97,5 +97,6 @@ describe("buildDeepSeekApiHeaders", () => {
 
     expect(headers["content-type"]).toBe("application/json");
     expect(headers["authorization"]).toBe("Bearer tok");
+    expect(headers["x-client-version"]).toBe("2.8.0");
   });
 });

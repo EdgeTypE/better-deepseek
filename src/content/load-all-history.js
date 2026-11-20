@@ -1,11 +1,6 @@
 /**
- * Load All History — intercepts DeepSeek's `/api/v0/chat/history_messages`
- * API call (via the injected script's fetch/XHR patch) to obtain every message
- * in the session along with accurate `accumulated_token_usage`.
- *
- * Default: off (opt-in via settings.loadAllHistoryOnSession).
- * When enabled, runs automatically on session open AND on-demand before
- * export / select-all / price recalculation.
+ * Load All History — fetches `/api/v0/chat/history_messages` on demand
+ * when an assistant message id is needed before passive capture has arrived.
  */
 
 import state from "./state.js";

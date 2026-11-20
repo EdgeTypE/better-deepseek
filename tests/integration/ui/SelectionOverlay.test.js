@@ -89,7 +89,7 @@ describe("SelectionOverlay Select All", () => {
     document.body.innerHTML = "";
     appState.selectionMode = true;
     appState.selectedMessageIds.clear();
-    appState.settings.loadAllHistoryOnSession = false;
+    appState.chatMessagesBySession.clear();
     exporterMocks.exportSession.mockClear();
     historyMocks.readCachedMessages.mockReset();
     historyMocks.getSessionIdFromUrl.mockReturnValue("session-1");
@@ -151,10 +151,9 @@ describe("SelectionOverlay Select All", () => {
     expect(exporterMocks.exportSession).toHaveBeenCalledWith("markdown", ["msg-a", "msg-b"]);
   });
 
-  it("uses the API ids when the cache misses and history loading is on", async () => {
+  it("uses passively-captured session messages when the cache misses", async () => {
     historyMocks.readCachedMessages.mockResolvedValue({ status: "missing" });
-    appState.settings.loadAllHistoryOnSession = true;
-    loadHistoryMocks.loadAllHistory.mockResolvedValue([
+    appState.chatMessagesBySession.set("session-1", [
       { message_id: 7, role: "USER" },
       { message_id: 8, role: "ASSISTANT" },
     ]);
@@ -164,7 +163,7 @@ describe("SelectionOverlay Select All", () => {
 
     await selectAllAndExport();
 
-    expect(loadHistoryMocks.loadAllHistory).toHaveBeenCalled();
+    expect(loadHistoryMocks.loadAllHistory).not.toHaveBeenCalled();
     expect(exporterMocks.exportSession).toHaveBeenCalledWith("markdown", null);
   });
 

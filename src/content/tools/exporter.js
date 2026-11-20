@@ -12,7 +12,6 @@ import { createPrintFrame } from "../../lib/utils/print-frame.js";
 import { simpleHash } from "../../lib/utils/hash.js";
 import { t } from "../../lib/i18n.svelte.js";
 import html2canvas from "html2canvas";
-import { loadAllHistory, isLoadInProgress } from "../load-all-history.js";
 import { readCachedMessages, getSessionIdFromUrl } from "./history-cache.js";
 import state from "../state.js";
 
@@ -259,10 +258,10 @@ export async function exportSession(format, filterIds = null) {
   // DeepSeek's local cache holds the full session history.
   let messages = await collectMessagesFromCache(filterIds);
 
-  // If the cache missed and load-on-demand is enabled, try the API so the
-  // export includes messages that DeepSeek's lazy-load hasn't rendered yet.
-  if ((!messages || !messages.length) && state.settings.loadAllHistoryOnSession) {
-    const apiMessages = await loadAllHistory();
+  // Fall back to any passively-captured session messages before scanning the DOM.
+  if (!messages || !messages.length) {
+    const sessionId = getSessionIdFromUrl();
+    const apiMessages = sessionId ? state.chatMessagesBySession?.get(sessionId) : null;
     if (apiMessages && apiMessages.length > 0) {
       messages = collectMessagesFromApi(apiMessages, filterIds);
     }

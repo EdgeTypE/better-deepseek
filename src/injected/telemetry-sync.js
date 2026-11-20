@@ -29,6 +29,33 @@ function pruneOld(list, maxAgeMs, nowMs) {
   }
 }
 
+function findMatchingLength(entry, expectedLen) {
+  if (!entry || typeof entry.rawPrompt !== "string") return false;
+  return (
+    entry.rawPrompt.length === expectedLen ||
+    entry.rawPrompt.trim().length === expectedLen
+  );
+}
+
+function findReusablePrepared(sync, sessionId, expectedLen, nowMs) {
+  const direct = sync.preparedBySession.get(sessionId);
+  if (direct && nowMs - direct.ts <= RECORD_TTL_MS && findMatchingLength(direct, expectedLen)) {
+    return direct;
+  }
+
+  // `send_button_click` on a brand-new chat uses `""` before a session id is assigned.
+  if (sessionId && sessionId !== "default") {
+    const anon = sync.preparedBySession.get("");
+    if (anon && nowMs - anon.ts <= RECORD_TTL_MS && findMatchingLength(anon, expectedLen)) {
+      sync.preparedBySession.set(sessionId, anon);
+      sync.preparedBySession.delete("");
+      return anon;
+    }
+  }
+
+  return null;
+}
+
 export function recordComposerText(state, text, nowMs = Date.now()) {
   if (typeof text !== "string" || !text) return;
   const sync = ensureSyncState(state);
@@ -107,12 +134,12 @@ export function installInputTracker(state, doc = typeof document !== "undefined"
   };
 }
 
-function resolveTelemetryTurnContext(eventParams, sessionId, state, doc) {
-  if (eventParams.scene === "editMessage") {
-    const isFirst = String(eventParams.messageId || "") === "1";
+function resolveTelemetryTurnContext(spec, sessionId, state, doc) {
+  if (spec.isEdit) {
+    const isFirst = String(spec.messageId || "") === "1";
     return {
       isFirst,
-      messageId: isFirst ? 1 : Number(eventParams.messageId) || 2,
+      messageId: isFirst ? 1 : Number(spec.messageId) || 2,
       parentMessageId: isFirst ? null : "known",
     };
   }
@@ -141,6 +168,44 @@ function resolveTelemetryTurnContext(eventParams, sessionId, state, doc) {
   };
 }
 
+function normalizePromptEventSpec(eventParams) {
+  if (!eventParams || typeof eventParams !== "object") return null;
+  if (typeof eventParams.expectedLen === "number" && eventParams.lengthField) {
+    return eventParams;
+  }
+  if (typeof eventParams.promptLength === "number") {
+    return {
+      lengthField: "promptLength",
+      expectedLen: eventParams.promptLength,
+      sessionId: String(eventParams.chatSessionId || "default"),
+      modelType: eventParams.modelType || "",
+      isEdit: eventParams.scene === "editMessage",
+      messageId: eventParams.messageId,
+    };
+  }
+  if (typeof eventParams.prompt_length === "number") {
+    return {
+      lengthField: "prompt_length",
+      expectedLen: eventParams.prompt_length,
+      sessionId: typeof eventParams.chat_session_id === "string"
+        ? eventParams.chat_session_id
+        : "",
+      modelType: eventParams.model_type || "",
+      isEdit: Number(eventParams.is_edit_mode) === 1,
+      messageId: undefined,
+    };
+  }
+  return null;
+}
+
+function extractTelemetryPromptSpec(value) {
+  if (!value || typeof value !== "object" || !value.event_params) return null;
+  if (value.event_name === "chatCompletionApi" || value.event_name === "send_button_click") {
+    return normalizePromptEventSpec(value.event_params);
+  }
+  return null;
+}
+
 /** Compute the transformed prompt length and stage its timestamp for XHR reuse. */
 export function computeMutatedPromptLengthForTelemetry(
   eventParams,
@@ -148,19 +213,26 @@ export function computeMutatedPromptLengthForTelemetry(
   doc = typeof document !== "undefined" ? document : null,
   now = new Date()
 ) {
-  if (!eventParams || typeof eventParams.promptLength !== "number") return null;
+  const spec = normalizePromptEventSpec(eventParams);
+  if (!spec) return null;
 
-  const expectedLen = eventParams.promptLength;
+  const expectedLen = spec.expectedLen;
+  const sessionId = spec.sessionId || "";
+  const sync = ensureSyncState(state);
+  const reusable = findReusablePrepared(sync, sessionId, expectedLen, now.getTime());
+  if (reusable) {
+    return reusable.mutatedLength;
+  }
+
   const rawPrompt = findMatchingComposerText(state, expectedLen, now.getTime());
   if (typeof rawPrompt !== "string") return null;
 
-  const sessionId = String(eventParams.chatSessionId || "default");
-  const turn = resolveTelemetryTurnContext(eventParams, sessionId, state, doc);
+  const turn = resolveTelemetryTurnContext(spec, sessionId || "default", state, doc);
 
   const previewPayload = {
-    chat_session_id: sessionId,
+    chat_session_id: sessionId || "default",
     prompt: rawPrompt,
-    model_type: eventParams.modelType || "",
+    model_type: spec.modelType || "",
     message_id: turn.messageId,
     parent_message_id: turn.parentMessageId,
   };
@@ -169,7 +241,6 @@ export function computeMutatedPromptLengthForTelemetry(
   if (!result.changed || typeof previewPayload.prompt !== "string") return null;
 
   const mutatedLength = previewPayload.prompt.length;
-  const sync = ensureSyncState(state);
   sync.preparedBySession.set(sessionId, {
     rawPrompt,
     mutatedLength,
@@ -191,16 +262,21 @@ export function consumePreparedTimestamp(payload, state) {
   if (!payload || typeof payload.prompt !== "string") return undefined;
   const sync = ensureSyncState(state);
   const sessionId = resolveConversationId(payload);
-  const staged = sync.preparedBySession.get(sessionId);
+  let staged = sync.preparedBySession.get(sessionId);
+  let stagedKey = sessionId;
+  if (!staged) {
+    staged = sync.preparedBySession.get("");
+    stagedKey = "";
+  }
   if (!staged) return undefined;
 
   if (Date.now() - staged.ts > RECORD_TTL_MS) {
-    sync.preparedBySession.delete(sessionId);
+    sync.preparedBySession.delete(stagedKey);
     return undefined;
   }
 
   if (staged.rawPrompt === payload.prompt || staged.rawPrompt.trim() === payload.prompt.trim()) {
-    sync.preparedBySession.delete(sessionId);
+    sync.preparedBySession.delete(stagedKey);
     return staged.now;
   }
 
@@ -224,8 +300,26 @@ function resolveRecordedLength(state, sessionId, rawLength) {
   const sync = ensureSyncState(state);
   const nowMs = Date.now();
 
-  const actualList = sync.actualBySession.get(sessionId);
-  if (actualList && actualList.length > 0) {
+  if (sessionId) {
+    const actualList = sync.actualBySession.get(sessionId);
+    if (actualList && actualList.length > 0) {
+      pruneOld(actualList, RECORD_TTL_MS, nowMs);
+      for (let i = actualList.length - 1; i >= 0; i--) {
+        if (actualList[i].rawLength === rawLength) {
+          return actualList[i].mutatedLength;
+        }
+      }
+    }
+
+    const staged = sync.preparedBySession.get(sessionId);
+    if (staged && nowMs - staged.ts <= RECORD_TTL_MS && findMatchingLength(staged, rawLength)) {
+      return staged.mutatedLength;
+    }
+    return null;
+  }
+
+  // Fallback when `send_button_click` was emitted before a session id existed.
+  for (const actualList of sync.actualBySession.values()) {
     pruneOld(actualList, RECORD_TTL_MS, nowMs);
     for (let i = actualList.length - 1; i >= 0; i--) {
       if (actualList[i].rawLength === rawLength) {
@@ -234,9 +328,10 @@ function resolveRecordedLength(state, sessionId, rawLength) {
     }
   }
 
-  const staged = sync.preparedBySession.get(sessionId);
-  if (staged && nowMs - staged.ts <= RECORD_TTL_MS && staged.rawPrompt.length === rawLength) {
-    return staged.mutatedLength;
+  for (const staged of sync.preparedBySession.values()) {
+    if (nowMs - staged.ts <= RECORD_TTL_MS && findMatchingLength(staged, rawLength)) {
+      return staged.mutatedLength;
+    }
   }
 
   return null;
@@ -254,25 +349,20 @@ export function patchTelemetryStringify(
   const proxied = new Proxy(originalStringify, {
     apply(target, thisArg, argArray) {
       const value = argArray[0];
-      if (
-        value &&
-        typeof value === "object" &&
-        value.event_name === "chatCompletionApi" &&
-        value.event_params &&
-        typeof value.event_params.promptLength === "number"
-      ) {
+      const spec = extractTelemetryPromptSpec(value);
+      if (spec) {
         try {
           const mutatedLength = computeMutatedPromptLengthForTelemetry(
-            value.event_params,
+            spec,
             state,
             doc
           );
-          if (typeof mutatedLength === "number" && mutatedLength !== value.event_params.promptLength) {
+          if (typeof mutatedLength === "number" && mutatedLength !== spec.expectedLen) {
             const cloned = {
               ...value,
               event_params: {
                 ...value.event_params,
-                promptLength: mutatedLength,
+                [spec.lengthField]: mutatedLength,
               },
             };
             return Reflect.apply(target, thisArg, [cloned, ...argArray.slice(1)]);
@@ -291,9 +381,28 @@ export function patchTelemetryStringify(
   };
 }
 
+function resolveBatchSessionId(events) {
+  for (const ev of events) {
+    if (ev?.event === "chatCompletionApi" && typeof ev.params === "string") {
+      try {
+        const p = JSON.parse(ev.params);
+        if (typeof p.ds_chatSessionId === "string" && p.ds_chatSessionId) {
+          return p.ds_chatSessionId;
+        }
+      } catch {
+        /* ignore malformed event params */
+      }
+    }
+  }
+  return "";
+}
+
 /** Update queued event batch payloads with the transformed prompt length. */
 export function rewriteGatorBatchBody(bodyText, state) {
-  if (typeof bodyText !== "string" || !bodyText.includes("chatCompletionApi")) {
+  if (
+    typeof bodyText !== "string" ||
+    (!bodyText.includes("chatCompletionApi") && !bodyText.includes("send_button_click"))
+  ) {
     return bodyText;
   }
 
@@ -304,15 +413,25 @@ export function rewriteGatorBatchBody(bodyText, state) {
     let modified = false;
     for (const batch of batches) {
       if (!batch || !Array.isArray(batch.events)) continue;
+      const fallbackSessionId = resolveBatchSessionId(batch.events);
       for (const ev of batch.events) {
-        if (!ev || ev.event !== "chatCompletionApi" || typeof ev.params !== "string") continue;
+        if (!ev || typeof ev.params !== "string") continue;
+        const isCompletion = ev.event === "chatCompletionApi";
+        const isSendClick = ev.event === "send_button_click";
+        if (!isCompletion && !isSendClick) continue;
+
         try {
           const params = JSON.parse(ev.params);
-          if (typeof params.ds_promptLength !== "number") continue;
-          const sessionId = String(params.ds_chatSessionId || "default");
-          const updatedLen = resolveRecordedLength(state, sessionId, params.ds_promptLength);
-          if (typeof updatedLen === "number" && updatedLen !== params.ds_promptLength) {
-            params.ds_promptLength = updatedLen;
+          const lengthKey = isCompletion ? "ds_promptLength" : "ds_prompt_length";
+          if (typeof params[lengthKey] !== "number") continue;
+
+          const rawSession = isCompletion
+            ? params.ds_chatSessionId
+            : params.ds_chat_session_id;
+          const sessionId = String(rawSession || fallbackSessionId || "");
+          const updatedLen = resolveRecordedLength(state, sessionId, params[lengthKey]);
+          if (typeof updatedLen === "number" && updatedLen !== params[lengthKey]) {
+            params[lengthKey] = updatedLen;
             ev.params = JSON.stringify(params);
             modified = true;
           }

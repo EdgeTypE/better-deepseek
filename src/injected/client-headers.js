@@ -2,6 +2,8 @@
  * Helpers for normalizing bearer tokens and forwarding page client headers.
  */
 
+export const DEFAULT_CLIENT_VERSION = "2.8.0";
+
 const CLIENT_HEADER_KEYS = new Set([
   "x-client-bundle-id",
   "x-client-platform",
@@ -156,12 +158,9 @@ export function buildDeepSeekApiHeaders({
     "x-client-timezone-offset":
       capturedHeaders["x-client-timezone-offset"] ||
       String(-new Date().getTimezoneOffset() * 60),
+    "x-client-version": capturedHeaders["x-client-version"] || DEFAULT_CLIENT_VERSION,
     "x-device-model": capturedHeaders["x-device-model"] ?? "",
   };
-
-  if (capturedHeaders["x-client-version"]) {
-    headers["x-client-version"] = capturedHeaders["x-client-version"];
-  }
 
   const deviceId = capturedHeaders["x-device-id"] || readStoredDeviceId(storage);
   if (deviceId) {
