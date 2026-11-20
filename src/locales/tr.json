@@ -458,7 +458,11 @@
       "maintenanceMessage": "DeepSeek planlı bakım gerçekleştiriyor. Bazı özellikler geçici olarak kullanılamayabilir."
     },
     "announcementBanner": {
-      "dismiss": "Kapat"
+      "dismiss": "Kapat",
+      "viewPast": "Geçmiş duyurular",
+      "pastTitle": "Geçmiş Duyurular",
+      "closePast": "Geçmiş duyuruları kapat",
+      "noPast": "Geçmiş duyuru yok."
     },
     "attachMenu": {
       "noFilesPicked": "Hiçbir şey eklenmedi - seçilen dosya(lar) atlandı (çok büyük, okunamıyor veya burada desteklenmiyor).",

@@ -231,6 +231,26 @@
       {#if showCmdManager}
         <CommandManager onclose={() => (showCmdManager = false)} />
       {/if}
+      <div style="display: flex; justify-content: center; margin-top: 12px;">
+        <button
+          type="button"
+          class="bds-past-announcements-link"
+          onclick={() => window.dispatchEvent(new CustomEvent("bds:open-announcement-history"))}
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            ><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></svg
+          >
+          <span>{t("announcementBanner.viewPast")}</span>
+        </button>
+      </div>
     </div>
 
     <div class="bds-drawer-bottom">
@@ -281,3 +301,27 @@
     </div>
   {/if}
 </aside>
+
+<style>
+  .bds-past-announcements-link {
+    background: none;
+    border: none;
+    padding: 2px 4px;
+    margin: 0;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--bds-text-tertiary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: color 0.15s ease;
+  }
+
+  .bds-past-announcements-link:hover {
+    color: var(--bds-text-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+</style>

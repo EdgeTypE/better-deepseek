@@ -458,7 +458,11 @@
       "maintenanceMessage": "DeepSeek is performing scheduled maintenance. Some features may be temporarily unavailable."
     },
     "announcementBanner": {
-      "dismiss": "Dismiss"
+      "dismiss": "Dismiss",
+      "viewPast": "Past announcements",
+      "pastTitle": "Past Announcements",
+      "closePast": "Close past announcements",
+      "noPast": "No past announcements."
     },
     "attachMenu": {
       "noFilesPicked": "Nothing was attached - the selected file(s) were skipped (too large, unreadable, or not supported here).",

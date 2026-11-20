@@ -458,7 +458,11 @@
       "maintenanceMessage": "DeepSeek 正在进行计划维护，部分功能可能暂时不可用。"
     },
     "announcementBanner": {
-      "dismiss": "关闭"
+      "dismiss": "关闭",
+      "viewPast": "历史公告",
+      "pastTitle": "历史公告",
+      "closePast": "关闭历史公告",
+      "noPast": "暂无历史公告。"
     },
     "attachMenu": {
       "noFilesPicked": "未附加任何内容 - 所选文件已被跳过（过大、无法读取或此处不支持）。",
