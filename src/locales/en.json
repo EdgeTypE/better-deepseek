@@ -147,6 +147,7 @@
       "disableSystemPrompt": "Disable Hidden System Prompt",
       "disableMemory": "Disable Stored Memory Injection",
       "injectSystemDateTime": "Inject system date & time into messages",
+      "followUpSuggestions": "Follow-up suggestions",
       "skipDeletionConfirmation": "Skip deletion confirmation",
       "injectionFrequency": "System Prompt Injection Frequency",
       "firstMessage": "Only on first message",
@@ -1627,6 +1628,10 @@
       "panelTitle": "Active Skills",
       "closePanel": "Close",
       "manageInDrawer": "Manage Skills"
+    },
+    "followUp": {
+      "accept": "Yes",
+      "sent": "Sent"
     }
   }
 }

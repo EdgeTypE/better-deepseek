@@ -61,6 +61,7 @@ export function normalizeConfig(config) {
     projectRagEnabled: Boolean(config.projectRagEnabled),
     projectRagLimit: Number(config.projectRagLimit) || 5,
     injectSystemDateTime: Boolean(config.injectSystemDateTime),
+    followUpSuggestions: config.followUpSuggestions !== false,
     isLiveMode: Boolean(config.isLiveMode),
     deepResearch: normalizeDeepResearch(config.deepResearch),
     deepCode: normalizeDeepCode(config.deepCode),

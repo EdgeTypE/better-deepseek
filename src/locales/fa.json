@@ -147,6 +147,7 @@
       "disableSystemPrompt": "غیرفعال‌کردن پرامپت سیستمی پنهان",
       "disableMemory": "غیرفعال‌کردن تزریق حافظه ذخیره‌شده",
       "injectSystemDateTime": "تزریق تاریخ و زمان سیستم به پیام‌ها",
+      "followUpSuggestions": "پیشنهادهای پیگیری (Follow-up)",
       "skipDeletionConfirmation": "ردکردن تأیید حذف",
       "injectionFrequency": "بسامد تزریق پرامپت سیستمی",
       "firstMessage": "فقط در اولین پیام",
@@ -1627,6 +1628,10 @@
       "panelTitle": "مهارت‌های فعال",
       "closePanel": "بستن",
       "manageInDrawer": "مدیریت مهارت‌ها"
+    },
+    "followUp": {
+      "accept": "بله",
+      "sent": "ارسال شد"
     }
   }
 }

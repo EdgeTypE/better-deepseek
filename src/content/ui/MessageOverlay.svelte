@@ -28,6 +28,7 @@
   import DirectorySearchResultCard from "./DirectorySearchResultCard.svelte";
   import DirListResultCard from "./DirListResultCard.svelte";
   import DownloadCard from "./DownloadCard.svelte";
+  import FollowUpCard from "./FollowUpCard.svelte";
   import { t } from "../../lib/i18n.svelte.js";
   import { parseLooseJson } from "../parser/json-repair.js";
   import { triggerTextDownload } from "../../lib/utils/download.js";
@@ -314,6 +315,14 @@
             fileName={block.fileName}
             blob={block.blob}
             files={block.files}
+          />
+        {/if}
+      {:else if block.name === 'follow_up'}
+        {#if appState.settings?.followUpSuggestions !== false}
+          <FollowUpCard
+            label={block.attrs?.label}
+            query={block.attrs?.query || block.content}
+            button={block.attrs?.button}
           />
         {/if}
       {:else if block.name === 'auto:code_runner'}

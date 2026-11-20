@@ -235,7 +235,10 @@
         <button
           type="button"
           class="bds-past-announcements-link"
-          onclick={() => window.dispatchEvent(new CustomEvent("bds:open-announcement-history"))}
+          onclick={() =>
+            window.dispatchEvent(
+              new CustomEvent("bds:open-announcement-history"),
+            )}
         >
           <svg
             width="12"
@@ -246,7 +249,9 @@
             stroke-width="2"
             stroke-linecap="round"
             stroke-linejoin="round"
-            ><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></svg
+            ><circle cx="12" cy="12" r="9" /><polyline
+              points="12 7 12 12 15 14"
+            /></svg
           >
           <span>{t("announcementBanner.viewPast")}</span>
         </button>

@@ -147,6 +147,7 @@
       "disableSystemPrompt": "Отключить скрытый системный промпт",
       "disableMemory": "Отключить инъекцию сохранённой памяти",
       "injectSystemDateTime": "Вставлять системные дату и время в сообщения",
+      "followUpSuggestions": "Предложения продолжения (Follow-up)",
       "skipDeletionConfirmation": "Пропустить подтверждение удаления",
       "injectionFrequency": "Частота инъекции системного промпта",
       "firstMessage": "Только в первом сообщении",
@@ -1627,6 +1628,10 @@
       "panelTitle": "Активные навыки",
       "closePanel": "Закрыть",
       "manageInDrawer": "Управление навыками"
+    },
+    "followUp": {
+      "accept": "Да",
+      "sent": "Отправлено"
     }
   }
 }

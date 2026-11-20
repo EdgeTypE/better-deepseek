@@ -233,6 +233,7 @@
   let projectRagLimit = $state(Number(appState.settings.projectRagLimit) || 5);
   let processGitignoreOnUpload = $state(Boolean(appState.settings.processGitignoreOnUpload));
   let injectSystemDateTime = $state(Boolean(appState.settings.injectSystemDateTime));
+  let followUpSuggestions = $state(appState.settings.followUpSuggestions !== false);
   let skipDeletionConfirmation = $state(Boolean(appState.settings.skipDeletionConfirmation));
   let deepResearchDeepFetch = $state(Number(appState.settings.deepResearchDeepFetch) ?? 1);
   let deepResearchContextGuardEnabled = $state(Boolean(appState.settings.deepResearchContextGuardEnabled));
@@ -483,7 +484,7 @@
       systemPromptInjectionFrequency, systemPromptInjectionInterval,
       disableMemory, htmlToMarkdownMaxDepth, maxChatSessions,
       tokenPriceDisplay, showTimestamps, projectRagEnabled, projectRagLimit,
-      processGitignoreOnUpload, injectSystemDateTime, skipDeletionConfirmation,
+      processGitignoreOnUpload, injectSystemDateTime, followUpSuggestions, skipDeletionConfirmation,
       deepResearchDeepFetch,
       searchProviders: enabledSearchProviderIds(),
       mcpInlineMaxChars,
@@ -858,7 +859,7 @@
     ]},
     { key: 'subInjection', labelKey: 'settings.subInjection', settingKeys: [
       'settings.disableSystemPrompt', 'settings.disableMemory',
-      'settings.injectSystemDateTime', 'settings.skipDeletionConfirmation',
+      'settings.injectSystemDateTime', 'settings.followUpSuggestions', 'settings.skipDeletionConfirmation',
       'settings.injectionFrequency',
     ]},
     { key: 'subResearch', labelKey: 'settings.subResearch', settingKeys: [
@@ -1052,6 +1053,7 @@
     searchProviderRows = buildSearchProviderRows(appState.settings.searchProviders);
     processGitignoreOnUpload = Boolean(appState.settings.processGitignoreOnUpload);
     injectSystemDateTime = Boolean(appState.settings.injectSystemDateTime);
+    followUpSuggestions = appState.settings.followUpSuggestions !== false;
     skipDeletionConfirmation = Boolean(appState.settings.skipDeletionConfirmation);
     locale = appState.settings.locale || availableLocaleCodes[0] || "en";
     syncLocale = Boolean(appState.settings.syncLocale);
@@ -1297,6 +1299,7 @@
     appState.settings.projectRagLimit = Number(projectRagLimit) || 5;
     appState.settings.processGitignoreOnUpload = processGitignoreOnUpload;
     appState.settings.injectSystemDateTime = injectSystemDateTime;
+    appState.settings.followUpSuggestions = followUpSuggestions;
     appState.settings.skipDeletionConfirmation = skipDeletionConfirmation;
     appState.settings.deepResearchDeepFetch = Math.max(0, Math.min(5, Math.round(Number(deepResearchDeepFetch) || 0)));
     // Never persist an empty provider list — fall back to the full default order.
@@ -2280,6 +2283,14 @@
           <span class="bds-toggle-label">{t('settings.injectSystemDateTime')}</span>
           <label class="bds-switch">
             <input id="bds-inject-datetime" type="checkbox" bind:checked={injectSystemDateTime} />
+            <span class="bds-switch-track"></span>
+          </label>
+        </div>
+
+        <div class="bds-toggle-row">
+          <span class="bds-toggle-label">{t('settings.followUpSuggestions')}</span>
+          <label class="bds-switch">
+            <input id="bds-follow-up-suggestions" type="checkbox" bind:checked={followUpSuggestions} />
             <span class="bds-switch-track"></span>
           </label>
         </div>

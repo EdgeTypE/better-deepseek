@@ -147,6 +147,7 @@
       "disableSystemPrompt": "停用系统提示词",
       "disableMemory": "停用记忆注入",
       "injectSystemDateTime": "在消息中附带系统日期和时间",
+      "followUpSuggestions": "后续追问建议",
       "skipDeletionConfirmation": "跳过删除确认步骤",
       "injectionFrequency": "系统提示词注入频率",
       "firstMessage": "仅首条消息",
@@ -1627,6 +1628,10 @@
       "panelTitle": "已启用技能",
       "closePanel": "关闭",
       "manageInDrawer": "管理技能"
+    },
+    "followUp": {
+      "accept": "好的",
+      "sent": "已发送"
     }
   }
 }

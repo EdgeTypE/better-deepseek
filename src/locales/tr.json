@@ -147,6 +147,7 @@
       "disableSystemPrompt": "Gizli Sistem Yönergesini Devre Dışı Bırak",
       "disableMemory": "Kayıtlı Bellek Enjeksiyonunu Devre Dışı Bırak",
       "injectSystemDateTime": "Mesajlara sistem tarih ve saatini ekle",
+      "followUpSuggestions": "Takip önerileri (Follow-up)",
       "skipDeletionConfirmation": "Silme onayını atla",
       "injectionFrequency": "Sistem Yönergesi Enjeksiyon Sıklığı",
       "firstMessage": "Sadece ilk mesajda",
@@ -1627,6 +1628,10 @@
       "panelTitle": "Aktif Yetenekler",
       "closePanel": "Kapat",
       "manageInDrawer": "Yetenekleri Yönet"
+    },
+    "followUp": {
+      "accept": "Evet",
+      "sent": "Gönderildi"
     }
   }
 }

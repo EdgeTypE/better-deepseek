@@ -915,6 +915,17 @@ export const SPEECH_LANGUAGES = [
 ];
 
 // ── Default Settings ──
+export const FOLLOW_UP_PROMPT_INSTRUCTION = [
+  "FOLLOW-UP SUGGESTIONS:",
+  "- When you have a genuinely helpful, natural next step or offer to propose at the very end of your response, you may include ONE self-closing tag:",
+  '  <BDS:follow_up label="Short user-facing question or offer" query="Exact self-contained prompt to send if the user accepts"/>',
+  "- Rules:",
+  "  - Keep `label` concise and in the same language as your response (e.g. a short question like \"Want me to generate a runnable script for this?\").",
+  "  - Make `query` a complete, actionable prompt that makes sense on its own when sent as the user's next message.",
+  "  - Optional `button` attribute overrides the button text (defaults to a short confirmation like \"Yes\").",
+  "  - Only emit this when it adds real value; never use it during DeepResearch, Live Voice Mode, or inside code blocks.",
+].join("\n");
+
 export const DEFAULT_SETTINGS = {
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   systemPromptTemplateVersion: SYSTEM_PROMPT_TEMPLATE_VERSION,
@@ -958,6 +969,7 @@ export const DEFAULT_SETTINGS = {
   processGitignoreOnUpload: true,
   keepReasoningBlocksOpen: true,
   injectSystemDateTime: true,
+  followUpSuggestions: true,
   skipDeletionConfirmation: false,
   customCSS: "",
   systemPromptMultiMode: false,

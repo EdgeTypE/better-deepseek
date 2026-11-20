@@ -60,6 +60,7 @@ const RENDERABLE_TOOLS = new Set([
   "harness_task",
   "auto:harness_task",
   "long_work",
+  "follow_up",
 ]);
 
 function normalizeAutoHttpTarget(value) {
@@ -285,7 +286,7 @@ export function parseBdsMessage(rawText, isSettled = false) {
       name
     );
 
-    if (RENDERABLE_TOOLS.has(name)) {
+    if (RENDERABLE_TOOLS.has(name) && name !== "follow_up" && name !== "followup") {
       const blockIdx = result.renderableBlocks.length;
       result.renderableBlocks.push({
         name,
@@ -616,6 +617,26 @@ export function parseBdsMessage(rawText, isSettled = false) {
     if (parsedMemory) {
       result.memoryWrites.push(parsedMemory);
     }
+  }
+
+  for (const tag of scanBdsTagPairs(text, ["follow_up", "followup"], { includeSelfClosing: true })) {
+    if (isInsideCodeBlock(tag.index)) continue;
+    const attrs = parseTagAttributes(tag.attrsRaw);
+    const label = String(attrs.label || attrs.title || attrs.text || "").trim();
+    const query = String(attrs.query || attrs.prompt || tag.body || label).trim();
+    if (!label && !query) continue;
+
+    const blockIdx = result.renderableBlocks.length;
+    result.renderableBlocks.push({
+      name: "follow_up",
+      attrs: {
+        label: label || query,
+        query,
+        button: String(attrs.button || attrs.cta || "").trim(),
+      },
+      content: query,
+    });
+    renderableTagMatches.push({ original: tag.raw, index: tag.index, blockIdx });
   }
 
   const plainCreateRegex =

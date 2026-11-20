@@ -107,3 +107,31 @@ describe("system prompt scheduling across F5 reloads", () => {
     expect(turn4.prompt).not.toContain("FIRST_ONLY");
   });
 });
+
+describe("followUpSuggestions prompt injection", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("injects follow-up instructions on first turn when enabled and skips when disabled or in Live mode", () => {
+    const baseConfig = {
+      systemPrompt: "",
+      systemPromptEntries: [],
+      skills: [],
+      memories: [],
+      injectSystemDateTime: false,
+    };
+
+    const enabledPayload = { chat_session_id: "fu-1", parent_message_id: null, prompt: "Hello" };
+    mutatePayload(enabledPayload, { config: { ...baseConfig, followUpSuggestions: true }, sessionUserMsgCounts: {} });
+    expect(enabledPayload.prompt).toContain("<BDS:follow_up");
+
+    const disabledPayload = { chat_session_id: "fu-2", parent_message_id: null, prompt: "Hello" };
+    mutatePayload(disabledPayload, { config: { ...baseConfig, followUpSuggestions: false }, sessionUserMsgCounts: {} });
+    expect(disabledPayload.prompt).not.toContain("<BDS:follow_up");
+
+    const livePayload = { chat_session_id: "fu-3", parent_message_id: null, prompt: "Hello" };
+    mutatePayload(livePayload, { config: { ...baseConfig, followUpSuggestions: true, isLiveMode: true }, sessionUserMsgCounts: {} });
+    expect(livePayload.prompt).not.toContain("<BDS:follow_up");
+  });
+});

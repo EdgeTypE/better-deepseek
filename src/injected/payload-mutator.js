@@ -10,7 +10,12 @@
 import { searchActiveProjectRAG, formatRagInjections } from "../lib/rag-engine.js";
 import { buildQuoteContextBlock } from "../lib/quote-context.js";
 import { parseSkillMentions } from "../lib/skill-mentions.js";
-import { LIVE_MODE_SYSTEM_PROMPT, BRIDGE_EVENTS, CONFIG_SYNC_TAG } from "../lib/constants.js";
+import {
+  LIVE_MODE_SYSTEM_PROMPT,
+  FOLLOW_UP_PROMPT_INSTRUCTION,
+  BRIDGE_EVENTS,
+  CONFIG_SYNC_TAG,
+} from "../lib/constants.js";
 
 /**
  * Instruction that rides in front of a settings-transfer block. Kept in its
@@ -494,6 +499,14 @@ export function buildHiddenPrefix(
           state.markInjected(conversationId);
         }
       }
+    }
+
+    if (
+      forceSystemPrompt &&
+      !state.config?.deepResearch?.enabled &&
+      state.config?.followUpSuggestions !== false
+    ) {
+      blocks.push(`<BetterDeepSeek>\n${FOLLOW_UP_PROMPT_INSTRUCTION}\n</BetterDeepSeek>`);
     }
   }
 
